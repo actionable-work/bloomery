@@ -113,10 +113,19 @@
               acc // prefixed
           ) {}
           testDirs;
+        bloomery = import ./lib {
+          inherit pkgs;
+          inherit (pkgs) lib;
+        };
+        rootWorkspace = bloomery.mkWorkspace {
+          root = ./.;
+        };
       in
         {
           unit-tests = unitTests.check;
           treefmt-check = treefmtCheck;
+          lock-check = rootWorkspace.checks.lock-check;
+          "workspace:lock" = rootWorkspace.checks."workspace:lock";
         }
         // subFlakeChecks
     );
