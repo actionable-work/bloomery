@@ -73,4 +73,4 @@ Inspired by `oxalica/nocargo`, this flake:
 - [`lib/workspace/`](./lib/workspace): Parses `Cargo.lock`, discovers workspace crates, and resolves profiles.
 - [`lib/lock/`](./lib/lock): Generates `bloomery.lock` manifests via `cargo metadata`.
 - [`lib/overrides/`](./lib/overrides): Built-in native dependencies for common `-sys` crates (`openssl`, `libpq`, `zlib`, `sqlite3`, etc.).
-- [`tests/test-workspace`](./tests/test-workspace): Complete reference workspace with library, binary, `build.rs`, unit tests, and crates.io dependencies.
+- [`tests/basic-workspace`](./tests/basic-workspace): Complete reference workspace with library, binary, `build.rs`, unit tests, and crates.io dependencies.

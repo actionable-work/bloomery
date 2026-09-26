@@ -290,7 +290,7 @@ async fn home() -> Result<impl View, Error> {
                                     <td>"Exports the library, unit-tests, and serves this Topcoat documentation server."</td>
                                 </tr>
                                 <tr>
-                                    <td><code>"tests/test-workspace"</code></td>
+                                    <td><code>"tests/basic-workspace"</code></td>
                                     <td><code>"checks.* (24 CI checks), packages.*"</code></td>
                                     <td>"Isolated sub-flake running all integration checks without polluting the main flake."</td>
                                 </tr>

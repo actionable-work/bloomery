@@ -2,7 +2,7 @@
 
 let
   discover = import ./discover.nix { inherit lib; };
-  testWorkspaceRoot = ../../tests/test-workspace;
+  testWorkspaceRoot = ../../tests/basic-workspace;
   discovered = discover.discoverWorkspaceCrates {
     root = testWorkspaceRoot;
   };
