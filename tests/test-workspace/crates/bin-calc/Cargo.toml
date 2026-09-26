@@ -1,0 +1,8 @@
+[package]
+name = "bin-calc"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lib-core = { path = "../lib-core" }
+lib-calc = { path = "../lib-calc" }
