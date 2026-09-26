@@ -23,7 +23,7 @@
       echo "==> Resolving features and dependencies via cargo metadata..."
       LOCK_HASH=$(sha256sum "$CARGO_LOCK" | awk '{print $1}')
 
-      METADATA=$(cargo metadata --manifest-path "$CARGO_TOML" --format-version 1)
+      METADATA=$(cargo metadata --locked --manifest-path "$CARGO_TOML" --format-version 1)
 
       echo "==> Generating $OUTPUT_LOCK..."
       echo "$METADATA" | jq -r --arg hash "$LOCK_HASH" '

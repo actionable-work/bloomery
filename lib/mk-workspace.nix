@@ -34,6 +34,7 @@ in
     profile ? {},
     unifyFeatures ? true,
     cratesIoIndex ? defaultCratesIoIndex,
+    throwOnOutOfDate ? false,
   }: let
     builderCrate = builders.buildCrateWith {inherit rustc stdenv;};
     builderBin = builders.buildBinWith {inherit rustc stdenv;};
@@ -41,6 +42,7 @@ in
     builderClippy = builders.clippyCrateWith {inherit rustc clippy stdenv;};
     builderDoc = builders.docCrateWith {inherit rustc stdenv;};
     builderDocTest = builders.doctestCrateWith {inherit rustc stdenv;};
+    builderLockCheck = import ./workspace/lock-check.nix {inherit pkgs lib;};
 
     mkCheckName = crateName: checkType:
       if checkNaming == "colon"
@@ -90,7 +92,7 @@ in
         expectedHash = builtins.hashFile "sha256" cargoLock;
         actualHash = lockData."cargo-lock-hash" or lockData.cargo_lock_hash or null;
       in
-        if actualHash != null && actualHash != expectedHash
+        if throwOnOutOfDate && actualHash != null && actualHash != expectedHash
         then throw "bloomery: Lock manifest '${lockName}' is out of date with '${toString cargoLock}'. Run 'nix run <bloomery>#lock' to update it."
         else lockData
       else null;
@@ -427,6 +429,34 @@ in
       workspaceDocs;
 
     apps = binApps // docApps;
+
+    workspaceLockCheck = let
+      lockCheckDrv = builderLockCheck {
+        inherit
+          root
+          cargoLock
+          cargoToml
+          bloomeryLock
+          discoveredMembers
+          parsed
+          lockManifest
+          ;
+      };
+    in
+      {
+        lock-check = lockCheckDrv;
+      }
+      // lib.optionalAttrs (checkNaming == "colon") {
+        "workspace:lock" = lockCheckDrv;
+      };
+
+    checks =
+      workspaceTests
+      // workspaceClippy
+      // workspaceDocTests
+      // workspaceDocs
+      // packageChecks
+      // workspaceLockCheck;
   in {
     # All compiled rlibs (DAG)
     inherit crates;
@@ -437,8 +467,8 @@ in
     # Runnable apps (binaries and doc servers)
     inherit apps;
 
-    # Standardized CI checks (crate:test, crate:clippy, crate:doc, crate:doctest, crate:bin, crate:lib)
-    checks = workspaceTests // workspaceClippy // workspaceDocTests // workspaceDocs // packageChecks;
+    # Standardized CI checks (crate:test, crate:clippy, crate:doc, crate:doctest, crate:bin, crate:lib, lock-check)
+    inherit checks;
 
     # Parsed lockfile representation
     lock = parsed;
