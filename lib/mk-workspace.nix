@@ -442,13 +442,13 @@ in
           lockManifest
           ;
       };
-    in
-      {
-        lock-check = lockCheckDrv;
-      }
-      // lib.optionalAttrs (checkNaming == "colon") {
-        "workspace:lock" = lockCheckDrv;
-      };
+      lockCheckName =
+        if checkNaming == "colon"
+        then "workspace:lock"
+        else "workspace-lock";
+    in {
+      ${lockCheckName} = lockCheckDrv;
+    };
 
     checks =
       workspaceTests

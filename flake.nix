@@ -107,7 +107,7 @@
               checks = subFlake.checks.${system} or {};
               prefixed =
                 nixpkgs.lib.mapAttrs'
-                (cname: drv: nixpkgs.lib.nameValuePair "${name}:${cname}" drv)
+                (cname: drv: nixpkgs.lib.nameValuePair "tests:${name}:${cname}" drv)
                 checks;
             in
               acc // prefixed
@@ -120,13 +120,16 @@
         rootWorkspace = bloomery.mkWorkspace {
           root = ./.;
         };
+        rootChecks =
+          nixpkgs.lib.mapAttrs'
+          (cname: drv: nixpkgs.lib.nameValuePair "core:${cname}" drv)
+          rootWorkspace.checks;
       in
         {
-          unit-tests = unitTests.check;
-          treefmt-check = treefmtCheck;
-          lock-check = rootWorkspace.checks.lock-check;
-          "workspace:lock" = rootWorkspace.checks."workspace:lock";
+          "core:unit-tests" = unitTests.check;
+          "core:treefmt-check" = treefmtCheck;
         }
+        // rootChecks
         // subFlakeChecks
     );
 

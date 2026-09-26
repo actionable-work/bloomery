@@ -121,6 +121,14 @@ in
           fi
         done
 
+        for f in _deps/lib*.rlib _deps/lib*.so _deps/lib*.dylib; do
+          if [ -f "$f" ]; then
+            fname=$(basename "$f")
+            cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
+            EXTERN_FLAGS+=("--extern" "$cname=$f")
+          fi
+        done
+
         runHook postConfigure
       '';
 
