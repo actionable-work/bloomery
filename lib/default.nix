@@ -6,7 +6,8 @@ rec {
   workspace = import ./workspace { inherit lib; };
   profile = import ./profile { inherit lib; };
   overrides = import ./overrides { inherit pkgs lib; };
-  docs = import ./docs { inherit pkgs lib cratesIoIndex; };
+  docs = import ./docs { inherit pkgs lib; };
+  lock = import ./lock { inherit pkgs lib; };
   tests = import ./tests.nix { inherit pkgs lib; };
 
   # High-level workspace builder

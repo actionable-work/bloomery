@@ -16,26 +16,9 @@
         "type": "github"
       }
     },
-    "registry-crates-io": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1790438135,
-        "narHash": "sha256-mV2Kmt1e7+jGDu/8jESKWviuhq5Z4oDdhleKuotiewk=",
-        "owner": "rust-lang",
-        "repo": "crates.io-index",
-        "rev": "606c539b1090cbe33c0c9bf43a8c77675967c4f2",
-        "type": "github"
-      },
-      "original": {
-        "owner": "rust-lang",
-        "repo": "crates.io-index",
-        "type": "github"
-      }
-    },
     "root": {
       "inputs": {
-        "nixpkgs": "nixpkgs",
-        "registry-crates-io": "registry-crates-io"
+        "nixpkgs": "nixpkgs"
       }
     }
   },

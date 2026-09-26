@@ -119,6 +119,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "bloomery-docs"
+version = "0.1.0"
+dependencies = [
+ "tokio",
+ "topcoat",
+]
+
+[[package]]
 name = "brotli"
 version = "8.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -860,14 +868,6 @@ dependencies = [
  "libc",
  "wasi",
  "windows-sys",
-]
-
-[[package]]
-name = "bloomery-docs"
-version = "0.1.0"
-dependencies = [
- "tokio",
- "topcoat",
 ]
 
 [[package]]

@@ -4,6 +4,8 @@ A pure Nix library for building Rust applications and workspaces directly from `
 
 Inspired by `oxalica/nocargo`, this flake:
 - **Direct `Cargo.lock` parsing**: Reads package versions and dependency trees purely in Nix using `builtins.fromTOML` (no external code generation).
+- **Zero Git index inputs**: Eliminates the multi-gigabyte `crates.io-index` git repository input entirely.
+- **Isolated resolution via `bloomery.lock.nix`**: Generates a static, lightweight lock manifest (`nix run bloomery#lock`) pinning active features and dependencies with instant (<1ms) evaluation.
 - **Direct source fetching with zero IFD**: Downloads crates.io dependencies via `pkgs.fetchurl` using the SHA-256 checksums already recorded in `Cargo.lock`.
 - **Pure `rustc` compiler driver**:
   - Compiles `.rlib` dependencies and `proc-macro` crates independently.
@@ -12,15 +14,21 @@ Inspired by `oxalica/nocargo`, this flake:
 - **Tests without cargo**: Generates test runner executables using `rustc --test` and runs unit and integration tests.
 - **Clippy without cargo**: Direct integration with `clippy-driver` to lint crates and enforce `-Dwarnings` in Nix derivations.
 
-## Usage
+## Quickstart
 
-### In your `flake.nix`
+1. In your Rust workspace, generate the bloomery lock manifest:
+   ```bash
+   nix run github:actionable/bloomery#lock
+   ```
+   This creates a `bloomery.lock.nix` file next to your `Cargo.lock`.
+
+2. Use bloomery in your `flake.nix`:
 
 ```nix
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    bloomery.url = "path:./bloomery"; # or github:your-repo/bloomery
+    bloomery.url = "github:actionable/bloomery";
   };
 
   outputs = { self, nixpkgs, bloomery }:
@@ -50,16 +58,19 @@ Inspired by `oxalica/nocargo`, this flake:
 
       # Unit tests and Clippy linting
       checks.${system} = workspace.checks;
+
+      # Lockfile generator app
+      apps.${system} = {
+        lock = bloomery.apps.${system}.lock;
+      };
     };
 }
 ```
 
 ## Structure
 
-- [`lib/parse-lock.nix`](./lib/parse-lock.nix): Parses `Cargo.lock` into a dependency DAG.
-- [`lib/build-crate.nix`](./lib/build-crate.nix): Compiles an individual `.rlib` or `proc-macro` using `rustc`.
-- [`lib/build-bin.nix`](./lib/build-bin.nix): Compiles final workspace executables.
-- [`lib/test-crate.nix`](./lib/test-crate.nix): Compiles and runs test runners with `rustc --test`.
-- [`lib/clippy-crate.nix`](./lib/clippy-crate.nix): Lints code with `clippy-driver`.
-- [`lib/default-overrides.nix`](./lib/default-overrides.nix): Built-in native dependencies for common `-sys` crates (`openssl`, `libpq`, `zlib`, `sqlite3`, etc.).
+- [`lib/builders/`](./lib/builders): Modular compilers for libraries, binaries, test runners, docs, and clippy using raw `rustc`.
+- [`lib/workspace/`](./lib/workspace): Parses `Cargo.lock`, discovers workspace crates, and resolves profiles.
+- [`lib/lock/`](./lib/lock): Generates `bloomery.lock.nix` manifests via `cargo metadata`.
+- [`lib/overrides/`](./lib/overrides): Built-in native dependencies for common `-sys` crates (`openssl`, `libpq`, `zlib`, `sqlite3`, etc.).
 - [`tests/test-workspace`](./tests/test-workspace): Complete reference workspace with library, binary, `build.rs`, unit tests, and crates.io dependencies.

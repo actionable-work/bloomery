@@ -1,11 +1,9 @@
-{ pkgs, lib ? pkgs.lib, cratesIoIndex ? null }:
+{ pkgs, lib ? pkgs.lib }:
 
 let
-  mkWorkspace = import ../mk-workspace.nix { inherit pkgs lib cratesIoIndex; };
+  mkWorkspace = import ../mk-workspace.nix { inherit pkgs lib; };
   workspace = mkWorkspace {
     root = ../../docs;
-    unifyFeatures = true;
-    inherit cratesIoIndex;
     profile = {
       optLevel = "3";
       lto = "thin";

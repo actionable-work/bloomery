@@ -11,6 +11,7 @@ in {
   root,
   cargoLock ? root + "/Cargo.lock",
   cargoToml ? root + "/Cargo.toml",
+  bloomeryLock ? (if builtins.pathExists (root + "/bloomery.lock.nix") then root + "/bloomery.lock.nix" else null),
   rustc ? pkgs.rustc,
   clippy ? pkgs.clippy,
   stdenv ? pkgs.stdenv,
@@ -63,11 +64,50 @@ in {
     discoveredMembers = lib.mapAttrs (_: cleanWorkspaceSource) rawDiscoveredMembers;
     cargoTomlPath = cargoToml;
 
+    # Load and validate bloomery.lock.nix if available
+    lockName = if builtins.isPath bloomeryLock || builtins.isString bloomeryLock then toString bloomeryLock else "<inline>";
+    lockManifest =
+      if bloomeryLock != null then
+        let
+          lockData = if builtins.isAttrs bloomeryLock then bloomeryLock else import bloomeryLock;
+          lockHash = builtins.hashFile "sha256" cargoLock;
+        in
+          if lockData ? cargoLockHash && lockData.cargoLockHash != lockHash then
+            throw "bloomery: Lock manifest '${lockName}' is out of date with '${toString cargoLock}'. Run 'nix run <bloomery>#lock' to update it."
+          else
+            lockData
+      else
+        null;
+
     # Resolve features across the workspace (unifyFeatures determines unified vs per-crate)
-    resolvedFeatures = workspace.resolveFeatures {
-      inherit root cargoTomlPath discoveredMembers unifyFeatures cratesIoIndex;
-      lockPackages = parsed.packages;
-    };
+    resolvedFeatures =
+      if lockManifest != null then
+        let
+          pkgsMap = lockManifest.packages or {};
+          featMap = lib.mapAttrs (pkgId: pdata: pdata.features or []) pkgsMap;
+          depMap = lib.mapAttrs (pkgId: pdata: pdata.dependencies or []) pkgsMap;
+          expandedFeats = lib.foldl' (acc: pkgId:
+            let
+              pkg = parsed.byId.${pkgId} or null;
+              cname = if pkg != null then pkg.name else pkgId;
+              feats = featMap.${pkgId} or [];
+            in
+              acc // {
+                "${pkgId}" = feats;
+                "${cname}" = feats;
+              }
+          ) featMap (builtins.attrNames featMap);
+        in
+          expandedFeats // {
+            __activeDeps = depMap;
+          }
+      else if cratesIoIndex != null then
+        workspace.resolveFeatures {
+          inherit root cargoTomlPath discoveredMembers unifyFeatures cratesIoIndex;
+          lockPackages = parsed.packages;
+        }
+      else
+        throw "bloomery: Lock manifest '${toString (root + "/bloomery.lock.nix")}' not found. Please run 'nix run <bloomery>#lock' to generate it.";
 
     # Resolve binary compilation profile (e.g. from [profile.release] in Cargo.toml)
     rootToml = if builtins.pathExists cargoTomlPath then builtins.fromTOML (builtins.readFile cargoTomlPath) else {};
@@ -100,8 +140,10 @@ in {
 
         depDrvs = map (depId: crates.${depId}) (getDepIds id pkg.depIds);
         cOverride = effectiveOverrides.${id} or effectiveOverrides.${pkg.name} or {};
+        pkgLock = if lockManifest != null then (lockManifest.packages.${id} or lockManifest.packages.${pkg.name} or {}) else {};
         pkgFeatures =
           if cOverride ? features then cOverride.features
+          else if pkgLock ? features then pkgLock.features
           else if resolvedFeatures ? ${id} then resolvedFeatures.${id}
           else if resolvedFeatures ? ${pkg.name} then resolvedFeatures.${pkg.name}
           else if resolvedFeatures ? ${pkg.crateName} then resolvedFeatures.${pkg.crateName}
@@ -113,6 +155,8 @@ in {
           override = cOverride;
           features = pkgFeatures;
           inherit defaultRustcFlags;
+          isProcMacro = pkgLock.procMacro or null;
+          edition = pkgLock.edition or null;
         }
     ) parsed.byId;
 

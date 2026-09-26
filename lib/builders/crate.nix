@@ -5,6 +5,8 @@
 , override ? {}
 , features ? []
 , defaultRustcFlags ? [ "-Copt-level=3" ]
+, isProcMacro ? null
+, edition ? null
 }:
 let
   pname = pkg.name;
@@ -77,8 +79,8 @@ in stdenv.mkDerivation (finalAttrs: {
     export CARGO_MANIFEST_DIR="$PWD"
 
     # Determine Edition (Cargo specification: defaults to 2015 if unspecified)
-    EDITION="2015"
-    if [ -f Cargo.toml ]; then
+    EDITION="${if edition != null then edition else "2015"}"
+    if [ "${if edition != null then "1" else "0"}" = "0" ] && [ -f Cargo.toml ]; then
       DETECTED_EDITION=$(sed -n -E 's/^[[:space:]]*edition[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' Cargo.toml | head -n 1)
       if [ -n "$DETECTED_EDITION" ]; then
         EDITION="$DETECTED_EDITION"
@@ -87,10 +89,10 @@ in stdenv.mkDerivation (finalAttrs: {
     EDITION_FLAG="--edition=$EDITION"
 
     # Determine crate type and proc-macro
-    IS_PROC_MACRO=0
-    CRATE_TYPE="rlib"
-    EXTRA_FLAGS=()
-    if [ -f Cargo.toml ] && grep -q -E 'proc-macro[[:space:]]*=[[:space:]]*true' Cargo.toml; then
+    IS_PROC_MACRO=${if isProcMacro == true then "1" else "0"}
+    CRATE_TYPE="${if isProcMacro == true then "proc-macro" else "rlib"}"
+    EXTRA_FLAGS=(${if isProcMacro == true then "\"--extern\" \"proc_macro\"" else ""})
+    if [ "${if isProcMacro != null then "1" else "0"}" = "0" ] && [ -f Cargo.toml ] && grep -q -E 'proc-macro[[:space:]]*=[[:space:]]*true' Cargo.toml; then
       IS_PROC_MACRO=1
       CRATE_TYPE="proc-macro"
       EXTRA_FLAGS+=("--extern" "proc_macro")

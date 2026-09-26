@@ -3,13 +3,9 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    registry-crates-io = {
-      url = "github:rust-lang/crates.io-index";
-      flake = false;
-    };
   };
 
-  outputs = { self, nixpkgs, registry-crates-io ? null, ... }:
+  outputs = { self, nixpkgs, ... }:
     let
       systems = [
         "x86_64-linux"
@@ -24,36 +20,41 @@
         parseLock = import ./lib/workspace/parse-lock.nix { inherit (nixpkgs) lib; };
       };
 
-      # Per-system runnable applications (Topcoat documentation server)
+      # Per-system runnable applications
       apps = eachSystem (system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
           bloomery = import ./lib {
             inherit pkgs;
             inherit (pkgs) lib;
-            cratesIoIndex = registry-crates-io;
           };
           docsApp = {
             type = "app";
             program = "${bloomery.docs}/bin/bloomery-docs";
           };
+          lockApp = {
+            type = "app";
+            program = "${bloomery.lock.lockScript}/bin/bloomery-lock";
+          };
         in {
           docs = docsApp;
-          default = docsApp;
+          lock = lockApp;
+          default = lockApp;
         }
       );
 
-      # Per-system outputs (Topcoat documentation application)
+      # Per-system outputs
       packages = eachSystem (system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
           bloomery = import ./lib {
             inherit pkgs;
             inherit (pkgs) lib;
-            cratesIoIndex = registry-crates-io;
           };
         in {
           docs = bloomery.docs;
+          lock = bloomery.lock.lockScript;
+          bloomery-lock = bloomery.lock.lockScript;
           default = bloomery.docs;
         }
       );
@@ -77,7 +78,6 @@
         in import ./lib {
           inherit pkgs;
           inherit (pkgs) lib;
-          cratesIoIndex = registry-crates-io;
         }
       );
 
@@ -89,6 +89,8 @@
             packages = [
               pkgs.rustc
               pkgs.clippy
+              pkgs.cargo
+              pkgs.jq
             ];
           };
         }
