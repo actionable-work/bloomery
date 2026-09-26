@@ -74,3 +74,4 @@ Inspired by `oxalica/nocargo`, this flake:
 - [`lib/lock/`](./lib/lock): Generates `bloomery.lock` manifests via `cargo metadata`.
 - [`lib/overrides/`](./lib/overrides): Built-in native dependencies for common `-sys` crates (`openssl`, `libpq`, `zlib`, `sqlite3`, etc.).
 - [`tests/basic-workspace`](./tests/basic-workspace): Complete reference workspace with library, binary, `build.rs`, unit tests, and crates.io dependencies.
+- [`tests/axum-workspace`](./tests/axum-workspace): Async web service test workspace with an Axum HTTP server and a Clap CLI client.

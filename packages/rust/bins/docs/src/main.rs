@@ -294,6 +294,11 @@ async fn home() -> Result<impl View, Error> {
                                     <td><code>"checks.* (24 CI checks), packages.*"</code></td>
                                     <td>"Isolated sub-flake running all integration checks without polluting the main flake."</td>
                                 </tr>
+                                <tr>
+                                    <td><code>"tests/axum-workspace"</code></td>
+                                    <td><code>"checks.* (8 CI checks), packages.*"</code></td>
+                                    <td>"Async web service test workspace with Axum server and Clap CLI client."</td>
+                                </tr>
                             </tbody>
                         </table>
                     </section>

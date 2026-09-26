@@ -2,7 +2,7 @@
 
 let
   lockScript = pkgs.writeShellApplication {
-    name = "bloomery-lock";
+    name = "lock";
     runtimeInputs = [ pkgs.cargo pkgs.jq pkgs.coreutils ];
     text = ''
       set -euo pipefail

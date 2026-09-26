@@ -34,7 +34,7 @@
           };
           lockApp = {
             type = "app";
-            program = "${bloomery.lock.lockScript}/bin/bloomery-lock";
+            program = "${bloomery.lock.lockScript}/bin/lock";
           };
         in {
           docs = docsApp;
@@ -54,7 +54,6 @@
         in {
           docs = bloomery.docs;
           lock = bloomery.lock.lockScript;
-          bloomery-lock = bloomery.lock.lockScript;
           default = bloomery.docs;
         }
       );
