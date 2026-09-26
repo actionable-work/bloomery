@@ -11,7 +11,7 @@ in {
   root,
   cargoLock ? root + "/Cargo.lock",
   cargoToml ? root + "/Cargo.toml",
-  bloomeryLock ? (if builtins.pathExists (root + "/bloomery.lock.nix") then root + "/bloomery.lock.nix" else null),
+  bloomeryLock ? (if builtins.pathExists (root + "/bloomery.lock") then root + "/bloomery.lock" else null),
   rustc ? pkgs.rustc,
   clippy ? pkgs.clippy,
   stdenv ? pkgs.stdenv,
@@ -64,15 +64,20 @@ in {
     discoveredMembers = lib.mapAttrs (_: cleanWorkspaceSource) rawDiscoveredMembers;
     cargoTomlPath = cargoToml;
 
-    # Load and validate bloomery.lock.nix if available
+    # Load and validate bloomery.lock if available
     lockName = if builtins.isPath bloomeryLock || builtins.isString bloomeryLock then toString bloomeryLock else "<inline>";
     lockManifest =
       if bloomeryLock != null then
         let
-          lockData = if builtins.isAttrs bloomeryLock then bloomeryLock else import bloomeryLock;
-          lockHash = builtins.hashFile "sha256" cargoLock;
+          lockData =
+            if builtins.isAttrs bloomeryLock then bloomeryLock
+            else if builtins.isPath bloomeryLock || builtins.isString bloomeryLock then
+              builtins.fromTOML (builtins.readFile bloomeryLock)
+            else throw "bloomery: Invalid bloomeryLock argument: expected path or attribute set.";
+          expectedHash = builtins.hashFile "sha256" cargoLock;
+          actualHash = lockData."cargo-lock-hash" or lockData.cargo_lock_hash or null;
         in
-          if lockData ? cargoLockHash && lockData.cargoLockHash != lockHash then
+          if actualHash != null && actualHash != expectedHash then
             throw "bloomery: Lock manifest '${lockName}' is out of date with '${toString cargoLock}'. Run 'nix run <bloomery>#lock' to update it."
           else
             lockData
@@ -107,7 +112,7 @@ in {
           lockPackages = parsed.packages;
         }
       else
-        throw "bloomery: Lock manifest '${toString (root + "/bloomery.lock.nix")}' not found. Please run 'nix run <bloomery>#lock' to generate it.";
+        throw "bloomery: Lock manifest '${toString (root + "/bloomery.lock")}' not found. Please run 'nix run <bloomery>#lock' to generate it.";
 
     # Resolve binary compilation profile (e.g. from [profile.release] in Cargo.toml)
     rootToml = if builtins.pathExists cargoTomlPath then builtins.fromTOML (builtins.readFile cargoTomlPath) else {};
@@ -155,7 +160,7 @@ in {
           override = cOverride;
           features = pkgFeatures;
           inherit defaultRustcFlags;
-          isProcMacro = pkgLock.procMacro or null;
+          isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or null;
           edition = pkgLock.edition or null;
         }
     ) parsed.byId;
