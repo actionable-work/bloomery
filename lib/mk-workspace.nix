@@ -29,7 +29,6 @@ in
     docRustdocFlags ? ["-Dwarnings"],
     doctestRustdocFlags ? [],
     includePackageChecks ? true,
-    checkNaming ? "colon", # "colon" ("crate:check") or "dash" ("crate-check")
     profileName ? "release",
     profile ? {},
     unifyFeatures ? true,
@@ -44,10 +43,7 @@ in
     builderDocTest = builders.doctestCrateWith {inherit rustc stdenv;};
     builderLockCheck = import ./workspace/lock-check.nix {inherit pkgs lib;};
 
-    mkCheckName = crateName: checkType:
-      if checkNaming == "colon"
-      then "${crateName}:${checkType}"
-      else "${crateName}-${checkType}";
+    mkCheckName = crateName: checkType: "${crateName}:${checkType}";
 
     parsed = workspace.parseLock {lockFile = cargoLock;};
     effectiveOverrides = defaultOverrides // overrides;
@@ -430,8 +426,8 @@ in
 
     apps = binApps // docApps;
 
-    workspaceLockCheck = let
-      lockCheckDrv = builderLockCheck {
+    workspaceLockCheck = {
+      "workspace:lock" = builderLockCheck {
         inherit
           root
           cargoLock
@@ -442,12 +438,6 @@ in
           lockManifest
           ;
       };
-      lockCheckName =
-        if checkNaming == "colon"
-        then "workspace:lock"
-        else "workspace-lock";
-    in {
-      ${lockCheckName} = lockCheckDrv;
     };
 
     checks =

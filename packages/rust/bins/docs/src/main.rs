@@ -419,7 +419,6 @@ async fn api() -> Result<impl View, Error> {
   rustc ? pkgs.rustc;                         # Rust compiler
   clippy ? pkgs.clippy;                       # Clippy driver
   unifyFeatures ? true;                       # Unify features across workspace
-  checkNaming ? "colon";                      # "colon" (crate:check) or "dash" (crate-check)
   profile ? {                                 # Strongly-typed compilation profile
     optLevel = 3;
     lto = "fat";
