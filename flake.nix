@@ -66,9 +66,31 @@
             inherit pkgs;
             inherit (pkgs) lib;
           };
+
+          # Discover any test workspace sub-flakes dynamically
+          testDirs = builtins.attrNames (nixpkgs.lib.filterAttrs
+            (name: type: type == "directory" && builtins.pathExists (./tests + "/${name}/flake.nix"))
+            (builtins.readDir ./tests));
+
+          # Import and instantiate each test sub-flake and prefix check names
+          subFlakeChecks = nixpkgs.lib.foldl' (acc: name:
+            let
+              subFlake = (import (./tests + "/${name}/flake.nix")).outputs {
+                self = null;
+                inherit nixpkgs;
+                bloomery = self;
+              };
+              checks = subFlake.checks.${system} or {};
+              prefixed = nixpkgs.lib.mapAttrs'
+                (cname: drv: nixpkgs.lib.nameValuePair "${name}:${cname}" drv)
+                checks;
+            in
+              acc // prefixed
+          ) {} testDirs;
+
         in {
           unit-tests = unitTests.check;
-        }
+        } // subFlakeChecks
       );
 
       # Per-system builder library
