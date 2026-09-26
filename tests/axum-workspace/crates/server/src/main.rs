@@ -1,7 +1,7 @@
 use axum::{
+    Json, Router,
     extract::Path,
     routing::{get, post},
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
@@ -41,9 +41,7 @@ async fn greet(Path(name): Path<String>) -> Json<GreetResponse> {
 }
 
 async fn echo(Json(payload): Json<EchoPayload>) -> Json<EchoResponse> {
-    Json(EchoResponse {
-        echo: payload.text,
-    })
+    Json(EchoResponse { echo: payload.text })
 }
 
 pub fn app() -> Router {
@@ -63,9 +61,7 @@ async fn main() {
         .await
         .expect("failed to bind address");
 
-    axum::serve(listener, app)
-        .await
-        .expect("server error");
+    axum::serve(listener, app).await.expect("server error");
 }
 
 #[cfg(test)]

@@ -1,7 +1,5 @@
-{ lib }:
-
-let
-  parseLock = import ./parse-lock.nix { inherit lib; };
+{lib}: let
+  parseLock = import ./parse-lock.nix {inherit lib;};
 
   sampleLock = ''
     version = 3
@@ -20,8 +18,7 @@ let
     checksum = "abcdef123456"
   '';
 
-  parsed = parseLock.parseLock { lockContent = sampleLock; };
-
+  parsed = parseLock.parseLock {lockContent = sampleLock;};
 in {
   testParseDepString = {
     expr = parseLock.parseDepString "syn 2.0.119 (registry+https://crates.io)";
@@ -50,6 +47,6 @@ in {
 
   testParseLockResolvedDeps = {
     expr = (builtins.head parsed.byName.foo).depIds;
-    expected = [ "bar-0.2.0" ];
+    expected = ["bar-0.2.0"];
   };
 }

@@ -1,9 +1,7 @@
-{ pkgs, lib ? pkgs.lib }:
-
-let
+{pkgs, ...}: let
   lockScript = pkgs.writeShellApplication {
     name = "lock";
-    runtimeInputs = [ pkgs.cargo pkgs.jq pkgs.coreutils ];
+    runtimeInputs = [pkgs.cargo pkgs.jq pkgs.coreutils];
     text = ''
       set -euo pipefail
 

@@ -1,7 +1,5 @@
-{ lib }:
-
-let
-  discover = import ./discover.nix { inherit lib; };
+{lib}: let
+  discover = import ./discover.nix {inherit lib;};
   testWorkspaceRoot = ../../tests/basic-workspace;
   discovered = discover.discoverWorkspaceCrates {
     root = testWorkspaceRoot;

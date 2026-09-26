@@ -86,7 +86,8 @@ mod tests {
 
     #[test]
     fn test_cli_parsing() {
-        let args = Args::try_parse_from(["cli", "--url", "http://localhost:8080", "health"]).unwrap();
+        let args =
+            Args::try_parse_from(["cli", "--url", "http://localhost:8080", "health"]).unwrap();
         assert_eq!(args.url, "http://localhost:8080");
         match args.command {
             Commands::Health => {}

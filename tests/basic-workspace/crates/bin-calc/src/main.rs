@@ -1,5 +1,5 @@
-use lib_core::int_to_str;
 use lib_calc::compute_sum;
+use lib_core::int_to_str;
 
 fn main() {
     let result = compute_sum(15, 25);

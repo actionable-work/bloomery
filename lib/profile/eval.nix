@@ -1,11 +1,10 @@
-{ lib }:
-
-let
-  types = import ./types.nix { inherit lib; };
+{lib}: let
+  types = import ./types.nix {inherit lib;};
 
   # Normalize kebab-case keys from Cargo.toml or user inputs to camelCase
   normalizeProfileAttrs = raw:
-    if !builtins.isAttrs raw then {}
+    if !builtins.isAttrs raw
+    then {}
     else {
       optLevel = raw.optLevel or raw."opt-level" or null;
       lto = raw.lto or null;
@@ -20,19 +19,17 @@ let
     };
 
   # Validate and evaluate raw profile attributes into a strongly-typed profile
-  evalProfile = raw:
-    let
-      normalized = normalizeProfileAttrs raw;
-      cleanAttrs = lib.filterAttrs (_: v: v != null) normalized;
-      evaluated = lib.evalModules {
-        modules = [
-          types.profileOptionModule
-          { config = cleanAttrs; }
-        ];
-      };
-    in
-      evaluated.config;
-
+  evalProfile = raw: let
+    normalized = normalizeProfileAttrs raw;
+    cleanAttrs = lib.filterAttrs (_: v: v != null) normalized;
+    evaluated = lib.evalModules {
+      modules = [
+        types.profileOptionModule
+        {config = cleanAttrs;}
+      ];
+    };
+  in
+    evaluated.config;
 in {
   inherit normalizeProfileAttrs evalProfile;
 }

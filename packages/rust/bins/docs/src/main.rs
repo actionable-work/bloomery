@@ -1,6 +1,6 @@
-use topcoat::router::{Router, page, internal_serve};
-use topcoat::view::{View, view};
 use topcoat::Error;
+use topcoat::router::{Router, internal_serve, page};
+use topcoat::view::{View, view};
 
 const CSS: &str = r#"
     :root {
@@ -448,6 +448,10 @@ async fn main() {
         .page(profiles)
         .page(api)
         .build();
-    let listener = tokio::net::TcpListener::bind(("127.0.0.1", port)).await.expect("bind port");
-    internal_serve(listener, router.into(), std::future::pending()).await.expect("serve");
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", port))
+        .await
+        .expect("bind port");
+    internal_serve(listener, router.into(), std::future::pending())
+        .await
+        .expect("serve");
 }

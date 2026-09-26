@@ -1,7 +1,7 @@
+[dependencies]
+itoa = "1.0.18"
+
 [package]
 name = "lib-core"
 version = "0.1.0"
 edition = "2021"
-
-[dependencies]
-itoa = "1.0.18"

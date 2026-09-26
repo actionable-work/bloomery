@@ -1,7 +1,8 @@
-{ pkgs, lib ? pkgs.lib }:
-
-let
-  mkWorkspace = import ../mk-workspace.nix { inherit pkgs lib; };
+{
+  pkgs,
+  lib ? pkgs.lib,
+}: let
+  mkWorkspace = import ../mk-workspace.nix {inherit pkgs lib;};
   workspace = mkWorkspace {
     root = ../..;
     profile = {
@@ -12,4 +13,3 @@ let
   };
 in
   workspace.packages."bloomery-docs"
-
