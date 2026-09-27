@@ -3,6 +3,8 @@
   lib,
   rustc ? pkgs.rustc,
   stdenv ? pkgs.stdenv,
+  lld ? pkgs.lld,
+  useLld ? stdenv.hostPlatform.isLinux,
 }: {
   pkg,
   src,
@@ -17,7 +19,7 @@
   version = pkg.version;
   crateName = pkg.crateName;
 
-  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc];
+  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc] ++ lib.optional useLld lld;
   buildInputs = override.buildInputs or [];
   featureList =
     if override ? features
@@ -133,6 +135,13 @@ in
           IS_PROC_MACRO=1
           CRATE_TYPE="proc-macro"
           EXTRA_FLAGS+=("--extern" "proc_macro")
+        fi
+        if [ "$IS_PROC_MACRO" = "1" ] && [ "${
+          if useLld
+          then "1"
+          else "0"
+        }" = "1" ]; then
+          EXTRA_FLAGS+=("-Clink-arg=-fuse-ld=lld")
         fi
 
         # Determine entrypoint
@@ -374,6 +383,7 @@ in
             $EDITION_FLAG \
             -L dependency=_deps \
             "''${EXTERN_FLAGS[@]}" \
+            ${lib.optionalString useLld "-Clink-arg=-fuse-ld=lld"} \
             "''${FEATURE_FLAGS[@]}" \
             -o _build_script/build_script_build
 

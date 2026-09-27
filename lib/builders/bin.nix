@@ -3,6 +3,8 @@
   lib,
   rustc ? pkgs.rustc,
   stdenv ? pkgs.stdenv,
+  lld ? pkgs.lld,
+  useLld ? stdenv.hostPlatform.isLinux,
 }: let
   types = import ../profile {inherit lib;};
 in
@@ -24,9 +26,10 @@ in
     evaluatedProfile = types.evalProfile rawProfile;
     profileFlags = types.profileToRustcFlags evaluatedProfile;
 
-    nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc];
+    lldLinkFlags = lib.optional (useLld && evaluatedProfile.linker == null) "-Clink-arg=-fuse-ld=lld";
+    nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc] ++ lib.optional useLld lld;
     buildInputs = override.buildInputs or [];
-    extraRustcFlags = (override.rustcFlags or []) ++ defaultRustcFlags ++ profileFlags;
+    extraRustcFlags = (override.rustcFlags or []) ++ defaultRustcFlags ++ profileFlags ++ lldLinkFlags;
     userEnv = override.env or {};
   in
     stdenv.mkDerivation (_finalAttrs:

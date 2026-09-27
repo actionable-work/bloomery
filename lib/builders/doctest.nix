@@ -3,6 +3,8 @@
   lib,
   rustc ? pkgs.rustc,
   stdenv ? pkgs.stdenv,
+  lld ? pkgs.lld,
+  useLld ? stdenv.hostPlatform.isLinux,
 }: {
   pkg,
   src,
@@ -15,9 +17,10 @@
   version = pkg.version;
   crateName = pkg.crateName;
 
-  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc];
+  lldLinkFlags = lib.optional useLld "-Clink-arg=-fuse-ld=lld";
+  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc] ++ lib.optional useLld lld;
   buildInputs = override.buildInputs or [];
-  extraRustdocFlags = (override.rustdocFlags or []) ++ defaultRustdocFlags;
+  extraRustdocFlags = (override.rustdocFlags or []) ++ defaultRustdocFlags ++ lldLinkFlags;
   userEnv = override.env or {};
 in
   stdenv.mkDerivation (_finalAttrs:

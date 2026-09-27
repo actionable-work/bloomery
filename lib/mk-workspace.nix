@@ -20,6 +20,8 @@ in
     ),
     rustc ? pkgs.rustc,
     clippy ? pkgs.clippy,
+    lld ? pkgs.lld,
+    useLld ? stdenv.hostPlatform.isLinux,
     stdenv ? pkgs.stdenv,
     overrides ? {},
     workspaceMembers ? null,
@@ -35,12 +37,12 @@ in
     cratesIoIndex ? defaultCratesIoIndex,
     throwOnOutOfDate ? false,
   }: let
-    builderCrate = builders.buildCrateWith {inherit rustc stdenv;};
-    builderBin = builders.buildBinWith {inherit rustc stdenv;};
-    builderTest = builders.testCrateWith {inherit rustc stdenv;};
+    builderCrate = builders.buildCrateWith {inherit rustc stdenv lld useLld;};
+    builderBin = builders.buildBinWith {inherit rustc stdenv lld useLld;};
+    builderTest = builders.testCrateWith {inherit rustc stdenv lld useLld;};
     builderClippy = builders.clippyCrateWith {inherit rustc clippy stdenv;};
     builderDoc = builders.docCrateWith {inherit rustc stdenv;};
-    builderDocTest = builders.doctestCrateWith {inherit rustc stdenv;};
+    builderDocTest = builders.doctestCrateWith {inherit rustc stdenv lld useLld;};
     builderLockCheck = import ./workspace/lock-check.nix {inherit pkgs lib;};
 
     mkCheckName = crateName: checkType: "${crateName}:${checkType}";
