@@ -321,6 +321,11 @@ async fn home() -> Result<impl View, Error> {
                                     <td><code>"checks.* (5 CI checks)"</code></td>
                                     <td>"Style 4: Flake-parts module integration via bloomery.flakeModules.default."</td>
                                 </tr>
+                                <tr>
+                                    <td><code>"tests/overrides-workspace"</code></td>
+                                    <td><code>"checks.* (5 CI checks)"</code></td>
+                                    <td>"Overrides: Validates colocated overrides.nix (fileset, flags, env) and flake-level overrides merging."</td>
+                                </tr>
                             </tbody>
                         </table>
                     </section>

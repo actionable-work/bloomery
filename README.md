@@ -247,4 +247,5 @@ Every supported flake setup style is verified by an isolated sub-flake in CI:
 | [`tests/axum-workspace`](./tests/axum-workspace) | Standard (`bloomery.lib.${system}.mkWorkspace`) | Full async web stack (Axum, Tokio, Clap, Hyper, Serde) with categorized options |
 | [`tests/mklib-workspace`](./tests/mklib-workspace) | Constructor (`bloomery.mkLib pkgs`) | Custom `pkgs` instance with overlays and compiler options |
 | [`tests/flake-parts-workspace`](./tests/flake-parts-workspace) | Flake-Parts Module (`bloomery.flakeModules.default`) | Declarative Nix module configuration via `perSystem.bloomery.workspace` |
+| [`tests/overrides-workspace`](./tests/overrides-workspace) | Overrides Validation | Validates colocated `overrides.nix` (fileset, flags, env) and flake-level overrides merging |
 
