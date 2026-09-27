@@ -25,22 +25,22 @@ in
     useMold ? null,
     useLld ? null,
     defaultLinker ? (
-      if useMold != null
-      then
-        (
-          if useMold
-          then "mold"
-          else null
-        )
-      else if useLld != null
+      if useLld != null
       then
         (
           if useLld
           then "lld"
           else null
         )
+      else if useMold != null
+      then
+        (
+          if useMold
+          then "mold"
+          else null
+        )
       else if stdenv.hostPlatform.isLinux
-      then "mold"
+      then "lld"
       else null
     ),
     stdenv ? pkgs.stdenv,
