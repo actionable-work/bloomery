@@ -303,13 +303,23 @@ async fn home() -> Result<impl View, Error> {
                                 </tr>
                                 <tr>
                                     <td><code>"tests/basic-workspace"</code></td>
-                                    <td><code>"checks.* (24 CI checks), packages.*"</code></td>
-                                    <td>"Isolated sub-flake running all integration checks without polluting the main flake."</td>
+                                    <td><code>"checks.* (24 CI checks)"</code></td>
+                                    <td>"Style 1: Zero-boilerplate bloomery.mkFlake testing multi-crate workspace."</td>
                                 </tr>
                                 <tr>
                                     <td><code>"tests/axum-workspace"</code></td>
-                                    <td><code>"checks.* (8 CI checks), packages.*"</code></td>
-                                    <td>"Async web service test workspace with Axum server and Clap CLI client."</td>
+                                    <td><code>"checks.* (8 CI checks)"</code></td>
+                                    <td>"Style 2: Standard bloomery.lib.${system}.mkWorkspace with categorized options (Axum & Clap)."</td>
+                                </tr>
+                                <tr>
+                                    <td><code>"tests/mklib-workspace"</code></td>
+                                    <td><code>"checks.* (5 CI checks)"</code></td>
+                                    <td>"Style 3: Constructor bloomery.mkLib pkgs with custom pkgs instance and overlays."</td>
+                                </tr>
+                                <tr>
+                                    <td><code>"tests/flake-parts-workspace"</code></td>
+                                    <td><code>"checks.* (5 CI checks)"</code></td>
+                                    <td>"Style 4: Flake-parts module integration via bloomery.flakeModules.default."</td>
                                 </tr>
                             </tbody>
                         </table>

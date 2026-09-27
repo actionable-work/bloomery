@@ -201,3 +201,17 @@ Calling `mkWorkspace` returns an attribute set with:
 - `crates`: DAG attribute set of all built `.rlib` crates.
 - `lock`: Parsed lockfile representation.
 - `config`: Evaluated and type-checked options.
+
+---
+
+## Test Workspaces (Setup Styles)
+
+Every supported flake setup style is verified by an isolated sub-flake in CI:
+
+| Workspace | Setup Style | Description |
+|---|---|---|
+| [`tests/basic-workspace`](./tests/basic-workspace) | Zero-Boilerplate (`bloomery.mkFlake`) | 5 member crates, `build.rs`, unit tests, doctests, crates.io dependencies |
+| [`tests/axum-workspace`](./tests/axum-workspace) | Standard (`bloomery.lib.${system}.mkWorkspace`) | Full async web stack (Axum, Tokio, Clap, Hyper, Serde) with categorized options |
+| [`tests/mklib-workspace`](./tests/mklib-workspace) | Constructor (`bloomery.mkLib pkgs`) | Custom `pkgs` instance with overlays and compiler options |
+| [`tests/flake-parts-workspace`](./tests/flake-parts-workspace) | Flake-Parts Module (`bloomery.flakeModules.default`) | Declarative Nix module configuration via `perSystem.bloomery.workspace` |
+

@@ -7,12 +7,17 @@
       url = "github:numtide/treefmt-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    flake-parts = {
+      url = "github:hercules-ci/flake-parts";
+      inputs.nixpkgs-lib.follows = "nixpkgs";
+    };
   };
 
   outputs = {
     self,
     nixpkgs,
     treefmt-nix,
+    flake-parts,
     ...
   }: let
     systems = [
@@ -127,9 +132,14 @@
           nixpkgs.lib.foldl' (
             acc: name: let
               subFlake = (import (./tests + "/${name}/flake.nix")).outputs {
-                self = null;
+                self = {
+                  inputs = {
+                    inherit nixpkgs;
+                  };
+                };
                 inherit nixpkgs;
                 bloomery = self;
+                inherit flake-parts;
               };
               checks = subFlake.checks.${system} or {};
               prefixed =
