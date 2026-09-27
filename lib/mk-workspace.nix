@@ -20,8 +20,29 @@ in
     ),
     rustc ? pkgs.rustc,
     clippy ? pkgs.clippy,
+    mold ? pkgs.mold,
     lld ? pkgs.lld,
-    useLld ? stdenv.hostPlatform.isLinux,
+    useMold ? null,
+    useLld ? null,
+    defaultLinker ? (
+      if useMold != null
+      then
+        (
+          if useMold
+          then "mold"
+          else null
+        )
+      else if useLld != null
+      then
+        (
+          if useLld
+          then "lld"
+          else null
+        )
+      else if stdenv.hostPlatform.isLinux
+      then "mold"
+      else null
+    ),
     stdenv ? pkgs.stdenv,
     overrides ? {},
     workspaceMembers ? null,
@@ -37,12 +58,12 @@ in
     cratesIoIndex ? defaultCratesIoIndex,
     throwOnOutOfDate ? false,
   }: let
-    builderCrate = builders.buildCrateWith {inherit rustc stdenv lld useLld;};
-    builderBin = builders.buildBinWith {inherit rustc stdenv lld useLld;};
-    builderTest = builders.testCrateWith {inherit rustc stdenv lld useLld;};
+    builderCrate = builders.buildCrateWith {inherit rustc stdenv mold lld useMold useLld defaultLinker;};
+    builderBin = builders.buildBinWith {inherit rustc stdenv mold lld useMold useLld defaultLinker;};
+    builderTest = builders.testCrateWith {inherit rustc stdenv mold lld useMold useLld defaultLinker;};
     builderClippy = builders.clippyCrateWith {inherit rustc clippy stdenv;};
     builderDoc = builders.docCrateWith {inherit rustc stdenv;};
-    builderDocTest = builders.doctestCrateWith {inherit rustc stdenv lld useLld;};
+    builderDocTest = builders.doctestCrateWith {inherit rustc stdenv mold lld useMold useLld defaultLinker;};
     builderLockCheck = import ./workspace/lock-check.nix {inherit pkgs lib;};
 
     mkCheckName = crateName: checkType: "${crateName}:${checkType}";

@@ -5,26 +5,89 @@
   buildCrateWith = {
     rustc ? pkgs.rustc,
     stdenv ? pkgs.stdenv,
+    mold ? pkgs.mold,
     lld ? pkgs.lld,
-    useLld ? stdenv.hostPlatform.isLinux,
+    useMold ? null,
+    useLld ? null,
+    defaultLinker ? (
+      if useMold != null
+      then
+        (
+          if useMold
+          then "mold"
+          else null
+        )
+      else if useLld != null
+      then
+        (
+          if useLld
+          then "lld"
+          else null
+        )
+      else if stdenv.hostPlatform.isLinux
+      then "mold"
+      else null
+    ),
   }:
-    import ./crate.nix {inherit pkgs lib rustc stdenv lld useLld;};
+    import ./crate.nix {inherit pkgs lib rustc stdenv mold lld useMold useLld defaultLinker;};
 
   buildBinWith = {
     rustc ? pkgs.rustc,
     stdenv ? pkgs.stdenv,
+    mold ? pkgs.mold,
     lld ? pkgs.lld,
-    useLld ? stdenv.hostPlatform.isLinux,
+    useMold ? null,
+    useLld ? null,
+    defaultLinker ? (
+      if useMold != null
+      then
+        (
+          if useMold
+          then "mold"
+          else null
+        )
+      else if useLld != null
+      then
+        (
+          if useLld
+          then "lld"
+          else null
+        )
+      else if stdenv.hostPlatform.isLinux
+      then "mold"
+      else null
+    ),
   }:
-    import ./bin.nix {inherit pkgs lib rustc stdenv lld useLld;};
+    import ./bin.nix {inherit pkgs lib rustc stdenv mold lld useMold useLld defaultLinker;};
 
   testCrateWith = {
     rustc ? pkgs.rustc,
     stdenv ? pkgs.stdenv,
+    mold ? pkgs.mold,
     lld ? pkgs.lld,
-    useLld ? stdenv.hostPlatform.isLinux,
+    useMold ? null,
+    useLld ? null,
+    defaultLinker ? (
+      if useMold != null
+      then
+        (
+          if useMold
+          then "mold"
+          else null
+        )
+      else if useLld != null
+      then
+        (
+          if useLld
+          then "lld"
+          else null
+        )
+      else if stdenv.hostPlatform.isLinux
+      then "mold"
+      else null
+    ),
   }:
-    import ./test.nix {inherit pkgs lib rustc stdenv lld useLld;};
+    import ./test.nix {inherit pkgs lib rustc stdenv mold lld useMold useLld defaultLinker;};
 
   clippyCrateWith = {
     rustc ? pkgs.rustc,
@@ -42,8 +105,29 @@
   doctestCrateWith = {
     rustc ? pkgs.rustc,
     stdenv ? pkgs.stdenv,
+    mold ? pkgs.mold,
     lld ? pkgs.lld,
-    useLld ? stdenv.hostPlatform.isLinux,
+    useMold ? null,
+    useLld ? null,
+    defaultLinker ? (
+      if useMold != null
+      then
+        (
+          if useMold
+          then "mold"
+          else null
+        )
+      else if useLld != null
+      then
+        (
+          if useLld
+          then "lld"
+          else null
+        )
+      else if stdenv.hostPlatform.isLinux
+      then "mold"
+      else null
+    ),
   }:
-    import ./doctest.nix {inherit pkgs lib rustc stdenv lld useLld;};
+    import ./doctest.nix {inherit pkgs lib rustc stdenv mold lld useMold useLld defaultLinker;};
 }

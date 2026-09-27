@@ -3,8 +3,29 @@
   lib,
   rustc ? pkgs.rustc,
   stdenv ? pkgs.stdenv,
+  mold ? pkgs.mold,
   lld ? pkgs.lld,
-  useLld ? stdenv.hostPlatform.isLinux,
+  useMold ? null,
+  useLld ? null,
+  defaultLinker ? (
+    if useMold != null
+    then
+      (
+        if useMold
+        then "mold"
+        else null
+      )
+    else if useLld != null
+    then
+      (
+        if useLld
+        then "lld"
+        else null
+      )
+    else if stdenv.hostPlatform.isLinux
+    then "mold"
+    else null
+  ),
 }: {
   pkg,
   src,
@@ -19,7 +40,14 @@
   version = pkg.version;
   crateName = pkg.crateName;
 
-  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc] ++ lib.optional useLld lld;
+  linkerPackage =
+    if defaultLinker == "mold"
+    then mold
+    else if defaultLinker == "lld"
+    then lld
+    else null;
+
+  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc] ++ lib.optional (linkerPackage != null) linkerPackage;
   buildInputs = override.buildInputs or [];
   featureList =
     if override ? features
@@ -136,13 +164,15 @@ in
           CRATE_TYPE="proc-macro"
           EXTRA_FLAGS+=("--extern" "proc_macro")
         fi
-        if [ "$IS_PROC_MACRO" = "1" ] && [ "${
-          if useLld
-          then "1"
-          else "0"
-        }" = "1" ]; then
-          EXTRA_FLAGS+=("-Clink-arg=-fuse-ld=lld")
-        fi
+        ${
+          if defaultLinker != null
+          then ''
+            if [ "$IS_PROC_MACRO" = "1" ]; then
+              EXTRA_FLAGS+=("-Clink-arg=-fuse-ld=${defaultLinker}")
+            fi
+          ''
+          else ""
+        }
 
         # Determine entrypoint
         ENTRY=""
@@ -383,7 +413,11 @@ in
             $EDITION_FLAG \
             -L dependency=_deps \
             "''${EXTERN_FLAGS[@]}" \
-            ${lib.optionalString useLld "-Clink-arg=-fuse-ld=lld"} \
+            ${
+          if defaultLinker != null
+          then "-Clink-arg=-fuse-ld=${defaultLinker}"
+          else ""
+        } \
             "''${FEATURE_FLAGS[@]}" \
             -o _build_script/build_script_build
 

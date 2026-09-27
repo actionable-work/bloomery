@@ -3,8 +3,29 @@
   lib,
   rustc ? pkgs.rustc,
   stdenv ? pkgs.stdenv,
+  mold ? pkgs.mold,
   lld ? pkgs.lld,
-  useLld ? stdenv.hostPlatform.isLinux,
+  useMold ? null,
+  useLld ? null,
+  defaultLinker ? (
+    if useMold != null
+    then
+      (
+        if useMold
+        then "mold"
+        else null
+      )
+    else if useLld != null
+    then
+      (
+        if useLld
+        then "lld"
+        else null
+      )
+    else if stdenv.hostPlatform.isLinux
+    then "mold"
+    else null
+  ),
 }: {
   pkg,
   src,
@@ -16,10 +37,19 @@
   version = pkg.version;
   crateName = pkg.crateName;
 
-  lldLinkFlags = lib.optional useLld "-Clink-arg=-fuse-ld=lld";
-  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc] ++ lib.optional useLld lld;
+  linkerPackage =
+    if defaultLinker == "mold"
+    then mold
+    else if defaultLinker == "lld"
+    then lld
+    else null;
+  linkerFlags =
+    if defaultLinker != null
+    then ["-Clink-arg=-fuse-ld=${defaultLinker}"]
+    else [];
+  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc] ++ lib.optional (linkerPackage != null) linkerPackage;
   buildInputs = override.buildInputs or [];
-  extraRustcFlags = (override.rustcFlags or []) ++ defaultRustcFlags ++ lldLinkFlags;
+  extraRustcFlags = (override.rustcFlags or []) ++ defaultRustcFlags ++ linkerFlags;
   userEnv = override.env or {};
 in
   stdenv.mkDerivation (_finalAttrs:
