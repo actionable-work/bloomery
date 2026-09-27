@@ -3,73 +3,56 @@
   lib ? pkgs.lib,
   cratesIoIndex ? null,
 }: let
-  defaultCratesIoIndex = cratesIoIndex;
   builders = import ./builders {inherit pkgs lib;};
   workspace = import ./workspace {inherit lib;};
   profileMod = import ./profile {inherit lib;};
   defaultOverrides = import ./overrides {inherit pkgs lib;};
+  optionsMod = import ./workspace/options.nix {inherit pkgs lib;};
 in
-  {
-    root,
-    cargoLock ? root + "/Cargo.lock",
-    cargoToml ? root + "/Cargo.toml",
-    bloomeryLock ? (
-      if builtins.pathExists (root + "/bloomery.lock")
-      then root + "/bloomery.lock"
-      else null
-    ),
-    rustc ? pkgs.rustc,
-    clippy ? pkgs.clippy,
-    mold ? pkgs.mold,
-    lld ? pkgs.lld,
-    useMold ? null,
-    useLld ? null,
-    defaultLinker ? (
-      if useLld != null
-      then
-        (
-          if useLld
-          then "lld"
-          else null
-        )
-      else if useMold != null
-      then
-        (
-          if useMold
-          then "mold"
-          else null
-        )
-      else if stdenv.hostPlatform.isLinux
-      then "lld"
-      else null
-    ),
-    stdenv ? pkgs.stdenv,
-    overrides ? {},
-    workspaceMembers ? null,
-    defaultRustcFlags ? ["-Copt-level=3"],
-    testRustcFlags ? [],
-    clippyRustcFlags ? [],
-    docRustdocFlags ? ["-Dwarnings"],
-    doctestRustdocFlags ? [],
-    includePackageChecks ? true,
-    profileName ? "release",
-    profile ? {},
-    unifyFeatures ? true,
-    cratesIoIndex ? defaultCratesIoIndex,
-    throwOnOutOfDate ? false,
-  }: let
-    builderCrate = builders.buildCrateWith {inherit rustc stdenv mold lld useMold useLld defaultLinker;};
-    builderBin = builders.buildBinWith {inherit rustc stdenv mold lld useMold useLld defaultLinker;};
-    builderTest = builders.testCrateWith {inherit rustc stdenv mold lld useMold useLld defaultLinker;};
+  rawArgs: let
+    cfg = optionsMod.evalWorkspaceOptions rawArgs;
+
+    root = cfg.root;
+    cargoLock = cfg.source.cargoLock;
+    cargoToml = cfg.source.cargoToml;
+    cargoTomlPath = cargoToml;
+    bloomeryLock = cfg.source.bloomeryLock;
+    workspaceMembers = cfg.source.members;
+
+    rustc = cfg.toolchain.rustc;
+    clippy = cfg.toolchain.clippy;
+    cargo = cfg.toolchain.cargo;
+    mold = cfg.toolchain.mold;
+    lld = cfg.toolchain.lld;
+    defaultLinker = cfg.toolchain.linker;
+    stdenv = cfg.toolchain.stdenv;
+
+    defaultRustcFlags = cfg.flags.rustc;
+    testRustcFlags = cfg.flags.test;
+    clippyRustcFlags = cfg.flags.clippy;
+    docRustdocFlags = cfg.flags.doc;
+    doctestRustdocFlags = cfg.flags.doctest;
+
+    profile = cfg.profile;
+    profileName = cfg.profileName;
+    unifyFeatures = cfg.features.unify;
+    throwOnOutOfDate = cfg.checks.throwOnOutOfDate;
+    includePackageChecks = cfg.checks.includePackageChecks;
+
+    overrides = cfg.overrides;
+    effectiveOverrides = defaultOverrides // overrides;
+
+    builderCrate = builders.buildCrateWith {inherit rustc stdenv mold lld defaultLinker;};
+    builderBin = builders.buildBinWith {inherit rustc stdenv mold lld defaultLinker;};
+    builderTest = builders.testCrateWith {inherit rustc stdenv mold lld defaultLinker;};
     builderClippy = builders.clippyCrateWith {inherit rustc clippy stdenv;};
     builderDoc = builders.docCrateWith {inherit rustc stdenv;};
-    builderDocTest = builders.doctestCrateWith {inherit rustc stdenv mold lld useMold useLld defaultLinker;};
+    builderDocTest = builders.doctestCrateWith {inherit rustc stdenv mold lld defaultLinker;};
     builderLockCheck = import ./workspace/lock-check.nix {inherit pkgs lib;};
 
     mkCheckName = crateName: checkType: "${crateName}:${checkType}";
 
     parsed = workspace.parseLock {lockFile = cargoLock;};
-    effectiveOverrides = defaultOverrides // overrides;
 
     cleanWorkspaceSource = p:
       if builtins.isAttrs p && p ? _isLibCleanSourceWith
@@ -92,7 +75,6 @@ in
       then workspaceMembers
       else workspace.discoverWorkspaceCrates {inherit root cargoTomlPath;};
     discoveredMembers = lib.mapAttrs (_: cleanWorkspaceSource) rawDiscoveredMembers;
-    cargoTomlPath = cargoToml;
 
     # Load and validate bloomery.lock if available
     lockName =
@@ -446,8 +428,24 @@ in
         }
       )
       workspaceDocs;
+    lockApp = {
+      type = "app";
+      program = "${(import ./lock {inherit pkgs lib;}).lockScript}/bin/lock";
+    };
+    firstBin = let
+      names = builtins.attrNames binApps;
+    in
+      if names != []
+      then binApps.${builtins.head names}
+      else lockApp;
 
-    apps = binApps // docApps;
+    apps =
+      binApps
+      // docApps
+      // {
+        lock = lockApp;
+        default = binApps.default or firstBin;
+      };
 
     workspaceLockCheck = {
       "workspace:lock" = builderLockCheck {
@@ -464,12 +462,38 @@ in
     };
 
     checks =
-      workspaceTests
-      // workspaceClippy
-      // workspaceDocTests
-      // workspaceDocs
-      // packageChecks
-      // workspaceLockCheck;
+      if cfg.checks.enable
+      then
+        workspaceTests
+        // workspaceClippy
+        // workspaceDocTests
+        // workspaceDocs
+        // (
+          if includePackageChecks
+          then packageChecks
+          else {}
+        )
+        // workspaceLockCheck
+      else {};
+
+    devShell =
+      if cfg.devShell.enable
+      then
+        pkgs.mkShell {
+          packages =
+            [
+              rustc
+              clippy
+              cargo
+              pkgs.jq
+              pkgs.nix-fast-build
+            ]
+            ++ (lib.optional (defaultLinker == "lld") lld)
+            ++ (lib.optional (defaultLinker == "mold") mold)
+            ++ cfg.devShell.packages;
+          shellHook = cfg.devShell.shellHook;
+        }
+      else null;
   in {
     # All compiled rlibs (DAG)
     inherit crates;
@@ -477,12 +501,18 @@ in
     # Only executable binaries in packages (clean nix flake show)
     packages = binPackages;
 
-    # Runnable apps (binaries and doc servers)
+    # Runnable apps (binaries, doc servers, and lock updater)
     inherit apps;
 
     # Standardized CI checks (crate:test, crate:clippy, crate:doc, crate:doctest, crate:bin, crate:lib, lock-check)
     inherit checks;
 
+    # Preconfigured development shell (direnv / nix develop)
+    inherit devShell;
+
     # Parsed lockfile representation
     lock = parsed;
+
+    # Evaluated and typed workspace options
+    config = cfg;
   }

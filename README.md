@@ -10,19 +10,19 @@ Inspired by `oxalica/nocargo`, this flake:
 - **Pure `rustc` compiler driver**:
   - Compiles `.rlib` dependencies and `proc-macro` crates independently.
   - Automatically compiles and executes build scripts (`build.rs`), capturing generated environment variables, `cargo:rustc-cfg`, and native library link search paths.
-  - Links rlib dependencies and workspace binaries using `rustc --crate-type bin`.
-- **Tests without cargo**: Generates test runner executables using `rustc --test` and runs unit and integration tests.
-- **Clippy without cargo**: Direct integration with `clippy-driver` to lint crates and enforce `-Dwarnings` in Nix derivations.
+  - Links rlib dependencies and workspace binaries using `rustc --crate-type bin` with default high-performance linkers (`lld` on Linux).
+- **Checks without cargo**: Generates independent CI checks for unit tests (`rustc --test`), clippy (`clippy-driver`), documentation (`rustdoc`), and doctests (`rustdoc --test`).
+- **Built-in DevShell & Apps**: Every workspace automatically generates a development shell (with `rustc`, `cargo`, `clippy`, `nix-fast-build`, direnv support) and a `lock` app.
 
-## Quickstart
+---
 
-1. In your Rust workspace, generate the bloomery lock manifest:
-   ```bash
-   nix run github:actionable/bloomery#lock
-   ```
-   This creates a `bloomery.lock` file next to your `Cargo.lock`.
+## Consumer APIs
 
-2. Use bloomery in your `flake.nix`:
+Bloomery supports three consumption workflows:
+
+### 1. Zero-Boilerplate (`bloomery.mkFlake`)
+
+The fastest way to package a Rust workspace:
 
 ```nix
 {
@@ -31,47 +31,173 @@ Inspired by `oxalica/nocargo`, this flake:
     bloomery.url = "github:actionable/bloomery";
   };
 
-  outputs = { self, nixpkgs, bloomery }:
+  outputs = { nixpkgs, bloomery, ... }:
+    bloomery.mkFlake {
+      inherit nixpkgs;
+      root = ./.;
+    };
+}
+```
+
+This automatically generates `packages`, `apps`, `checks`, and `devShells` across standard systems (`x86_64-linux`, `aarch64-linux`, `aarch64-darwin`).
+
+### 2. Standard Flake (`bloomery.lib.${system}.mkWorkspace`)
+
+When you want manual control over system outputs:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    bloomery.url = "github:actionable/bloomery";
+  };
+
+  outputs = { nixpkgs, bloomery, ... }:
     let
-      system = "x86_64-linux";
-      pkgs = nixpkgs.legacyPackages.${system};
+      systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
+      eachSystem = nixpkgs.lib.genAttrs systems;
+    in {
+      packages = eachSystem (system:
+        (bloomery.lib.${system}.mkWorkspace {
+          root = ./.;
+        }).packages
+      );
 
-      # Instantiate bloomery for your system
-      bl = bloomery.mkLib.${system};
+      checks = eachSystem (system:
+        (bloomery.lib.${system}.mkWorkspace {
+          root = ./.;
+        }).checks
+      );
 
-      # Compile your workspace
-      workspace = bl.mkWorkspace {
-        root = ./.;
-        # Optional overrides for native C dependencies:
-        overrides = {
-          openssl-sys = {
-            nativeBuildInputs = [ pkgs.pkg-config ];
-            buildInputs = [ pkgs.openssl ];
+      devShells = eachSystem (system: {
+        default = (bloomery.lib.${system}.mkWorkspace {
+          root = ./.;
+        }).devShell;
+      });
+    };
+}
+```
+
+*Tip*: If you have custom `pkgs` with overlays, construct the library directly with `bloomery.mkLib pkgs`.
+
+### 3. Flake-Parts Module (`bloomery.flakeModules.default`)
+
+Integrate into a `flake-parts` project with strongly-typed module options:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+    bloomery.url = "github:actionable/bloomery";
+  };
+
+  outputs = inputs@{ flake-parts, bloomery, ... }:
+    flake-parts.lib.mkFlake { inherit inputs; } {
+      imports = [ bloomery.flakeModules.default ];
+      systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
+      perSystem = { ... }: {
+        bloomery.workspace = {
+          root = ./.;
+          profile = {
+            optLevel = 3;
+            lto = "thin";
           };
         };
-      };
-    in {
-      # Workspace binaries (e.g. packages.x86_64-linux.my-binary)
-      packages.${system} = workspace.packages // {
-        default = workspace.packages.my-binary;
-      };
-
-      # Unit tests and Clippy linting
-      checks.${system} = workspace.checks;
-
-      # Lockfile generator app
-      apps.${system} = {
-        lock = bloomery.apps.${system}.lock;
       };
     };
 }
 ```
 
-## Structure
+---
 
-- [`lib/builders/`](./lib/builders): Modular compilers for libraries, binaries, test runners, docs, and clippy using raw `rustc`.
-- [`lib/workspace/`](./lib/workspace): Parses `Cargo.lock`, discovers workspace crates, and resolves profiles.
-- [`lib/lock/`](./lib/lock): Generates `bloomery.lock` manifests via `cargo metadata`.
-- [`lib/overrides/`](./lib/overrides): Built-in native dependencies for common `-sys` crates (`openssl`, `libpq`, `zlib`, `sqlite3`, etc.).
-- [`tests/basic-workspace`](./tests/basic-workspace): Complete reference workspace with library, binary, `build.rs`, unit tests, and crates.io dependencies.
-- [`tests/axum-workspace`](./tests/axum-workspace): Async web service test workspace with an Axum HTTP server and a Clap CLI client.
+## Categorized `mkWorkspace` Options
+
+Workspace configuration is strongly typed and organized into clear categories:
+
+```nix
+bloomery.lib.${system}.mkWorkspace {
+  # Top-level required setting
+  root = ./.;
+
+  # ── Source & Files ────────────────────────────────────────────────────────
+  source = {
+    cargoToml = ./Cargo.toml;           # defaults to root + "/Cargo.toml"
+    cargoLock = ./Cargo.lock;           # defaults to root + "/Cargo.lock"
+    bloomeryLock = null;                # auto-detected at root + "/bloomery.lock" if present
+    members = null;                     # subset of crate names (null = build all)
+  };
+
+  # ── Toolchain & Linker ────────────────────────────────────────────────────
+  toolchain = {
+    rustc = pkgs.rustc;
+    clippy = pkgs.clippy;
+    cargo = pkgs.cargo;
+    linker = "lld";                     # "lld" (default on Linux), "mold", or null (system)
+  };
+
+  # ── Compilation Profile ───────────────────────────────────────────────────
+  profile = {
+    optLevel = 3;                       # 0, 1, 2, 3, "s", "z"
+    lto = "thin";                       # "fat", "thin", "off", or bool
+    codegenUnits = 1;                   # positive int
+    panic = "abort";                    # "unwind", "abort"
+    strip = true;                       # true, false, "debuginfo", "symbols"
+    targetCpu = null;                   # e.g. "x86-64-v3"
+  };
+
+  # ── Custom Compiler & Runner Flags ────────────────────────────────────────
+  flags = {
+    rustc = [ "-Copt-level=3" ];        # base flags for binary & library builds
+    test = [];                          # extra flags for test runners
+    clippy = [];                        # extra flags for clippy-driver
+    doc = [ "-Dwarnings" ];             # extra flags for rustdoc
+    doctest = [];                       # extra flags for doctest runner
+  };
+
+  # ── Crate Overrides (Native Dependencies) ─────────────────────────────────
+  overrides = {
+    openssl-sys = {
+      nativeBuildInputs = [ pkgs.pkg-config ];
+      buildInputs = [ pkgs.openssl ];
+      rustcFlags = [];
+      env = {};
+      features = null;
+    };
+  };
+
+  # ── Development Shell (Direnv / nix develop) ──────────────────────────────
+  devShell = {
+    enable = true;                      # automatically generated devShell
+    packages = [ pkgs.rust-analyzer ];  # extra shell packages
+    shellHook = "";                     # bash setup script
+  };
+
+  # ── Checks & CI ───────────────────────────────────────────────────────────
+  checks = {
+    enable = true;                      # generate unit tests, clippy, doc, doctest checks
+    includePackageChecks = true;        # include binary and library package builds in checks
+    throwOnOutOfDate = false;           # fail evaluation immediately if lockfile is stale
+  };
+
+  # ── Feature Resolution ────────────────────────────────────────────────────
+  features = {
+    unify = true;                       # match Cargo's workspace feature unification
+    cratesIoIndex = null;               # custom crates.io index directory
+  };
+}
+```
+
+---
+
+## Workspace Outputs
+
+Calling `mkWorkspace` returns an attribute set with:
+
+- `packages`: Derivations for workspace member binary executables.
+- `apps`: Runnable app specifications (`${bin}`, `${bin}-doc`, and `lock`).
+- `checks`: Independent CI check derivations (`crate:test`, `crate:clippy`, `crate:doc`, `crate:doctest`, `crate:bin`, `crate:lib`, `workspace:lock`).
+- `devShell`: Preconfigured development shell with rustc, clippy, cargo, nix-fast-build, and lld.
+- `crates`: DAG attribute set of all built `.rlib` crates.
+- `lock`: Parsed lockfile representation.
+- `config`: Evaluated and type-checked options.

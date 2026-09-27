@@ -245,30 +245,42 @@ async fn home() -> Result<impl View, Error> {
 
                     <section id="quickstart">
                         <h2>"Quickstart"</h2>
-                        <p>"Import bloomery in your flake.nix and call mkWorkspace:"</p>
+                        <p>"Zero-boilerplate flake.nix using bloomery.mkFlake:"</p>
                         <pre><code>{r#"{
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    bloomery.url = "path:./bloomery";
+    bloomery.url = "github:actionable/bloomery";
   };
 
-  outputs = { self, nixpkgs, bloomery }:
+  outputs = { nixpkgs, bloomery, ... }:
+    bloomery.mkFlake {
+      inherit nixpkgs;
+      root = ./.;
+    };
+}"#}</code></pre>
+                        <p>"Or using bloomery.lib.${system}.mkWorkspace with categorized options:"</p>
+                        <pre><code>{r#"{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    bloomery.url = "github:actionable/bloomery";
+  };
+
+  outputs = { nixpkgs, bloomery, ... }:
     let
       system = "x86_64-linux";
-      pkgs = nixpkgs.legacyPackages.${system};
-      bl = bloomery.mkLib.${system};
-      workspace = bl.mkWorkspace {
+      workspace = bloomery.lib.${system}.mkWorkspace {
         root = ./.;
         profile = {
           optLevel = 3;
-          lto = "fat";
-          codegenUnits = 1;
+          lto = "thin";
         };
+        toolchain.linker = "lld";
       };
     in {
       packages.${system} = workspace.packages;
       apps.${system} = workspace.apps;
       checks.${system} = workspace.checks;
+      devShells.${system}.default = workspace.devShell;
     };
 }"#}</code></pre>
                     </section>
@@ -412,21 +424,75 @@ async fn api() -> Result<impl View, Error> {
                 <main>
                     <section>
                         <h2>"mkWorkspace API Reference"</h2>
-                        <pre><code>{r#"bl.mkWorkspace {
-  root = ./.;                                  # Workspace root path
-  cargoLock ? root + "/Cargo.lock";           # Path to Cargo.lock
-  cargoToml ? root + "/Cargo.toml";           # Path to Cargo.toml
-  rustc ? pkgs.rustc;                         # Rust compiler
-  clippy ? pkgs.clippy;                       # Clippy driver
-  unifyFeatures ? true;                       # Unify features across workspace
-  profile ? {                                 # Strongly-typed compilation profile
-    optLevel = 3;
-    lto = "fat";
-    codegenUnits = 1;
-    panic = "abort";
-    strip = true;
+                        <pre><code>{r#"bloomery.lib.${system}.mkWorkspace {
+  # Top-level required setting
+  root = ./.;
+
+  # ── Source & Files ──────────────────────────────────
+  source = {
+    cargoToml = ./Cargo.toml;       # defaults to root + "/Cargo.toml"
+    cargoLock = ./Cargo.lock;       # defaults to root + "/Cargo.lock"
+    bloomeryLock = null;            # auto-detected if present
+    members = null;                 # null builds all workspace crates
   };
-  overrides ? {};                             # Crate build overrides & features
+
+  # ── Toolchain & Linker ──────────────────────────────
+  toolchain = {
+    rustc = pkgs.rustc;
+    clippy = pkgs.clippy;
+    cargo = pkgs.cargo;
+    linker = "lld";                 # "lld" (Linux default), "mold", or null
+  };
+
+  # ── Compilation Profile ─────────────────────────────
+  profile = {
+    optLevel = 3;                   # 0, 1, 2, 3, "s", "z"
+    lto = "thin";                   # "fat", "thin", "off", or bool
+    codegenUnits = 1;               # positive integer
+    panic = "abort";                # "unwind", "abort"
+    strip = true;                   # true, false, "symbols", "debuginfo"
+    targetCpu = null;               # e.g. "x86-64-v3"
+  };
+
+  # ── Flags ───────────────────────────────────────────
+  flags = {
+    rustc = [ "-Copt-level=3" ];    # base flags for binary & lib builds
+    test = [];                      # extra flags for test runners
+    clippy = [];                    # extra flags for clippy-driver
+    doc = [ "-Dwarnings" ];         # extra flags for rustdoc
+    doctest = [];                   # extra flags for doctest runner
+  };
+
+  # ── Crate Overrides ─────────────────────────────────
+  overrides = {
+    openssl-sys = {
+      nativeBuildInputs = [ pkgs.pkg-config ];
+      buildInputs = [ pkgs.openssl ];
+      rustcFlags = [];
+      env = {};
+      features = null;
+    };
+  };
+
+  # ── Development Shell ───────────────────────────────
+  devShell = {
+    enable = true;                  # automatic devShell output
+    packages = [];                  # extra shell tools
+    shellHook = "";                 # bash setup script
+  };
+
+  # ── Checks & CI ─────────────────────────────────────
+  checks = {
+    enable = true;                  # unit tests, clippy, doc, doctest
+    includePackageChecks = true;    # build packages as CI checks
+    throwOnOutOfDate = false;       # error immediately if lock is stale
+  };
+
+  # ── Features ────────────────────────────────────────
+  features = {
+    unify = true;                   # Cargo-compatible feature unification
+    cratesIoIndex = null;           # custom crates.io index directory
+  };
 }"#}</code></pre>
                     </section>
                 </main>

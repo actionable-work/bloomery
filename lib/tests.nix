@@ -3,10 +3,12 @@
   lib ? pkgs.lib,
 }: let
   profile = import ./profile {inherit lib;};
-  workspace = import ./workspace {inherit lib;};
+  workspace = import ./workspace {inherit pkgs lib;};
+  mkFlakeTests = import ./mk-flake.test.nix {inherit pkgs lib;};
+  flakeModuleTests = import ./modules/flake-module.test.nix {inherit pkgs lib;};
 
   # Aggregate all colocated unit tests
-  testCases = profile.tests // workspace.tests;
+  testCases = profile.tests // workspace.tests // mkFlakeTests // flakeModuleTests;
 
   failedTests = lib.runTests testCases;
 in {

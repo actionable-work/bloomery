@@ -17,35 +17,28 @@
       "aarch64-darwin"
     ];
     eachSystem = nixpkgs.lib.genAttrs systems;
+    workspaces = eachSystem (
+      system:
+        bloomery.lib.${system}.mkWorkspace {
+          root = ./.;
+          profile = {
+            optLevel = 3;
+            codegenUnits = 16;
+          };
+          toolchain = {
+            linker = "lld";
+          };
+          flags = {
+            rustc = ["-Copt-level=3"];
+          };
+        }
+    );
   in {
-    packages = eachSystem (
-      system: let
-        bl = bloomery.mkLib.${system};
-        workspace = bl.mkWorkspace {
-          root = ./.;
-        };
-      in
-        workspace.packages
-    );
-
-    apps = eachSystem (
-      system: let
-        bl = bloomery.mkLib.${system};
-        workspace = bl.mkWorkspace {
-          root = ./.;
-        };
-      in
-        workspace.apps
-    );
-
-    checks = eachSystem (
-      system: let
-        bl = bloomery.mkLib.${system};
-        workspace = bl.mkWorkspace {
-          root = ./.;
-        };
-      in
-        workspace.checks
-    );
+    packages = eachSystem (system: workspaces.${system}.packages);
+    apps = eachSystem (system: workspaces.${system}.apps);
+    checks = eachSystem (system: workspaces.${system}.checks);
+    devShells = eachSystem (system: {
+      default = workspaces.${system}.devShell;
+    });
   };
 }
