@@ -154,6 +154,7 @@
             pkgs.clippy
             pkgs.cargo
             pkgs.jq
+            pkgs.nix-fast-build
           ];
         };
       }
