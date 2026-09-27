@@ -505,6 +505,23 @@ async fn api() -> Result<impl View, Error> {
   };
 }"#}</code></pre>
                     </section>
+
+                    <section>
+                        <h2>"Colocated Package Overrides (overrides.nix)"</h2>
+                        <p>"Place an overrides.nix file next to any crate's Cargo.toml to configure package-specific filesets, compilation flags, or native dependencies:"</p>
+                        <pre><code>{r#"# crates/my-app/overrides.nix
+{ pkgs, lib, ... }: {
+  fileset = lib.fileset.unions [
+    ./src
+    ./Cargo.toml
+    ./templates
+  ];
+  rustcFlags = [ "-Ctarget-cpu=native" ];
+  nativeBuildInputs = [ pkgs.pkg-config ];
+  buildInputs = [ pkgs.openssl ];
+  env = { ASSETS_DIR = "./assets"; };
+}"#}</code></pre>
+                    </section>
                 </main>
             </body>
         </html>

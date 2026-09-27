@@ -38,6 +38,21 @@
         default = null;
         description = "Override active features for this crate (null to use resolved features).";
       };
+      fileset = lib.mkOption {
+        type = types.nullOr types.raw;
+        default = null;
+        description = "Custom lib.fileset for this workspace crate.";
+      };
+      src = lib.mkOption {
+        type = types.nullOr (types.either types.path types.package);
+        default = null;
+        description = "Custom source derivation or path for this workspace crate.";
+      };
+      profile = lib.mkOption {
+        type = types.attrsOf types.anything;
+        default = {};
+        description = "Per-crate binary profile override settings.";
+      };
     };
   };
 

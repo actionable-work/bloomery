@@ -39,20 +39,79 @@ in
     throwOnOutOfDate = cfg.checks.throwOnOutOfDate;
     includePackageChecks = cfg.checks.includePackageChecks;
 
-    overrides = cfg.overrides;
-    effectiveOverrides = defaultOverrides // overrides;
+    # Discover workspace members from Cargo.toml or explicit option
+    rawDiscoveredMembers =
+      if workspaceMembers != null
+      then workspaceMembers
+      else workspace.discoverWorkspaceCrates {inherit root cargoTomlPath;};
 
-    builderCrate = builders.buildCrateWith {inherit rustc stdenv mold lld defaultLinker;};
-    builderBin = builders.buildBinWith {inherit rustc stdenv mold lld defaultLinker;};
-    builderTest = builders.testCrateWith {inherit rustc stdenv mold lld defaultLinker;};
-    builderClippy = builders.clippyCrateWith {inherit rustc clippy stdenv;};
-    builderDoc = builders.docCrateWith {inherit rustc stdenv;};
-    builderDocTest = builders.doctestCrateWith {inherit rustc stdenv mold lld defaultLinker;};
-    builderLockCheck = import ./workspace/lock-check.nix {inherit pkgs lib;};
+    # Support colocated overrides.nix files next to member Cargo.toml files
+    loadColocatedOverride = crateDir: let
+      overridePath = crateDir + "/overrides.nix";
+    in
+      if builtins.pathExists overridePath
+      then let
+        imported = import overridePath;
+      in
+        if builtins.isFunction imported
+        then let
+          fnArgs = builtins.functionArgs imported;
+          availableArgs = {inherit pkgs lib;};
+          passedArgs =
+            if fnArgs == {}
+            then availableArgs
+            else builtins.intersectAttrs fnArgs availableArgs;
+        in
+          imported passedArgs
+        else imported
+      else {};
 
-    mkCheckName = crateName: checkType: "${crateName}:${checkType}";
+    colocatedOverrides = lib.mapAttrs (_cname: crateDir: loadColocatedOverride crateDir) rawDiscoveredMembers;
 
-    parsed = workspace.parseLock {lockFile = cargoLock;};
+    mergeOverrides = a: b: let
+      mergedFeats =
+        if b ? features && b.features != null
+        then b.features
+        else if a ? features && a.features != null
+        then a.features
+        else null;
+    in
+      a
+      // b
+      // {
+        nativeBuildInputs = (a.nativeBuildInputs or []) ++ (b.nativeBuildInputs or []);
+        buildInputs = (a.buildInputs or []) ++ (b.buildInputs or []);
+        rustcFlags = (a.rustcFlags or []) ++ (b.rustcFlags or []);
+        rustdocFlags = (a.rustdocFlags or []) ++ (b.rustdocFlags or []);
+        env = (a.env or {}) // (b.env or {});
+        profile = (a.profile or {}) // (b.profile or {});
+        src =
+          if b ? src && b.src != null
+          then b.src
+          else a.src or null;
+        fileset =
+          if b ? fileset && b.fileset != null
+          then b.fileset
+          else a.fileset or null;
+      }
+      // lib.optionalAttrs (mergedFeats != null) {
+        features = mergedFeats;
+      };
+
+    allOverrideNames = lib.unique (
+      (builtins.attrNames defaultOverrides)
+      ++ (builtins.attrNames colocatedOverrides)
+      ++ (builtins.attrNames cfg.overrides)
+    );
+
+    effectiveOverrides = lib.genAttrs allOverrideNames (
+      name: let
+        defOvr = defaultOverrides.${name} or {};
+        colocOvr = colocatedOverrides.${name} or {};
+        userOvr = cfg.overrides.${name} or {};
+      in
+        mergeOverrides (mergeOverrides defOvr colocOvr) userOvr
+    );
 
     cleanWorkspaceSource = p:
       if builtins.isAttrs p && p ? _isLibCleanSourceWith
@@ -70,11 +129,32 @@ in
         }
       else p;
 
-    rawDiscoveredMembers =
-      if workspaceMembers != null
-      then workspaceMembers
-      else workspace.discoverWorkspaceCrates {inherit root cargoTomlPath;};
-    discoveredMembers = lib.mapAttrs (_: cleanWorkspaceSource) rawDiscoveredMembers;
+    resolveMemberSource = cname: crateDir: let
+      cOverride = effectiveOverrides.${cname} or {};
+    in
+      if cOverride ? src && cOverride.src != null
+      then cOverride.src
+      else if cOverride ? fileset && cOverride.fileset != null
+      then
+        lib.fileset.toSource {
+          root = crateDir;
+          fileset = cOverride.fileset;
+        }
+      else cleanWorkspaceSource crateDir;
+
+    discoveredMembers = lib.mapAttrs resolveMemberSource rawDiscoveredMembers;
+
+    builderCrate = builders.buildCrateWith {inherit rustc stdenv mold lld defaultLinker;};
+    builderBin = builders.buildBinWith {inherit rustc stdenv mold lld defaultLinker;};
+    builderTest = builders.testCrateWith {inherit rustc stdenv mold lld defaultLinker;};
+    builderClippy = builders.clippyCrateWith {inherit rustc clippy stdenv;};
+    builderDoc = builders.docCrateWith {inherit rustc stdenv;};
+    builderDocTest = builders.doctestCrateWith {inherit rustc stdenv mold lld defaultLinker;};
+    builderLockCheck = import ./workspace/lock-check.nix {inherit pkgs lib;};
+
+    mkCheckName = crateName: checkType: "${crateName}:${checkType}";
+
+    parsed = workspace.parseLock {lockFile = cargoLock;};
 
     # Load and validate bloomery.lock if available
     lockName =

@@ -75,6 +75,8 @@ in {
             nativeBuildInputs = [pkgs.hello];
             rustcFlags = ["-Cprefer-dynamic"];
             env = {FOO = "bar";};
+            profile = {optLevel = 1;};
+            src = ./.;
           };
         };
       };
@@ -82,11 +84,15 @@ in {
       fooNativeDeps = builtins.length cfg.overrides.foo-sys.nativeBuildInputs;
       fooFlags = cfg.overrides.foo-sys.rustcFlags;
       fooEnv = cfg.overrides.foo-sys.env.FOO;
+      fooProfileOptLevel = cfg.overrides.foo-sys.profile.optLevel;
+      hasSrc = cfg.overrides.foo-sys.src == ./.;
     };
     expected = {
       fooNativeDeps = 1;
       fooFlags = ["-Cprefer-dynamic"];
       fooEnv = "bar";
+      fooProfileOptLevel = 1;
+      hasSrc = true;
     };
   };
 }

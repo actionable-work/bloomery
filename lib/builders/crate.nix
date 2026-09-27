@@ -50,7 +50,7 @@
   nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc] ++ lib.optional (linkerPackage != null) linkerPackage;
   buildInputs = override.buildInputs or [];
   featureList =
-    if override ? features
+    if override ? features && override.features != null
     then override.features
     else features;
 

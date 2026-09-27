@@ -165,6 +165,39 @@ bloomery.lib.${system}.mkWorkspace {
       features = null;
     };
   };
+}
+```
+
+### Colocated Package Overrides (`overrides.nix`)
+
+In addition to top-level `overrides`, Bloomery automatically discovers and loads an `overrides.nix` file placed next to any workspace member's `Cargo.toml`. This allows individual packages to define custom filesets, compilation flags, environment variables, or native dependencies:
+
+```nix
+# crates/my-app/overrides.nix
+{ pkgs, lib, ... }: {
+  # Custom fileset (automatically converted to a clean derivation source)
+  fileset = lib.fileset.unions [
+    ./src
+    ./Cargo.toml
+    ./templates
+    ./assets
+  ];
+
+  # Package-specific rustc compiler flags
+  rustcFlags = [
+    "-Ctarget-cpu=native"
+  ];
+
+  # Additional build-time tools and runtime C libraries
+  nativeBuildInputs = [ pkgs.pkg-config ];
+  buildInputs = [ pkgs.openssl ];
+
+  # Environment variables for compilation
+  env = {
+    CUSTOM_ASSETS = "./assets";
+  };
+}
+```
 
   # ── Development Shell (Direnv / nix develop) ──────────────────────────────
   devShell = {
