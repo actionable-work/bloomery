@@ -49,4 +49,23 @@ in {
     expr = (builtins.head parsed.byName.foo).depIds;
     expected = ["bar-0.2.0"];
   };
+
+  testParseGitDepString = {
+    expr = parseLock.parseDepString "my-git-crate 0.3.0 (git+https://github.com/foo/bar.git?branch=main#0123456789abcdef)";
+    expected = {
+      name = "my-git-crate";
+      version = "0.3.0";
+      source = "git+https://github.com/foo/bar.git?branch=main#0123456789abcdef";
+      raw = "my-git-crate 0.3.0 (git+https://github.com/foo/bar.git?branch=main#0123456789abcdef)";
+    };
+  };
+
+  testCrlfHashNormalization = let
+    crlfContent = "version = 3\r\n\r\n[[package]]\r\nname = \"foo\"\r\n";
+    lfContent = "version = 3\n\n[[package]]\nname = \"foo\"\n";
+    hashNormalize = s: builtins.hashString "sha256" (lib.replaceStrings ["\r\n"] ["\n"] s);
+  in {
+    expr = (hashNormalize crlfContent) == (hashNormalize lfContent);
+    expected = true;
+  };
 }

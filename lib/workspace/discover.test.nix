@@ -21,4 +21,21 @@ in {
       hasLibMsg = true;
     };
   };
+
+  testDiscoverRootAndExclude = let
+    edgeCasesDiscovered = discover.discoverWorkspaceCrates {
+      root = ../../tests/edge-cases-workspace;
+    };
+  in {
+    expr = {
+      hasRootPackage = edgeCasesDiscovered ? edge-cases-root;
+      hasMemberApp = edgeCasesDiscovered ? member-app;
+      hasIgnoredCrate = edgeCasesDiscovered ? ignored-crate;
+    };
+    expected = {
+      hasRootPackage = true;
+      hasMemberApp = true;
+      hasIgnoredCrate = false;
+    };
+  };
 }
