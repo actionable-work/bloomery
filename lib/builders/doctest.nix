@@ -70,6 +70,7 @@ in
       RUSTDOC = "${rustc}/bin/rustdoc";
       RUSTC = "${rustc}/bin/rustc";
       CRATE_NAME = crateName;
+      CARGO_CRATE_NAME = crateName;
       PKG_NAME = pname;
       PKG_VERSION = version;
 
@@ -91,6 +92,8 @@ in
 
       configurePhase = ''
         runHook preConfigure
+
+        export CARGO_MANIFEST_DIR="$PWD"
 
         EDITION="${
           if edition != null

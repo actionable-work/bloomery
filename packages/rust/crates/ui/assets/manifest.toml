@@ -1,0 +1,25 @@
+version = 1
+
+[[assets]]
+id = 5980739593239084941
+file = "bloomery.css"
+hash = "cc5dbd6dd382bfa5"
+content_type = "text/css"
+
+[[assets]]
+id = 17480042475603922802
+file = "bloomery-forge.svg"
+hash = "7c8d810635c14f4a"
+content_type = "image/svg+xml"
+
+[[assets]]
+id = 14284000542628707956
+file = "bloomery.css"
+hash = "cc5dbd6dd382bfa5"
+content_type = "text/css"
+
+[[assets]]
+id = 3593387884842354127
+file = "bloomery-forge.svg"
+hash = "7c8d810635c14f4a"
+content_type = "image/svg+xml"

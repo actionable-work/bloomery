@@ -563,6 +563,27 @@ in
           fi
         done
 
+        # Discover and forward dependency assets for transitive downstream consumers
+        for dep in $dependencies; do
+          for adir in "assets" "static" "public"; do
+            if [ -d "$dep/$adir" ]; then
+              mkdir -p "$out/$adir"
+              cp -rn "$dep/$adir"/* "$out/$adir/" 2>/dev/null || cp -r "$dep/$adir"/* "$out/$adir/" 2>/dev/null || true
+            fi
+          done
+        done
+
+        # Discover and install library assets for downstream consumers (own assets take precedence)
+        mkdir -p "$out/share/$PKG_NAME"
+        for adir in "assets" "static" "public" ${lib.concatStringsSep " " (override.assetDirs or [])}; do
+          if [ -d "$adir" ]; then
+            mkdir -p "$out/$adir" "$out/share/$PKG_NAME/$adir"
+            cp -r "$adir"/* "$out/$adir/" 2>/dev/null || true
+            cp -r "$adir"/* "$out/share/$PKG_NAME/$adir/" 2>/dev/null || true
+            chmod -R u+w "$out/$adir" "$out/share/$PKG_NAME/$adir" 2>/dev/null || true
+          fi
+        done
+
         cat << EOF > "$out/nix-support/meta.sh"
         export DEP_PKG_NAME="$PKG_NAME"
         export DEP_CRATE_NAME="$CRATE_NAME"
@@ -570,6 +591,16 @@ in
         export DEP_IS_PROC_MACRO="$IS_PROC_MACRO"
         export DEP_RUSTC_LINK_FLAGS="''${BUILD_SCRIPT_LINK_FLAGS[*]}"
         EOF
+        if [ -d "$out/assets" ]; then
+          echo 'export DEP_HAS_ASSETS=1' >> "$out/nix-support/meta.sh"
+          echo "export DEP_ASSETS_DIR=\"$out/assets\"" >> "$out/nix-support/meta.sh"
+        fi
+        if [ -d "$out/static" ]; then
+          echo "export DEP_STATIC_DIR=\"$out/static\"" >> "$out/nix-support/meta.sh"
+        fi
+        if [ -d "$out/public" ]; then
+          echo "export DEP_PUBLIC_DIR=\"$out/public\"" >> "$out/nix-support/meta.sh"
+        fi
         if [ ''${#BUILD_SCRIPT_METADATA[@]} -gt 0 ]; then
           printf '%s\n' "''${BUILD_SCRIPT_METADATA[@]}" >> "$out/nix-support/meta.sh"
         fi

@@ -1,4 +1,6 @@
 [dependencies]
+bloomery-content = { path = "../../crates/content" }
+bloomery-ui = { path = "../../crates/ui" }
 tokio = { version = "1", default-features = false, features = [
   "macros",
   "net",
@@ -10,6 +12,7 @@ topcoat = { version = "0.9.0", default-features = false, features = [
   "router",
   "serve",
   "compression",
+  "asset",
 ] }
 
 [package]

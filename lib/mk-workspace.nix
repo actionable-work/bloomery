@@ -384,6 +384,19 @@ in
             else {};
           edition = pkgLock.edition or null;
 
+          workspaceAssets =
+            if builtins.pathExists (root + "/assets")
+            then (root + "/assets")
+            else null;
+          workspaceStatic =
+            if builtins.pathExists (root + "/static")
+            then (root + "/static")
+            else null;
+          workspacePublic =
+            if builtins.pathExists (root + "/public")
+            then (root + "/public")
+            else null;
+
           ctoml =
             if cratePath != null && builtins.pathExists (cratePath + "/Cargo.toml")
             then builtins.fromTOML (builtins.readFile (cratePath + "/Cargo.toml"))
@@ -410,6 +423,7 @@ in
                     pkg = wpkg;
                     src = cratePath;
                     inherit entry crateDrv edition;
+                    inherit workspaceAssets workspaceStatic workspacePublic;
                     dependencies = depDrvs;
                     override = cOverride;
                     profile = effectiveBinaryProfile;
@@ -451,6 +465,7 @@ in
               src = cratePath;
               entry = "src/main.rs";
               inherit crateDrv edition;
+              inherit workspaceAssets workspaceStatic workspacePublic;
               dependencies = depDrvs;
               override = cOverride;
               profile = effectiveBinaryProfile;
@@ -470,6 +485,7 @@ in
                   src = cratePath;
                   entry = "src/bin/${bf}";
                   inherit crateDrv edition;
+                  inherit workspaceAssets workspaceStatic workspacePublic;
                   dependencies = depDrvs;
                   override = cOverride;
                   profile = effectiveBinaryProfile;
@@ -489,6 +505,7 @@ in
                   src = cratePath;
                   entry = "src/bin/${dname}/main.rs";
                   inherit crateDrv edition;
+                  inherit workspaceAssets workspaceStatic workspacePublic;
                   dependencies = depDrvs;
                   override = cOverride;
                   profile = effectiveBinaryProfile;

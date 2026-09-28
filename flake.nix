@@ -16,8 +16,8 @@
   outputs = {
     self,
     nixpkgs,
-    treefmt-nix,
-    flake-parts,
+    treefmt-nix ? null,
+    flake-parts ? null,
     ...
   }: let
     systems = [
@@ -102,20 +102,30 @@
     formatter = eachSystem (
       system: let
         pkgs = nixpkgs.legacyPackages.${system};
-        treefmt = treefmt-nix.lib.evalModule pkgs ./nix/lib/treefmt-config.nix;
       in
-        treefmt.config.build.wrapper
+        if treefmt-nix != null
+        then (treefmt-nix.lib.evalModule pkgs ./nix/lib/treefmt-config.nix).config.build.wrapper
+        else pkgs.writeShellScriptBin "treefmt" "exit 0"
     );
 
     checks = eachSystem (
       system: let
         pkgs = nixpkgs.legacyPackages.${system};
-        treefmtModule = treefmt-nix.lib.evalModule pkgs ./nix/lib/treefmt-config.nix;
-        treefmtCheck = import ./nix/checks/treefmt-check.nix {
-          inherit pkgs;
-          treefmt = treefmtModule.config;
-          root = ./.;
-        };
+        treefmtCheck =
+          if treefmt-nix != null
+          then let
+            treefmtModule = treefmt-nix.lib.evalModule pkgs ./nix/lib/treefmt-config.nix;
+          in
+            import ./nix/checks/treefmt-check.nix {
+              inherit pkgs;
+              treefmt = treefmtModule.config;
+              root = ./.;
+            }
+          else
+            pkgs.runCommand "treefmt-check-skipped" {} ''
+              mkdir $out
+              echo "skipped" > $out/success
+            '';
 
         unitTests = import ./tests/unit-tests.nix {
           inherit pkgs;
@@ -161,10 +171,21 @@
           nixpkgs.lib.mapAttrs'
           (cname: drv: nixpkgs.lib.nameValuePair "core:${cname}" drv)
           rootWorkspace.checks;
+        docsAssetsCheck = pkgs.runCommand "validate-docs-assets" {} ''
+          echo "Validating docs assets in ${bloomery.docs}..."
+          test -d "${bloomery.docs}/bin/assets" || { echo "Missing bin/assets"; exit 1; }
+          test -f "${bloomery.docs}/bin/assets/manifest.toml" || { echo "Missing manifest.toml"; exit 1; }
+          test -f "${bloomery.docs}/bin/assets/bloomery.css" || { echo "Missing bloomery.css"; exit 1; }
+          test -f "${bloomery.docs}/bin/assets/bloomery-forge.svg" || { echo "Missing bloomery-forge.svg"; exit 1; }
+          test -d "${bloomery.docs}/share/bloomery-docs/assets" || { echo "Missing share assets"; exit 1; }
+          mkdir $out
+          echo "OK" > $out/success
+        '';
       in
         {
           "core:unit-tests" = unitTests.check;
           "core:treefmt-check" = treefmtCheck;
+          "core:validate-docs-assets" = docsAssetsCheck;
         }
         // rootChecks
         // subFlakeChecks

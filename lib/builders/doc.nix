@@ -34,6 +34,7 @@ in
       CRATE_NAME = crateName;
       PKG_NAME = pname;
       PKG_VERSION = version;
+      CARGO_CRATE_NAME = crateName;
 
       unpackPhase = ''
         runHook preUnpack
@@ -51,6 +52,8 @@ in
 
       configurePhase = ''
         runHook preConfigure
+
+        export CARGO_MANIFEST_DIR="$PWD"
 
         EDITION="${
           if edition != null

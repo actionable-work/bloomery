@@ -56,4 +56,19 @@ mod tests {
             "Expected bloomery_toplevel_overrides_validated cfg to be enabled!"
         );
     }
+
+    #[test]
+    fn test_runtime_asset_file_presence() {
+        // Assets are available either at ./assets (current dir during tests) or adjacent to exe
+        let path = if std::path::Path::new("assets/data.txt").is_file() {
+            std::path::PathBuf::from("assets/data.txt")
+        } else if let Ok(exe) = std::env::current_exe() {
+            exe.parent().unwrap().join("assets").join("data.txt")
+        } else {
+            panic!("Could not locate runtime assets/data.txt");
+        };
+        assert!(path.is_file(), "assets/data.txt must exist at runtime");
+        let content = std::fs::read_to_string(path).expect("read runtime asset file");
+        assert_eq!(content.trim(), "hello-from-fileset-asset");
+    }
 }

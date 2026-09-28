@@ -40,6 +40,9 @@ in
     profile ? {},
     defaultRustcFlags ? ["-Copt-level=3"],
     edition ? null,
+    workspaceAssets ? null,
+    workspaceStatic ? null,
+    workspacePublic ? null,
   }: let
     pname = binName;
     version = pkg.version;
@@ -330,6 +333,73 @@ in
         installPhase = ''
           runHook preInstall
           # Binaries already placed in $out/bin/$BIN_NAME
+
+          # Discover, collect, and bundle assets into $out/bin and $out/share
+          mkdir -p "$out/share/$BIN_NAME"
+
+          # 1. Collect assets from dependencies (libraries, UI crates, asset packs)
+          for dep in $dependencies $crateDrv; do
+            if [ -d "$dep/assets" ]; then
+              mkdir -p "$out/bin/assets" "$out/share/$BIN_NAME/assets"
+              cp -rn "$dep/assets"/* "$out/bin/assets/" 2>/dev/null || cp -r "$dep/assets"/* "$out/bin/assets/" 2>/dev/null || true
+              cp -rn "$dep/assets"/* "$out/share/$BIN_NAME/assets/" 2>/dev/null || cp -r "$dep/assets"/* "$out/share/$BIN_NAME/assets/" 2>/dev/null || true
+            fi
+            if [ -d "$dep/static" ]; then
+              mkdir -p "$out/bin/static" "$out/share/$BIN_NAME/static"
+              cp -rn "$dep/static"/* "$out/bin/static/" 2>/dev/null || cp -r "$dep/static"/* "$out/bin/static/" 2>/dev/null || true
+              cp -rn "$dep/static"/* "$out/share/$BIN_NAME/static/" 2>/dev/null || cp -r "$dep/static"/* "$out/share/$BIN_NAME/static/" 2>/dev/null || true
+            fi
+            if [ -d "$dep/public" ]; then
+              mkdir -p "$out/bin/public" "$out/share/$BIN_NAME/public"
+              cp -rn "$dep/public"/* "$out/bin/public/" 2>/dev/null || cp -r "$dep/public"/* "$out/bin/public/" 2>/dev/null || true
+              cp -rn "$dep/public"/* "$out/share/$BIN_NAME/public/" 2>/dev/null || cp -r "$dep/public"/* "$out/share/$BIN_NAME/public/" 2>/dev/null || true
+            fi
+          done
+
+          # 2. Collect workspace-level assets (if present at workspace root)
+          ${lib.optionalString (workspaceAssets != null) ''
+            if [ -d "${workspaceAssets}" ]; then
+              mkdir -p "$out/bin/assets" "$out/share/$BIN_NAME/assets"
+              cp -rn "${workspaceAssets}"/* "$out/bin/assets/" 2>/dev/null || cp -r "${workspaceAssets}"/* "$out/bin/assets/" 2>/dev/null || true
+              cp -rn "${workspaceAssets}"/* "$out/share/$BIN_NAME/assets/" 2>/dev/null || cp -r "${workspaceAssets}"/* "$out/share/$BIN_NAME/assets/" 2>/dev/null || true
+            fi
+          ''}
+          ${lib.optionalString (workspaceStatic != null) ''
+            if [ -d "${workspaceStatic}" ]; then
+              mkdir -p "$out/bin/static" "$out/share/$BIN_NAME/static"
+              cp -rn "${workspaceStatic}"/* "$out/bin/static/" 2>/dev/null || cp -r "${workspaceStatic}"/* "$out/bin/static/" 2>/dev/null || true
+              cp -rn "${workspaceStatic}"/* "$out/share/$BIN_NAME/static/" 2>/dev/null || cp -r "${workspaceStatic}"/* "$out/share/$BIN_NAME/static/" 2>/dev/null || true
+            fi
+          ''}
+          ${lib.optionalString (workspacePublic != null) ''
+            if [ -d "${workspacePublic}" ]; then
+              mkdir -p "$out/bin/public" "$out/share/$BIN_NAME/public"
+              cp -rn "${workspacePublic}"/* "$out/bin/public/" 2>/dev/null || cp -r "${workspacePublic}"/* "$out/bin/public/" 2>/dev/null || true
+              cp -rn "${workspacePublic}"/* "$out/share/$BIN_NAME/public/" 2>/dev/null || cp -r "${workspacePublic}"/* "$out/share/$BIN_NAME/public/" 2>/dev/null || true
+            fi
+          ''}
+
+          # 3. Collect binary crate's own assets (takes precedence over dependency assets)
+          for adir in "assets" "static" "public" ${lib.concatStringsSep " " (override.assetDirs or [])}; do
+            if [ -d "$adir" ]; then
+              mkdir -p "$out/bin/$adir" "$out/share/$BIN_NAME/$adir"
+              cp -r "$adir"/* "$out/bin/$adir/" 2>/dev/null || true
+              cp -r "$adir"/* "$out/share/$BIN_NAME/$adir/" 2>/dev/null || true
+            fi
+          done
+
+          # 4. Explicit extra asset paths from overrides.nix
+          ${lib.concatMapStringsSep "\n" (assetPath: ''
+            if [ -e "${assetPath}" ]; then
+              mkdir -p "$out/bin/assets" "$out/share/$BIN_NAME/assets"
+              cp -r "${assetPath}" "$out/bin/assets/" 2>/dev/null || true
+              cp -r "${assetPath}" "$out/share/$BIN_NAME/assets/" 2>/dev/null || true
+            fi
+          '') (override.assets or [])}
+
+          # Ensure copied assets have standard write permissions in derivation
+          chmod -R u+w "$out/bin/assets" "$out/bin/static" "$out/bin/public" "$out/share" 2>/dev/null || true
+
           runHook postInstall
         '';
       }
