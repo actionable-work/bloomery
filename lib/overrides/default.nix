@@ -73,4 +73,36 @@ in {
   aws-lc-sys = {
     nativeBuildInputs = [pkgs.cmake] ++ lib.optionals pkgs.stdenv.hostPlatform.isDarwin [pkgs.darwin.cctools];
   };
+
+  bzip2-sys = {
+    nativeBuildInputs = [pkgs.pkg-config];
+    buildInputs = [pkgs.bzip2];
+  };
+
+  lz4-sys = {
+    nativeBuildInputs = [pkgs.pkg-config];
+    buildInputs = [pkgs.lz4];
+  };
+
+  libgit2-sys = {
+    nativeBuildInputs = [pkgs.pkg-config];
+    buildInputs = [pkgs.libgit2 pkgs.openssl pkgs.zlib];
+  };
+
+  libssh2-sys = {
+    nativeBuildInputs = [pkgs.pkg-config];
+    buildInputs = [pkgs.libssh2 pkgs.openssl pkgs.zlib];
+  };
+
+  libudev-sys = {
+    nativeBuildInputs = [pkgs.pkg-config];
+    buildInputs = lib.optionals pkgs.stdenv.hostPlatform.isLinux [pkgs.systemdLibs];
+  };
+
+  prost-build = {
+    nativeBuildInputs = [pkgs.protobuf];
+    env = {
+      PROTOC = "${pkgs.protobuf}/bin/protoc";
+    };
+  };
 }

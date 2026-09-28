@@ -107,12 +107,21 @@ in
         ENTRY=""
         if [ -f src/lib.rs ]; then
           ENTRY="src/lib.rs"
+        elif [ -f lib.rs ]; then
+          ENTRY="lib.rs"
         elif [ -f src/main.rs ]; then
           ENTRY="src/main.rs"
+        elif [ -f main.rs ]; then
+          ENTRY="main.rs"
+        elif [ -f Cargo.toml ]; then
+          LIB_PATH=$(sed -n -E 's/^[[:space:]]*path[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' Cargo.toml | head -n 1)
+          if [ -n "$LIB_PATH" ] && [ -f "$LIB_PATH" ]; then
+            ENTRY="$LIB_PATH"
+          fi
         fi
 
-        if [ -z "$ENTRY" ]; then
-          echo "No testable entrypoint found for $PKG_NAME"
+        if [ -z "$ENTRY" ] && [ ! -d tests ]; then
+          echo "No testable entrypoint or integration tests found for $PKG_NAME"
           mkdir -p $out
           echo "skipped" > $out/skipped
           exit 0
@@ -274,32 +283,52 @@ in
           done < _build_script/stdout.txt
         fi
 
-        echo "Compiling test binary for $CRATE_NAME..."
-        $RUSTC --test "$ENTRY" \
-          --crate-name "$CRATE_NAME" \
-          $EDITION_FLAG \
-          -L dependency=_deps \
-          "''${EXTERN_FLAGS[@]}" \
-          "''${BUILD_SCRIPT_FLAGS[@]}" \
-          "''${EXTRA_LINK_FLAGS[@]}" \
-          ${lib.escapeShellArgs extraRustcFlags} \
-          -o _unit_test_runner
+        if [ -n "$ENTRY" ]; then
+          echo "Compiling test binary for $CRATE_NAME..."
+          $RUSTC --test "$ENTRY" \
+            --crate-name "$CRATE_NAME" \
+            $EDITION_FLAG \
+            -L dependency=_deps \
+            "''${EXTERN_FLAGS[@]}" \
+            "''${BUILD_SCRIPT_FLAGS[@]}" \
+            "''${EXTRA_LINK_FLAGS[@]}" \
+            ${lib.escapeShellArgs extraRustcFlags} \
+            -o _unit_test_runner
+        fi
 
         runHook postBuild
       '';
 
       checkPhase = ''
         runHook preCheck
-        echo "Running unit tests for $CRATE_NAME..."
-        ./_unit_test_runner --color always
+        if [ -f _unit_test_runner ]; then
+          echo "Running unit tests for $CRATE_NAME..."
+          ./_unit_test_runner --color always
+        fi
 
-        # Check for integration tests in tests/*.rs
+        # Check for integration tests in tests/*.rs and tests/*/main.rs
         if [ -d tests ]; then
           for testfile in tests/*.rs; do
             if [ -f "$testfile" ]; then
               testname=$(basename "$testfile" .rs)
               echo "Compiling integration test $testname..."
               $RUSTC --test "$testfile" \
+                --crate-name "$testname" \
+                $EDITION_FLAG \
+                -L dependency=_deps \
+                "''${EXTERN_FLAGS[@]}" \
+                "''${BUILD_SCRIPT_FLAGS[@]}" \
+                "''${EXTRA_LINK_FLAGS[@]}" \
+                -o "_test_$testname"
+              echo "Running integration test $testname..."
+              "./_test_$testname" --color always
+            fi
+          done
+          for testdir in tests/*; do
+            if [ -d "$testdir" ] && [ -f "$testdir/main.rs" ]; then
+              testname=$(basename "$testdir")
+              echo "Compiling integration test $testname from $testdir/main.rs..."
+              $RUSTC --test "$testdir/main.rs" \
                 --crate-name "$testname" \
                 $EDITION_FLAG \
                 -L dependency=_deps \

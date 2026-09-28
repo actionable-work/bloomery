@@ -52,21 +52,34 @@
       ++ targetSections;
 
     processSection = sec:
-      lib.mapAttrsToList (
-        depName: spec:
-          if builtins.isAttrs spec
-          then {
-            name = depName;
-            features =
-              (spec.features or [])
-              ++ (lib.optional (!(spec ? default-features) || spec.default-features == true) "default");
-          }
-          else {
-            name = depName;
-            features = ["default"];
-          }
-      )
-      sec;
+      builtins.filter (x: x != null) (
+        lib.mapAttrsToList (
+          depName: spec:
+            if builtins.isAttrs spec
+            then let
+              defaultFeaturesEnabled =
+                if spec ? default-features
+                then spec.default-features
+                else if spec ? default_features
+                then spec.default_features
+                else true;
+              isOptional = spec.optional or false;
+            in
+              if isOptional
+              then null
+              else {
+                name = depName;
+                features =
+                  (spec.features or [])
+                  ++ (lib.optional defaultFeaturesEnabled "default");
+              }
+            else {
+              name = depName;
+              features = ["default"];
+            }
+        )
+        sec
+      );
 
     directEntries = lib.concatMap processSection sections;
 
@@ -78,7 +91,8 @@
               if lib.hasInfix "/" item
               then let
                 parts = lib.splitString "/" item;
-                depName = builtins.head parts;
+                rawDepName = builtins.head parts;
+                depName = lib.removeSuffix "?" rawDepName;
                 feat = builtins.elemAt parts 1;
               in [
                 {
@@ -86,7 +100,20 @@
                   features = [feat];
                 }
               ]
-              else []
+              else let
+                depName =
+                  if lib.hasPrefix "dep:" item
+                  then lib.removePrefix "dep:" item
+                  else item;
+              in
+                if builtins.any (sec: sec ? ${depName}) sections
+                then [
+                  {
+                    name = depName;
+                    features = ["default"];
+                  }
+                ]
+                else []
           )
           impliedList
       )
@@ -259,7 +286,14 @@
                 else [];
               default-features =
                 if isAttr
-                then (!(spec ? default-features) || spec.default-features == true)
+                then
+                  (
+                    if spec ? default-features
+                    then spec.default-features
+                    else if spec ? default_features
+                    then spec.default_features
+                    else true
+                  )
                 else true;
               optional =
                 if isAttr

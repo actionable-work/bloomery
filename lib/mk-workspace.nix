@@ -113,6 +113,22 @@ in
         mergeOverrides (mergeOverrides defOvr colocOvr) userOvr
     );
 
+    getOverride = nameOrId: let
+      hyphenName = lib.replaceStrings ["_"] ["-"] nameOrId;
+      underscoreName = lib.replaceStrings ["-"] ["_"] nameOrId;
+    in
+      effectiveOverrides.${nameOrId}
+      or effectiveOverrides.${hyphenName}
+      or effectiveOverrides.${underscoreName}
+      or {};
+
+    getCrateOverride = id: name: let
+      byId = getOverride id;
+    in
+      if byId != {}
+      then byId
+      else getOverride name;
+
     cleanWorkspaceSource = p:
       if builtins.isAttrs p && p ? _isLibCleanSourceWith
       then p
@@ -130,7 +146,7 @@ in
       else p;
 
     resolveMemberSource = cname: crateDir: let
-      cOverride = effectiveOverrides.${cname} or {};
+      cOverride = getOverride cname;
     in
       if cOverride ? src && cOverride.src != null
       then cOverride.src
@@ -260,28 +276,34 @@ in
       isRoot =
         builtins.pathExists rootToml
         && ((builtins.fromTOML (builtins.readFile rootToml)).package.name or null) == name;
+
+      # Search up to 2 levels deep for nested crates (e.g. crates/<name>/Cargo.toml or packages/<name>/Cargo.toml)
+      scanDir = dir: depth:
+        if depth > 2
+        then []
+        else let
+          entries = builtins.readDir dir;
+          hasToml = entries ? "Cargo.toml" && entries."Cargo.toml" == "regular";
+          tomlMatches =
+            hasToml
+            && ((builtins.fromTOML (builtins.readFile (dir + "/Cargo.toml"))).package.name or null) == name;
+        in
+          if tomlMatches
+          then [dir]
+          else let
+            subdirs =
+              builtins.filter (d: !lib.hasPrefix "." d && d != "target" && d != "result")
+              (builtins.attrNames (lib.filterAttrs (_: t: t == "directory") entries));
+          in
+            lib.concatMap (sub: scanDir (dir + "/${sub}") (depth + 1)) subdirs;
+
+      matches = scanDir repo 1;
     in
       if isRoot
       then repo
-      else let
-        entries = builtins.readDir repo;
-        dirs = builtins.attrNames (lib.filterAttrs (_: t: t == "directory") entries);
-        matchInSubdirs =
-          lib.concatMap (
-            d: let
-              sub = repo + "/${d}";
-            in
-              if
-                builtins.pathExists (sub + "/Cargo.toml")
-                && ((builtins.fromTOML (builtins.readFile (sub + "/Cargo.toml"))).package.name or null) == name
-              then [sub]
-              else []
-          )
-          dirs;
-      in
-        if matchInSubdirs != []
-        then builtins.head matchInSubdirs
-        else repo;
+      else if matches != []
+      then builtins.head matches
+      else repo;
 
     # Attribute set of all crate derivations, keyed by package ID ("name-version")
     crates =
@@ -308,7 +330,7 @@ in
             else throw "Unsupported source for package ${pkg.name}: ${builtins.toString pkg.source}";
 
           depDrvs = map (depId: crates.${depId}) (getDepIds id pkg.depIds);
-          cOverride = effectiveOverrides.${id} or effectiveOverrides.${pkg.name} or {};
+          cOverride = getCrateOverride id pkg.name;
           pkgLock =
             if lockManifest != null
             then (lockManifest.packages.${id} or lockManifest.packages.${pkg.name} or {})
@@ -344,7 +366,7 @@ in
         wpkg: let
           cratePath = discoveredMembers.${wpkg.name} or null;
           depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
-          cOverride = effectiveOverrides.${wpkg.name} or {};
+          cOverride = getOverride wpkg.name;
           hasLib =
             cratePath
             != null
@@ -361,13 +383,6 @@ in
             then (lockManifest.packages.${wpkg.id} or lockManifest.packages.${wpkg.name} or {})
             else {};
           edition = pkgLock.edition or null;
-          hasMainRs = cratePath != null && builtins.pathExists (cratePath + "/src/main.rs");
-          binDir = cratePath + "/src/bin";
-          hasBinDir = cratePath != null && builtins.pathExists binDir;
-          binFiles =
-            if hasBinDir
-            then builtins.attrNames (lib.filterAttrs (n: t: t == "regular" && lib.hasSuffix ".rs" n) (builtins.readDir binDir))
-            else [];
 
           ctoml =
             if cratePath != null && builtins.pathExists (cratePath + "/Cargo.toml")
@@ -377,14 +392,24 @@ in
             if ctoml ? bin && builtins.isList ctoml.bin
             then
               map (
-                b: {
-                  name = b.name;
+                b: let
+                  binName = b.name;
+                  defaultPath =
+                    if binName == wpkg.name && builtins.pathExists (cratePath + "/src/main.rs")
+                    then "src/main.rs"
+                    else if builtins.pathExists (cratePath + "/src/bin/${binName}.rs")
+                    then "src/bin/${binName}.rs"
+                    else if builtins.pathExists (cratePath + "/src/bin/${binName}/main.rs")
+                    then "src/bin/${binName}/main.rs"
+                    else "src/main.rs";
+                  entry = b.path or defaultPath;
+                in {
+                  name = binName;
                   drv = builderBin {
-                    binName = b.name;
+                    inherit binName;
                     pkg = wpkg;
                     src = cratePath;
-                    entry = b.path;
-                    inherit crateDrv edition;
+                    inherit entry crateDrv edition;
                     dependencies = depDrvs;
                     override = cOverride;
                     profile = effectiveBinaryProfile;
@@ -393,6 +418,29 @@ in
                 }
               )
               ctoml.bin
+            else [];
+          manifestBinNames = map (b: b.name) manifestBins;
+
+          hasMainRs =
+            cratePath
+            != null
+            && builtins.pathExists (cratePath + "/src/main.rs")
+            && !(builtins.elem wpkg.name manifestBinNames);
+          binDir = cratePath + "/src/bin";
+          hasBinDir = cratePath != null && builtins.pathExists binDir;
+          binFiles =
+            if hasBinDir
+            then
+              builtins.filter (bf: !(builtins.elem (lib.removeSuffix ".rs" bf) manifestBinNames)) (
+                builtins.attrNames (lib.filterAttrs (n: t: t == "regular" && lib.hasSuffix ".rs" n) (builtins.readDir binDir))
+              )
+            else [];
+          binDirs =
+            if hasBinDir
+            then
+              builtins.filter (bd: !(builtins.elem bd manifestBinNames)) (
+                builtins.attrNames (lib.filterAttrs (n: t: t == "directory" && builtins.pathExists (binDir + "/${n}/main.rs")) (builtins.readDir binDir))
+              )
             else [];
 
           mainBin = lib.optional hasMainRs {
@@ -430,8 +478,27 @@ in
               }
             )
             binFiles;
+
+          extraDirBins =
+            map (
+              dname: {
+                name = dname;
+                drv = builderBin {
+                  binName = dname;
+                  pkg = wpkg;
+                  src = cratePath;
+                  entry = "src/bin/${dname}/main.rs";
+                  inherit crateDrv edition;
+                  dependencies = depDrvs;
+                  override = cOverride;
+                  profile = effectiveBinaryProfile;
+                  inherit defaultRustcFlags;
+                };
+              }
+            )
+            binDirs;
         in
-          mainBin ++ extraBins ++ manifestBins
+          manifestBins ++ mainBin ++ extraBins ++ extraDirBins
       )
       parsed.workspacePackages;
 
@@ -473,7 +540,7 @@ in
         wpkg: let
           cratePath = discoveredMembers.${wpkg.name};
           depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
-          cOverride = effectiveOverrides.${wpkg.name} or {};
+          cOverride = getOverride wpkg.name;
           hasLib =
             cratePath
             != null
@@ -511,7 +578,7 @@ in
         wpkg: let
           cratePath = discoveredMembers.${wpkg.name};
           depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
-          cOverride = effectiveOverrides.${wpkg.name} or {};
+          cOverride = getOverride wpkg.name;
           pkgLock =
             if lockManifest != null
             then (lockManifest.packages.${wpkg.id} or lockManifest.packages.${wpkg.name} or {})
@@ -538,7 +605,7 @@ in
         wpkg: let
           cratePath = discoveredMembers.${wpkg.name};
           depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
-          cOverride = effectiveOverrides.${wpkg.name} or {};
+          cOverride = getOverride wpkg.name;
           pkgLock =
             if lockManifest != null
             then (lockManifest.packages.${wpkg.id} or lockManifest.packages.${wpkg.name} or {})
@@ -573,7 +640,7 @@ in
                 || builtins.pathExists (cratePath + "/lib.rs")
               );
             depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
-            cOverride = effectiveOverrides.${wpkg.name} or {};
+            cOverride = getOverride wpkg.name;
             pkgLock =
               if lockManifest != null
               then (lockManifest.packages.${wpkg.id} or lockManifest.packages.${wpkg.name} or {})

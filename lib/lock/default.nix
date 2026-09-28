@@ -34,10 +34,11 @@
             $pkgMap[.id] as $pkg |
             ($pkg.name + "-" + $pkg.version) as $pkgId |
             ($pkg.targets | any(.kind[] == "proc-macro")) as $isProcMacro |
+            ([.deps[] | $pkgMap[.pkg] | ("\"" + .name + "-" + .version + "\"")] | unique) as $depList |
             (
               "\n[packages.\"" + $pkgId + "\"]\n" +
               "features = [ " + (.features | map("\"" + . + "\"") | join(", ")) + (if (.features | length) > 0 then " " else "" end) + "]\n" +
-              "dependencies = [ " + ([.deps[] | $pkgMap[.pkg] | ("\"" + .name + "-" + .version + "\"")] | join(", ")) + (if (.deps | length) > 0 then " " else "" end) + "]\n" +
+              "dependencies = [ " + ($depList | join(", ")) + (if ($depList | length) > 0 then " " else "" end) + "]\n" +
               "proc-macro = " + (if $isProcMacro then "true" else "false" end) + "\n" +
               "edition = \"" + ($pkg.edition // "2021") + "\"\n"
             )

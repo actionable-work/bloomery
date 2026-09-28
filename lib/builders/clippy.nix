@@ -74,12 +74,25 @@ in
         EDITION_FLAG="--edition=$EDITION"
 
         ENTRY=""
-        if [ -f src/lib.rs ]; then
-          ENTRY="src/lib.rs"
-          CRATE_TYPE="rlib"
-        elif [ -f src/main.rs ]; then
-          ENTRY="src/main.rs"
-          CRATE_TYPE="bin"
+        CRATE_TYPE="rlib"
+        if [ -f Cargo.toml ]; then
+          LIB_PATH=$(sed -n -E '/^[[:space:]]*\[lib\]/,/^[[:space:]]*\[/ s/^[[:space:]]*path[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' Cargo.toml | head -n 1)
+          if [ -n "$LIB_PATH" ] && [ -f "$LIB_PATH" ]; then
+            ENTRY="$LIB_PATH"
+          fi
+        fi
+        if [ -z "$ENTRY" ]; then
+          if [ -f src/lib.rs ]; then
+            ENTRY="src/lib.rs"
+          elif [ -f lib.rs ]; then
+            ENTRY="lib.rs"
+          elif [ -f src/main.rs ]; then
+            ENTRY="src/main.rs"
+            CRATE_TYPE="bin"
+          elif [ -f main.rs ]; then
+            ENTRY="main.rs"
+            CRATE_TYPE="bin"
+          fi
         fi
 
         if [ -z "$ENTRY" ]; then
@@ -90,6 +103,7 @@ in
         fi
 
         mkdir -p _deps
+        declare -A SEEN_EXTERNS=()
         EXTERN_FLAGS=()
         EXTRA_LINK_FLAGS=()
 
@@ -97,17 +111,26 @@ in
           if [ -f "$dep/nix-support/meta.sh" ]; then
             source "$dep/nix-support/meta.sh"
             if [ -n "$DEP_CRATE_NAME" ] && [ -f "$DEP_LIB_PATH" ]; then
-              EXTERN_FLAGS+=("--extern" "$DEP_CRATE_NAME=$DEP_LIB_PATH")
+              if [ -z "''${SEEN_EXTERNS[$DEP_CRATE_NAME]:-}" ]; then
+                EXTERN_FLAGS+=("--extern" "$DEP_CRATE_NAME=$DEP_LIB_PATH")
+                SEEN_EXTERNS["$DEP_CRATE_NAME"]=1
+              fi
             fi
             if [ -n "$DEP_RUSTC_LINK_FLAGS" ]; then
               EXTRA_LINK_FLAGS+=($DEP_RUSTC_LINK_FLAGS)
             fi
+            for env_var in $(compgen -v | grep '^DEP_'); do
+              export "$env_var"
+            done
           elif [ -d "$dep/lib" ]; then
             for f in "$dep/lib"/*; do
               if [ -f "$f" ]; then
                 fname=$(basename "$f")
                 cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
-                EXTERN_FLAGS+=("--extern" "$cname=$f")
+                if [ -z "''${SEEN_EXTERNS[$cname]:-}" ]; then
+                  EXTERN_FLAGS+=("--extern" "$cname=$f")
+                  SEEN_EXTERNS["$cname"]=1
+                fi
               fi
             done
           fi
@@ -134,7 +157,10 @@ in
           if [ -f "$f" ]; then
             fname=$(basename "$f")
             cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
-            EXTERN_FLAGS+=("--extern" "$cname=$f")
+            if [ -z "''${SEEN_EXTERNS[$cname]:-}" ]; then
+              EXTERN_FLAGS+=("--extern" "$cname=$f")
+              SEEN_EXTERNS["$cname"]=1
+            fi
           fi
         done
 
@@ -169,23 +195,35 @@ in
 
           ./_build_script/build_script_build > _build_script/stdout.txt || true
 
-          while IFS= read -r line; do
+          while IFS= read -r raw_line; do
+            line="''${raw_line#cargo::}"
+            if [ "$line" = "$raw_line" ]; then
+              line="''${raw_line#cargo:}"
+            fi
             case "$line" in
-              cargo:rustc-cfg=*)
-                BUILD_SCRIPT_FLAGS+=("--cfg" "''${line#cargo:rustc-cfg=}")
+              rustc-flags=*)
+                flags="''${line#rustc-flags=}"
+                BUILD_SCRIPT_FLAGS+=($flags)
+                BUILD_SCRIPT_LINK_FLAGS+=($flags)
                 ;;
-              cargo:rustc-link-lib=*)
-                lib_val="''${line#cargo:rustc-link-lib=}"
+              rustc-cfg=*)
+                BUILD_SCRIPT_FLAGS+=("--cfg" "''${line#rustc-cfg=}")
+                ;;
+              rustc-check-cfg=*)
+                BUILD_SCRIPT_FLAGS+=("--check-cfg" "''${line#rustc-check-cfg=}")
+                ;;
+              rustc-link-lib=*)
+                lib_val="''${line#rustc-link-lib=}"
                 BUILD_SCRIPT_FLAGS+=("-l" "$lib_val")
                 BUILD_SCRIPT_LINK_FLAGS+=("-l" "$lib_val")
                 ;;
-              cargo:rustc-link-search=*)
-                search_val="''${line#cargo:rustc-link-search=}"
+              rustc-link-search=*)
+                search_val="''${line#rustc-link-search=}"
                 BUILD_SCRIPT_FLAGS+=("-L" "$search_val")
                 BUILD_SCRIPT_LINK_FLAGS+=("-L" "$search_val")
                 ;;
-              cargo:rustc-env=*)
-                env_val="''${line#cargo:rustc-env=}"
+              rustc-env=*)
+                env_val="''${line#rustc-env=}"
                 export "$env_val"
                 ;;
             esac

@@ -1,3 +1,6 @@
+[[bin]]
+name = "manifest-bin"
+
 [dependencies]
 
 [package]

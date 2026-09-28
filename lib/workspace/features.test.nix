@@ -23,6 +23,33 @@ in {
     };
   };
 
+  testExtractFeaturesUnderscoreDefaultFeaturesAndOptional = {
+    expr = features.extractFeaturesFromToml {
+      dependencies = {
+        serde = {
+          version = "1.0";
+          features = ["derive"];
+          default_features = false;
+        };
+        opt_dep = {
+          version = "1.0";
+          optional = true;
+        };
+        activated_opt = {
+          version = "1.0";
+          optional = true;
+        };
+      };
+      features = {
+        with_opt = ["dep:activated_opt"];
+      };
+    };
+    expected = {
+      serde = ["derive"];
+      activated_opt = ["default"];
+    };
+  };
+
   testExtractFeaturesWorkspace = {
     expr = features.extractFeaturesFromToml {
       workspace.dependencies = {

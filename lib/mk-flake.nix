@@ -36,9 +36,14 @@ in
       packages = eachSystem (system: perSystemWorkspace.${system}.packages);
       apps = eachSystem (system: perSystemWorkspace.${system}.apps);
       checks = eachSystem (system: perSystemWorkspace.${system}.checks);
-      devShells = eachSystem (system: {
-        default = perSystemWorkspace.${system}.devShell;
-      });
+      devShells = eachSystem (
+        system: let
+          ds = perSystemWorkspace.${system}.devShell;
+        in
+          lib.optionalAttrs (ds != null) {
+            default = ds;
+          }
+      );
     };
 
     extra =
