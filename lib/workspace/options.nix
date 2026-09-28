@@ -53,6 +53,11 @@
         default = {};
         description = "Per-crate binary profile override settings.";
       };
+      profileDev = lib.mkOption {
+        type = types.attrsOf types.anything;
+        default = {};
+        description = "Per-crate binary dev profile override settings.";
+      };
       assets = lib.mkOption {
         type = types.listOf (types.either types.path types.package);
         default = [];
@@ -161,10 +166,35 @@
         description = "Workspace binary compilation profile settings (optLevel, lto, codegenUnits, panic, strip, etc.).";
       };
 
+      profileDev = lib.mkOption {
+        type = profileTypes.profileType;
+        default = {};
+        description = "Workspace binary dev compilation profile settings (defaults to optLevel=0, lto=off, codegenUnits=256, debuginfo=2).";
+      };
+
       profileName = lib.mkOption {
         type = types.str;
         default = "release";
         description = "Name of the active cargo profile.";
+      };
+
+      # ── Binary Packages & Dev Targets ────────────────────────────────────────
+      createDevPackages = lib.mkOption {
+        type = types.bool;
+        default = true;
+        description = "Whether to generate dev profile packages and apps (<bin>:dev) for workspace binaries.";
+      };
+      devPackages = lib.mkOption {
+        type = types.nullOr types.bool;
+        default = null;
+        description = "Alias for createDevPackages.";
+      };
+      packages = {
+        createDev = lib.mkOption {
+          type = types.nullOr types.bool;
+          default = null;
+          description = "Whether to generate dev profile packages and apps (<bin>:dev) for workspace binaries.";
+        };
       };
 
       # ── Custom Compiler & Runner Flags ───────────────────────────────────────

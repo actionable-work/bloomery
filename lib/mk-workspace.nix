@@ -34,7 +34,14 @@ in
     doctestRustdocFlags = cfg.flags.doctest;
 
     profile = cfg.profile;
+    profileDev = cfg.profileDev;
     profileName = cfg.profileName;
+    createDevPackages =
+      if cfg.devPackages != null
+      then cfg.devPackages
+      else if cfg.packages.createDev != null
+      then cfg.packages.createDev
+      else cfg.createDevPackages;
     unifyFeatures = cfg.features.unify;
     throwOnOutOfDate = cfg.checks.throwOnOutOfDate;
     includePackageChecks = cfg.checks.includePackageChecks;
@@ -85,6 +92,7 @@ in
         rustdocFlags = (a.rustdocFlags or []) ++ (b.rustdocFlags or []);
         env = (a.env or {}) // (b.env or {});
         profile = (a.profile or {}) // (b.profile or {});
+        profileDev = (a.profileDev or {}) // (b.profileDev or {});
         src =
           if b ? src && b.src != null
           then b.src
@@ -244,6 +252,32 @@ in
       else {};
     effectiveBinaryProfile = profileMod.evalProfile (tomlProfile // profile);
 
+    # Resolve dev compilation profile (defaults to opt-level=0, lto=off, codegen-units=256, debuginfo=2)
+    tomlDevProfile =
+      if rootToml ? profile && rootToml.profile ? dev
+      then rootToml.profile.dev
+      else {};
+    baseDevProfile = {
+      optLevel = 0;
+      lto = "off";
+      codegenUnits = 256;
+      debuginfo = 2;
+    };
+    filterNullAttrs = lib.filterAttrs (_: v: v != null);
+    effectiveDevBinaryProfile = profileMod.evalProfile (
+      (profileMod.normalizeProfileAttrs baseDevProfile)
+      // (filterNullAttrs (profileMod.normalizeProfileAttrs tomlDevProfile))
+      // (filterNullAttrs (profileMod.normalizeProfileAttrs profileDev))
+    );
+    devRustcFlags = lib.filter (f: !lib.hasPrefix "-Copt-level=" f && !lib.hasPrefix "-C opt-level=" f) defaultRustcFlags;
+    devCrateRustcFlags =
+      [
+        "-Copt-level=${toString (effectiveDevBinaryProfile.optLevel or 0)}"
+        "-Ccodegen-units=${toString (effectiveDevBinaryProfile.codegenUnits or 256)}"
+      ]
+      ++ lib.optional (effectiveDevBinaryProfile.debuginfo != null) "-Cdebuginfo=${toString effectiveDevBinaryProfile.debuginfo}"
+      ++ devRustcFlags;
+
     # Helper to resolve active dependencies for a package (only dependencies activated by features)
     getDepIds = id: defaultDepIds:
       if resolvedFeatures ? __activeDeps && resolvedFeatures.__activeDeps ? ${id}
@@ -360,13 +394,64 @@ in
       )
       parsed.byId;
 
-    # Find and build binaries for workspace crates
+    # Attribute set of dev workspace crate derivations (workspace crates compiled with dev flags)
+    devCrates =
+      if createDevPackages
+      then
+        lib.mapAttrs (
+          id: pkg:
+            if !pkg.isWorkspace
+            then crates.${id}
+            else let
+              src = discoveredMembers.${pkg.name} or (throw "Workspace crate '${pkg.name}' path not found in workspace");
+              depDrvs = map (depId: devCrates.${depId}) (getDepIds id pkg.depIds);
+              cOverride = getCrateOverride id pkg.name;
+              pkgLock =
+                if lockManifest != null
+                then (lockManifest.packages.${id} or lockManifest.packages.${pkg.name} or {})
+                else {};
+              pkgFeatures =
+                if cOverride ? features
+                then cOverride.features
+                else if pkgLock ? features
+                then pkgLock.features
+                else if resolvedFeatures ? ${id}
+                then resolvedFeatures.${id}
+                else if resolvedFeatures ? ${pkg.name}
+                then resolvedFeatures.${pkg.name}
+                else if resolvedFeatures ? ${pkg.crateName}
+                then resolvedFeatures.${pkg.crateName}
+                else ["default"];
+            in
+              builderCrate {
+                inherit pkg src;
+                dependencies = depDrvs;
+                override = cOverride;
+                features = pkgFeatures;
+                defaultRustcFlags = devCrateRustcFlags;
+                isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or null;
+                edition = pkgLock.edition or null;
+              }
+        )
+        parsed.byId
+      else {};
+
+    # Find and build binaries for workspace crates (both release and dev profiles)
     workspaceBinaries =
       lib.concatMap (
         wpkg: let
           cratePath = discoveredMembers.${wpkg.name} or null;
           depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
+          depDevDrvs =
+            if createDevPackages
+            then map (depId: devCrates.${depId}) (getDepIds wpkg.id wpkg.depIds)
+            else depDrvs;
           cOverride = getOverride wpkg.name;
+          cOverrideDev =
+            cOverride
+            // {
+              profile = cOverride.profileDev or {};
+            };
           hasLib =
             cratePath
             != null
@@ -377,6 +462,10 @@ in
           crateDrv =
             if hasLib
             then (crates.${wpkg.id} or null)
+            else null;
+          crateDevDrv =
+            if hasLib && createDevPackages
+            then (devCrates.${wpkg.id} or null)
             else null;
           pkgLock =
             if lockManifest != null
@@ -397,6 +486,40 @@ in
             then (root + "/public")
             else null;
 
+          buildBinary = {
+            binName,
+            entry,
+          }: {
+            name = binName;
+            drv = builderBin {
+              inherit binName entry;
+              pkg = wpkg;
+              src = cratePath;
+              inherit crateDrv edition;
+              inherit workspaceAssets workspaceStatic workspacePublic;
+              dependencies = depDrvs;
+              override = cOverride;
+              profile = effectiveBinaryProfile;
+              inherit defaultRustcFlags;
+            };
+            devDrv =
+              if createDevPackages
+              then
+                builderBin {
+                  inherit binName entry;
+                  pkg = wpkg;
+                  src = cratePath;
+                  crateDrv = crateDevDrv;
+                  inherit edition;
+                  inherit workspaceAssets workspaceStatic workspacePublic;
+                  dependencies = depDevDrvs;
+                  override = cOverrideDev;
+                  profile = effectiveDevBinaryProfile;
+                  defaultRustcFlags = devRustcFlags;
+                }
+              else null;
+          };
+
           ctoml =
             if cratePath != null && builtins.pathExists (cratePath + "/Cargo.toml")
             then builtins.fromTOML (builtins.readFile (cratePath + "/Cargo.toml"))
@@ -416,20 +539,10 @@ in
                     then "src/bin/${binName}/main.rs"
                     else "src/main.rs";
                   entry = b.path or defaultPath;
-                in {
-                  name = binName;
-                  drv = builderBin {
-                    inherit binName;
-                    pkg = wpkg;
-                    src = cratePath;
-                    inherit entry crateDrv edition;
-                    inherit workspaceAssets workspaceStatic workspacePublic;
-                    dependencies = depDrvs;
-                    override = cOverride;
-                    profile = effectiveBinaryProfile;
-                    inherit defaultRustcFlags;
-                  };
-                }
+                in
+                  buildBinary {
+                    inherit binName entry;
+                  }
               )
               ctoml.bin
             else [];
@@ -457,61 +570,30 @@ in
               )
             else [];
 
-          mainBin = lib.optional hasMainRs {
-            name = wpkg.name;
-            drv = builderBin {
-              binName = wpkg.name;
-              pkg = wpkg;
-              src = cratePath;
-              entry = "src/main.rs";
-              inherit crateDrv edition;
-              inherit workspaceAssets workspaceStatic workspacePublic;
-              dependencies = depDrvs;
-              override = cOverride;
-              profile = effectiveBinaryProfile;
-              inherit defaultRustcFlags;
-            };
-          };
+          mainBin = lib.optional hasMainRs (buildBinary {
+            binName = wpkg.name;
+            entry = "src/main.rs";
+          });
 
           extraBins =
             map (
               bf: let
-                bname = lib.removeSuffix ".rs" bf;
-              in {
-                name = bname;
-                drv = builderBin {
-                  binName = bname;
-                  pkg = wpkg;
-                  src = cratePath;
+                binName = lib.removeSuffix ".rs" bf;
+              in
+                buildBinary {
+                  inherit binName;
                   entry = "src/bin/${bf}";
-                  inherit crateDrv edition;
-                  inherit workspaceAssets workspaceStatic workspacePublic;
-                  dependencies = depDrvs;
-                  override = cOverride;
-                  profile = effectiveBinaryProfile;
-                  inherit defaultRustcFlags;
-                };
-              }
+                }
             )
             binFiles;
 
           extraDirBins =
             map (
-              dname: {
-                name = dname;
-                drv = builderBin {
+              dname:
+                buildBinary {
                   binName = dname;
-                  pkg = wpkg;
-                  src = cratePath;
                   entry = "src/bin/${dname}/main.rs";
-                  inherit crateDrv edition;
-                  inherit workspaceAssets workspaceStatic workspacePublic;
-                  dependencies = depDrvs;
-                  override = cOverride;
-                  profile = effectiveBinaryProfile;
-                  inherit defaultRustcFlags;
-                };
-              }
+                }
             )
             binDirs;
         in
@@ -519,37 +601,55 @@ in
       )
       parsed.workspacePackages;
 
-    # Binary packages attribute set
-    binPackages = lib.listToAttrs (map (b: {
-        inherit (b) name;
-        value = b.drv;
-      })
-      workspaceBinaries);
+    # Binary packages attribute set (release and optional :dev colon targets)
+    binPackages =
+      lib.foldl' (
+        acc: b:
+          acc
+          // {
+            "${b.name}" = b.drv;
+          }
+          // lib.optionalAttrs createDevPackages {
+            "${b.name}:dev" = b.devDrv;
+          }
+      ) {}
+      workspaceBinaries;
 
-    # Library packages attribute set for workspace libraries
-    libPackages = lib.listToAttrs (
-      builtins.filter (x: x != null) (
-        map (
-          wpkg: let
-            cratePath = discoveredMembers.${wpkg.name} or null;
-            hasLib =
-              cratePath
-              != null
-              && (
-                builtins.pathExists (cratePath + "/src/lib.rs")
-                || builtins.pathExists (cratePath + "/lib.rs")
-              );
-          in
-            if hasLib
-            then {
-              name = "${wpkg.name}-lib";
-              value = crates.${wpkg.id};
+    # Library packages attribute set for workspace libraries (release and :dev targets)
+    binNames = map (b: b.name) workspaceBinaries;
+    libPackages =
+      lib.foldl' (
+        acc: wpkg: let
+          cratePath = discoveredMembers.${wpkg.name} or null;
+          hasLib =
+            cratePath
+            != null
+            && (
+              builtins.pathExists (cratePath + "/src/lib.rs")
+              || builtins.pathExists (cratePath + "/lib.rs")
+            );
+          hasNoBinCollision = !(builtins.elem wpkg.name binNames);
+        in
+          if hasLib
+          then
+            acc
+            // {
+              "${wpkg.name}-lib" = crates.${wpkg.id};
             }
-            else null
-        )
-        parsed.workspacePackages
-      )
-    );
+            // lib.optionalAttrs hasNoBinCollision {
+              "${wpkg.name}" = crates.${wpkg.id};
+            }
+            // lib.optionalAttrs createDevPackages (
+              {
+                "${wpkg.name}-lib:dev" = devCrates.${wpkg.id};
+              }
+              // lib.optionalAttrs hasNoBinCollision {
+                "${wpkg.name}:dev" = devCrates.${wpkg.id};
+              }
+            )
+          else acc
+      ) {}
+      parsed.workspacePackages;
 
     # Test checks for all workspace crates
     workspaceTests = lib.listToAttrs (
@@ -687,11 +787,14 @@ in
     packageChecks =
       if includePackageChecks
       then
-        (lib.mapAttrs' (name: pkg: {
-            name = mkCheckName name "bin";
-            value = pkg;
-          })
-          binPackages)
+        (lib.foldl' (
+            acc: b:
+              acc
+              // {
+                "${b.name}:bin" = b.drv;
+              }
+          ) {}
+          workspaceBinaries)
         // (lib.mapAttrs' (name: pkg: {
             name = mkCheckName (lib.removeSuffix "-lib" name) "lib";
             value = pkg;
@@ -701,11 +804,23 @@ in
 
     # Runnable apps for binaries and doc servers
     binApps =
-      lib.mapAttrs (name: binPkg: {
-        type = "app";
-        program = "${binPkg}/bin/${name}";
-      })
-      binPackages;
+      lib.foldl' (
+        acc: b:
+          acc
+          // {
+            "${b.name}" = {
+              type = "app";
+              program = "${b.drv}/bin/${b.name}";
+            };
+          }
+          // lib.optionalAttrs createDevPackages {
+            "${b.name}:dev" = {
+              type = "app";
+              program = "${b.devDrv}/bin/${b.name}";
+            };
+          }
+      ) {}
+      workspaceBinaries;
 
     docApps =
       lib.concatMapAttrs (
@@ -732,11 +847,14 @@ in
       type = "app";
       program = "${(import ./lock {inherit pkgs lib;}).lockScript}/bin/lock";
     };
-    firstBin = let
-      names = builtins.attrNames binApps;
-    in
-      if names != []
-      then binApps.${builtins.head names}
+    firstBin =
+      if workspaceBinaries != []
+      then let
+        headBin = builtins.head workspaceBinaries;
+      in {
+        type = "app";
+        program = "${headBin.drv}/bin/${headBin.name}";
+      }
       else lockApp;
 
     apps =
@@ -798,14 +916,15 @@ in
     defaultPackage =
       if binPackages ? default
       then binPackages.default
-      else if binPackages != {}
-      then binPackages.${builtins.head (builtins.attrNames binPackages)}
+      else if workspaceBinaries != []
+      then (builtins.head workspaceBinaries).drv
       else if libPackages != {}
       then libPackages.${builtins.head (builtins.attrNames libPackages)}
       else null;
   in {
-    # All compiled rlibs (DAG)
-    inherit crates;
+    # All compiled rlibs (DAG) - release and dev variants
+    inherit crates devCrates;
+    cratesDev = devCrates;
 
     # Expose both binaries and libraries
     packages =

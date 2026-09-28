@@ -11,5 +11,10 @@
       codegenUnits = 1;
     };
   };
+  releasePkg = workspace.packages."bloomery-docs";
+  devPkg = workspace.packages."bloomery-docs:dev";
 in
-  workspace.packages."bloomery-docs"
+  releasePkg
+  // {
+    dev = devPkg;
+  }

@@ -72,12 +72,17 @@
           type = "app";
           program = "${bloomery.docs}/bin/bloomery-docs";
         };
+        docsDevApp = {
+          type = "app";
+          program = "${bloomery.docs.dev}/bin/bloomery-docs";
+        };
         lockApp = {
           type = "app";
           program = "${bloomery.lock.lockScript}/bin/lock";
         };
       in {
         docs = docsApp;
+        "docs:dev" = docsDevApp;
         lock = lockApp;
         default = lockApp;
       }
@@ -93,6 +98,7 @@
         };
       in {
         docs = bloomery.docs;
+        "docs:dev" = bloomery.docs.dev;
         lock = bloomery.lock.lockScript;
         default = bloomery.docs;
       }

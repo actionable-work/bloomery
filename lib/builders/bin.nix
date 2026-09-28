@@ -48,7 +48,8 @@ in
     version = pkg.version;
     crateName = pkg.crateName;
 
-    rawProfile = (override.profile or {}) // profile;
+    filterNullAttrs = lib.filterAttrs (_: v: v != null);
+    rawProfile = (filterNullAttrs profile) // (filterNullAttrs (override.profile or {}));
     evaluatedProfile = types.evalProfile rawProfile;
     profileFlags = types.profileToRustcFlags evaluatedProfile;
 
@@ -64,13 +65,21 @@ in
       else [];
     nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc] ++ lib.optional (linkerPackage != null) linkerPackage;
     buildInputs = override.buildInputs or [];
-    extraRustcFlags = (override.rustcFlags or []) ++ defaultRustcFlags ++ profileFlags ++ linkerFlags;
+    cleanDefaultFlags =
+      if evaluatedProfile.optLevel != null
+      then lib.filter (f: !lib.hasPrefix "-Copt-level=" f && !lib.hasPrefix "-C opt-level=" f) defaultRustcFlags
+      else defaultRustcFlags;
+    extraRustcFlags = (override.rustcFlags or []) ++ cleanDefaultFlags ++ profileFlags ++ linkerFlags;
     userEnv = override.env or {};
   in
     stdenv.mkDerivation (_finalAttrs:
       {
         name = "${binName}-${version}";
         inherit pname version src crateDrv;
+
+        meta = {
+          mainProgram = binName;
+        };
 
         nativeBuildInputs = nativeBuildInputs;
         buildInputs = buildInputs;
