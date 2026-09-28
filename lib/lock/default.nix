@@ -21,7 +21,7 @@
       fi
 
       echo "==> Resolving features and dependencies via cargo metadata..."
-      LOCK_HASH=$(sha256sum "$CARGO_LOCK" | awk '{print $1}')
+      LOCK_HASH=$(tr -d '\r' < "$CARGO_LOCK" | sha256sum | awk '{print $1}')
 
       METADATA=$(cargo metadata --locked --manifest-path "$CARGO_TOML" --format-version 1)
 

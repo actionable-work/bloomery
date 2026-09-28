@@ -34,10 +34,12 @@ in
     pkg,
     src,
     entry ? null,
+    crateDrv ? null,
     dependencies ? [],
     override ? {},
     profile ? {},
     defaultRustcFlags ? ["-Copt-level=3"],
+    edition ? null,
   }: let
     pname = binName;
     version = pkg.version;
@@ -65,7 +67,7 @@ in
     stdenv.mkDerivation (_finalAttrs:
       {
         name = "${binName}-${version}";
-        inherit pname version src;
+        inherit pname version src crateDrv;
 
         nativeBuildInputs = nativeBuildInputs;
         buildInputs = buildInputs;
@@ -110,8 +112,16 @@ in
           export CARGO_MANIFEST_DIR="$PWD"
 
           # Determine Edition
-          EDITION="2021"
-          if [ -f Cargo.toml ]; then
+          EDITION="${
+            if edition != null
+            then edition
+            else "2021"
+          }"
+          if [ "${
+            if edition != null
+            then "1"
+            else "0"
+          }" = "0" ] && [ -f Cargo.toml ]; then
             DETECTED_EDITION=$(sed -n -E 's/^[[:space:]]*edition[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' Cargo.toml | head -n 1)
             if [ -n "$DETECTED_EDITION" ]; then
               EDITION="$DETECTED_EDITION"
@@ -142,6 +152,7 @@ in
 
           # Assemble dependencies
           mkdir -p _deps
+          declare -A SEEN_EXTERNS=()
           EXTERN_FLAGS=()
           EXTRA_LINK_FLAGS=()
 
@@ -149,7 +160,10 @@ in
             if [ -f "$dep/nix-support/meta.sh" ]; then
               source "$dep/nix-support/meta.sh"
               if [ -n "$DEP_CRATE_NAME" ] && [ -f "$DEP_LIB_PATH" ]; then
-                EXTERN_FLAGS+=("--extern" "$DEP_CRATE_NAME=$DEP_LIB_PATH")
+                if [ -z "''${SEEN_EXTERNS[$DEP_CRATE_NAME]:-}" ]; then
+                  EXTERN_FLAGS+=("--extern" "$DEP_CRATE_NAME=$DEP_LIB_PATH")
+                  SEEN_EXTERNS["$DEP_CRATE_NAME"]=1
+                fi
               fi
               if [ -n "$DEP_RUSTC_LINK_FLAGS" ]; then
                 EXTRA_LINK_FLAGS+=($DEP_RUSTC_LINK_FLAGS)
@@ -159,7 +173,10 @@ in
                 if [ -f "$f" ]; then
                   fname=$(basename "$f")
                   cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
-                  EXTERN_FLAGS+=("--extern" "$cname=$f")
+                  if [ -z "''${SEEN_EXTERNS[$cname]:-}" ]; then
+                    EXTERN_FLAGS+=("--extern" "$cname=$f")
+                    SEEN_EXTERNS["$cname"]=1
+                  fi
                 fi
               done
             fi
@@ -182,11 +199,52 @@ in
             fi
           done
 
+          # If crateDrv is provided, link the crate's own .rlib
+          if [ -n "$crateDrv" ] && [ -d "$crateDrv" ]; then
+            if [ -f "$crateDrv/nix-support/meta.sh" ]; then
+              source "$crateDrv/nix-support/meta.sh"
+              if [ -n "$DEP_CRATE_NAME" ] && [ -f "$DEP_LIB_PATH" ]; then
+                if [ -z "''${SEEN_EXTERNS[$DEP_CRATE_NAME]:-}" ]; then
+                  EXTERN_FLAGS+=("--extern" "$DEP_CRATE_NAME=$DEP_LIB_PATH")
+                  SEEN_EXTERNS["$DEP_CRATE_NAME"]=1
+                fi
+              fi
+              if [ -n "$DEP_RUSTC_LINK_FLAGS" ]; then
+                EXTRA_LINK_FLAGS+=($DEP_RUSTC_LINK_FLAGS)
+              fi
+            elif [ -d "$crateDrv/lib" ]; then
+              for f in "$crateDrv/lib"/*; do
+                if [ -f "$f" ]; then
+                  fname=$(basename "$f")
+                  cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
+                  if [ -z "''${SEEN_EXTERNS[$cname]:-}" ]; then
+                    EXTERN_FLAGS+=("--extern" "$cname=$f")
+                    SEEN_EXTERNS["$cname"]=1
+                  fi
+                fi
+              done
+            fi
+
+            if [ -d "$crateDrv/lib" ]; then
+              for f in "$crateDrv/lib"/*; do
+                if [ -e "$f" ]; then
+                  target=$(readlink -f "$f")
+                  ln -sf "$target" "_deps/$(basename "$f")"
+                fi
+              done
+            fi
+          fi
+
+          # Make transitive dependencies in _deps available as extern crates (e.g. for proc-macro code generation)
+          # without overriding direct dependencies or repeating crate names
           for f in _deps/lib*.rlib _deps/lib*.so _deps/lib*.dylib; do
             if [ -f "$f" ]; then
               fname=$(basename "$f")
               cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
-              EXTERN_FLAGS+=("--extern" "$cname=$f")
+              if [ -z "''${SEEN_EXTERNS[$cname]:-}" ]; then
+                EXTERN_FLAGS+=("--extern" "$cname=$f")
+                SEEN_EXTERNS["$cname"]=1
+              fi
             fi
           done
 
@@ -226,22 +284,27 @@ in
 
             while IFS= read -r line; do
               case "$line" in
-                cargo:rustc-cfg=*)
-                  BUILD_SCRIPT_FLAGS+=("--cfg" "''${line#cargo:rustc-cfg=}")
+                cargo:rustc-cfg=*|cargo::rustc-cfg=*)
+                  BUILD_SCRIPT_FLAGS+=("--cfg" "''${line#*rustc-cfg=}")
                   ;;
-                cargo:rustc-link-lib=*)
-                  lib_val="''${line#cargo:rustc-link-lib=}"
-                  BUILD_SCRIPT_FLAGS+=("-l" "$lib_val")
-                  BUILD_SCRIPT_LINK_FLAGS+=("-l" "$lib_val")
+                cargo:rustc-link-lib=*|cargo::rustc-link-lib=*)
+                  lib_val="''${line#*rustc-link-lib=}"
+                  BUILD_SCRIPT_FLAGS+=("-l" "''$lib_val")
+                  BUILD_SCRIPT_LINK_FLAGS+=("-l" "''$lib_val")
                   ;;
-                cargo:rustc-link-search=*)
-                  search_val="''${line#cargo:rustc-link-search=}"
-                  BUILD_SCRIPT_FLAGS+=("-L" "$search_val")
-                  BUILD_SCRIPT_LINK_FLAGS+=("-L" "$search_val")
+                cargo:rustc-link-search=*|cargo::rustc-link-search=*)
+                  search_val="''${line#*rustc-link-search=}"
+                  BUILD_SCRIPT_FLAGS+=("-L" "''$search_val")
+                  BUILD_SCRIPT_LINK_FLAGS+=("-L" "''$search_val")
                   ;;
-                cargo:rustc-env=*)
-                  env_val="''${line#cargo:rustc-env=}"
-                  export "$env_val"
+                cargo:rustc-env=*|cargo::rustc-env=*)
+                  env_val="''${line#*rustc-env=}"
+                  export "''$env_val"
+                  ;;
+                cargo:rustc-flags=*|cargo::rustc-flags=*)
+                  flags_val="''${line#*rustc-flags=}"
+                  BUILD_SCRIPT_FLAGS+=(''${flags_val})
+                  BUILD_SCRIPT_LINK_FLAGS+=(''${flags_val})
                   ;;
               esac
             done < _build_script/stdout.txt

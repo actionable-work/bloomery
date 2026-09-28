@@ -52,4 +52,25 @@ in {
   security-framework-sys = {
     buildInputs = darwinFrameworks;
   };
+
+  core-foundation-sys = {
+    buildInputs = darwinFrameworks;
+  };
+
+  core-graphics-types = {
+    buildInputs = darwinFrameworks;
+  };
+
+  io-kit-sys = {
+    buildInputs = lib.optionals pkgs.stdenv.hostPlatform.isDarwin (
+      with pkgs.darwin.apple_sdk.frameworks; [
+        IOKit
+        CoreFoundation
+      ]
+    );
+  };
+
+  aws-lc-sys = {
+    nativeBuildInputs = [pkgs.cmake] ++ lib.optionals pkgs.stdenv.hostPlatform.isDarwin [pkgs.darwin.cctools];
+  };
 }

@@ -47,7 +47,7 @@
     then lld
     else null;
 
-  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc] ++ lib.optional (linkerPackage != null) linkerPackage;
+  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc] ++ lib.optional (linkerPackage != null) linkerPackage;
   buildInputs = override.buildInputs or [];
   featureList =
     if override ? features && override.features != null
@@ -163,6 +163,22 @@ in
           IS_PROC_MACRO=1
           CRATE_TYPE="proc-macro"
           EXTRA_FLAGS+=("--extern" "proc_macro")
+        fi
+        EXTRA_CRATE_TYPES=()
+        if [ -f Cargo.toml ] && [ "$IS_PROC_MACRO" = "0" ]; then
+          DETECTED_CRATE_TYPES=$(awk '
+            /^\[lib\]/ { in_lib = 1; next }
+            /^\[/ { in_lib = 0 }
+            in_lib && /crate-type/ {
+              match($0, /crate-type[[:space:]]*=[[:space:]]*\[(.*)\]/, m)
+              print m[1]
+            }
+          ' Cargo.toml | tr -d '",')
+          for ct in $DETECTED_CRATE_TYPES; do
+            if [ "$ct" = "cdylib" ] || [ "$ct" = "staticlib" ]; then
+              EXTRA_CRATE_TYPES+=("--crate-type" "$ct")
+            fi
+          done
         fi
         ${
           if defaultLinker != null
@@ -440,24 +456,48 @@ in
           echo "Executing build script for $PKG_NAME..."
           ./_build_script/build_script_build > _build_script/stdout.txt || true
 
+          LINKS_NAME=""
+          if [ -f Cargo.toml ]; then
+            LINKS_NAME=$(sed -n -E 's/^[[:space:]]*links[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' Cargo.toml | head -n 1)
+          fi
+          BUILD_SCRIPT_METADATA=()
+
           while IFS= read -r line; do
             case "$line" in
-              cargo:rustc-cfg=*)
-                BUILD_SCRIPT_FLAGS+=("--cfg" "''${line#cargo:rustc-cfg=}")
+              cargo:rustc-cfg=*|cargo::rustc-cfg=*)
+                cfg_val="''${line#*rustc-cfg=}"
+                BUILD_SCRIPT_FLAGS+=("--cfg" "''$cfg_val")
                 ;;
-              cargo:rustc-link-lib=*)
-                lib_val="''${line#cargo:rustc-link-lib=}"
-                BUILD_SCRIPT_FLAGS+=("-l" "$lib_val")
-                BUILD_SCRIPT_LINK_FLAGS+=("-l" "$lib_val")
+              cargo:rustc-link-lib=*|cargo::rustc-link-lib=*)
+                lib_val="''${line#*rustc-link-lib=}"
+                BUILD_SCRIPT_FLAGS+=("-l" "''$lib_val")
+                BUILD_SCRIPT_LINK_FLAGS+=("-l" "''$lib_val")
                 ;;
-              cargo:rustc-link-search=*)
-                search_val="''${line#cargo:rustc-link-search=}"
-                BUILD_SCRIPT_FLAGS+=("-L" "$search_val")
-                BUILD_SCRIPT_LINK_FLAGS+=("-L" "$search_val")
+              cargo:rustc-link-search=*|cargo::rustc-link-search=*)
+                search_val="''${line#*rustc-link-search=}"
+                BUILD_SCRIPT_FLAGS+=("-L" "''$search_val")
+                BUILD_SCRIPT_LINK_FLAGS+=("-L" "''$search_val")
                 ;;
-              cargo:rustc-env=*)
-                env_val="''${line#cargo:rustc-env=}"
-                export "$env_val"
+              cargo:rustc-env=*|cargo::rustc-env=*)
+                env_val="''${line#*rustc-env=}"
+                export "''$env_val"
+                ;;
+              cargo:rustc-flags=*|cargo::rustc-flags=*)
+                flags_val="''${line#*rustc-flags=}"
+                BUILD_SCRIPT_FLAGS+=(''${flags_val})
+                BUILD_SCRIPT_LINK_FLAGS+=(''${flags_val})
+                ;;
+              cargo:*=*|cargo::*=*)
+                if [ -n "''$LINKS_NAME" ]; then
+                  meta_pair="''${line#cargo::}"
+                  meta_pair="''${meta_pair#cargo:}"
+                  meta_key="''${meta_pair%%=*}"
+                  meta_val="''${meta_pair#*=}"
+                  meta_key_upper=$(echo "''$meta_key" | tr '[:lower:]-' '[:upper:]_')
+                  links_upper=$(echo "''$LINKS_NAME" | tr '[:lower:]-' '[:upper:]_')
+                  export "DEP_''${links_upper}_''${meta_key_upper}=''$meta_val"
+                  BUILD_SCRIPT_METADATA+=("export DEP_''${links_upper}_''${meta_key_upper}=\"''$meta_val\"")
+                fi
                 ;;
             esac
           done < _build_script/stdout.txt
@@ -470,6 +510,7 @@ in
         $RUSTC "$ENTRY" \
           --crate-name "$CRATE_NAME" \
           --crate-type "$CRATE_TYPE" \
+          "''${EXTRA_CRATE_TYPES[@]}" \
           --emit=link,metadata \
           $EDITION_FLAG \
           -L dependency=_deps \
@@ -489,7 +530,7 @@ in
         if [ "$IS_PROC_MACRO" = "1" ] || [ "$CRATE_TYPE" = "proc-macro" ]; then
           OUT_LIB=$(ls $out/lib/*.so $out/lib/*.dylib 2>/dev/null | head -n 1)
         else
-          OUT_LIB=$(ls $out/lib/*.rlib 2>/dev/null | head -n 1)
+          OUT_LIB=$(ls $out/lib/*.rlib $out/lib/*.so $out/lib/*.dylib $out/lib/*.a 2>/dev/null | head -n 1)
         fi
         if [ -z "$OUT_LIB" ]; then
           OUT_LIB=$(ls $out/lib/lib* 2>/dev/null | head -n 1)
@@ -529,6 +570,9 @@ in
         export DEP_IS_PROC_MACRO="$IS_PROC_MACRO"
         export DEP_RUSTC_LINK_FLAGS="''${BUILD_SCRIPT_LINK_FLAGS[*]}"
         EOF
+        if [ ''${#BUILD_SCRIPT_METADATA[@]} -gt 0 ]; then
+          printf '%s\n' "''${BUILD_SCRIPT_METADATA[@]}" >> "$out/nix-support/meta.sh"
+        fi
 
         runHook postInstall
       '';

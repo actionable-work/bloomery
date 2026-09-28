@@ -20,7 +20,7 @@
 
   cargoLockHash =
     if cargoLockExists
-    then builtins.hashFile "sha256" cargoLock
+    then builtins.hashString "sha256" (lib.replaceStrings ["\r\n"] ["\n"] (builtins.readFile cargoLock))
     else null;
 
   bloomeryLockData =

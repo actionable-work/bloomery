@@ -11,6 +11,7 @@
   override ? {},
   defaultRustcFlags ? [],
   denyWarnings ? true,
+  edition ? null,
 }: let
   pname = pkg.name;
   version = pkg.version;
@@ -55,8 +56,16 @@ in
       configurePhase = ''
         runHook preConfigure
 
-        EDITION="2021"
-        if [ -f Cargo.toml ]; then
+        EDITION="${
+          if edition != null
+          then edition
+          else "2021"
+        }"
+        if [ "${
+          if edition != null
+          then "1"
+          else "0"
+        }" = "0" ] && [ -f Cargo.toml ]; then
           DETECTED_EDITION=$(sed -n -E 's/^[[:space:]]*edition[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' Cargo.toml | head -n 1)
           if [ -n "$DETECTED_EDITION" ]; then
             EDITION="$DETECTED_EDITION"

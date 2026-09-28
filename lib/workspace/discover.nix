@@ -12,10 +12,32 @@
         (lib.filterAttrs (_: spec: spec ? path) toml.workspace.dependencies)
       else {};
 
-    memberCrates =
-      if toml ? package
+    # Root package member (if present)
+    rootPackage =
+      if toml ? package && toml.package ? name
       then {"${toml.package.name}" = root;}
-      else if toml ? workspace && toml.workspace ? members
+      else {};
+
+    # Exclude patterns from [workspace] exclude = [...]
+    excludeList =
+      if toml ? workspace && toml.workspace ? exclude
+      then toml.workspace.exclude
+      else [];
+
+    isExcluded = p: let
+      relPath = lib.removePrefix "${toString root}/" (toString p);
+    in
+      builtins.any (
+        ex: let
+          cleanEx = lib.removeSuffix "/" ex;
+        in
+          relPath == cleanEx || lib.hasPrefix "${cleanEx}/" relPath
+      )
+      excludeList;
+
+    # Expand workspace members
+    workspaceMemberDirs =
+      if toml ? workspace && toml.workspace ? members
       then let
         members = toml.workspace.members;
         expandMember = m:
@@ -33,7 +55,7 @@
               sub: let
                 p = dir + "/${sub}";
               in
-                if builtins.pathExists (p + "/Cargo.toml")
+                if builtins.pathExists (p + "/Cargo.toml") && !isExcluded p
                 then [p]
                 else []
             )
@@ -58,7 +80,7 @@
               sub: let
                 p = dir + "/${sub}";
               in
-                if builtins.pathExists (p + "/Cargo.toml")
+                if builtins.pathExists (p + "/Cargo.toml") && !isExcluded p
                 then [p]
                 else []
             )
@@ -66,20 +88,30 @@
           else let
             p = root + "/${m}";
           in
-            if builtins.pathExists (p + "/Cargo.toml")
+            if builtins.pathExists (p + "/Cargo.toml") && !isExcluded p
             then [p]
             else [];
 
         crateDirs = lib.concatMap expandMember members;
         readCrate = p: let
-          ctoml = builtins.fromTOML (builtins.readFile (p + "/Cargo.toml"));
-        in {
-          name = ctoml.package.name;
-          value = p;
-        };
+          manifestPath = p + "/Cargo.toml";
+        in
+          if builtins.pathExists manifestPath
+          then let
+            ctoml = builtins.fromTOML (builtins.readFile manifestPath);
+          in
+            if ctoml ? package && ctoml.package ? name
+            then [
+              {
+                name = ctoml.package.name;
+                value = p;
+              }
+            ]
+            else []
+          else [];
       in
-        lib.listToAttrs (map readCrate crateDirs)
+        lib.listToAttrs (lib.concatMap readCrate crateDirs)
       else {};
   in
-    explicitPathCrates // memberCrates;
+    explicitPathCrates // rootPackage // workspaceMemberDirs;
 }

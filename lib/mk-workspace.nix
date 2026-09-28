@@ -170,7 +170,7 @@ in
           else if builtins.isPath bloomeryLock || builtins.isString bloomeryLock
           then builtins.fromTOML (builtins.readFile bloomeryLock)
           else throw "bloomery: Invalid bloomeryLock argument: expected path or attribute set.";
-        expectedHash = builtins.hashFile "sha256" cargoLock;
+        expectedHash = builtins.hashString "sha256" (lib.replaceStrings ["\r\n"] ["\n"] (builtins.readFile cargoLock));
         actualHash = lockData."cargo-lock-hash" or lockData.cargo_lock_hash or null;
       in
         if throwOnOutOfDate && actualHash != null && actualHash != expectedHash
@@ -234,6 +234,55 @@ in
       then lib.filter (depId: builtins.elem depId defaultDepIds) resolvedFeatures.__activeDeps.${id}
       else defaultDepIds;
 
+    parseGitSource = srcStr: let
+      noPrefix = lib.removePrefix "git+" srcStr;
+      parts = lib.splitString "#" noPrefix;
+      urlAndParams = builtins.elemAt parts 0;
+      rev =
+        if builtins.length parts > 1
+        then builtins.elemAt parts 1
+        else null;
+      url = builtins.head (lib.splitString "?" urlAndParams);
+    in {
+      inherit url rev;
+    };
+
+    fetchGitCrate = {
+      url,
+      rev,
+      name,
+    }: let
+      repo = builtins.fetchGit {
+        inherit url rev;
+        allRefs = true;
+      };
+      rootToml = repo + "/Cargo.toml";
+      isRoot =
+        builtins.pathExists rootToml
+        && ((builtins.fromTOML (builtins.readFile rootToml)).package.name or null) == name;
+    in
+      if isRoot
+      then repo
+      else let
+        entries = builtins.readDir repo;
+        dirs = builtins.attrNames (lib.filterAttrs (_: t: t == "directory") entries);
+        matchInSubdirs =
+          lib.concatMap (
+            d: let
+              sub = repo + "/${d}";
+            in
+              if
+                builtins.pathExists (sub + "/Cargo.toml")
+                && ((builtins.fromTOML (builtins.readFile (sub + "/Cargo.toml"))).package.name or null) == name
+              then [sub]
+              else []
+          )
+          dirs;
+      in
+        if matchInSubdirs != []
+        then builtins.head matchInSubdirs
+        else repo;
+
     # Attribute set of all crate derivations, keyed by package ID ("name-version")
     crates =
       lib.mapAttrs (
@@ -247,6 +296,14 @@ in
                 name = "${pkg.name}-${pkg.version}.crate";
                 url = "https://static.crates.io/crates/${pkg.name}/${pkg.name}-${pkg.version}.crate";
                 sha256 = pkg.checksum;
+              }
+            else if pkg.isGit
+            then let
+              gitInfo = parseGitSource pkg.source;
+            in
+              fetchGitCrate {
+                inherit (gitInfo) url rev;
+                name = pkg.name;
               }
             else throw "Unsupported source for package ${pkg.name}: ${builtins.toString pkg.source}";
 
@@ -288,12 +345,54 @@ in
           cratePath = discoveredMembers.${wpkg.name} or null;
           depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
           cOverride = effectiveOverrides.${wpkg.name} or {};
+          hasLib =
+            cratePath
+            != null
+            && (
+              builtins.pathExists (cratePath + "/src/lib.rs")
+              || builtins.pathExists (cratePath + "/lib.rs")
+            );
+          crateDrv =
+            if hasLib
+            then (crates.${wpkg.id} or null)
+            else null;
+          pkgLock =
+            if lockManifest != null
+            then (lockManifest.packages.${wpkg.id} or lockManifest.packages.${wpkg.name} or {})
+            else {};
+          edition = pkgLock.edition or null;
           hasMainRs = cratePath != null && builtins.pathExists (cratePath + "/src/main.rs");
           binDir = cratePath + "/src/bin";
           hasBinDir = cratePath != null && builtins.pathExists binDir;
           binFiles =
             if hasBinDir
             then builtins.attrNames (lib.filterAttrs (n: t: t == "regular" && lib.hasSuffix ".rs" n) (builtins.readDir binDir))
+            else [];
+
+          ctoml =
+            if cratePath != null && builtins.pathExists (cratePath + "/Cargo.toml")
+            then builtins.fromTOML (builtins.readFile (cratePath + "/Cargo.toml"))
+            else {};
+          manifestBins =
+            if ctoml ? bin && builtins.isList ctoml.bin
+            then
+              map (
+                b: {
+                  name = b.name;
+                  drv = builderBin {
+                    binName = b.name;
+                    pkg = wpkg;
+                    src = cratePath;
+                    entry = b.path;
+                    inherit crateDrv edition;
+                    dependencies = depDrvs;
+                    override = cOverride;
+                    profile = effectiveBinaryProfile;
+                    inherit defaultRustcFlags;
+                  };
+                }
+              )
+              ctoml.bin
             else [];
 
           mainBin = lib.optional hasMainRs {
@@ -303,6 +402,7 @@ in
               pkg = wpkg;
               src = cratePath;
               entry = "src/main.rs";
+              inherit crateDrv edition;
               dependencies = depDrvs;
               override = cOverride;
               profile = effectiveBinaryProfile;
@@ -321,6 +421,7 @@ in
                   pkg = wpkg;
                   src = cratePath;
                   entry = "src/bin/${bf}";
+                  inherit crateDrv edition;
                   dependencies = depDrvs;
                   override = cOverride;
                   profile = effectiveBinaryProfile;
@@ -330,7 +431,7 @@ in
             )
             binFiles;
         in
-          mainBin ++ extraBins
+          mainBin ++ extraBins ++ manifestBins
       )
       parsed.workspacePackages;
 
@@ -373,11 +474,28 @@ in
           cratePath = discoveredMembers.${wpkg.name};
           depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
           cOverride = effectiveOverrides.${wpkg.name} or {};
+          hasLib =
+            cratePath
+            != null
+            && (
+              builtins.pathExists (cratePath + "/src/lib.rs")
+              || builtins.pathExists (cratePath + "/lib.rs")
+            );
+          crateDrv =
+            if hasLib
+            then (crates.${wpkg.id} or null)
+            else null;
+          pkgLock =
+            if lockManifest != null
+            then (lockManifest.packages.${wpkg.id} or lockManifest.packages.${wpkg.name} or {})
+            else {};
+          edition = pkgLock.edition or null;
         in {
           name = mkCheckName wpkg.name "test";
           value = builderTest {
             pkg = wpkg;
             src = cratePath;
+            inherit crateDrv edition;
             dependencies = depDrvs;
             override = cOverride;
             defaultRustcFlags = testRustcFlags;
@@ -394,11 +512,17 @@ in
           cratePath = discoveredMembers.${wpkg.name};
           depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
           cOverride = effectiveOverrides.${wpkg.name} or {};
+          pkgLock =
+            if lockManifest != null
+            then (lockManifest.packages.${wpkg.id} or lockManifest.packages.${wpkg.name} or {})
+            else {};
+          edition = pkgLock.edition or null;
         in {
           name = mkCheckName wpkg.name "clippy";
           value = builderClippy {
             pkg = wpkg;
             src = cratePath;
+            inherit edition;
             dependencies = depDrvs;
             override = cOverride;
             defaultRustcFlags = clippyRustcFlags;
@@ -415,11 +539,17 @@ in
           cratePath = discoveredMembers.${wpkg.name};
           depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
           cOverride = effectiveOverrides.${wpkg.name} or {};
+          pkgLock =
+            if lockManifest != null
+            then (lockManifest.packages.${wpkg.id} or lockManifest.packages.${wpkg.name} or {})
+            else {};
+          edition = pkgLock.edition or null;
         in {
           name = mkCheckName wpkg.name "doc";
           value = builderDoc {
             pkg = wpkg;
             src = cratePath;
+            inherit edition;
             dependencies = depDrvs;
             override = cOverride;
             defaultRustdocFlags = docRustdocFlags;
@@ -444,6 +574,11 @@ in
               );
             depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
             cOverride = effectiveOverrides.${wpkg.name} or {};
+            pkgLock =
+              if lockManifest != null
+              then (lockManifest.packages.${wpkg.id} or lockManifest.packages.${wpkg.name} or {})
+              else {};
+            edition = pkgLock.edition or null;
           in
             if hasLib
             then {
@@ -452,6 +587,7 @@ in
                 pkg = wpkg;
                 src = cratePath;
                 crateDrv = crates.${wpkg.id} or null;
+                inherit edition;
                 dependencies = depDrvs;
                 override = cOverride;
                 defaultRustdocFlags = doctestRustdocFlags;
@@ -574,12 +710,26 @@ in
           shellHook = cfg.devShell.shellHook;
         }
       else null;
+
+    defaultPackage =
+      if binPackages ? default
+      then binPackages.default
+      else if binPackages != {}
+      then binPackages.${builtins.head (builtins.attrNames binPackages)}
+      else if libPackages != {}
+      then libPackages.${builtins.head (builtins.attrNames libPackages)}
+      else null;
   in {
     # All compiled rlibs (DAG)
     inherit crates;
 
-    # Only executable binaries in packages (clean nix flake show)
-    packages = binPackages;
+    # Expose both binaries and libraries
+    packages =
+      binPackages
+      // libPackages
+      // lib.optionalAttrs (defaultPackage != null) {
+        default = defaultPackage;
+      };
 
     # Runnable apps (binaries, doc servers, and lock updater)
     inherit apps;
