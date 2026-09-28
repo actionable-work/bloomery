@@ -1,5 +1,3 @@
-# mkWorkspace API Reference
-
 The primary constructor for customized workspaces is `bloomery.lib.${system}.mkWorkspace`. It accepts a strongly-typed and categorized option set.
 
 ---
@@ -25,16 +23,23 @@ bloomery.lib.${system}.mkWorkspace {
     clippy = pkgs.clippy;           # clippy-driver derivation
     cargo = pkgs.cargo;             # cargo derivation (for lock generation)
     linker = "lld";                 # "lld" (fast default on Linux), "mold", or null
+    lld = pkgs.lld;                 # LLVM lld package
+    mold = pkgs.mold;               # Mold linker package
+    stdenv = pkgs.stdenv;           # base stdenv
   };
 
   # ── Compilation Profile ─────────────────────────────
   profile = {
     optLevel = 3;                   # 0, 1, 2, 3, "s", "z"
-    lto = "thin";                   # "fat", "thin", "off", or bool
+    lto = "thin";                   # "fat", "thin", "off", "full", or bool
     codegenUnits = 1;               # positive integer
     panic = "abort";                # "unwind", "abort"
     strip = true;                   # true, false, "symbols", "debuginfo"
-    targetCpu = null;               # e.g. "x86-64-v3"
+    targetCpu = null;               # e.g. "x86-64-v3", "native"
+    debuginfo = null;               # bool, 0, 1, 2, "limited", "full"
+    overflowChecks = null;          # bool
+    linker = null;                  # custom linker executable
+    linkArgs = [];                  # extra linker flags
   };
 
   # ── Compiler & Linker Flags ─────────────────────────
@@ -54,6 +59,8 @@ bloomery.lib.${system}.mkWorkspace {
       rustcFlags = [];
       env = {};
       features = null;
+      assets = [];                  # extra asset files/dirs to copy into $out/bin/assets
+      assetDirs = [];               # custom asset directory names to collect
     };
   };
 

@@ -6,30 +6,46 @@ use topcoat::{
 #[component]
 pub async fn hero_banner() -> Result<impl View> {
     Ok(view! {
-        <div class="hero-container">
+        <div class="hero-container" id="overview">
+            <div class="hero-glow-1"></div>
+            <div class="hero-glow-2"></div>
+
             <div class="hero-pill-bar">
-                <span class="pill forge">"🔥 Pure Nix Rust Engine"</span>
-                <span class="pill emerald">"✓ Zero Cargo Overhead"</span>
-                <span class="pill cyan">"⚡ Hermetic Store Caching"</span>
-                <span class="pill">"🦀 Built with Topcoat"</span>
+                <span class="pill forge">
+                    <span class="material-symbols-outlined" style="font-size: 14px;">"bolt"</span>
+                    "Bloomery Core"
+                </span>
+                <span class="pill cyan">
+                    "Nix Flakes & Cargo"
+                </span>
+                <span class="pill">
+                    "NixOS 24.11 ready"
+                </span>
             </div>
+
             <h1 class="hero-title">
-                "Forge pure Rust binaries straight from Cargo.lock."
+                "Fast, Hermetic Rust Builds with Nix"
             </h1>
+
             <p class="hero-description">
-                "Every crate becomes an independent Nix store derivation. Rebuild leaves in seconds with zero cache invalidation, parallel check runners, and typed optimization profiles."
+                "Bloomery transforms standard "
+                <code>"Cargo.lock"</code>
+                " dependencies into isolated, reproducible derivation trees—delivering instant CI layer caching, fine-grained vendor hashing, and zero-drift cross-compilation without boilerplate generation."
             </p>
+
             <div class="hero-actions">
                 <a href="/docs/quickstart" class="btn-primary">
+                    <span class="material-symbols-outlined" style="font-size: 18px;">"terminal"</span>
                     <span>"Get Started"</span>
-                    <span>"→"</span>
                 </a>
-                <a href="/api" class="btn-secondary">
-                    <span>"API Reference"</span>
+                <a href="#benchmarks" class="btn-secondary">
+                    <span class="material-symbols-outlined" style="font-size: 18px;">"query_stats"</span>
+                    <span>"Benchmarks"</span>
                 </a>
-                <a href="/profiles" class="btn-secondary">
-                    <span>"Profile Options"</span>
-                </a>
+                <button class="copy-cmd-pill" id="copy-nix-eval" data-copy="nix flake check" title="Copy CLI check command">
+                    <span class="material-symbols-outlined" style="font-size: 16px; color: var(--secondary);">"content_copy"</span>
+                    <code>"nix flake check"</code>
+                </button>
             </div>
         </div>
     })

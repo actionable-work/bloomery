@@ -397,6 +397,11 @@ in
             fi
           '') (override.assets or [])}
 
+          # 5. Native framework asset bundling (Topcoat asset! macro support)
+          if [ -d "$out/bin/assets" ] && [ -f "$out/bin/$BIN_NAME" ]; then
+            ${pkgs.python3}/bin/python3 ${./topcoat-bundler.py} "$out/bin/$BIN_NAME" "$out/bin/assets" "$out/share/$BIN_NAME/assets"
+          fi
+
           # Ensure copied assets have standard write permissions in derivation
           chmod -R u+w "$out/bin/assets" "$out/bin/static" "$out/bin/public" "$out/share" 2>/dev/null || true
 

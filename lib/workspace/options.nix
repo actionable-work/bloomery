@@ -53,6 +53,16 @@
         default = {};
         description = "Per-crate binary profile override settings.";
       };
+      assets = lib.mkOption {
+        type = types.listOf (types.either types.path types.package);
+        default = [];
+        description = "Additional asset file or directory paths to bundle alongside binaries.";
+      };
+      assetDirs = lib.mkOption {
+        type = types.listOf types.str;
+        default = [];
+        description = "Custom asset directory names to collect from the crate source (in addition to assets, static, public).";
+      };
     };
   };
 

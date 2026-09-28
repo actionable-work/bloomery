@@ -1,5 +1,3 @@
-# The Bloomery Philosophy
-
 > [!NOTE]
 > A **bloomery** was the earliest metallurgical furnace invented by ancient smiths to smelt iron directly from ore and charcoal. Instead of producing brittle pig iron, it yielded a porous iron mass—a *bloom*—which was forged on the anvil to produce pure wrought iron.
 

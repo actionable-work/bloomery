@@ -1,10 +1,4 @@
-# Quickstart Guide
-
-Get up and running with Bloomery in less than 60 seconds.
-
----
-
-## 1. Zero-Boilerplate with `mkFlake`
+## Zero-Boilerplate with `mkFlake`
 
 For standard workspaces, `bloomery.mkFlake` sets up complete packages, runnable apps, check suites, and development shells with just a few lines of Nix:
 
@@ -18,9 +12,9 @@ For standard workspaces, `bloomery.mkFlake` sets up complete packages, runnable 
     bloomery.url = "github:actionable/bloomery";
   };
 
-  outputs = { self, nixpkgs, bloomery, ... }:
+  outputs = { nixpkgs, bloomery, ... }:
     bloomery.mkFlake {
-      inherit self nixpkgs;
+      inherit nixpkgs;
       root = ./.;
     };
 }
@@ -35,7 +29,7 @@ For standard workspaces, `bloomery.mkFlake` sets up complete packages, runnable 
 
 ---
 
-## 2. Generating the Lock Manifest
+## Generating the Lock Manifest
 
 Bloomery resolves all crate dependencies and features without IFD. Run the lock updater once to initialize `bloomery.lock`:
 
@@ -51,7 +45,7 @@ git add bloomery.lock && git commit -m "chore: add bloomery lockfile"
 
 ---
 
-## 3. Running & Checking
+## Running and Checking
 
 Build and run your default binary:
 
