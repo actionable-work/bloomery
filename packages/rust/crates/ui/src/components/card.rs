@@ -6,7 +6,7 @@ use topcoat::{
 const FLAKE_CODE_HTML: &str = r#"<span class="syntax-punct">{</span>
   <span class="syntax-kw">inputs</span> = <span class="syntax-punct">{</span>
     <span class="syntax-fn">nixpkgs</span>.url = <span class="syntax-str">"github:NixOS/nixpkgs/nixos-unstable"</span>;
-    <span class="syntax-fn">bloomery</span>.url = <span class="syntax-str">"github:actionable/bloomery"</span>;
+    <span class="syntax-fn">bloomery</span>.url = <span class="syntax-str">"github:actionable-work/bloomery"</span>;
   <span class="syntax-punct">}</span>;
 
   <span class="syntax-kw">outputs</span> = <span class="syntax-punct">{</span> nixpkgs, bloomery, ... <span class="syntax-punct">}</span>:
@@ -311,6 +311,8 @@ pub async fn next_steps_cards() -> Result<impl View> {
     })
 }
 
+use bloomery_content::CONFIG;
+
 #[component]
 pub async fn feedback_box() -> Result<impl View> {
     Ok(view! {
@@ -319,7 +321,7 @@ pub async fn feedback_box() -> Result<impl View> {
                 <span class="feedback-title">"Was this page helpful?"</span>
                 <span class="feedback-sub">"Let us know how we can improve these docs."</span>
             </div>
-            <div class="feedback-actions">
+            <div class="feedback-actions" id="feedback-container">
                 <button class="feedback-btn" id="feedback-yes" title="Yes, helpful">
                     <span class="material-symbols-outlined" style="font-size: 16px; color: var(--secondary);">"thumb_up"</span>
                     <span>"Yes"</span>
@@ -329,7 +331,7 @@ pub async fn feedback_box() -> Result<impl View> {
                     <span>"No"</span>
                 </button>
                 <span style="opacity: 0.3; margin: 0 0.25rem;">"|"</span>
-                <a href="https://github.com/actionable/bloomery/issues/new" target="_blank" rel="noopener noreferrer" style="font-size: 0.85rem; color: var(--text-dim); display: flex; align-items: center; gap: 0.35rem;">
+                <a href=(CONFIG.issues_url) target="_blank" rel="noopener noreferrer" style="font-size: 0.85rem; color: var(--text-dim); display: flex; align-items: center; gap: 0.35rem;">
                     <span class="material-symbols-outlined" style="font-size: 16px;">"bug_report"</span>
                     <span>"Report issue"</span>
                 </a>

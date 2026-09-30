@@ -10,19 +10,6 @@ pub async fn hero_banner() -> Result<impl View> {
             <div class="hero-glow-1"></div>
             <div class="hero-glow-2"></div>
 
-            <div class="hero-pill-bar">
-                <span class="pill forge">
-                    <span class="material-symbols-outlined" style="font-size: 14px;">"bolt"</span>
-                    "Bloomery Core"
-                </span>
-                <span class="pill cyan">
-                    "Nix Flakes & Cargo"
-                </span>
-                <span class="pill">
-                    "NixOS 24.11 ready"
-                </span>
-            </div>
-
             <h1 class="hero-title">
                 "Fast, Hermetic Rust Builds with Nix"
             </h1>
@@ -38,7 +25,7 @@ pub async fn hero_banner() -> Result<impl View> {
                     <span class="material-symbols-outlined" style="font-size: 18px;">"terminal"</span>
                     <span>"Get Started"</span>
                 </a>
-                <a href="#benchmarks" class="btn-secondary">
+                <a href="/benchmarks" class="btn-secondary">
                     <span class="material-symbols-outlined" style="font-size: 18px;">"query_stats"</span>
                     <span>"Benchmarks"</span>
                 </a>

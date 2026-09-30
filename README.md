@@ -28,7 +28,7 @@ The fastest way to package a Rust workspace:
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    bloomery.url = "github:actionable/bloomery";
+    bloomery.url = "github:actionable-work/bloomery";
   };
 
   outputs = { nixpkgs, bloomery, ... }:
@@ -49,7 +49,7 @@ When you want manual control over system outputs:
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    bloomery.url = "github:actionable/bloomery";
+    bloomery.url = "github:actionable-work/bloomery";
   };
 
   outputs = { nixpkgs, bloomery, ... }:
@@ -89,7 +89,7 @@ Integrate into a `flake-parts` project with strongly-typed module options:
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
-    bloomery.url = "github:actionable/bloomery";
+    bloomery.url = "github:actionable-work/bloomery";
   };
 
   outputs = inputs@{ flake-parts, bloomery, ... }:

@@ -35,7 +35,7 @@ pub async fn home() -> Result<impl View, Error> {
                             <span class="status-dot"></span>
                             "v0.1.0"
                         </span>
-                        <a href="https://github.com/actionable/bloomery" target="_blank" rel="noopener noreferrer" class="meta-edit-btn" title="View repository on GitHub">
+                        <a href="https://github.com/actionable-work/bloomery" target="_blank" rel="noopener noreferrer" class="meta-edit-btn" title="View repository on GitHub">
                             <span class="material-symbols-outlined" style="font-size: 14px;">"code"</span>
                             "GitHub"
                         </a>
@@ -54,7 +54,6 @@ pub async fn home() -> Result<impl View, Error> {
 
                 <section style="display: flex; flex-direction: column; gap: 1.25rem;" id="philosophy">
                     <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                        <span class="pill forge" style="align-self: flex-start;">"Philosophy"</span>
                         <h2 class="doc-h2" style="margin: 0.25rem 0; border: none; padding: 0;">"The Bloomery Philosophy"</h2>
                         <p class="doc-paragraph" style="margin: 0; color: var(--text-muted);">
                             (OVERVIEW.description)
@@ -67,7 +66,6 @@ pub async fn home() -> Result<impl View, Error> {
 
                 <section style="display: flex; flex-direction: column; gap: 1rem;" id="matrix">
                     <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                        <span class="pill emerald" style="align-self: flex-start;">"Verification Matrix"</span>
                         <h2 class="doc-h2" style="margin: 0.25rem 0; border: none; padding: 0;">"Included Test Workspaces Matrix"</h2>
                         <p class="doc-paragraph" style="margin: 0; color: var(--text-muted);">
                             "Bloomery verifies its own correctness against 6 dedicated test workspaces, running 68+ automated checks in CI:"

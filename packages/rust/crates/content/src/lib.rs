@@ -1,3 +1,6 @@
+pub mod config;
+pub use config::*;
+
 pub struct DocPage {
     pub slug: &'static str,
     pub title: &'static str,
@@ -61,19 +64,39 @@ pub static OVERRIDES: DocPage = DocPage {
 pub static ARCHITECTURE: DocPage = DocPage {
     slug: "architecture",
     title: "Architecture & Internals",
-    category: "Architecture",
+    category: "Getting Started",
     description: "Deep dive into zero-IFD feature resolution, per-crate DAGs, and build script sandboxes.",
-    order: 6,
+    order: 3,
     markdown: include_str!("docs/architecture.md"),
+};
+
+pub static MATRIX: DocPage = DocPage {
+    slug: "matrix",
+    title: "Verification Matrix",
+    category: "Validation & Benchmarks",
+    description: "Overview of Bloomery's 6 dedicated test workspaces running 68+ CI checks.",
+    order: 7,
+    markdown: include_str!("docs/matrix.md"),
+};
+
+pub static BENCHMARKS: DocPage = DocPage {
+    slug: "benchmarks",
+    title: "Architectural Benchmarks",
+    category: "Validation & Benchmarks",
+    description: "Performance comparisons and architectural advantages over Crane and Cargo2nix.",
+    order: 8,
+    markdown: include_str!("docs/benchmarks.md"),
 };
 
 pub static ALL_PAGES: &[&DocPage] = &[
     &OVERVIEW,
     &QUICKSTART,
+    &ARCHITECTURE,
     &PROFILES,
     &API,
     &OVERRIDES,
-    &ARCHITECTURE,
+    &MATRIX,
+    &BENCHMARKS,
 ];
 
 pub fn all_pages() -> &'static [&'static DocPage] {
@@ -88,7 +111,7 @@ pub fn categories() -> Vec<DocCategory> {
     let mut map: Vec<(&'static str, &'static str, Vec<&'static DocPage>)> = vec![
         ("Getting Started", "🚀", Vec::new()),
         ("Configuration", "⚙️", Vec::new()),
-        ("Architecture", "🏗️", Vec::new()),
+        ("Validation & Benchmarks", "📊", Vec::new()),
     ];
 
     for page in ALL_PAGES {
@@ -462,13 +485,15 @@ mod tests {
 
     #[test]
     fn test_all_pages_exist() {
-        assert_eq!(all_pages().len(), 6);
+        assert_eq!(all_pages().len(), 8);
         assert!(get_page("overview").is_some());
         assert!(get_page("quickstart").is_some());
         assert!(get_page("profiles").is_some());
         assert!(get_page("api").is_some());
         assert!(get_page("overrides").is_some());
         assert!(get_page("architecture").is_some());
+        assert!(get_page("matrix").is_some());
+        assert!(get_page("benchmarks").is_some());
     }
 
     #[test]

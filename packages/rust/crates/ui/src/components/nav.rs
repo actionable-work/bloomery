@@ -17,13 +17,13 @@ pub async fn sidebar(active_path: &str) -> Result<impl View> {
                         <span class="material-symbols-outlined" style="font-size: 14px; opacity: 0.5;">"expand_more"</span>
                     </div>
                     <div style="display: flex; flex-direction: column; gap: 0.2rem;">
-                        <a href="/" class=(if active_path == "/" { "sidebar-link active" } else { "sidebar-link" })>
+                        <a href="/" class=(if active_path == "/" || active_path == "/overview" || active_path == "/docs/overview" { "sidebar-link active" } else { "sidebar-link" })>
                             "Introduction"
                         </a>
-                        <a href="/docs/quickstart" class=(if active_path == "/docs/quickstart" { "sidebar-link active" } else { "sidebar-link" })>
+                        <a href="/docs/quickstart" class=(if active_path == "/quickstart" || active_path == "/docs/quickstart" { "sidebar-link active" } else { "sidebar-link" })>
                             "Quickstart"
                         </a>
-                        <a href="/docs/architecture" class=(if active_path == "/docs/architecture" { "sidebar-link active" } else { "sidebar-link" })>
+                        <a href="/docs/architecture" class=(if active_path == "/architecture" || active_path == "/docs/architecture" { "sidebar-link active" } else { "sidebar-link" })>
                             "Architecture"
                         </a>
                     </div>
@@ -38,13 +38,13 @@ pub async fn sidebar(active_path: &str) -> Result<impl View> {
                         <span class="material-symbols-outlined" style="font-size: 14px; opacity: 0.5;">"expand_more"</span>
                     </div>
                     <div style="display: flex; flex-direction: column; gap: 0.2rem;">
-                        <a href="/profiles" class=(if active_path == "/profiles" { "sidebar-link active" } else { "sidebar-link" })>
+                        <a href="/profiles" class=(if active_path == "/profiles" || active_path == "/docs/profiles" { "sidebar-link active" } else { "sidebar-link" })>
                             "Strongly-Typed Profiles"
                         </a>
-                        <a href="/api" class=(if active_path == "/api" { "sidebar-link active" } else { "sidebar-link" })>
+                        <a href="/api" class=(if active_path == "/api" || active_path == "/docs/api" { "sidebar-link active" } else { "sidebar-link" })>
                             "mkWorkspace Options API"
                         </a>
-                        <a href="/overrides" class=(if active_path == "/overrides" { "sidebar-link active" } else { "sidebar-link" })>
+                        <a href="/overrides" class=(if active_path == "/overrides" || active_path == "/docs/overrides" { "sidebar-link active" } else { "sidebar-link" })>
                             "Colocated overrides.nix"
                         </a>
                     </div>
@@ -53,38 +53,21 @@ pub async fn sidebar(active_path: &str) -> Result<impl View> {
                 <div class="sidebar-group">
                     <div class="sidebar-group-header">
                         <span class="sidebar-group-title">
-                            <span class="material-symbols-outlined" style="font-size: 15px;">"hub"</span>
-                            "Tooling & Matrix"
+                            <span class="material-symbols-outlined" style="font-size: 15px;">"analytics"</span>
+                            "Validation & Benchmarks"
                         </span>
                         <span class="material-symbols-outlined" style="font-size: 14px; opacity: 0.5;">"expand_more"</span>
                     </div>
                     <div style="display: flex; flex-direction: column; gap: 0.2rem;">
-                        <a href="/#matrix" class="sidebar-link">
-                            "6x Workspace Test Matrix"
+                        <a href="/matrix" class=(if active_path == "/matrix" || active_path == "/docs/matrix" { "sidebar-link active" } else { "sidebar-link" })>
+                            "Verification Matrix"
                         </a>
-                        <a href="/#installation" class="sidebar-link">
-                            "Flake Setup & Terminal"
-                        </a>
-                        <a href="/#benchmarks" class="sidebar-link">
+                        <a href="/benchmarks" class=(if active_path == "/benchmarks" || active_path == "/docs/benchmarks" { "sidebar-link active" } else { "sidebar-link" })>
                             "Architectural Benchmarks"
                         </a>
                     </div>
                 </div>
             </nav>
-
-            <div class="sidebar-status-box">
-                <div class="status-row">
-                    <span>"Engine status"</span>
-                    <span class="status-tag">
-                        <span class="status-dot"></span>
-                        "stable"
-                    </span>
-                </div>
-                <a href="https://github.com/actionable/bloomery/releases" target="_blank" rel="noopener noreferrer" class="changelog-link">
-                    <span>"Release notes & changelog"</span>
-                    <span class="material-symbols-outlined" style="font-size: 14px;">"arrow_forward"</span>
-                </a>
-            </div>
         </aside>
     })
 }
@@ -99,10 +82,15 @@ pub async fn toc_sidebar(active_path: &str) -> Result<impl View> {
     };
 
     let items: &[(&str, &str, bool)] = match path {
-        "/docs/quickstart" => &[
+        "/quickstart" | "/docs/quickstart" => &[
             (
                 "#zero-boilerplate-with-mkflake",
                 "Zero-Boilerplate mkFlake",
+                false,
+            ),
+            (
+                "#alternative-integration-styles",
+                "Integration Styles",
                 false,
             ),
             (
@@ -114,11 +102,25 @@ pub async fn toc_sidebar(active_path: &str) -> Result<impl View> {
         ],
         "/profiles" | "/docs/profiles" => &[
             ("#profile-options-matrix", "Profile Options Matrix", false),
-            ("#configuring-profiles", "Configuring Profiles", false),
+            (
+                "#configuring-release-and-dev-profiles",
+                "Configuring Profiles",
+                false,
+            ),
         ],
         "/api" | "/docs/api" => &[
-            ("#complete-options-schema", "Options Schema", false),
-            ("#workspace-return-value", "Workspace Outputs", false),
+            (
+                "#mkflake-top-level-constructor",
+                "mkFlake Constructor",
+                false,
+            ),
+            (
+                "#mkworkspace-complete-options-schema",
+                "mkWorkspace Options Schema",
+                false,
+            ),
+            ("#flakemodules-default-schema", "flake-parts Module", false),
+            ("#workspace-return-value", "Workspace Return Value", false),
         ],
         "/overrides" | "/docs/overrides" => &[
             (
@@ -137,7 +139,7 @@ pub async fn toc_sidebar(active_path: &str) -> Result<impl View> {
                 false,
             ),
         ],
-        "/docs/architecture" => &[
+        "/architecture" | "/docs/architecture" => &[
             ("#zero-ifd-feature-resolution", "Zero-IFD Resolution", false),
             ("#per-crate-derivation-graph", "Per-Crate DAG", false),
             (
@@ -151,19 +153,24 @@ pub async fn toc_sidebar(active_path: &str) -> Result<impl View> {
                 false,
             ),
         ],
+        "/matrix" | "/docs/matrix" => {
+            &[("#workspace-integration-matrix", "Integration Matrix", false)]
+        }
+        "/benchmarks" | "/docs/benchmarks" => &[
+            ("#performance-comparison", "Performance", false),
+            (
+                "#architectural-comparison-matrix",
+                "Comparison Matrix",
+                false,
+            ),
+        ],
         "/docs/overview" | "/overview" => &[
             ("#why-pure-nix-derivations", "Why Pure Nix?", false),
             ("#core-capabilities", "Core Capabilities", false),
         ],
         _ => &[
-            ("#overview", "Overview", false),
-            ("#key-features", "Pure Nix Sandbox", true),
-            ("#installation", "Quickstart & Code Tabs", true),
-            ("#graph", "Derivation Graph Flow", true),
-            ("#benchmarks", "Architectural Advantage", false),
-            ("#philosophy", "The Bloomery Philosophy", false),
-            ("#matrix", "Test Workspaces Matrix", true),
-            ("#next-steps", "Next Steps", false),
+            ("#why-pure-nix-derivations", "Why Pure Nix?", false),
+            ("#core-capabilities", "Core Capabilities", false),
         ],
     };
 
@@ -191,15 +198,15 @@ pub async fn toc_sidebar(active_path: &str) -> Result<impl View> {
             <div class="community-group">
                 <div class="toc-title">"Community & Links"</div>
                 <div class="toc-list">
-                    <a href="https://github.com/actionable/bloomery" target="_blank" rel="noopener noreferrer" class="community-link">
+                    <a href="https://github.com/actionable-work/bloomery" target="_blank" rel="noopener noreferrer" class="community-link">
                         <span class="material-symbols-outlined" style="font-size: 16px;">"code"</span>
                         <span>"GitHub Repository"</span>
                     </a>
-                    <a href="https://github.com/actionable/bloomery/issues/new" target="_blank" rel="noopener noreferrer" class="community-link">
+                    <a href="https://github.com/actionable-work/bloomery/issues/new" target="_blank" rel="noopener noreferrer" class="community-link">
                         <span class="material-symbols-outlined" style="font-size: 16px;">"bug_report"</span>
                         <span>"Report docs issue"</span>
                     </a>
-                    <a href="https://github.com/actionable/bloomery/discussions" target="_blank" rel="noopener noreferrer" class="community-link">
+                    <a href="https://github.com/actionable-work/bloomery/discussions" target="_blank" rel="noopener noreferrer" class="community-link">
                         <span class="material-symbols-outlined" style="font-size: 16px;">"forum"</span>
                         <span>"Ask on Discussions"</span>
                     </a>

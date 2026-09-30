@@ -1,7 +1,9 @@
 use topcoat::{
     Result,
-    view::{Child, View, component, view},
+    view::{Child, Unescaped, View, component, view},
 };
+
+use bloomery_content::CONFIG;
 
 use crate::assets::{BLOOMERY_CSS, BLOOMERY_FAVICON, BLOOMERY_LOGO};
 use crate::components::nav::{sidebar, toc_sidebar};
@@ -39,7 +41,7 @@ pub async fn page_layout(
                             <img src=(BLOOMERY_LOGO) class="brand-logo-img" alt="Bloomery logo" />
                             <span class="brand-text">"bloomery"</span>
                         </a>
-                        <span class="brand-version-badge">"v0.1.0"</span>
+                        <span class="brand-version-badge">(CONFIG.default_version)</span>
                     </div>
 
                     <div class="header-center">
@@ -51,20 +53,15 @@ pub async fn page_layout(
                     </div>
 
                     <div class="header-right">
-                        <nav class="header-nav">
-                            <a href="/" class=(if active_path == "/" { "header-nav-link active" } else { "header-nav-link" })>"Docs"</a>
-                            <a href="/docs/quickstart" class=(if active_path == "/docs/quickstart" { "header-nav-link active" } else { "header-nav-link" })>"Guides"</a>
-                            <a href="/api" class=(if active_path == "/api" { "header-nav-link active" } else { "header-nav-link" })>"API Reference"</a>
-                            <a href="/profiles" class=(if active_path == "/profiles" { "header-nav-link active" } else { "header-nav-link" })>"Profiles"</a>
-                            <a href="/docs/architecture" class=(if active_path == "/docs/architecture" { "header-nav-link active" } else { "header-nav-link" })>"Architecture"</a>
-                        </nav>
                         <div class="header-actions">
-                            <a href="https://github.com/actionable/bloomery" target="_blank" rel="noopener noreferrer" class="header-action-btn" title="GitHub Repository">
-                                <span class="material-symbols-outlined" style="font-size: 16px; color: var(--primary);">"code"</span>
+                            <a href=(CONFIG.repo_url) target="_blank" rel="noopener noreferrer" class="header-action-btn" title="GitHub Repository & Stars">
+                                <span class="material-symbols-outlined" style="font-size: 16px; color: #f59e0b;">"star"</span>
                                 <span>"GitHub"</span>
+                                <span id="github-stars-count" class="github-stars-badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; padding: 0.15rem 0.45rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; margin-left: 0.2rem;">"★"</span>
                             </a>
-                            <a href="https://github.com/actionable/bloomery/discussions" target="_blank" rel="noopener noreferrer" class="header-action-btn" title="Discussions">
+                            <a href=(CONFIG.discussions_url) target="_blank" rel="noopener noreferrer" class="header-action-btn" title="Discussions">
                                 <span class="material-symbols-outlined" style="font-size: 18px;">"forum"</span>
+                                <span>"Discussions"</span>
                             </a>
                         </div>
                     </div>
@@ -82,58 +79,92 @@ pub async fn page_layout(
                     <div class="search-modal-card">
                         <div class="search-input-row">
                             <span class="material-symbols-outlined" style="color: var(--primary); font-size: 20px;">"search"</span>
-                            <input type="text" id="docs-search-input" class="search-modal-input" placeholder="Search documentation, guides, and options..." autocomplete="off" />
+                            <input type="text" id="docs-search-input" class="search-modal-input" placeholder="Search documentation, options, architecture..." autocomplete="off" />
                             <kbd class="search-kbd" id="close-search-btn" style="cursor: pointer;">"ESC"</kbd>
                         </div>
                         <div class="search-results-list" id="search-results">
-                            <a href="/" class="search-result-item">
+                            <a href="/" class="search-result-item" data-keywords="overview philosophy nix cargo lock pure rlib">
                                 <span class="material-symbols-outlined result-icon">"home"</span>
                                 <div>
                                     <div class="result-title">"Introduction & Philosophy"</div>
-                                    <div class="result-desc">"Pure Nix Rust engine without Cargo lock contention"</div>
+                                    <div class="result-desc">"Pure Nix Rust engine, zero Cargo overhead, and core principles"</div>
                                 </div>
                             </a>
-                            <a href="/docs/quickstart" class="search-result-item">
+                            <a href="/quickstart" class="search-result-item" data-keywords="quickstart flake mkflake mkworkspace flake-parts lock shell">
                                 <span class="material-symbols-outlined result-icon">"rocket_launch"</span>
                                 <div>
-                                    <div class="result-title">"Quickstart Guide"</div>
-                                    <div class="result-desc">"Initialize flake.nix and compile in under 60 seconds"</div>
+                                    <div class="result-title">"Quickstart & Integration Styles"</div>
+                                    <div class="result-desc">"Zero-boilerplate flake.nix, flake-parts modules, and lock commands"</div>
                                 </div>
                             </a>
-                            <a href="/profiles" class="search-result-item">
+                            <a href="/architecture" class="search-result-item" data-keywords="architecture dag zero-ifd build.rs assets rlib dependencies">
+                                <span class="material-symbols-outlined result-icon">"account_tree"</span>
+                                <div>
+                                    <div class="result-title">"Architecture & Internals"</div>
+                                    <div class="result-desc">"Zero-IFD resolution, per-crate DAGs, and build script sandboxing"</div>
+                                </div>
+                            </a>
+                            <a href="/profiles" class="search-result-item" data-keywords="profiles lto optlevel panic codegenunits strip debuginfo targetcpu">
                                 <span class="material-symbols-outlined result-icon">"tune"</span>
                                 <div>
                                     <div class="result-title">"Strongly-Typed Profiles"</div>
-                                    <div class="result-desc">"LTO, codegen units, panic strategies, and target-cpu"</div>
+                                    <div class="result-desc">"LTO, codegen units, panic strategies, and profileDev settings"</div>
                                 </div>
                             </a>
-                            <a href="/api" class="search-result-item">
+                            <a href="/api" class="search-result-item" data-keywords="api schema options mkworkspace mkflake toolchain source flags">
                                 <span class="material-symbols-outlined result-icon">"menu_book"</span>
                                 <div>
                                     <div class="result-title">"mkWorkspace Options API"</div>
                                     <div class="result-desc">"Categorized options reference for sources, toolchain, flags"</div>
                                 </div>
                             </a>
-                            <a href="/overrides" class="search-result-item">
+                            <a href="/overrides" class="search-result-item" data-keywords="overrides fileset assets assetdirs openssl sys-crates env">
                                 <span class="material-symbols-outlined result-icon">"settings_input_component"</span>
                                 <div>
-                                    <div class="result-title">"Colocated Overrides"</div>
+                                    <div class="result-title">"Colocated overrides.nix"</div>
                                     <div class="result-desc">"overrides.nix, native C libraries, and asset pipelines"</div>
                                 </div>
                             </a>
-                            <a href="/docs/architecture" class="search-result-item">
-                                <span class="material-symbols-outlined result-icon">"account_tree"</span>
+                            <a href="/matrix" class="search-result-item" data-keywords="matrix tests workspaces verification axum mklib edge-cases">
+                                <span class="material-symbols-outlined result-icon">"fact_check"</span>
                                 <div>
-                                    <div class="result-title">"Architecture & Internals"</div>
-                                    <div class="result-desc">"Zero-IFD resolution, per-crate DAGs, and build scripts"</div>
+                                    <div class="result-title">"Verification Matrix"</div>
+                                    <div class="result-desc">"6 dedicated test workspaces running automated checks in CI"</div>
                                 </div>
                             </a>
+                            <a href="/benchmarks" class="search-result-item" data-keywords="benchmarks comparison crane cargo2nix cache ci speed">
+                                <span class="material-symbols-outlined result-icon">"query_stats"</span>
+                                <div>
+                                    <div class="result-title">"Architectural Benchmarks"</div>
+                                    <div class="result-desc">"Performance comparisons with Crane & Cargo2nix"</div>
+                                </div>
+                            </a>
+                            <div id="search-no-results" style="display: none; padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.9rem;">
+                                "No matching documentation pages found."
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <script>
-                    "// Tab switching interactivity
+                <script>(Unescaped::new_unchecked(r#"
+                    // Dynamically fetch GitHub stars
+                    (function fetchGitHubStars() {
+                        var badge = document.getElementById('github-stars-count');
+                        if (!badge) return;
+                        fetch('https://api.github.com/repos/actionable-work/bloomery')
+                            .then(function(r) { return r.json(); })
+                            .then(function(d) {
+                                if (d && typeof d.stargazers_count === 'number') {
+                                    var count = d.stargazers_count;
+                                    badge.textContent = count >= 1000 ? (count / 1000).toFixed(1) + 'k' : count;
+                                } else {
+                                    badge.textContent = '★';
+                                }
+                            })
+                            .catch(function() { badge.textContent = '★'; });
+                    })();
+
+                    // Tab switching interactivity
                     document.addEventListener('click', function(e) {
                         var tab = e.target.closest('.tab-btn');
                         if (!tab) return;
@@ -146,11 +177,11 @@ pub async fn page_layout(
                         if (container && tabName) {
                             var pane = container.querySelector('.code-block');
                             if (tabName === 'flake') {
-                                pane.innerHTML = '<span class=\"syntax-punct\">{</span>\\n  <span class=\"syntax-kw\">inputs</span> = <span class=\"syntax-punct\">{</span>\\n    <span class=\"syntax-fn\">nixpkgs</span>.url = <span class=\"syntax-str\">\"github:NixOS/nixpkgs/nixos-unstable\"</span>;\\n    <span class=\"syntax-fn\">bloomery</span>.url = <span class=\"syntax-str\">\"github:actionable/bloomery\"</span>;\\n  <span class=\"syntax-punct\">}</span>;\\n\\n  <span class=\"syntax-kw\">outputs</span> = <span class=\"syntax-punct\">{</span> nixpkgs, bloomery, ... <span class=\"syntax-punct\">}</span>:\\n    bloomery.mkFlake <span class=\"syntax-punct\">{</span>\\n      <span class=\"syntax-kw\">inherit</span> nixpkgs;\\n      root = ./.;\\n    <span class=\"syntax-punct\">}</span>;\\n<span class=\"syntax-punct\">}</span>';
+                                pane.innerHTML = '<span class="syntax-punct">{</span>\n  <span class="syntax-kw">inputs</span> = <span class="syntax-punct">{</span>\n    <span class="syntax-fn">nixpkgs</span>.url = <span class="syntax-str">"github:NixOS/nixpkgs/nixos-unstable"</span>;\n    <span class="syntax-fn">bloomery</span>.url = <span class="syntax-str">"github:actionable-work/bloomery"</span>;\n  <span class="syntax-punct">}</span>;\n\n  <span class="syntax-kw">outputs</span> = <span class="syntax-punct">{</span> nixpkgs, bloomery, ... <span class="syntax-punct">}</span>:\n    bloomery.mkFlake <span class="syntax-punct">{</span>\n      <span class="syntax-kw">inherit</span> nixpkgs;\n      root = ./.;\n    <span class="syntax-punct">}</span>;\n<span class="syntax-punct">}</span>';
                             } else if (tabName === 'overrides') {
-                                pane.innerHTML = '<span class=\"syntax-comment\"># overrides.nix colocated next to Cargo.toml</span>\\n<span class=\"syntax-punct\">{</span> pkgs, lib <span class=\"syntax-punct\">}</span>:\\n<span class=\"syntax-punct\">{</span>\\n  fileset = ./.;\\n  rustcFlags = [ <span class=\"syntax-str\">\"-C\"</span> <span class=\"syntax-str\">\"opt-level=3\"</span> ];\\n  env = <span class=\"syntax-punct\">{</span>\\n    MY_VAR = <span class=\"syntax-str\">\"custom_value\"</span>;\\n  <span class=\"syntax-punct\">}</span>;\\n<span class=\"syntax-punct\">}</span>';
+                                pane.innerHTML = '<span class="syntax-comment"># overrides.nix colocated next to Cargo.toml</span>\n<span class="syntax-punct">{</span> pkgs, lib <span class="syntax-punct">}</span>:\n<span class="syntax-punct">{</span>\n  fileset = ./.;\n  rustcFlags = [ <span class="syntax-str">"-C"</span> <span class="syntax-str">"opt-level=3"</span> ];\n  env = <span class="syntax-punct">{</span>\n    MY_VAR = <span class="syntax-str">"custom_value"</span>;\n  <span class="syntax-punct">}</span>;\n<span class="syntax-punct">}</span>';
                             } else if (tabName === 'devshell') {
-                                pane.innerHTML = '<span class=\"syntax-comment\"># Automatically exposed in devShells.default</span>\\n$ nix develop\\n\\n<span class=\"syntax-comment\"># Drops you into an isolated shell with rustc, cargo, rust-analyzer, clippy</span>';
+                                pane.innerHTML = '<span class="syntax-comment"># Automatically exposed in devShells.default</span>\n$ nix develop\n\n<span class="syntax-comment"># Drops you into an isolated shell with rustc, cargo, rust-analyzer, clippy</span>';
                             }
                         }
                     });
@@ -161,8 +192,11 @@ pub async fn page_layout(
                         var input = document.getElementById('docs-search-input');
                         if (modal) {
                             modal.style.display = 'flex';
-                            if (input) { input.value = ''; input.focus(); }
                             filterResults('');
+                            if (input) {
+                                input.value = '';
+                                setTimeout(function() { input.focus(); }, 15);
+                            }
                         }
                     }
 
@@ -174,17 +208,27 @@ pub async fn page_layout(
                     function filterResults(query) {
                         var q = query.toLowerCase().trim();
                         var items = document.querySelectorAll('.search-result-item');
+                        var count = 0;
                         items.forEach(function(item) {
                             var title = (item.querySelector('.result-title') || {}).textContent || '';
                             var desc = (item.querySelector('.result-desc') || {}).textContent || '';
-                            var match = !q || title.toLowerCase().includes(q) || desc.toLowerCase().includes(q);
+                            var kw = item.getAttribute('data-keywords') || '';
+                            var match = !q || title.toLowerCase().indexOf(q) !== -1 || desc.toLowerCase().indexOf(q) !== -1 || kw.toLowerCase().indexOf(q) !== -1;
                             item.style.display = match ? 'flex' : 'none';
+                            if (match) count++;
                         });
+                        var noRes = document.getElementById('search-no-results');
+                        if (noRes) noRes.style.display = (count === 0) ? 'block' : 'none';
                     }
 
                     document.addEventListener('click', function(e) {
                         if (e.target.closest('.quick-search-box')) {
                             openSearch();
+                            return;
+                        }
+                        var resultLink = e.target.closest('.search-result-item');
+                        if (resultLink) {
+                            closeSearch();
                             return;
                         }
                         if (e.target.id === 'search-modal' || e.target.id === 'close-search-btn') {
@@ -208,34 +252,42 @@ pub async fn page_layout(
                         searchInput.addEventListener('input', function(e) {
                             filterResults(e.target.value);
                         });
+                        searchInput.addEventListener('keyup', function(e) {
+                            filterResults(e.target.value);
+                        });
                     }
 
-                    // Quick copy interaction
+                    // Copy code snippets and feedback box interactions
                     document.addEventListener('click', function(e) {
-                        var copyBtn = e.target.closest('#copy-code-btn') || e.target.closest('#copy-nix-eval');
+                        var copyBtn = e.target.closest('.copy-btn') || e.target.closest('#copy-code-btn') || e.target.closest('#copy-nix-eval');
                         if (copyBtn) {
-                            var cmd = copyBtn.getAttribute('data-copy') || 'nix flake check';
-                            navigator.clipboard.writeText(cmd).then(function() {
-                                var icon = copyBtn.querySelector('.material-symbols-outlined');
-                                if (icon) {
-                                    var orig = icon.textContent;
-                                    icon.textContent = 'check';
-                                    setTimeout(function() { icon.textContent = orig; }, 1500);
-                                }
+                            var wrapper = copyBtn.closest('.code-block-wrapper');
+                            var codeText = '';
+                            if (wrapper) {
+                                var codeEl = wrapper.querySelector('code');
+                                if (codeEl) codeText = codeEl.innerText || codeEl.textContent;
+                            }
+                            if (!codeText) {
+                                codeText = copyBtn.getAttribute('data-copy') || 'nix flake check';
+                            }
+                            navigator.clipboard.writeText(codeText).then(function() {
+                                var origText = copyBtn.innerText || copyBtn.textContent;
+                                copyBtn.innerText = 'Copied!';
+                                setTimeout(function() { copyBtn.innerText = origText; }, 1800);
                             });
                         }
+
                         var fYes = e.target.closest('#feedback-yes');
                         var fNo = e.target.closest('#feedback-no');
-                        if (fYes) {
-                            fYes.style.background = 'rgba(52, 211, 153, 0.2)';
-                            fYes.style.color = '#34d399';
+                        var fContainer = e.target.closest('.feedback-actions');
+                        if (fYes && fContainer) {
+                            fContainer.innerHTML = '<span style="color: var(--secondary); font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem;"><span class="material-symbols-outlined" style="font-size: 18px;">check_circle</span> Thank you for your feedback!</span>';
                         }
-                        if (fNo) {
-                            fNo.style.background = 'rgba(255, 180, 171, 0.2)';
-                            fNo.style.color = '#ffb4ab';
+                        if (fNo && fContainer) {
+                            fContainer.innerHTML = '<span style="color: var(--primary); font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem;"><span class="material-symbols-outlined" style="font-size: 18px;">info</span> Thank you! We will work to improve this page.</span>';
                         }
-                    });"
-                </script>
+                    });
+                "#))</script>
             </body>
         </html>
     })

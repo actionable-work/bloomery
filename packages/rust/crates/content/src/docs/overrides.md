@@ -16,10 +16,11 @@ An `overrides.nix` file can be an attribute set or a function taking `{ pkgs, li
     ./Cargo.toml
   ];
 
-  # Custom compilation and linker flags
+  # Custom compilation and documentation flags
   rustcFlags = [ "-Ctarget-cpu=native" ];
+  rustdocFlags = [ "--html-in-header" "./header.html" ];
 
-  # Native system dependencies
+  # Native C system dependencies
   nativeBuildInputs = [ pkgs.pkg-config ];
   buildInputs = [ pkgs.openssl pkgs.zlib ];
 
@@ -27,9 +28,18 @@ An `overrides.nix` file can be an attribute set or a function taking `{ pkgs, li
   assets = [ ./data.json ];
   assetDirs = [ "templates" "styles" ];
 
-  # Build-time and runtime environment variables
+  # Environment variables for build & runtime
   env = {
     APP_ASSETS_DIR = "./assets";
+  };
+
+  # Override active features for this crate
+  features = [ "default" "extra-feature" ];
+
+  # Per-crate binary profile overrides
+  profile = {
+    optLevel = 3;
+    lto = "thin";
   };
 }
 ```
@@ -51,9 +61,10 @@ Bloomery automatically detects and forwards static assets for Rust web, GUI, and
 
 Overrides are merged automatically with the following precedence:
 
-1. **Default built-in overrides** (e.g. `openssl-sys`, `zstd-sys`, `libsqlite3-sys`, `libgit2-sys`, `lz4-sys`, `bzip2-sys`, `prost-build`).
+1. **Default built-in sys-crate overrides** (e.g. `openssl-sys`, `sqlite3-sys`, `libpq-sys`, `zstd-sys`, `libgit2-sys`, `libssh2-sys`, `bzip2-sys`, `lz4-sys`, `ring`, `curl-sys`, `libudev-sys`, `prost-build`).
 2. **Colocated `overrides.nix`** files discovered next to member `Cargo.toml` files.
 3. **Flake-level explicit `overrides`** passed to `mkWorkspace` or `mkFlake`.
 
 > [!TIP]
 > Both hyphenated (`openssl-sys`) and underscored (`openssl_sys`) override identifiers are recognized and normalized automatically.
+
