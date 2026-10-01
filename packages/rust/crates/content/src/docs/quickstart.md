@@ -22,8 +22,8 @@ For standard workspaces, `bloomery.mkFlake` sets up complete packages, runnable 
 
 > [!TIP]
 > `mkFlake` automatically searches default systems (`x86_64-linux`, `aarch64-linux`, `aarch64-darwin`) and exports standard flake attributes:
-> - `packages.${system}.<name>`, `packages.${system}.<name>:dev`, and `packages.${system}.default`
-> - `apps.${system}.<name>`, `apps.${system}.<name>:dev`, and `apps.${system}.default`
+> - `packages.${system}.<name>`, optional `packages.${system}.<crate>:lib`, and `packages.${system}.default` when a binary exists
+> - `apps.${system}.<name>`, `apps.${system}.<name>:dev`, `apps.${system}.<crate>:doc`, `apps.${system}.lock`, and `apps.${system}.default` when a binary exists
 > - `checks.${system}.<name>:<test|clippy|doc|doctest>` and `checks.${system}.workspace:lock`
 > - `devShells.${system}.default` (with `rustc`, `clippy`, `cargo`, and fast-build tools)
 
@@ -131,4 +131,3 @@ Or drop into an isolated shell with preconfigured `rustc`, `cargo`, and dev tool
 ```bash
 nix develop
 ```
-

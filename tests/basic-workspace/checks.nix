@@ -11,6 +11,17 @@
       // {
         validate-basic-workspace = assert builtins.hasAttr "bin-calc" workspace.packages;
         assert builtins.hasAttr "bin-report" workspace.packages;
+        assert builtins.hasAttr "lib-calc:lib" workspace.packages;
+        assert builtins.hasAttr "lib-core:lib" workspace.packages;
+        assert !(builtins.hasAttr "lib-calc" workspace.packages);
+        assert !(builtins.hasAttr "lib-calc-lib" workspace.packages);
+        assert !(builtins.hasAttr "bin-calc:dev" workspace.packages);
+        assert !(builtins.hasAttr "lock" workspace.packages);
+        assert builtins.hasAttr "bin-calc:dev" workspace.apps;
+        assert builtins.hasAttr "lib-calc:doc" workspace.apps;
+        assert !(builtins.hasAttr "lib-calc-doc" workspace.apps);
+        assert builtins.hasAttr "default" workspace.packages;
+        assert builtins.hasAttr "default" workspace.apps;
           pkgs.runCommand "validate-basic-workspace" {} ''
             echo "Validating the rendered basic workspace..."
             test -x "${workspace.packages.bin-calc}/bin/bin-calc" || { echo "Missing bin-calc"; exit 1; }

@@ -128,8 +128,8 @@ bloomery.lib.${system}.mkWorkspace {
   root = ./.;
 
   # ── Public Package Outputs ────────────────────────────────────────────────
-  createLibPackages = false;             # expose <crate> and <crate>-lib outputs
-  createDevPackages = false;             # expose <name>:dev outputs and apps
+  createLibPackages = false;             # expose <crate>:lib outputs
+  createDevPackages = false;             # expose <name>:dev apps
 
   # ── Source & Files ────────────────────────────────────────────────────────
   source = {

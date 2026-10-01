@@ -10,6 +10,11 @@
       workspace.checks
       // {
         validate-edge-cases-workspace = assert builtins.hasAttr "edge-cases-root" workspace.packages;
+        assert builtins.hasAttr "edge-cases-root:lib" workspace.packages;
+        assert builtins.hasAttr "edge-cases-root:dev" workspace.apps;
+        assert builtins.hasAttr "edge-cases-root:doc" workspace.apps;
+        assert !(builtins.hasAttr "edge-cases-root-doc" workspace.apps);
+        assert !(builtins.hasAttr "edge-cases-root:dev" workspace.packages);
         assert builtins.hasAttr "manifest-bin" workspace.packages;
         assert builtins.hasAttr "dir_bin" workspace.packages;
         assert !(builtins.hasAttr "ignored-crate" workspace.packages);

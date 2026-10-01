@@ -74,8 +74,8 @@ bloomery.lib.${system}.mkWorkspace {
 
   profileName = "release";          # active profile name ("release" or "dev")
 
-  # ── Dev Binary Packages ──────────────────────────────
-  createDevPackages = true;         # generate dev profile packages and apps (<bin>:dev)
+  # ── Dev Binary Apps ──────────────────────────────────
+  createDevPackages = true;         # generate dev profile apps (<bin>:dev)
 
   # ── Compiler & Linker Flags ─────────────────────────
   flags = {
@@ -147,10 +147,9 @@ perSystem = { pkgs, ... }: {
 
 The evaluated workspace attribute set returned by `mkWorkspace` exposes:
 
-- `packages`: Derivation set containing binaries (`<name>`, `<name>:dev`), libraries, and `default`.
-- `apps`: Runnable apps (`apps.${system}.<name>`, `apps.${system}.<name>:dev`, and `default`).
+- `packages`: Release derivations for binaries (`<name>`) and, when enabled, libraries (`<crate>:lib`), plus `default` when a binary exists.
+- `apps`: Runnable release/dev binaries, documentation apps (`<crate>:doc`), `lock`, and `default` when a binary exists.
 - `checks`: Comprehensive check suite (`name:test`, `name:clippy`, `name:doc`, `name:doctest`, `workspace:lock`).
 - `devShell`: Preconfigured `mkShell` environment with Rust toolchain and build utilities.
 - `crates`: Map of all individual `.rlib` derivations in the dependency DAG.
 - `config`: Fully evaluated options configuration set.
-
