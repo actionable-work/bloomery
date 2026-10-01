@@ -1,0 +1,10 @@
+[dependencies]
+
+[package]
+name = "overrides-app"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+members = ["."]
+resolver = "2"

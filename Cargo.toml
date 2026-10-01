@@ -1,0 +1,7 @@
+[workspace]
+resolver = "2"
+members = [
+  "packages/rust/bins/docs",
+  "packages/rust/crates/ui",
+  "packages/rust/crates/content",
+]

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="bloomGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F97316"/>
+      <stop offset="100%" stop-color="#EC4899"/>
+    </linearGradient>
+    <linearGradient id="nixGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="100%" stop-color="#818CF8"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="24" fill="#0E131F"/>
+  <rect x="1" y="1" width="98" height="98" rx="23" stroke="#1E293B" stroke-width="1.5"/>
+  <!-- Geometric Bloom / Nix Crystal & Rust Anvil -->
+  <path d="M50 18L74 32V60L50 74L26 60V32L50 18Z" stroke="url(#nixGrad)" stroke-width="2.5" stroke-linejoin="round" fill="none" opacity="0.6"/>
+  <!-- Inner Bloomery Petals / Blades -->
+  <path d="M50 26L68 36.5V57.5L50 68L32 57.5V36.5L50 26Z" fill="#151C2C" stroke="#334155" stroke-width="1.5"/>
+  <path d="M50 34L61 40V53L50 59L39 53V40L50 34Z" fill="url(#bloomGrad)"/>
+  <!-- Center Core spark -->
+  <circle cx="50" cy="46.5" r="3.5" fill="#FFFFFF"/>
+  <path d="M50 26V34M68 36.5L61 40M68 57.5L61 53M50 68V59M32 57.5L39 53M32 36.5L39 40" stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/>
+</svg>
