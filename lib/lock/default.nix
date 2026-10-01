@@ -1,7 +1,11 @@
-{pkgs, ...}: let
+{
+  pkgs,
+  cargo ? pkgs.cargo,
+  ...
+}: let
   lockScript = pkgs.writeShellApplication {
     name = "lock";
-    runtimeInputs = [pkgs.cargo pkgs.jq pkgs.coreutils];
+    runtimeInputs = [cargo pkgs.jq pkgs.coreutils];
     text = ''
       set -euo pipefail
 
@@ -49,6 +53,10 @@
       echo "==> Successfully wrote $OUTPUT_LOCK."
     '';
   };
+  lockApp = {
+    type = "app";
+    program = "${lockScript}/bin/lock";
+  };
 in {
-  inherit lockScript;
+  inherit lockScript lockApp;
 }

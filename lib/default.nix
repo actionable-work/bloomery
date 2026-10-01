@@ -19,6 +19,11 @@
   # High-level workspace builder
   mkWorkspace = import ./mk-workspace.nix {inherit pkgs lib cratesIoIndex;};
 
+  # Generic lock app for consumers that construct their own flake outputs
+  apps = {
+    lock = lock.lockApp;
+  };
+
   # Zero-boilerplate flake builder
   mkFlake = import ./mk-flake.nix {
     bloomeryLib = {

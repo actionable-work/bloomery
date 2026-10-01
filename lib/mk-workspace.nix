@@ -22,6 +22,7 @@ in
     rustc = cfg.toolchain.rustc;
     clippy = cfg.toolchain.clippy;
     cargo = cfg.toolchain.cargo;
+    lockTools = import ./lock {inherit pkgs lib cargo;};
     mold = cfg.toolchain.mold;
     lld = cfg.toolchain.lld;
     defaultLinker = cfg.toolchain.linker;
@@ -852,10 +853,7 @@ in
         }
       )
       workspaceDocs;
-    lockApp = {
-      type = "app";
-      program = "${(import ./lock {inherit pkgs lib;}).lockScript}/bin/lock";
-    };
+    lockApp = lockTools.lockApp;
     firstBin =
       if workspaceBinaries != []
       then let
