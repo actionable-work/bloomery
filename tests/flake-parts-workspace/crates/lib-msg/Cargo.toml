@@ -1,0 +1,7 @@
+[dependencies]
+lib-core = { path = "../lib-core" }
+
+[package]
+name = "lib-msg"
+version = "0.1.0"
+edition = "2021"

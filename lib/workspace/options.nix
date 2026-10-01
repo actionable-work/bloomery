@@ -179,9 +179,19 @@
       };
 
       # ── Binary Packages & Dev Targets ────────────────────────────────────────
+      createLibPackages = lib.mkOption {
+        type = types.bool;
+        default = false;
+        description = "Whether to expose workspace library packages (<crate> and <crate>-lib).";
+      };
+      libPackages = lib.mkOption {
+        type = types.nullOr types.bool;
+        default = null;
+        description = "Alias for createLibPackages.";
+      };
       createDevPackages = lib.mkOption {
         type = types.bool;
-        default = true;
+        default = false;
         description = "Whether to generate dev profile packages and apps (<bin>:dev) for workspace binaries.";
       };
       devPackages = lib.mkOption {
@@ -190,6 +200,11 @@
         description = "Alias for createDevPackages.";
       };
       packages = {
+        createLib = lib.mkOption {
+          type = types.nullOr types.bool;
+          default = null;
+          description = "Whether to expose workspace library packages (<crate> and <crate>-lib).";
+        };
         createDev = lib.mkOption {
           type = types.nullOr types.bool;
           default = null;

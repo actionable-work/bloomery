@@ -1,10 +1,13 @@
 use axum::{
     Json, Router,
     extract::Path,
+    response::Html,
     routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+
+const INDEX_HTML: &str = include_str!("../assets/index.html");
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct StatusResponse {
@@ -44,8 +47,13 @@ async fn echo(Json(payload): Json<EchoPayload>) -> Json<EchoResponse> {
     Json(EchoResponse { echo: payload.text })
 }
 
+async fn index() -> Html<&'static str> {
+    Html(INDEX_HTML)
+}
+
 pub fn app() -> Router {
     Router::new()
+        .route("/", get(index))
         .route("/health", get(health_check))
         .route("/greet/:name", get(greet))
         .route("/echo", post(echo))

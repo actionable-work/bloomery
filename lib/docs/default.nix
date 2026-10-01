@@ -5,6 +5,7 @@
   mkWorkspace = import ../mk-workspace.nix {inherit pkgs lib;};
   workspace = mkWorkspace {
     root = ../..;
+    createDevPackages = true;
     profile = {
       optLevel = "3";
       lto = "thin";

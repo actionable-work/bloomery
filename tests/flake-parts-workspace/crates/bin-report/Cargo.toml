@@ -1,0 +1,8 @@
+[dependencies]
+lib-calc = { path = "../lib-calc" }
+lib-msg = { path = "../lib-msg" }
+
+[package]
+name = "bin-report"
+version = "0.1.0"
+edition = "2021"

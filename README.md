@@ -120,6 +120,10 @@ bloomery.lib.${system}.mkWorkspace {
   # Top-level required setting
   root = ./.;
 
+  # ── Public Package Outputs ────────────────────────────────────────────────
+  createLibPackages = false;             # expose <crate> and <crate>-lib outputs
+  createDevPackages = false;             # expose <name>:dev outputs and apps
+
   # ── Source & Files ────────────────────────────────────────────────────────
   source = {
     cargoToml = ./Cargo.toml;           # defaults to root + "/Cargo.toml"
@@ -227,8 +231,8 @@ In addition to top-level `overrides`, Bloomery automatically discovers and loads
 
 Calling `mkWorkspace` returns an attribute set with:
 
-- `packages`: Derivations for workspace member binary executables.
-- `apps`: Runnable app specifications (`${bin}`, `${bin}-doc`, and `lock`).
+- `packages`: Derivations for workspace member binaries, plus optional library and dev outputs.
+- `apps`: Runnable app specifications for binaries, optional dev binaries, documentation, and `lock`.
 - `checks`: Independent CI check derivations (`crate:test`, `crate:clippy`, `crate:doc`, `crate:doctest`, `crate:bin`, `crate:lib`, `workspace:lock`).
 - `devShell`: Preconfigured development shell with rustc, clippy, cargo, nix-fast-build, and lld.
 - `crates`: DAG attribute set of all built `.rlib` crates.
@@ -243,9 +247,10 @@ Every supported flake setup style is verified by an isolated sub-flake in CI:
 
 | Workspace | Setup Style | Description |
 |---|---|---|
-| [`tests/basic-workspace`](./tests/basic-workspace) | Zero-Boilerplate (`bloomery.mkFlake`) | 5 member crates, `build.rs`, unit tests, doctests, crates.io dependencies |
-| [`tests/axum-workspace`](./tests/axum-workspace) | Standard (`bloomery.lib.${system}.mkWorkspace`) | Full async web stack (Axum, Tokio, Clap, Hyper, Serde) with categorized options |
-| [`tests/mklib-workspace`](./tests/mklib-workspace) | Constructor (`bloomery.mkLib pkgs`) | Custom `pkgs` instance with overlays and compiler options |
-| [`tests/flake-parts-workspace`](./tests/flake-parts-workspace) | Flake-Parts Module (`bloomery.flakeModules.default`) | Declarative Nix module configuration via `perSystem.bloomery.workspace` |
-| [`tests/overrides-workspace`](./tests/overrides-workspace) | Overrides Validation | Validates colocated `overrides.nix` (fileset, flags, env) and flake-level overrides merging |
-
+| [`tests/basic-workspace`](./tests/basic-workspace) | Zero-Boilerplate (`bloomery.mkFlake`) | Common five-member workspace layout with `build.rs`, unit tests, doctests, and crates.io dependencies |
+| [`tests/axum-workspace`](./tests/axum-workspace) | Standard (`bloomery.lib.${system}.mkWorkspace`) | Axum webserver and CLI, including server asset packaging |
+| [`tests/edge-cases-workspace`](./tests/edge-cases-workspace) | Zero-Boilerplate (`bloomery.mkFlake`) | Root package, glob members, excluded crates, build cfgs, integration tests, and multiple binary layouts |
+| [`tests/mklib-workspace`](./tests/mklib-workspace) | Constructor (`bloomery.mkLib pkgs`) | Common workspace layout through a custom `pkgs` instance and compiler profile |
+| [`tests/flake-parts-workspace`](./tests/flake-parts-workspace) | Flake-Parts Module (`bloomery.flakeModules.default`) | Common workspace layout through declarative `perSystem.bloomery.workspace` configuration |
+| [`tests/overrides-workspace`](./tests/overrides-workspace) | Multi-Crate Overrides | Validates colocated member overrides and flake-level overrides merging in a multi-crate workspace |
+| [`tests/single-crate-workspace`](./tests/single-crate-workspace) | Single-Crate Overrides | Validates root-package discovery and both colocated and flake-level overrides in a single-crate workspace |
