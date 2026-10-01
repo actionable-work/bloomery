@@ -1,10 +1,9 @@
-[dependencies]
-
-[package]
-name = "overrides-app"
-version = "0.1.0"
-edition = "2024"
-
 [workspace]
-members = ["."]
+members = [
+  "crates/lib-core",
+  "crates/lib-calc",
+  "crates/lib-msg",
+  "crates/bin-calc",
+  "crates/bin-report",
+]
 resolver = "2"

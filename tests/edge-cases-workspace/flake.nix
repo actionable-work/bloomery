@@ -7,13 +7,13 @@
   };
 
   outputs = {
-    self,
     nixpkgs,
     bloomery,
     ...
   }:
     bloomery.mkFlake {
-      inherit self nixpkgs;
+      inherit nixpkgs;
       root = ./.;
+      extraOutputs = import ./checks.nix {inherit nixpkgs;};
     };
 }

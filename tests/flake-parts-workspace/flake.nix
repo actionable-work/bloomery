@@ -13,21 +13,26 @@
   outputs = inputs @ {
     flake-parts,
     bloomery,
+    nixpkgs,
     ...
   }:
     flake-parts.lib.mkFlake {inherit inputs;} {
       imports = [
         bloomery.flakeModules.default
       ];
-      systems = [
-        "x86_64-linux"
-        "aarch64-linux"
-        "aarch64-darwin"
-      ];
+      systems = import ../../nix/systems.nix;
       perSystem = {
+        config,
+        system,
+        ...
+      }: let
+        workspace = config.bloomery.outputs;
+        extraChecks = import ./checks.nix {inherit nixpkgs;};
+      in {
         bloomery.workspace = {
           root = ./.;
         };
+        checks = workspace.checks // extraChecks system workspace;
       };
     };
 }

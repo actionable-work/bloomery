@@ -36,6 +36,12 @@ in
     profile = cfg.profile;
     profileDev = cfg.profileDev;
     profileName = cfg.profileName;
+    createLibPackages =
+      if cfg.libPackages != null
+      then cfg.libPackages
+      else if cfg.packages.createLib != null
+      then cfg.packages.createLib
+      else cfg.createLibPackages;
     createDevPackages =
       if cfg.devPackages != null
       then cfg.devPackages
@@ -615,9 +621,11 @@ in
       ) {}
       workspaceBinaries;
 
-    # Library packages attribute set for workspace libraries (release and :dev targets)
+    # Library package candidates for workspace libraries (release and :dev targets).
+    # These are kept separately from the public package set so library checks and
+    # binary linking remain available when library outputs are hidden.
     binNames = map (b: b.name) workspaceBinaries;
-    libPackages =
+    libraryPackages =
       lib.foldl' (
         acc: wpkg: let
           cratePath = discoveredMembers.${wpkg.name} or null;
@@ -650,6 +658,7 @@ in
           else acc
       ) {}
       parsed.workspacePackages;
+    libPackages = lib.optionalAttrs createLibPackages libraryPackages;
 
     # Test checks for all workspace crates
     workspaceTests = lib.listToAttrs (
@@ -799,7 +808,7 @@ in
             name = mkCheckName (lib.removeSuffix "-lib" name) "lib";
             value = pkg;
           })
-          libPackages)
+          libraryPackages)
       else {};
 
     # Runnable apps for binaries and doc servers

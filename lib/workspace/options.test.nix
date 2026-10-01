@@ -17,6 +17,8 @@ in {
       checksEnabled = cfg.checks.enable;
       unifyFeatures = cfg.features.unify;
       linker = cfg.toolchain.linker;
+      libPackages = cfg.createLibPackages;
+      devPackages = cfg.createDevPackages;
     };
     expected = {
       hasRoot = true;
@@ -29,6 +31,8 @@ in {
         if pkgs.stdenv.hostPlatform.isLinux
         then "lld"
         else null;
+      libPackages = false;
+      devPackages = false;
     };
   };
 

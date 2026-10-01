@@ -10,15 +10,10 @@
     nixpkgs,
     bloomery,
     ...
-  }: let
-    systems = [
-      "x86_64-linux"
-      "aarch64-linux"
-      "aarch64-darwin"
-    ];
-    eachSystem = nixpkgs.lib.genAttrs systems;
-    workspaces = eachSystem (
-      system:
+  }:
+    import ../workspace-flake.nix {
+      inherit nixpkgs;
+      workspace = system:
         bloomery.lib.${system}.mkWorkspace {
           root = ./.;
           profile = {
@@ -31,14 +26,7 @@
           flags = {
             rustc = ["-Copt-level=3"];
           };
-        }
-    );
-  in {
-    packages = eachSystem (system: workspaces.${system}.packages);
-    apps = eachSystem (system: workspaces.${system}.apps);
-    checks = eachSystem (system: workspaces.${system}.checks);
-    devShells = eachSystem (system: {
-      default = workspaces.${system}.devShell;
-    });
-  };
+        };
+      extraChecks = import ./checks.nix {inherit nixpkgs;};
+    };
 }
