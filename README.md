@@ -40,6 +40,7 @@ The fastest way to package a Rust workspace:
 ```
 
 This automatically generates `packages`, `apps`, `checks`, and `devShells` across standard systems (`x86_64-linux`, `aarch64-linux`, `aarch64-darwin`).
+The generated `apps.lock` runs Bloomery's lock generator; invoke it with `nix run .#lock` from the workspace root.
 
 ### 2. Standard Flake (`bloomery.lib.${system}.mkWorkspace`)
 
@@ -61,6 +62,12 @@ When you want manual control over system outputs:
         (bloomery.lib.${system}.mkWorkspace {
           root = ./.;
         }).packages
+      );
+
+      apps = eachSystem (system:
+        (bloomery.lib.${system}.mkWorkspace {
+          root = ./.;
+        }).apps
       );
 
       checks = eachSystem (system:
