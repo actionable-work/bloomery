@@ -1,0 +1,9 @@
+[dependencies]
+bloomery-model = { path = "../model" }
+serde_yaml = "0.9"
+toml = "1.1"
+
+[package]
+name = "bloomery-workspace"
+version = "0.1.0"
+edition = "2024"
