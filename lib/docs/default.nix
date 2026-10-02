@@ -5,7 +5,6 @@
   mkWorkspace = import ../mk-workspace.nix {inherit pkgs lib;};
   workspace = mkWorkspace {
     root = ../..;
-    createDevPackages = true;
     profile = {
       optLevel = "3";
       lto = "thin";
@@ -13,9 +12,5 @@
     };
   };
   releasePkg = workspace.packages."bloomery-docs";
-  devPkg = workspace.packages."bloomery-docs:dev";
 in
   releasePkg
-  // {
-    dev = devPkg;
-  }

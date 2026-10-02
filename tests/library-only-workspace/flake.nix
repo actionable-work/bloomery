@@ -1,5 +1,5 @@
 {
-  description = "Edge cases test workspace";
+  description = "bloomery library-only output layout workspace";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

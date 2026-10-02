@@ -1,0 +1,2 @@
+{bloomery}:
+bloomery.tests.check

@@ -37,7 +37,7 @@ bloomery.mkWorkspace {
     targetCpu = "x86-64-v3";
   };
 
-  # Dev profile configuration (built as packages."<name>:dev")
+  # Dev profile configuration (used by apps."<name>:dev")
   profileDev = {
     optLevel = 0;
     lto = "off";
@@ -48,8 +48,7 @@ bloomery.mkWorkspace {
 ```
 
 > [!NOTE]
-> When `createDevPackages = true` (the default), Bloomery automatically builds both release packages (`packages.<name>`) and fast-compiling dev packages (`packages."<name>:dev"`), enabling fast iterative builds without modifying flake configuration.
+> When `createDevPackages = true`, Bloomery generates fast-compiling dev apps (`apps."<name>:dev"`) without publishing dev derivations as packages.
 
 > [!TIP]
 > When `Cargo.toml` specifies `[profile.release]` or `[profile.dev]` sections, Bloomery automatically parses their values as base profiles, allowing Nix overrides without editing `Cargo.toml`.
-

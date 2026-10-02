@@ -178,11 +178,11 @@
         description = "Name of the active cargo profile.";
       };
 
-      # ── Binary Packages & Dev Targets ────────────────────────────────────────
+      # ── Release Packages & Dev App Targets ───────────────────────────────────
       createLibPackages = lib.mkOption {
         type = types.bool;
         default = false;
-        description = "Whether to expose workspace library packages (<crate> and <crate>-lib).";
+        description = "Whether to expose workspace library packages as <crate>:lib outputs.";
       };
       libPackages = lib.mkOption {
         type = types.nullOr types.bool;
@@ -192,7 +192,7 @@
       createDevPackages = lib.mkOption {
         type = types.bool;
         default = false;
-        description = "Whether to generate dev profile packages and apps (<bin>:dev) for workspace binaries.";
+        description = "Whether to generate dev profile apps (<bin>:dev) for workspace binaries.";
       };
       devPackages = lib.mkOption {
         type = types.nullOr types.bool;
@@ -203,12 +203,12 @@
         createLib = lib.mkOption {
           type = types.nullOr types.bool;
           default = null;
-          description = "Whether to expose workspace library packages (<crate> and <crate>-lib).";
+          description = "Whether to expose workspace library packages as <crate>:lib outputs.";
         };
         createDev = lib.mkOption {
           type = types.nullOr types.bool;
           default = null;
-          description = "Whether to generate dev profile packages and apps (<bin>:dev) for workspace binaries.";
+          description = "Whether to generate dev profile apps (<bin>:dev) for workspace binaries.";
         };
       };
 

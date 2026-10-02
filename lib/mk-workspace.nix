@@ -608,7 +608,7 @@ in
       )
       parsed.workspacePackages;
 
-    # Binary packages attribute set (release and optional :dev colon targets)
+    # Binary package outputs (release only; dev variants are apps).
     binPackages =
       lib.foldl' (
         acc: b:
@@ -616,16 +616,12 @@ in
           // {
             "${b.name}" = b.drv;
           }
-          // lib.optionalAttrs createDevPackages {
-            "${b.name}:dev" = b.devDrv;
-          }
       ) {}
       workspaceBinaries;
 
-    # Library package candidates for workspace libraries (release and :dev targets).
+    # Library package outputs for workspace libraries.
     # These are kept separately from the public package set so library checks and
     # binary linking remain available when library outputs are hidden.
-    binNames = map (b: b.name) workspaceBinaries;
     libraryPackages =
       lib.foldl' (
         acc: wpkg: let
@@ -637,25 +633,13 @@ in
               builtins.pathExists (cratePath + "/src/lib.rs")
               || builtins.pathExists (cratePath + "/lib.rs")
             );
-          hasNoBinCollision = !(builtins.elem wpkg.name binNames);
         in
           if hasLib
           then
             acc
             // {
-              "${wpkg.name}-lib" = crates.${wpkg.id};
+              "${wpkg.name}:lib" = crates.${wpkg.id};
             }
-            // lib.optionalAttrs hasNoBinCollision {
-              "${wpkg.name}" = crates.${wpkg.id};
-            }
-            // lib.optionalAttrs createDevPackages (
-              {
-                "${wpkg.name}-lib:dev" = devCrates.${wpkg.id};
-              }
-              // lib.optionalAttrs hasNoBinCollision {
-                "${wpkg.name}:dev" = devCrates.${wpkg.id};
-              }
-            )
           else acc
       ) {}
       parsed.workspacePackages;
@@ -806,7 +790,7 @@ in
           ) {}
           workspaceBinaries)
         // (lib.mapAttrs' (name: pkg: {
-            name = mkCheckName (lib.removeSuffix "-lib" name) "lib";
+            name = mkCheckName (lib.removeSuffix ":lib" name) "lib";
             value = pkg;
           })
           libraryPackages)
@@ -838,15 +822,9 @@ in
           cname =
             if lib.hasSuffix ":doc" name
             then lib.removeSuffix ":doc" name
-            else if lib.hasSuffix "-doc" name
-            then lib.removeSuffix "-doc" name
             else name;
         in {
           "${cname}:doc" = {
-            type = "app";
-            program = "${docPkg}/bin/${cname}-doc";
-          };
-          "${cname}-doc" = {
             type = "app";
             program = "${docPkg}/bin/${cname}-doc";
           };
@@ -862,13 +840,15 @@ in
         type = "app";
         program = "${headBin.drv}/bin/${headBin.name}";
       }
-      else lockApp;
+      else null;
 
     apps =
       binApps
       // docApps
       // {
         lock = lockApp;
+      }
+      // lib.optionalAttrs (workspaceBinaries != []) {
         default = binApps.default or firstBin;
       };
 
@@ -925,8 +905,6 @@ in
       then binPackages.default
       else if workspaceBinaries != []
       then (builtins.head workspaceBinaries).drv
-      else if libPackages != {}
-      then libPackages.${builtins.head (builtins.attrNames libPackages)}
       else null;
   in {
     # All compiled rlibs (DAG) - release and dev variants
