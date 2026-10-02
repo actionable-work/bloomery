@@ -1,4 +1,8 @@
-{lib, ...} @ args: let
+{
+  lib,
+  bloomeryPackageForSystem ? (_system: null),
+  ...
+} @ args: let
   flake-parts-lib = args.flake-parts-lib or null;
   perSystemModule = {
     config,
@@ -22,7 +26,7 @@
     };
 
     config = lib.mkIf (config.bloomery.workspace != null) (let
-      bl = import ../. {inherit pkgs lib;};
+      bl = import ../. {inherit pkgs lib bloomeryPackageForSystem;};
       ws = bl.mkWorkspace config.bloomery.workspace;
     in {
       bloomery.outputs = ws;

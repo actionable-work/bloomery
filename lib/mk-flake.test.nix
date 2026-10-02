@@ -7,7 +7,10 @@
       pkgs,
       lib,
     }:
-      import ./. {inherit pkgs lib;};
+      import ./. {
+        inherit pkgs lib;
+        bloomeryPackageForSystem = _system: pkgs.hello;
+      };
   };
   mockNixpkgs = {
     inherit lib;
@@ -43,6 +46,7 @@ in {
       hasDefaultPackage = builtins.hasAttr "default" flakeOutputs.packages.${pkgs.system};
       hasDevShell = builtins.hasAttr "default" flakeOutputs.devShells.${pkgs.system};
       hasChecks = builtins.hasAttr pkgs.system flakeOutputs.checks;
+      hasBloomeryCheck = builtins.hasAttr "bloomery:check" flakeOutputs.checks.${pkgs.system};
     };
     expected = {
       hasPackages = true;
@@ -64,6 +68,7 @@ in {
       hasDefaultPackage = true;
       hasDevShell = true;
       hasChecks = true;
+      hasBloomeryCheck = true;
     };
   };
 
@@ -79,10 +84,12 @@ in {
     in {
       hasExplicitBinary = builtins.hasAttr "bloomery" packages;
       hasDuplicateImplicitBinary = builtins.hasAttr "bloomery-cli" packages;
+      hasBloomeryCheck = builtins.hasAttr "bloomery:check" flakeOutputs.checks.${pkgs.system};
     };
     expected = {
       hasExplicitBinary = true;
       hasDuplicateImplicitBinary = false;
+      hasBloomeryCheck = true;
     };
   };
 

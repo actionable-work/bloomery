@@ -2,7 +2,8 @@
   pkgs,
   lib ? pkgs.lib,
 }: let
-  flakeModule = import ./flake-module.nix;
+  flakeModule = args:
+    import ./flake-module.nix (args // {bloomeryPackageForSystem = _system: pkgs.hello;});
 
   # Helper module providing standard flake-parts perSystem options
   mockFlakeParts = {

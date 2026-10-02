@@ -2,6 +2,7 @@
   pkgs,
   lib ? pkgs.lib,
   cratesIoIndex ? null,
+  bloomeryPackageForSystem ? (_system: null),
 }: rec {
   # Submodules
   builders = import ./builders {inherit pkgs lib;};
@@ -13,11 +14,15 @@
   lock = import ./lock {inherit pkgs lib;};
   tests = import ./tests.nix {inherit pkgs lib;};
   modules = {
-    flake = import ./modules/flake-module.nix;
+    flake = args:
+      import ./modules/flake-module.nix (args // {inherit bloomeryPackageForSystem;});
   };
 
   # High-level workspace builder
-  mkWorkspace = import ./mk-workspace.nix {inherit pkgs lib cratesIoIndex;};
+  mkWorkspace = import ./mk-workspace.nix {
+    inherit pkgs lib cratesIoIndex;
+    bloomeryPackage = bloomeryPackageForSystem pkgs.stdenv.buildPlatform.system;
+  };
 
   # Generic lock app for consumers that construct their own flake outputs
   apps = {
@@ -30,7 +35,7 @@
       pkgs,
       lib ? pkgs.lib,
     }:
-      import ./. {inherit pkgs lib;};
+      import ./. {inherit pkgs lib bloomeryPackageForSystem;};
   };
 
   # Convenience re-exports

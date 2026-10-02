@@ -11,7 +11,7 @@ Inspired by `oxalica/nocargo`, this flake:
   - Compiles `.rlib` dependencies and `proc-macro` crates independently.
   - Automatically compiles and executes build scripts (`build.rs`), capturing generated environment variables, `cargo:rustc-cfg`, and native library link search paths.
   - Links rlib dependencies and workspace binaries using `rustc --crate-type bin` with default high-performance linkers (`lld` on Linux).
-- **Checks without cargo**: Generates independent CI checks for unit tests (`rustc --test`), clippy (`clippy-driver`), documentation (`rustdoc`), and doctests (`rustdoc --test`).
+- **Checks without cargo**: Generates independent CI checks for unit tests (`rustc --test`), clippy (`clippy-driver`), documentation (`rustdoc`), and doctests (`rustdoc --test`). If a workspace has a `.bloomery/` directory, it also gets a check that runs `bloomery check` using the Bloomery flake input's `packages.${system}.bloomery` output; a local Bloomery binary is not required.
 - **Built-in DevShell & Apps**: Every workspace automatically generates a development shell (with `rustc`, `cargo`, `clippy`, `nix-fast-build`, direnv support) and a `lock` app.
 
 ---
@@ -219,7 +219,7 @@ In addition to top-level `overrides`, Bloomery automatically discovers and loads
 
   # ── Checks & CI ───────────────────────────────────────────────────────────
   checks = {
-    enable = true;                      # generate unit tests, clippy, doc, doctest checks
+    enable = true;                      # generate crate checks, lock validation, and bloomery check when .bloomery/ exists
     includePackageChecks = true;        # include binary and library package builds in checks
     throwOnOutOfDate = false;           # fail evaluation immediately if lockfile is stale
   };
@@ -240,7 +240,7 @@ Calling `mkWorkspace` returns an attribute set with:
 
 - `packages`: Derivations for workspace member binaries, plus optional library and dev outputs.
 - `apps`: Runnable app specifications for binaries, optional dev binaries, documentation, and `lock`.
-- `checks`: Independent CI check derivations (`crate:test`, `crate:clippy`, `crate:doc`, `crate:doctest`, `crate:bin`, `crate:lib`, `workspace:lock`).
+- `checks`: Independent CI check derivations (`crate:test`, `crate:clippy`, `crate:doc`, `crate:doctest`, `crate:bin`, `crate:lib`, `workspace:lock`), plus `bloomery:check` when the workspace has a `.bloomery/` directory. The check uses the Bloomery flake input's `packages.${system}.bloomery` output.
 - `devShell`: Preconfigured development shell with rustc, clippy, cargo, nix-fast-build, and lld.
 - `crates`: DAG attribute set of all built `.rlib` crates.
 - `lock`: Parsed lockfile representation.

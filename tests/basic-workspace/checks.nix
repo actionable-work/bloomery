@@ -1,4 +1,7 @@
-{nixpkgs}: {
+{
+  nixpkgs,
+  bloomery,
+}: {
   eachSystem,
   perSystemWorkspace,
 }: {
@@ -9,7 +12,10 @@
     in
       workspace.checks
       // {
-        validate-basic-workspace = assert builtins.hasAttr "bin-calc" workspace.packages;
+        validate-basic-workspace = assert builtins.hasAttr "bloomery:check" workspace.checks;
+        assert !(builtins.hasAttr "bloomery" workspace.packages);
+        assert builtins.elem bloomery.packages.${system}.bloomery workspace.checks."bloomery:check".nativeBuildInputs;
+        assert builtins.hasAttr "bin-calc" workspace.packages;
         assert builtins.hasAttr "bin-report" workspace.packages;
         assert builtins.hasAttr "lib-calc:lib" workspace.packages;
         assert builtins.hasAttr "lib-core:lib" workspace.packages;

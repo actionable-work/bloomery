@@ -113,7 +113,7 @@ bloomery.lib.${system}.mkWorkspace {
 
   # ── Checks & CI ─────────────────────────────────────
   checks = {
-    enable = true;                  # generate test, clippy, doc, doctest checks
+    enable = true;                  # generate crate checks, lock validation, and bloomery check when .bloomery/ exists
     includePackageChecks = true;    # build final packages as CI checks
     throwOnOutOfDate = false;       # error evaluation if bloomery.lock is out of date
   };
@@ -149,7 +149,7 @@ The evaluated workspace attribute set returned by `mkWorkspace` exposes:
 
 - `packages`: Release derivations for binaries (`<name>`) and, when enabled, libraries (`<crate>:lib`), plus `default` when a binary exists.
 - `apps`: Runnable release/dev binaries, documentation apps (`<crate>:doc`), `lock`, and `default` when a binary exists.
-- `checks`: Comprehensive check suite (`name:test`, `name:clippy`, `name:doc`, `name:doctest`, `workspace:lock`).
+- `checks`: Comprehensive check suite (`name:test`, `name:clippy`, `name:doc`, `name:doctest`, `workspace:lock`), plus `bloomery:check` when the workspace has a `.bloomery/` directory. This check uses the Bloomery flake input's `packages.${system}.bloomery` output.
 - `devShell`: Preconfigured `mkShell` environment with Rust toolchain and build utilities.
 - `crates`: Map of all individual `.rlib` derivations in the dependency DAG.
 - `config`: Fully evaluated options configuration set.

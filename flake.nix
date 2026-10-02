@@ -22,12 +22,13 @@
   }: let
     inherit (nixpkgs) lib;
     systems = import ./nix/systems.nix;
+    bloomeryPackageForSystem = system: self.packages.${system}.bloomery;
 
     bloomeryFor = system: let
       pkgs = nixpkgs.legacyPackages.${system};
     in
       import ./lib {
-        inherit pkgs;
+        inherit pkgs bloomeryPackageForSystem;
         inherit (pkgs) lib;
       };
 
@@ -36,11 +37,12 @@
         pkgs,
         lib ? pkgs.lib,
       }:
-        import ./lib {inherit pkgs lib;};
+        import ./lib {inherit pkgs lib bloomeryPackageForSystem;};
     };
 
     flakeModules = {
-      default = import ./lib/modules/flake-module.nix;
+      default = args:
+        import ./lib/modules/flake-module.nix (args // {inherit bloomeryPackageForSystem;});
     };
     flakeModule = flakeModules.default;
 
@@ -49,7 +51,7 @@
       {
         __functor = _self: pkgs:
           import ./lib {
-            inherit pkgs;
+            inherit pkgs bloomeryPackageForSystem;
             inherit (pkgs) lib;
           };
       }

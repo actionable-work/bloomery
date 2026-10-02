@@ -272,7 +272,7 @@
         enable = lib.mkOption {
           type = types.bool;
           default = true;
-          description = "Generate workspace check derivations (unit tests, clippy, doc, doctest, lock check).";
+          description = "Generate workspace check derivations (unit tests, clippy, doc, doctest, lock check, and bloomery check when .bloomery/ exists).";
         };
         includePackageChecks = lib.mkOption {
           type = types.bool;

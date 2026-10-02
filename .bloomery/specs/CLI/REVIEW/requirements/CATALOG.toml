@@ -1,0 +1,12 @@
+group = "CATALOG"
+
+[[requirements]]
+id = "CLI-REVIEW-CATALOG-001"
+title = "Manual requirements are presented for review"
+manual = true
+design = "design/manual-catalog.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery review"
+action = "render the declared manual requirements in a deterministic review catalog"

@@ -1,0 +1,13 @@
+group = "NIX"
+
+[[requirements]]
+id = "CLI-IMPLEMENTATION-NIX-001"
+title = "Optional Bloomery metadata enables the Nix check"
+manual = true
+design = "design/workspace-check.md"
+
+[requirements.ears]
+type = "optional"
+feature = "the Rust workspace contains a .bloomery/ directory"
+system = "mkWorkspace and mkFlake"
+action = "include a bloomery:check Nix check that runs the bloomery package from the input flake against the workspace root"

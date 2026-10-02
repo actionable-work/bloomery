@@ -2,6 +2,7 @@
   pkgs,
   lib ? pkgs.lib,
   cratesIoIndex ? null,
+  bloomeryPackage ? null,
 }: let
   builders = import ./builders {inherit pkgs lib;};
   workspace = import ./workspace {inherit lib;};
@@ -182,6 +183,7 @@ in
     builderDoc = builders.docCrateWith {inherit rustc stdenv;};
     builderDocTest = builders.doctestCrateWith {inherit rustc stdenv mold lld defaultLinker;};
     builderLockCheck = import ./workspace/lock-check.nix {inherit pkgs lib;};
+    builderBloomeryCheck = import ./workspace/bloomery-check.nix {inherit pkgs;};
 
     mkCheckName = crateName: checkType: "${crateName}:${checkType}";
 
@@ -869,6 +871,21 @@ in
       };
     };
 
+    rootEntries = builtins.readDir root;
+    hasBloomeryDirectory = (rootEntries.".bloomery" or null) == "directory";
+    workspaceBloomeryCheck =
+      if hasBloomeryDirectory
+      then
+        if bloomeryPackage == null
+        then throw "bloomery: Workspace contains .bloomery/ but no Bloomery CLI package was supplied."
+        else {
+          "bloomery:check" = builderBloomeryCheck {
+            root = cleanWorkspaceSource root;
+            inherit bloomeryPackage;
+          };
+        }
+      else {};
+
     checks =
       if cfg.checks.enable
       then
@@ -882,6 +899,7 @@ in
           else {}
         )
         // workspaceLockCheck
+        // workspaceBloomeryCheck
       else {};
 
     devShell =
