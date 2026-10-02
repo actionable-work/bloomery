@@ -531,7 +531,7 @@ in
             if cratePath != null && builtins.pathExists (cratePath + "/Cargo.toml")
             then builtins.fromTOML (builtins.readFile (cratePath + "/Cargo.toml"))
             else {};
-          manifestBins =
+          manifestBinEntries =
             if ctoml ? bin && builtins.isList ctoml.bin
             then
               map (
@@ -546,20 +546,19 @@ in
                     then "src/bin/${binName}/main.rs"
                     else "src/main.rs";
                   entry = b.path or defaultPath;
-                in
-                  buildBinary {
-                    inherit binName entry;
-                  }
+                in {inherit binName entry;}
               )
               ctoml.bin
             else [];
-          manifestBinNames = map (b: b.name) manifestBins;
+          manifestBins = map (b: buildBinary b) manifestBinEntries;
+          manifestBinNames = map (b: b.binName) manifestBinEntries;
+          manifestBinPaths = map (b: lib.removePrefix "./" b.entry) manifestBinEntries;
 
           hasMainRs =
             cratePath
             != null
             && builtins.pathExists (cratePath + "/src/main.rs")
-            && !(builtins.elem wpkg.name manifestBinNames);
+            && !(builtins.elem "src/main.rs" manifestBinPaths);
           binDir = cratePath + "/src/bin";
           hasBinDir = cratePath != null && builtins.pathExists binDir;
           binFiles =
