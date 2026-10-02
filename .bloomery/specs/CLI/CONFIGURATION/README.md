@@ -21,6 +21,8 @@ requirement identity or lifecycle state.
 
 ## Responsibilities
 
+- Use validated defaults when `.bloomery/config.toml` is absent or omits
+  tables and keys.
 - Locate the specs root relative to `.bloomery/`.
 - Enable or disable supported scanners.
 - Define source globs relative to the repository root.

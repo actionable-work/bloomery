@@ -7,7 +7,7 @@ directory:
 
 ```text
 .bloomery/
-├── config.toml
+├── config.toml                       # optional
 └── specs/
     └── <SERVICE>/
         ├── README.md
@@ -18,6 +18,10 @@ directory:
             └── requirements/
                 └── <GROUP>.toml       # at least one group file
 ```
+
+The `config.toml` file is optional. When it is absent, Bloomery uses the
+validated defaults described in the
+[configuration file design](../../CONFIGURATION/design/config-file.md).
 
 Every feature contains a `requirements/` directory with at least one grouped
 TOML file. The checker rejects a feature whose requirements directory is absent

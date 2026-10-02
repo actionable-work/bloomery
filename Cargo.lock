@@ -224,6 +224,7 @@ dependencies = [
 name = "bloomery-model"
 version = "0.1.0"
 dependencies = [
+ "bloomery-test-macros",
  "serde",
  "toml",
 ]
@@ -250,6 +251,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "bloomery-test-macros"
+version = "0.1.0"
+
+[[package]]
 name = "bloomery-ui"
 version = "0.1.0"
 dependencies = [
@@ -262,6 +267,7 @@ name = "bloomery-workspace"
 version = "0.1.0"
 dependencies = [
  "bloomery-model",
+ "bloomery-test-macros",
  "serde_yaml",
  "toml",
 ]

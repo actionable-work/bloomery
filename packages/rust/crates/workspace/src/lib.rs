@@ -8,6 +8,7 @@ pub use loader::load;
 #[cfg(test)]
 mod tests {
     use super::load;
+    use bloomery_test_macros::bloomery;
     use std::fs;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -51,6 +52,22 @@ mod tests {
         let context = load(&root).expect("workspace should load");
         assert_eq!(context.services.len(), 1);
         assert_eq!(context.requirements().count(), 1);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[bloomery("CLI-CONFIGURATION-OPTIONAL-004")]
+    fn loads_a_valid_workspace_without_a_configuration_file() {
+        let root = fixture();
+        fs::remove_file(root.join(".bloomery/config.toml")).expect("remove config");
+
+        let context = load(&root).expect("workspace should load without configuration");
+        assert_eq!(context.services.len(), 1);
+        assert_eq!(context.requirements().count(), 1);
+        assert_eq!(context.config.specs.dir, "specs");
+        assert!(!context.config.scanners.rust.enabled);
+        assert!(!context.config.scanners.playwright.enabled);
+        assert!(!context.config.scanners.nix.enabled);
         let _ = fs::remove_dir_all(root);
     }
 

@@ -12,6 +12,7 @@
   defaultRustcFlags ? [],
   denyWarnings ? true,
   edition ? null,
+  isProcMacro ? null,
 }: let
   pname = pkg.name;
   version = pkg.version;
@@ -96,6 +97,24 @@ in
             ENTRY="main.rs"
             CRATE_TYPE="bin"
           fi
+        fi
+
+        IS_PROC_MACRO=${
+          if isProcMacro == true
+          then "1"
+          else "0"
+        }
+        if [ "${
+          if isProcMacro != null
+          then "1"
+          else "0"
+        }" = "0" ] && [ -f Cargo.toml ] && grep -q -E 'proc-macro[[:space:]]*=[[:space:]]*true' Cargo.toml; then
+          IS_PROC_MACRO=1
+        fi
+        PROC_MACRO_FLAGS=()
+        if [ "$IS_PROC_MACRO" = "1" ]; then
+          CRATE_TYPE="proc-macro"
+          PROC_MACRO_FLAGS+=("--extern" "proc_macro")
         fi
 
         if [ -z "$ENTRY" ]; then
@@ -238,6 +257,7 @@ in
         $CLIPPY_DRIVER "$ENTRY" \
           --crate-name "$CRATE_NAME" \
           --crate-type "$CRATE_TYPE" \
+          "''${PROC_MACRO_FLAGS[@]}" \
           --emit=metadata \
           --out-dir _clippy_out \
           $EDITION_FLAG \

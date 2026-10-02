@@ -10,4 +10,8 @@ members = [
   "packages/rust/crates/review",
   "packages/rust/crates/scanning",
   "packages/rust/crates/workspace",
+  "packages/rust/crates/test-macros",
 ]
+
+[workspace.dependencies]
+bloomery-test-macros = { path = "packages/rust/crates/test-macros" }
