@@ -67,6 +67,25 @@ in {
     };
   };
 
+  testMkFlakeExplicitMainBinary = {
+    expr = let
+      flakeOutputs = mkFlake {
+        nixpkgs = mockNixpkgs;
+        systems = [pkgs.system];
+        root = ../.;
+        createLibPackages = false;
+      };
+      packages = flakeOutputs.packages.${pkgs.system};
+    in {
+      hasExplicitBinary = builtins.hasAttr "bloomery" packages;
+      hasDuplicateImplicitBinary = builtins.hasAttr "bloomery-cli" packages;
+    };
+    expected = {
+      hasExplicitBinary = true;
+      hasDuplicateImplicitBinary = false;
+    };
+  };
+
   testMkFlakeOptionalPackages = {
     expr = let
       flakeOutputs = mkFlake {
