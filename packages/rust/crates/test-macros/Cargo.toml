@@ -1,0 +1,7 @@
+[lib]
+proc-macro = true
+
+[package]
+name = "bloomery-test-macros"
+version = "0.1.0"
+edition = "2024"

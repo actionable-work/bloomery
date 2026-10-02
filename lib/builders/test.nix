@@ -34,6 +34,7 @@
   override ? {},
   defaultRustcFlags ? [],
   edition ? null,
+  isProcMacro ? null,
 }: let
   pname = pkg.name;
   version = pkg.version;
@@ -106,6 +107,25 @@ in
           fi
         fi
         EDITION_FLAG="--edition=$EDITION"
+
+        IS_PROC_MACRO=${
+          if isProcMacro == true
+          then "1"
+          else "0"
+        }
+        if [ "${
+          if isProcMacro != null
+          then "1"
+          else "0"
+        }" = "0" ] && [ -f Cargo.toml ] && grep -q -E 'proc-macro[[:space:]]*=[[:space:]]*true' Cargo.toml; then
+          IS_PROC_MACRO=1
+        fi
+        CRATE_TYPE="rlib"
+        PROC_MACRO_FLAGS=()
+        if [ "$IS_PROC_MACRO" = "1" ]; then
+          CRATE_TYPE="proc-macro"
+          PROC_MACRO_FLAGS+=("--extern" "proc_macro")
+        fi
 
         ENTRY=""
         if [ -f src/lib.rs ]; then
@@ -290,6 +310,8 @@ in
           echo "Compiling test binary for $CRATE_NAME..."
           $RUSTC --test "$ENTRY" \
             --crate-name "$CRATE_NAME" \
+            --crate-type "$CRATE_TYPE" \
+            "''${PROC_MACRO_FLAGS[@]}" \
             $EDITION_FLAG \
             -L dependency=_deps \
             "''${EXTERN_FLAGS[@]}" \

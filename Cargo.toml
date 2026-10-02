@@ -1,7 +1,17 @@
 [workspace]
 resolver = "2"
 members = [
+  "packages/rust/bins/cli",
   "packages/rust/bins/docs",
+  "packages/rust/crates/check",
   "packages/rust/crates/ui",
   "packages/rust/crates/content",
+  "packages/rust/crates/model",
+  "packages/rust/crates/review",
+  "packages/rust/crates/scanning",
+  "packages/rust/crates/workspace",
+  "packages/rust/crates/test-macros",
 ]
+
+[workspace.dependencies]
+bloomery-test-macros = { path = "packages/rust/crates/test-macros" }

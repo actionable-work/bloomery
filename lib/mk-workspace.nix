@@ -676,6 +676,7 @@ in
             dependencies = depDrvs;
             override = cOverride;
             defaultRustcFlags = testRustcFlags;
+            isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or null;
           };
         }
       )
@@ -703,6 +704,7 @@ in
             dependencies = depDrvs;
             override = cOverride;
             defaultRustcFlags = clippyRustcFlags;
+            isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or null;
           };
         }
       )
@@ -730,6 +732,7 @@ in
             dependencies = depDrvs;
             override = cOverride;
             defaultRustdocFlags = docRustdocFlags;
+            isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or null;
           };
         }
       )
@@ -768,6 +771,7 @@ in
                 dependencies = depDrvs;
                 override = cOverride;
                 defaultRustdocFlags = doctestRustdocFlags;
+                isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or null;
               };
             }
             else null

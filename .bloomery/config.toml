@@ -1,0 +1,3 @@
+[scanners.rust]
+enabled = true
+paths = ["packages/rust/**/*.rs"]
