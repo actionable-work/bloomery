@@ -1,0 +1,12 @@
+group = "CONTRACT"
+
+[[requirements]]
+id = "CLI-CHECK-CONTRACT-001"
+title = "Check enforces all declared workspace invariants"
+manual = true
+design = "design/pipeline.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "return success only when the workspace structure and traceability invariants are valid"

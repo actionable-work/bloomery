@@ -24,9 +24,12 @@ designed around two commands:
 ## Boundaries
 
 Bloomery owns document discovery, parsing, identifier alignment, static source
-scanning, relational validation, and deterministic output. It does not own
-requirement workflow, approval, test execution, build orchestration, ticket
-management, or review scheduling.
+scanning, relational validation, and deterministic output. The `bloomery check`
+command itself does not own requirement workflow, approval, test execution,
+build orchestration, ticket management, or review scheduling. When a Rust
+workspace has a `.bloomery/` directory, the Nix workspace builder invokes the
+Bloomery package from the input flake as a generated check; that integration is
+documented with the [implementation architecture](IMPLEMENTATION/README.md).
 
 ## Features
 
@@ -38,7 +41,7 @@ management, or review scheduling.
 | [Scanning](SCANNING/README.md) | Static references from Rust, Playwright, and Nix | [overview](SCANNING/design/overview.md), [Rust](SCANNING/design/rust.md), [Playwright](SCANNING/design/playwright.md), [Nix](SCANNING/design/nix.md) |
 | [Check](CHECK/README.md) | Structural, grammar, and coverage validation | [pipeline](CHECK/design/pipeline.md), [diagnostics](CHECK/design/diagnostics.md) |
 | [Review](REVIEW/README.md) | Deterministic manual-review catalogues | [catalog](REVIEW/design/manual-catalog.md), [output](REVIEW/design/output.md) |
-| [Implementation](IMPLEMENTATION/README.md) | Reference Rust module and domain architecture | [architecture](IMPLEMENTATION/design/architecture.md), [model](IMPLEMENTATION/design/domain-model.md), [tooling](IMPLEMENTATION/design/tooling.md) |
+| [Implementation](IMPLEMENTATION/README.md) | Rust CLI architecture and Nix workspace-check integration | [architecture](IMPLEMENTATION/design/architecture.md), [model](IMPLEMENTATION/design/domain-model.md), [tooling](IMPLEMENTATION/design/tooling.md), [Nix workspace check](IMPLEMENTATION/design/workspace-check.md) |
 
 ## System flow
 

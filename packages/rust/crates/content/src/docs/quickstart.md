@@ -24,7 +24,7 @@ For standard workspaces, `bloomery.mkFlake` sets up complete packages, runnable 
 > `mkFlake` automatically searches default systems (`x86_64-linux`, `aarch64-linux`, `aarch64-darwin`) and exports standard flake attributes:
 > - `packages.${system}.<name>`, optional `packages.${system}.<crate>:lib`, and `packages.${system}.default` when a binary exists
 > - `apps.${system}.<name>`, `apps.${system}.<name>:dev`, `apps.${system}.<crate>:doc`, `apps.${system}.lock`, and `apps.${system}.default` when a binary exists
-> - `checks.${system}.<name>:<test|clippy|doc|doctest>` and `checks.${system}.workspace:lock`
+> - `checks.${system}.<name>:<test|clippy|doc|doctest>` and `checks.${system}.workspace:lock`; `checks.${system}.bloomery:check` is included whenever the workspace has a `.bloomery/` directory and runs the Bloomery flake input's `bloomery` package
 > - `devShells.${system}.default` (with `rustc`, `clippy`, `cargo`, and fast-build tools)
 
 ---

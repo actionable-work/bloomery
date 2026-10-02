@@ -5,11 +5,12 @@
   profile = import ./profile {inherit lib;};
   workspace = import ./workspace {inherit pkgs lib;};
   mkFlakeTests = import ./mk-flake.test.nix {inherit pkgs lib;};
+  mkWorkspaceTests = import ./mk-workspace.test.nix {inherit pkgs lib;};
   flakeModuleTests = import ./modules/flake-module.test.nix {inherit pkgs lib;};
   builderTests = import ./builders/builders.test.nix {inherit pkgs lib;};
 
   # Aggregate all colocated unit tests
-  testCases = profile.tests // workspace.tests // mkFlakeTests // flakeModuleTests // builderTests;
+  testCases = profile.tests // workspace.tests // mkFlakeTests // mkWorkspaceTests // flakeModuleTests // builderTests;
 
   failedTests = lib.runTests testCases;
 in {

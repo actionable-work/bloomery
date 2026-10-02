@@ -1,0 +1,12 @@
+group = "CHECK"
+
+[[requirements]]
+id = "TEST-WORKSPACE-CHECK-001"
+title = "Fixture metadata is valid for Bloomery check"
+manual = true
+design = "design/check.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery check fixture"
+action = "provide valid traceability metadata for the generated Nix check"
