@@ -134,7 +134,7 @@ pub async fn code_tabs_showcase() -> Result<impl View> {
                         <div>"[3/4] compiling "<span style="color: var(--primary); font-weight: 600;">"tokio v1.38.0"</span>" via nix-store derivation"</div>
                         <div class="terminal-success">
                             <span class="material-symbols-outlined" style="font-size: 14px;">"check_circle"</span>
-                            "[4/4] built derivation -> /nix/store/29df...-bloomery-service-0.1.0"
+                            "[4/4] built derivation -> /nix/store/29df...-bloomery-0.1.0"
                         </div>
                     </div>
                 </div>

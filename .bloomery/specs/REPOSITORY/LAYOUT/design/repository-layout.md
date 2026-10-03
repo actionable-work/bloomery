@@ -15,7 +15,7 @@ workspaces, and repository-local Bloomery metadata.
 | `nix/lib/` | Shared Nix helpers used by the flake. |
 | `tests/` | Isolated consumer workspaces, Nix integration fixtures, and test support. |
 | `.bloomery/config.toml` | Optional local scanner configuration for this repository. |
-| `.bloomery/specs/` | Bloomery service and feature specifications for this repository. |
+| `.bloomery/specs/` | Bloomery area and feature specifications for this repository. |
 
 The Rust workspace contains these binaries and libraries:
 

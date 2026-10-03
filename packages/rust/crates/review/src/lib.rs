@@ -3,7 +3,7 @@ use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ReviewItem {
-    pub service: String,
+    pub area: String,
     pub feature: String,
     pub group: String,
     pub id: String,
@@ -16,8 +16,8 @@ pub fn items(context: &Context) -> Vec<ReviewItem> {
     let mut items = context
         .requirements()
         .filter(|(_, _, requirement)| requirement.entry.manual)
-        .map(|(service, feature, requirement)| ReviewItem {
-            service: service.id.clone(),
+        .map(|(area, feature, requirement)| ReviewItem {
+            area: area.id.clone(),
             feature: feature.id.clone(),
             group: requirement.group.clone(),
             id: requirement.entry.id.clone(),
@@ -28,13 +28,13 @@ pub fn items(context: &Context) -> Vec<ReviewItem> {
         .collect::<Vec<_>>();
     items.sort_by(|left, right| {
         (
-            left.service.as_str(),
+            left.area.as_str(),
             left.feature.as_str(),
             left.group.as_str(),
             sequence(&left.id),
         )
             .cmp(&(
-                right.service.as_str(),
+                right.area.as_str(),
                 right.feature.as_str(),
                 right.group.as_str(),
                 sequence(&right.id),
@@ -45,17 +45,17 @@ pub fn items(context: &Context) -> Vec<ReviewItem> {
 
 pub fn render_text(items: &[ReviewItem]) -> String {
     let mut output = String::new();
-    let mut previous_service = None;
+    let mut previous_area = None;
     let mut previous_feature = None;
     let mut previous_group = None;
     for item in items {
-        if previous_service != Some(item.service.as_str()) {
+        if previous_area != Some(item.area.as_str()) {
             if !output.is_empty() {
                 output.push('\n');
             }
-            output.push_str(&item.service);
+            output.push_str(&item.area);
             output.push('\n');
-            previous_service = Some(item.service.as_str());
+            previous_area = Some(item.area.as_str());
             previous_feature = None;
             previous_group = None;
         }

@@ -1,10 +1,10 @@
 ---
 id: WORKSPACE
 name: Bloomery Specification Workspace
-tagline: Discover service and feature documents and resolve their design and requirement paths.
+tagline: Discover area and feature documents and resolve their design and requirement paths.
 description: |
   The workspace feature defines how Bloomery finds its configuration and
-  specification tree, pairs service and feature documents with directories,
+  specification tree, pairs area and feature documents with directories,
   and resolves relative design references. It provides the filesystem contract
   consumed by the other PARSER features.
 ---
@@ -19,13 +19,13 @@ remain in their normal repository locations and are found through
 ## Design documents
 
 - [Workspace layout](design/layout.md)
-- [Service and feature document contracts](design/document-contracts.md)
+- [Area and feature document contracts](design/document-contracts.md)
 
 ## Responsibilities
 
 - Establish the `.bloomery/config.toml` and `.bloomery/specs/` roots.
-- Discover service and feature directories without case normalization.
-- Require a service `README.md` and a feature `README.md` when those nodes
+- Discover area and feature directories without case normalization.
+- Require an area `README.md` and a feature `README.md` when those nodes
   exist in the design tree.
 - Require every feature to contain a `requirements/` directory with at least
   one grouped TOML file.

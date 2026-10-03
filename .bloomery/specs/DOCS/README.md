@@ -1,17 +1,17 @@
 ---
 id: DOCS
-name: Bloomery Documentation Service
+name: Bloomery Documentation Area
 tagline: Publish Bloomery guides and API documentation through a searchable web application.
 description: |
-  The DOCS service owns the documentation content catalog, web presentation,
+  The DOCS area owns the documentation content catalog, web presentation,
   and server that exposes the Bloomery documentation site. It separates static
   authored content from page rendering and server startup.
 ---
 
-# DOCS Service
+# DOCS Area
 
 The documentation site is implemented by the `bloomery-content` and
-`bloomery-ui` libraries and the `bloomery-docs` server binary. The service
+`bloomery-ui` libraries and the `bloomery-docs` server binary. This area
 specifies their public responsibilities without coupling content authoring to
 HTTP startup.
 

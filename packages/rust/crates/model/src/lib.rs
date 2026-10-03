@@ -7,8 +7,8 @@ mod domain;
 pub use config::Config;
 pub use diagnostics::{Diagnostic, SourceLocation, render_diagnostics, sort_diagnostics};
 pub use domain::{
-    Context, DesignReference, EarsStatement, Evidence, Feature, MarkdownFrontmatter, Requirement,
-    RequirementEntry, RequirementGroup, RequirementGroupFile, Service,
+    Area, Context, DesignReference, EarsStatement, Evidence, Feature, MarkdownFrontmatter,
+    Requirement, RequirementEntry, RequirementGroup, RequirementGroupFile,
 };
 
 #[cfg(test)]

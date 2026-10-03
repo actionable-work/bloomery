@@ -1,7 +1,7 @@
 use crate::markdown;
 use bloomery_model::{
-    Context, DesignReference, Diagnostic, Feature, MarkdownFrontmatter, Requirement,
-    RequirementEntry, RequirementGroup, RequirementGroupFile, Service, config,
+    Area, Context, DesignReference, Diagnostic, Feature, MarkdownFrontmatter, Requirement,
+    RequirementEntry, RequirementGroup, RequirementGroupFile, config,
 };
 use std::collections::{BTreeSet, HashSet};
 use std::fs;
@@ -27,35 +27,35 @@ pub fn load(root: &Path) -> Result<Context, Vec<Diagnostic>> {
         ]);
     }
 
-    let service_paths = match child_directories(&specs_root) {
+    let area_paths = match child_directories(&specs_root) {
         Ok(paths) => paths,
         Err(diagnostic) => return Err(vec![diagnostic]),
     };
-    let mut services = Vec::new();
+    let mut areas = Vec::new();
     let mut all_ids = HashSet::new();
-    for service_path in service_paths {
-        if let Some(service) = load_service(root, &service_path, &mut all_ids, &mut diagnostics) {
-            services.push(service);
+    for area_path in area_paths {
+        if let Some(area) = load_area(root, &area_path, &mut all_ids, &mut diagnostics) {
+            areas.push(area);
         }
     }
-    services.sort_by(|left, right| left.id.cmp(&right.id));
+    areas.sort_by(|left, right| left.id.cmp(&right.id));
     if diagnostics.is_empty() {
         Ok(Context {
             root: root.to_path_buf(),
             config: configuration,
-            services,
+            areas,
         })
     } else {
         Err(diagnostics)
     }
 }
 
-fn load_service(
+fn load_area(
     root: &Path,
     path: &Path,
     all_ids: &mut HashSet<String>,
     diagnostics: &mut Vec<Diagnostic>,
-) -> Option<Service> {
+) -> Option<Area> {
     let readme = path.join("README.md");
     let frontmatter = read_frontmatter(&readme, diagnostics)?;
     let id = path
@@ -68,7 +68,7 @@ fn load_service(
             Diagnostic::new(
                 "DirectoryIdMismatch",
                 format!(
-                    "Service directory is '{id}', but frontmatter id is '{}'.",
+                    "Area directory is '{id}', but frontmatter id is '{}'.",
                     frontmatter.id
                 ),
             )
@@ -89,7 +89,7 @@ fn load_service(
         }
     }
     features.sort_by(|left, right| left.id.cmp(&right.id));
-    Some(Service {
+    Some(Area {
         id,
         path: path.to_path_buf(),
         frontmatter,
@@ -99,7 +99,7 @@ fn load_service(
 
 fn load_feature(
     root: &Path,
-    service_path: &Path,
+    area_path: &Path,
     path: &Path,
     all_ids: &mut HashSet<String>,
     diagnostics: &mut Vec<Diagnostic>,
@@ -155,7 +155,7 @@ fn load_feature(
     for group_path in group_paths {
         if let Some(group) = load_group(
             root,
-            service_path,
+            area_path,
             path,
             &readme,
             &group_path,
@@ -176,7 +176,7 @@ fn load_feature(
 
 fn load_group(
     root: &Path,
-    service_path: &Path,
+    area_path: &Path,
     feature_path: &Path,
     readme: &Path,
     path: &Path,
@@ -232,7 +232,7 @@ fn load_group(
         let line = markdown::line_containing(&contents, &format!("\"{}\"", entry.id));
         if let Some(design) = validate_requirement(
             root,
-            service_path,
+            area_path,
             feature_path,
             readme,
             &group,
@@ -262,7 +262,7 @@ fn load_group(
 #[allow(clippy::too_many_arguments)]
 fn validate_requirement(
     root: &Path,
-    service_path: &Path,
+    area_path: &Path,
     feature_path: &Path,
     readme: &Path,
     group: &str,
@@ -273,7 +273,7 @@ fn validate_requirement(
     all_ids: &mut HashSet<String>,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Option<DesignReference> {
-    let service = service_path
+    let area = area_path
         .file_name()
         .and_then(|value| value.to_str())
         .unwrap_or_default();
@@ -300,12 +300,12 @@ fn validate_requirement(
             .at(group_path.to_path_buf(), Some(line)),
         );
     } else {
-        let expected = format!("{service}-{feature}-{group}-{}", parts[3]);
+        let expected = format!("{area}-{feature}-{group}-{}", parts[3]);
         if entry.id != expected {
             diagnostics.push(
                 Diagnostic::new(
                     "SpecIdPathMismatch",
-                    format!("Expected requirement ID prefix '{service}-{feature}-{group}-'"),
+                    format!("Expected requirement ID prefix '{area}-{feature}-{group}-'"),
                 )
                 .at(group_path.to_path_buf(), Some(line)),
             );

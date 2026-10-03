@@ -23,7 +23,7 @@ Total manual requirements requiring review: 1
 ```json
 [
   {
-    "service": "PARSER",
+    "area": "PARSER",
     "feature": "REQUIREMENTS",
     "group": "AUTH",
     "id": "PARSER-REQUIREMENTS-AUTH-001",

@@ -4,7 +4,7 @@ The command runs ordered passes so each check operates on a known model:
 
 1. **Configuration ingestion** — parse `.bloomery/config.toml`, resolve roots,
    and validate scanner settings.
-2. **Workspace and frontmatter** — discover service and feature directories,
+2. **Workspace and frontmatter** — discover area and feature directories,
    require their READMEs and non-empty `requirements/` directories, and compare
    frontmatter IDs with directory names.
 3. **Requirement and design linkage** — parse grouped TOML records, validate

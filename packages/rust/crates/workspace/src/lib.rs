@@ -11,14 +11,16 @@ mod tests {
     use bloomery_test_macros::bloomery;
     use std::fs;
     use std::path::PathBuf;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static FIXTURE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     fn fixture() -> PathBuf {
-        let suffix = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock")
-            .as_nanos();
-        let root = std::env::temp_dir().join(format!("bloomery-workspace-{suffix}"));
+        let suffix = FIXTURE_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!(
+            "bloomery-workspace-{}-{suffix}",
+            std::process::id()
+        ));
         let feature = root.join(".bloomery/specs/PARSER/WORKSPACE");
         fs::create_dir_all(feature.join("design")).expect("design");
         fs::create_dir_all(feature.join("requirements")).expect("requirements");
@@ -29,9 +31,9 @@ mod tests {
         .expect("config");
         fs::write(
             root.join(".bloomery/specs/PARSER/README.md"),
-            "---\nid: PARSER\nname: PARSER\ntagline: PARSER\ndescription: Service\n---\n# PARSER\n",
+            "---\nid: PARSER\nname: PARSER\ntagline: PARSER\ndescription: Area\n---\n# PARSER\n",
         )
-        .expect("service README");
+        .expect("area README");
         fs::write(
             feature.join("README.md"),
             "---\nid: WORKSPACE\nname: Workspace\ntagline: Workspace\ndescription: Feature\n---\n# Workspace\n",
@@ -50,7 +52,7 @@ mod tests {
     fn loads_a_complete_workspace() {
         let root = fixture();
         let context = load(&root).expect("workspace should load");
-        assert_eq!(context.services.len(), 1);
+        assert_eq!(context.areas.len(), 1);
         assert_eq!(context.requirements().count(), 1);
         let _ = fs::remove_dir_all(root);
     }
@@ -62,7 +64,7 @@ mod tests {
         fs::remove_file(root.join(".bloomery/config.toml")).expect("remove config");
 
         let context = load(&root).expect("workspace should load without configuration");
-        assert_eq!(context.services.len(), 1);
+        assert_eq!(context.areas.len(), 1);
         assert_eq!(context.requirements().count(), 1);
         assert_eq!(context.config.specs.dir, "specs");
         assert!(!context.config.scanners.rust.enabled);

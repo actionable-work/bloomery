@@ -5,7 +5,7 @@ The in-memory context is a resolved graph:
 ```text
 Context
 ├── Configuration
-├── Services[*]
+├── Areas[*]
 │   ├── Frontmatter
 │   └── Features[*]
 │       ├── Frontmatter
