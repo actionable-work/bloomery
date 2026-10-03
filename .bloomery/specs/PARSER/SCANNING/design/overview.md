@@ -17,11 +17,11 @@ static references ───────┘
 
 ## Common rules
 
-- Only configured paths and systems are scanned.
-- Requirement IDs are extracted from syntax nodes or declared metadata, not
-  from arbitrary comments or prose.
-- Parser failures are reported with source context; the scanner does not fall
-  back to regex matching after a syntax error.
+- Only configured source paths are scanned.
+- Requirement IDs are extracted from syntax nodes or literal metadata, not from
+  arbitrary comments or prose.
+- Rust and Playwright parse failures are reported with source context; those
+  scanners do not fall back to text matching after a syntax error.
 - References are de-duplicated for set validation but retain all meaningful
   source locations for diagnostics.
 - A reference to an unknown ID is not ignored; it becomes an orphan-reference

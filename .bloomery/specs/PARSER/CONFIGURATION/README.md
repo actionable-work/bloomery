@@ -1,11 +1,11 @@
 ---
 id: CONFIGURATION
 name: Bloomery Configuration
-tagline: Explicit roots, scanner paths, parser options, and Nix evaluation targets.
+tagline: Explicit roots, scanner paths, and parser options.
 description: |
   Configuration controls where requirements are discovered and which source
-  trees are inspected for static references. It selects scanner behavior and
-  Nix systems without changing requirement identity or the architecture model.
+  trees are inspected for static references. It selects scanner behavior
+  without changing requirement identity or the architecture model.
 ---
 
 # Configuration
@@ -27,13 +27,13 @@ requirement identity or lifecycle state.
 - Enable or disable supported scanners.
 - Define source globs relative to the repository root.
 - Define Playwright tag prefixes.
-- Define the Nix checks attribute and target systems.
+- Define repository-relative Nix source paths for static evidence scanning.
 - Reject malformed or ambiguous configuration before scanning begins.
 
 ## Dependencies
 
 [PARSER/WORKSPACE](../WORKSPACE/README.md) consumes the specs root.
 [PARSER/SCANNING](../SCANNING/README.md) consumes scanner paths and
-source-specific options. [CLI/CHECK](../../CLI/CHECK/README.md) treats
+source-specific options; Nix evidence is read statically from source metadata. [CLI/CHECK](../../CLI/CHECK/README.md) treats
 configuration errors as an early failure and does not proceed with an
 incomplete configuration.

@@ -1,3 +1,7 @@
+[scanners.nix]
+enabled = true
+paths = ["*.nix", "lib/**/*.nix", "nix/**/*.nix", "tests/**/*.nix"]
+
 [scanners.rust]
 enabled = true
 paths = ["packages/rust/**/*.rs"]

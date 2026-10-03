@@ -50,15 +50,13 @@ pub struct PlaywrightScannerConfig {
     pub tag_prefix: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct NixScannerConfig {
     #[serde(default)]
     pub enabled: bool,
-    #[serde(default = "default_checks_attr")]
-    pub checks_attr: String,
     #[serde(default)]
-    pub systems: Vec<String>,
+    pub paths: Vec<String>,
 }
 
 fn default_specs_dir() -> String {
@@ -67,10 +65,6 @@ fn default_specs_dir() -> String {
 
 fn default_tag_prefix() -> String {
     "@bloomery:".to_owned()
-}
-
-fn default_checks_attr() -> String {
-    ".#checks".to_owned()
 }
 
 impl Default for SpecsConfig {
@@ -91,37 +85,53 @@ impl Default for PlaywrightScannerConfig {
     }
 }
 
-impl Default for NixScannerConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            checks_attr: default_checks_attr(),
-            systems: Vec::new(),
-        }
-    }
+#[derive(Debug, Clone)]
+pub struct LoadedConfig {
+    pub config: Config,
+    /// The user-authored TOML tree, before typed defaults are inserted.
+    /// `None` means that the configuration file does not exist.
+    pub raw: Option<toml::Value>,
 }
 
 #[allow(clippy::result_large_err)]
 pub fn load(root: &Path) -> Result<Config, Diagnostic> {
+    load_with_raw(root).map(|loaded| loaded.config)
+}
+
+#[allow(clippy::result_large_err)]
+pub fn load_with_raw(root: &Path) -> Result<LoadedConfig, Diagnostic> {
     let path = root.join(".bloomery/config.toml");
-    let config = match fs::read_to_string(&path) {
-        Ok(contents) => toml::from_str(&contents).map_err(|error| {
-            Diagnostic::new(
-                "ConfigurationError",
-                format!("Unable to parse configuration: {error}"),
-            )
-            .at(
-                path.clone(),
-                Some(error_span_line(&contents, error.to_string())),
-            )
-        })?,
+    let (config, raw) = match fs::read_to_string(&path) {
+        Ok(contents) => {
+            let raw = toml::from_str::<toml::Value>(&contents).map_err(|error| {
+                Diagnostic::new(
+                    "ConfigurationError",
+                    format!("Unable to parse configuration: {error}"),
+                )
+                .at(
+                    path.clone(),
+                    Some(error_span_line(&contents, error.to_string())),
+                )
+            })?;
+            let config = toml::from_str(&contents).map_err(|error| {
+                Diagnostic::new(
+                    "ConfigurationError",
+                    format!("Unable to parse configuration: {error}"),
+                )
+                .at(
+                    path.clone(),
+                    Some(error_span_line(&contents, error.to_string())),
+                )
+            })?;
+            (config, Some(raw))
+        }
         Err(error)
             if error.kind() == std::io::ErrorKind::NotFound
                 && fs::symlink_metadata(&path).is_err_and(|metadata_error| {
                     metadata_error.kind() == std::io::ErrorKind::NotFound
                 }) =>
         {
-            Config::default()
+            (Config::default(), None)
         }
         Err(error) => {
             return Err(Diagnostic::new(
@@ -132,7 +142,7 @@ pub fn load(root: &Path) -> Result<Config, Diagnostic> {
         }
     };
     config.validate()?;
-    Ok(config)
+    Ok(LoadedConfig { config, raw })
 }
 
 impl Config {
@@ -155,26 +165,7 @@ impl Config {
                 "scanners.playwright.tag_prefix must not be empty",
             ));
         }
-        if self.scanners.nix.enabled {
-            if self.scanners.nix.checks_attr.trim().is_empty() {
-                return Err(Diagnostic::new(
-                    "ConfigurationError",
-                    "scanners.nix.checks_attr must not be empty",
-                ));
-            }
-            if self
-                .scanners
-                .nix
-                .systems
-                .iter()
-                .any(|system| system.trim().is_empty())
-            {
-                return Err(Diagnostic::new(
-                    "ConfigurationError",
-                    "scanners.nix.systems must not contain empty values",
-                ));
-            }
-        }
+        validate_file_scanner("nix", self.scanners.nix.enabled, &self.scanners.nix.paths)?;
         Ok(())
     }
 
@@ -271,8 +262,7 @@ mod tests {
         assert!(playwright.paths.is_empty());
         assert_eq!(playwright.tag_prefix, "@bloomery:");
         assert!(!nix.enabled);
-        assert_eq!(nix.checks_attr, ".#checks");
-        assert!(nix.systems.is_empty());
+        assert!(nix.paths.is_empty());
     }
 
     fn assert_configuration_error(root: &Path) {
@@ -366,7 +356,18 @@ mod tests {
             &config_path,
             "[scanners.rust]\nenabled = true\npaths = []\n",
         )
-        .expect("invalid config");
+        .expect("invalid Rust scanner config");
+        assert_configuration_error(&root);
+
+        fs::write(&config_path, "[scanners.nix]\nenabled = true\npaths = []\n")
+            .expect("Nix scanner without paths");
+        assert_configuration_error(&root);
+
+        fs::write(
+            &config_path,
+            "[scanners.nix]\nenabled = true\npaths = [\"../checks.nix\"]\n",
+        )
+        .expect("Nix scanner with an escaping path");
         assert_configuration_error(&root);
         let _ = fs::remove_dir_all(root);
     }

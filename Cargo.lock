@@ -201,6 +201,8 @@ dependencies = [
  "bloomery-check",
  "bloomery-model",
  "bloomery-review",
+ "bloomery-sync",
+ "bloomery-test-macros",
  "bloomery-workspace",
  "clap",
  "serde_json",
@@ -209,12 +211,16 @@ dependencies = [
 [[package]]
 name = "bloomery-content"
 version = "0.1.0"
+dependencies = [
+ "bloomery-test-macros",
+]
 
 [[package]]
 name = "bloomery-docs"
 version = "0.1.0"
 dependencies = [
  "bloomery-content",
+ "bloomery-test-macros",
  "bloomery-ui",
  "tokio",
  "topcoat",
@@ -234,6 +240,7 @@ name = "bloomery-review"
 version = "0.1.0"
 dependencies = [
  "bloomery-model",
+ "bloomery-test-macros",
  "serde",
 ]
 
@@ -242,12 +249,25 @@ name = "bloomery-scanning"
 version = "0.1.0"
 dependencies = [
  "bloomery-model",
+ "bloomery-test-macros",
  "oxc_allocator",
  "oxc_ast",
  "oxc_parser",
  "oxc_span",
  "serde_json",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "bloomery-sync"
+version = "0.1.0"
+dependencies = [
+ "bloomery-model",
+ "bloomery-test-macros",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "toml",
 ]
 
 [[package]]
@@ -259,6 +279,7 @@ name = "bloomery-ui"
 version = "0.1.0"
 dependencies = [
  "bloomery-content",
+ "bloomery-test-macros",
  "topcoat",
 ]
 

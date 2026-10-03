@@ -11,7 +11,6 @@
   profile = import ./profile {inherit lib;};
   overrides = import ./overrides {inherit pkgs lib;};
   docs = import ./docs {inherit pkgs lib;};
-  lock = import ./lock {inherit pkgs lib;};
   tests = import ./tests.nix {inherit pkgs lib;};
   modules = {
     flake = args:
@@ -22,11 +21,6 @@
   mkWorkspace = import ./mk-workspace.nix {
     inherit pkgs lib cratesIoIndex;
     bloomeryPackage = bloomeryPackageForSystem pkgs.stdenv.buildPlatform.system;
-  };
-
-  # Generic lock app for consumers that construct their own flake outputs
-  apps = {
-    lock = lock.lockApp;
   };
 
   # Zero-boilerplate flake builder

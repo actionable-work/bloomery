@@ -2,11 +2,33 @@ group = "FORMAT"
 
 [[requirements]]
 id = "PARSER-REQUIREMENTS-FORMAT-001"
-title = "Grouped requirements are validated against their contracts"
-manual = true
+title = "Requirement identifiers are validated"
+manual = false
 design = "design/format.md"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "requirement loader"
-action = "validate each grouped record's identifier and EARS fields and resolve its design reference"
+action = "validate each grouped record's identifier against its contract"
+
+[[requirements]]
+id = "PARSER-REQUIREMENTS-FORMAT-002"
+title = "EARS fields are validated"
+manual = false
+design = "design/format.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "requirement loader"
+action = "validate each grouped record's EARS fields against the selected grammar"
+
+[[requirements]]
+id = "PARSER-REQUIREMENTS-FORMAT-003"
+title = "Design references are resolved"
+manual = false
+design = "design/format.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "requirement loader"
+action = "resolve each grouped record's design reference"

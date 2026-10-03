@@ -23,7 +23,7 @@ For standard workspaces, `bloomery.mkFlake` sets up complete packages, runnable 
 > [!TIP]
 > `mkFlake` automatically searches default systems (`x86_64-linux`, `aarch64-linux`, `aarch64-darwin`) and exports standard flake attributes:
 > - `packages.${system}.<name>`, optional `packages.${system}.<crate>:lib`, and `packages.${system}.default` when a binary exists
-> - `apps.${system}.<name>`, `apps.${system}.<name>:dev`, `apps.${system}.<crate>:doc`, `apps.${system}.lock`, and `apps.${system}.default` when a binary exists
+> - `apps.${system}.<name>`, `apps.${system}.<name>:dev`, `apps.${system}.<crate>:doc`, and `apps.${system}.default` when a binary exists
 > - `checks.${system}.<name>:<test|clippy|doc|doctest>` and `checks.${system}.workspace:lock`; `checks.${system}.bloomery:check` is included whenever the workspace has a `.bloomery/` directory and runs the Bloomery flake input's `bloomery` package
 > - `devShells.${system}.default` (with `rustc`, `clippy`, `cargo`, and fast-build tools)
 
@@ -90,25 +90,19 @@ in ws.packages.my-bin
 
 ---
 
-## Generating the Lock Manifest
+## Synchronizing Lockfiles
 
-Bloomery resolves all crate dependencies and features deterministically without Import-From-Derivation (IFD). Run the lock generator once to initialize `bloomery.lock`:
-
-```bash
-nix run github:actionable-work/bloomery#lock
-```
-
-Or run the lock generator locally:
+Bloomery resolves crate features and dependency edges without Import-From-Derivation (IFD). Use the Bloomery CLI package to reconcile Cargo manifests and generate `bloomery.lock`:
 
 ```bash
-nix run .#lock
+nix run github:actionable-work/bloomery#bloomery -- sync
 ```
 
-Commit `bloomery.lock` to version control:
+This runs Cargo's normal workspace resolution, preserving compatible locked versions where possible. Request upgrades explicitly with `--update=rust`, `--update=nix`, or bare `--update` to update all applicable ecosystems. Sync requires `cargo`; it requires `nix` only when updating a flake. It does not require a specification tree or create configuration files.
 
-```bash
-git add bloomery.lock && git commit -m "chore: add bloomery lockfile"
-```
+The `check`, `review`, and `sync` commands all accept the same `--json` flag for machine-readable output. Human-readable output is colorized when writing to a terminal and respects `NO_COLOR`.
+
+Commit the generated `Cargo.lock` (if newly created), `bloomery.lock`, and any selected `flake.lock` update to version control.
 
 ---
 

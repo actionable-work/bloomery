@@ -1,0 +1,264 @@
+group = "INTERFACE"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-001"
+title = "Sync accepts optional update selection"
+manual = false
+design = "design/sync.md#invocation-and-update-selection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "accept --update with an optional comma-separated list of nix and rust ecosystems"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-002"
+title = "Duplicate update names are deduplicated"
+manual = false
+design = "design/sync.md#invocation-and-update-selection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "deduplicate names in an update selection"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-003"
+title = "Explicit selection restricts upgrades"
+manual = false
+design = "design/sync.md#invocation-and-update-selection"
+
+[requirements.ears]
+type = "event"
+trigger = "an explicit update ecosystem list is supplied"
+system = "bloomery sync"
+action = "upgrade only the selected ecosystems"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-004"
+title = "Nix lock app exports are removed"
+manual = false
+design = "design/sync.md#nix-migration"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "Bloomery"
+action = "remove lock-app exports across its flake and workspace APIs"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-005"
+title = "Update selection accepts equals syntax"
+manual = false
+design = "design/sync.md#invocation-and-update-selection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "accept an explicit update list through --update=LIST"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-006"
+title = "Update selection accepts a separate argument"
+manual = false
+design = "design/sync.md#invocation-and-update-selection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "accept an explicit update list through --update LIST"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-007"
+title = "Sync without update performs reconciliation only"
+manual = false
+design = "design/sync.md#invocation-and-update-selection"
+
+[requirements.ears]
+type = "event"
+trigger = "--update is omitted"
+system = "bloomery sync"
+action = "reconcile locks without deliberately upgrading dependencies"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-008"
+title = "Bare update selects Rust updates"
+manual = false
+design = "design/sync.md#invocation-and-update-selection"
+
+[requirements.ears]
+type = "event"
+trigger = "--update is supplied without a list"
+system = "bloomery sync"
+action = "select Rust dependency updates"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-009"
+title = "Bare update selects an existing Nix flake"
+manual = false
+design = "design/sync.md#invocation-and-update-selection"
+
+[requirements.ears]
+type = "event"
+trigger = "--update is supplied without a list and flake.nix exists"
+system = "bloomery sync"
+action = "select Nix input updates"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-010"
+title = "Bare update skips absent Nix flakes"
+manual = false
+design = "design/sync.md#invocation-and-update-selection"
+
+[requirements.ears]
+type = "event"
+trigger = "--update is supplied without a list and flake.nix is absent"
+system = "bloomery sync"
+action = "skip Nix updates"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-011"
+title = "Update selection is order independent"
+manual = false
+design = "design/sync.md#invocation-and-update-selection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "interpret update selections independently of ecosystem name order"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-012"
+title = "Unknown update names are usage errors"
+manual = false
+design = "design/sync.md#invocation-and-update-selection"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "an update selection contains an unknown ecosystem name"
+system = "the bloomery CLI"
+action = "return usage exit code 2 before mutation"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-013"
+title = "Empty update elements are usage errors"
+manual = false
+design = "design/sync.md#invocation-and-update-selection"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "an update selection contains an empty list element"
+system = "the bloomery CLI"
+action = "return usage exit code 2 before mutation"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-014"
+title = "Explicitly empty update lists are usage errors"
+manual = false
+design = "design/sync.md#invocation-and-update-selection"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "an explicitly empty update list is supplied"
+system = "the bloomery CLI"
+action = "return usage exit code 2 before mutation"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-015"
+title = "Repeated update flags are usage errors"
+manual = false
+design = "design/sync.md#invocation-and-update-selection"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "--update is supplied more than once"
+system = "the bloomery CLI"
+action = "return usage exit code 2 before mutation"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-016"
+title = "Explicit Nix updates require a flake"
+manual = false
+design = "design/sync.md#invocation-and-update-selection"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "Nix updates are explicitly selected but flake.nix is absent"
+system = "bloomery sync"
+action = "report an error before mutation"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-017"
+title = "Nix lock script exports are removed"
+manual = false
+design = "design/sync.md#nix-migration"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "Bloomery"
+action = "remove lock-script exports across its flake and workspace APIs"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-018"
+title = "No replacement Nix sync app is exposed"
+manual = false
+design = "design/sync.md#nix-migration"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "Bloomery"
+action = "refrain from exposing a replacement Nix sync app"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-019"
+title = "No deprecated Nix lock alias is retained"
+manual = false
+design = "design/sync.md#nix-migration"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "Bloomery"
+action = "refrain from exposing a deprecated Nix lock alias"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-020"
+title = "Unrelated Nix apps remain available"
+manual = false
+design = "design/sync.md#nix-migration"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "Bloomery"
+action = "preserve unrelated Nix app outputs"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-021"
+title = "Nix lock validation remains read-only"
+manual = false
+design = "design/sync.md#nix-migration"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "Bloomery"
+action = "preserve read-only Nix lock validation"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-022"
+title = "Lock repair guidance uses sync"
+manual = false
+design = "design/sync.md#nix-migration"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "Bloomery"
+action = "direct lock-repair guidance to bloomery sync"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-023"
+title = "No CLI lock subcommand is introduced"
+manual = false
+design = "design/sync.md#nix-migration"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "Bloomery"
+action = "refrain from exposing a bloomery lock subcommand"

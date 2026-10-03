@@ -6,9 +6,13 @@ path = "src/main.rs"
 bloomery-check = { path = "../../crates/check" }
 bloomery-model = { path = "../../crates/model" }
 bloomery-review = { path = "../../crates/review" }
+bloomery-sync = { path = "../../crates/sync" }
 bloomery-workspace = { path = "../../crates/workspace" }
 clap = { version = "4.6", features = ["derive"] }
 serde_json = "1.0"
+
+[dev-dependencies]
+bloomery-test-macros.workspace = true
 
 [package]
 name = "bloomery-cli"

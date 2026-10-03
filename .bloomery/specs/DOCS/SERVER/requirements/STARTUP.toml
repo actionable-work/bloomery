@@ -2,11 +2,58 @@ group = "STARTUP"
 
 [[requirements]]
 id = "DOCS-SERVER-STARTUP-001"
-title = "The docs server serves registered pages on a configurable local port"
-manual = true
+title = "The docs server serves registered routes"
+manual = false
 design = "design/server.md"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "the Bloomery docs server"
-action = "serve registered routes on 127.0.0.1 using PORT or port 8080 by default and attach a native asset bundle when one is available"
+action = "serve the routes registered by the documentation UI"
+
+[[requirements]]
+id = "DOCS-SERVER-STARTUP-002"
+title = "The docs server binds to localhost"
+manual = false
+design = "design/server.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery docs server"
+action = "bind its listener to 127.0.0.1"
+
+[[requirements]]
+id = "DOCS-SERVER-STARTUP-003"
+title = "A valid PORT selects the server port"
+manual = false
+design = "design/server.md"
+
+[requirements.ears]
+type = "event"
+trigger = "PORT contains a valid port number"
+system = "the Bloomery docs server"
+action = "use the port specified by PORT"
+
+[[requirements]]
+id = "DOCS-SERVER-STARTUP-004"
+title = "Missing or invalid PORT uses the default"
+manual = false
+design = "design/server.md"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "PORT is missing or cannot be parsed as a port number"
+system = "the Bloomery docs server"
+action = "use port 8080"
+
+[[requirements]]
+id = "DOCS-SERVER-STARTUP-005"
+title = "Available native assets are attached"
+manual = false
+design = "design/server.md"
+
+[requirements.ears]
+type = "event"
+trigger = "a native asset bundle is available"
+system = "the Bloomery docs server"
+action = "attach the native asset bundle to the router"

@@ -482,18 +482,73 @@ fn render_inline(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bloomery_test_macros::bloomery;
+    use std::collections::BTreeSet;
 
     #[test]
-    fn test_all_pages_exist() {
-        assert_eq!(all_pages().len(), 8);
-        assert!(get_page("overview").is_some());
-        assert!(get_page("quickstart").is_some());
-        assert!(get_page("profiles").is_some());
-        assert!(get_page("api").is_some());
-        assert!(get_page("overrides").is_some());
-        assert!(get_page("architecture").is_some());
-        assert!(get_page("matrix").is_some());
-        assert!(get_page("benchmarks").is_some());
+    #[bloomery("DOCS-CONTENT-CATALOG-001")]
+    #[bloomery("DOCS-CONTENT-CATALOG-003")]
+    #[bloomery("DOCS-CONTENT-CATALOG-004")]
+    #[bloomery("DOCS-CONTENT-CATALOG-005")]
+    #[bloomery("DOCS-CONTENT-CATALOG-006")]
+    fn every_catalog_page_has_stable_slugs_and_complete_metadata() {
+        let pages = all_pages();
+        let expected_slugs = [
+            "overview",
+            "quickstart",
+            "architecture",
+            "profiles",
+            "api",
+            "overrides",
+            "matrix",
+            "benchmarks",
+        ];
+        let actual_slugs = pages.iter().map(|page| page.slug).collect::<Vec<_>>();
+        let unique_slugs = actual_slugs.iter().copied().collect::<BTreeSet<_>>();
+
+        assert_eq!(actual_slugs, expected_slugs);
+        assert_eq!(unique_slugs.len(), pages.len());
+        assert_eq!(
+            pages.iter().map(|page| page.order).collect::<Vec<_>>(),
+            vec![1, 2, 3, 3, 4, 5, 7, 8]
+        );
+        for page in pages {
+            assert!(
+                !page.title.trim().is_empty(),
+                "missing title for {}",
+                page.slug
+            );
+            assert!(
+                [
+                    "Getting Started",
+                    "Configuration",
+                    "Validation & Benchmarks"
+                ]
+                .contains(&page.category),
+                "unknown category for {}",
+                page.slug
+            );
+            assert!(
+                !page.description.trim().is_empty(),
+                "missing description for {}",
+                page.slug
+            );
+            assert!(
+                !page.markdown.trim().is_empty(),
+                "missing content for {}",
+                page.slug
+            );
+        }
+    }
+
+    #[test]
+    #[bloomery("DOCS-CONTENT-CATALOG-002")]
+    fn every_catalog_page_is_retrievable_by_its_slug() {
+        for page in all_pages() {
+            let found = get_page(page.slug).expect("catalog slug should resolve");
+            assert!(std::ptr::eq(found, *page));
+        }
+        assert!(get_page("not-a-documentation-page").is_none());
     }
 
     #[test]

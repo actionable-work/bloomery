@@ -44,7 +44,7 @@ bloomery.lib.${system}.mkWorkspace {
   toolchain = {
     rustc = pkgs.rustc;             # rustc compiler derivation
     clippy = pkgs.clippy;           # clippy-driver derivation
-    cargo = pkgs.cargo;             # cargo derivation (for lock generation)
+    cargo = pkgs.cargo;             # cargo derivation (for development shells)
     linker = "lld";                 # "lld", "mold", "system", or null
     lld = pkgs.lld;                 # LLVM lld package
     mold = pkgs.mold;               # Mold linker package

@@ -2,11 +2,55 @@ group = "COMMANDS"
 
 [[requirements]]
 id = "CLI-INTERFACE-COMMANDS-001"
-title = "The CLI exposes check and review commands"
-manual = true
+title = "The CLI exposes check"
+manual = false
 design = "design/commands.md"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "bloomery"
-action = "expose check and review subcommands, provide the CLI parser's help command, and resolve verification commands against the repository rooted at the current working directory"
+action = "expose the check subcommand"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-002"
+title = "The CLI exposes review"
+manual = false
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery"
+action = "expose the review subcommand"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-003"
+title = "The CLI exposes sync"
+manual = false
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery"
+action = "expose the sync subcommand"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-004"
+title = "The CLI exposes parser-generated help"
+manual = false
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery"
+action = "provide the CLI parser's help subcommand"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-005"
+title = "Repository commands use the current working directory"
+manual = false
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery"
+action = "resolve repository commands against the repository rooted at the process's current working directory"

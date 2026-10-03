@@ -1,0 +1,321 @@
+group = "RECOMMENDATIONS"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-001"
+title = "Recommendations use a built-in catalog"
+manual = false
+design = "design/sync.md#recommendations"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "compare the raw configuration with an extensible built-in catalog"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-002"
+title = "Only absent raw keys are recommended"
+manual = false
+design = "design/sync.md#recommendations"
+
+[requirements.ears]
+type = "event"
+trigger = "a valid configuration file is present"
+system = "bloomery sync"
+action = "report a catalog entry only when its exact key path is absent before default insertion"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-003"
+title = "Notices are emitted at most once"
+manual = false
+design = "design/sync.md#recommendations"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "emit at most one advisory notice per absent catalog key per invocation"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-004"
+title = "Missing config identifies its path"
+manual = false
+design = "design/sync.md#missing-configuration"
+
+[requirements.ears]
+type = "event"
+trigger = ".bloomery/config.toml is absent"
+system = "bloomery sync"
+action = "emit one missing-configuration warning identifying .bloomery/config.toml"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-005"
+title = "Advisory notices do not fail sync"
+manual = false
+design = "design/sync.md#missing-configuration"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "keep warnings and recommendations non-fatal"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-006"
+title = "Rust scanning is initially recommended"
+manual = false
+design = "design/sync.md#recommendations"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "include scanners.rust.enabled in the initial recommendation catalog"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-007"
+title = "Playwright scanning is initially recommended"
+manual = false
+design = "design/sync.md#recommendations"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "include scanners.playwright.enabled in the initial recommendation catalog"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-008"
+title = "Nix scanning is initially recommended"
+manual = false
+design = "design/sync.md#recommendations"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "include scanners.nix.enabled in the initial recommendation catalog"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-009"
+title = "Recommendations describe benefits"
+manual = false
+design = "design/sync.md#recommendations"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "provide a benefit description for each catalog entry"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-010"
+title = "Recommendations give configuration guidance"
+manual = false
+design = "design/sync.md#recommendations"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "provide actionable configuration guidance for each catalog entry"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-011"
+title = "Absent parent tables imply absent keys"
+manual = false
+design = "design/sync.md#recommendations"
+
+[requirements.ears]
+type = "event"
+trigger = "a valid configuration file is present"
+system = "bloomery sync"
+action = "treat a recommended key as absent when a parent table is absent"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-012"
+title = "Absent leaves in present tables are recommended"
+manual = false
+design = "design/sync.md#recommendations"
+
+[requirements.ears]
+type = "event"
+trigger = "a valid configuration file is present"
+system = "bloomery sync"
+action = "treat an omitted recommended leaf as absent even when its parent table is present"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-013"
+title = "Explicit disablement suppresses recommendations"
+manual = false
+design = "design/sync.md#recommendations"
+
+[requirements.ears]
+type = "event"
+trigger = "a valid configuration file is present"
+system = "bloomery sync"
+action = "suppress recommendations for keys explicitly set to false"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-014"
+title = "Explicit configuration suppresses recommendations"
+manual = false
+design = "design/sync.md#recommendations"
+
+[requirements.ears]
+type = "event"
+trigger = "a valid configuration file is present"
+system = "bloomery sync"
+action = "suppress recommendations for any explicitly present schema-valid value other than false"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-015"
+title = "Dotted keys preserve presence semantics"
+manual = false
+design = "design/sync.md#recommendations"
+
+[requirements.ears]
+type = "event"
+trigger = "a valid configuration file is present"
+system = "bloomery sync"
+action = "recognize recommended keys expressed through TOML dotted-key syntax"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-016"
+title = "Inline tables preserve presence semantics"
+manual = false
+design = "design/sync.md#recommendations"
+
+[requirements.ears]
+type = "event"
+trigger = "a valid configuration file is present"
+system = "bloomery sync"
+action = "recognize recommended keys expressed through TOML inline tables"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-017"
+title = "Notices are sorted by key path"
+manual = false
+design = "design/sync.md#recommendations"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "emit recommendation notices in sorted full-key-path order"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-018"
+title = "Absent keys are reported on every invocation"
+manual = false
+design = "design/sync.md#recommendations"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "report absent catalog keys on each invocation regardless of previous runs"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-019"
+title = "Notification history is not stored"
+manual = false
+design = "design/sync.md#recommendations"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "refrain from persisting recommendation notification history"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-020"
+title = "Recommendations do not depend on introduction date"
+manual = false
+design = "design/sync.md#recommendations"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "recommend absent catalog keys regardless of when the feature was introduced"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-021"
+title = "Missing config recommends creation"
+manual = false
+design = "design/sync.md#missing-configuration"
+
+[requirements.ears]
+type = "event"
+trigger = ".bloomery/config.toml is absent"
+system = "bloomery sync"
+action = "recommend creating .bloomery/config.toml to configure or explicitly disable recommended features"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-022"
+title = "Missing config suppresses individual notices"
+manual = false
+design = "design/sync.md#missing-configuration"
+
+[requirements.ears]
+type = "event"
+trigger = ".bloomery/config.toml is absent"
+system = "bloomery sync"
+action = "suppress individual missing-key recommendation notices"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-023"
+title = "Missing config uses validated defaults"
+manual = false
+design = "design/sync.md#missing-configuration"
+
+[requirements.ears]
+type = "event"
+trigger = ".bloomery/config.toml is absent"
+system = "bloomery sync"
+action = "use validated configuration defaults"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-024"
+title = "Missing config allows synchronization"
+manual = false
+design = "design/sync.md#missing-configuration"
+
+[requirements.ears]
+type = "event"
+trigger = ".bloomery/config.toml is absent"
+system = "bloomery sync"
+action = "continue lock synchronization"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-025"
+title = "Sync does not create configuration"
+manual = false
+design = "design/sync.md#missing-configuration"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "refrain from creating .bloomery/config.toml"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-026"
+title = "Sync does not edit configuration"
+manual = false
+design = "design/sync.md#missing-configuration"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "refrain from editing .bloomery/config.toml"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-027"
+title = "Sync does not enable recommended features"
+manual = false
+design = "design/sync.md#missing-configuration"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "refrain from automatically enabling recommended features"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-028"
+title = "Sync does not create the Bloomery directory"
+manual = false
+design = "design/sync.md#missing-configuration"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "refrain from creating the .bloomery directory"

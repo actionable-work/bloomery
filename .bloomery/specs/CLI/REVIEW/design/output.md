@@ -3,7 +3,10 @@
 ## Human-readable output
 
 The default output presents the hierarchy as a tree and includes the title,
-canonical EARS statement, and design path for each manual requirement:
+canonical EARS statement, and design path for each manual requirement. Area and
+feature headings, requirement IDs, and the final count are highlighted with
+terminal colors when supported; non-empty `NO_COLOR` and redirected output
+disable ANSI styling.
 
 ```text
 PARSER
@@ -18,7 +21,8 @@ Total manual requirements requiring review: 1
 
 ## JSON output
 
-`bloomery review --format json` emits an array with stable field names:
+`bloomery review --json` emits an array with stable field names and no ANSI
+escape sequences:
 
 ```json
 [

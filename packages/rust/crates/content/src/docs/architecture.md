@@ -6,13 +6,13 @@ Bloomery maps Cargo semantics into a native Nix derivation graph. Understanding 
 
 In traditional Nix-Rust tools, determining which optional features and dependencies are active often triggers an Import-From-Derivation (IFD), forcing Nix evaluation to pause and launch a builder process:
 
-1. Bloomery provides the `lock` tool (`nix run .#lock`), which queries `cargo metadata --format-version 1` and produces `bloomery.lock`.
+1. The Bloomery CLI provides `bloomery sync`, which reconciles `Cargo.lock`, queries Cargo's resolved metadata, and produces `bloomery.lock`. Obtain the CLI with `nix run github:actionable-work/bloomery#bloomery -- sync` or add the Bloomery package to your development environment.
 2. `bloomery.lock` captures:
    - Activated features per crate
    - Exact resolved runtime dependencies
    - Proc-macro flags and Rust editions
    - SHA-256 digest of `Cargo.lock`
-3. During evaluation, `mkWorkspace` reads `bloomery.lock` via pure `builtins.fromTOML` with zero IFD.
+3. During evaluation, `mkWorkspace` reads `bloomery.lock` via pure `builtins.fromTOML` with zero IFD. Lock validation is read-only; repair it by rerunning `bloomery sync`.
 
 ---
 

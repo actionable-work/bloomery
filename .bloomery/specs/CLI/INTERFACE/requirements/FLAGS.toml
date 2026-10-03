@@ -2,11 +2,66 @@ group = "FLAGS"
 
 [[requirements]]
 id = "CLI-INTERFACE-FLAGS-001"
-title = "Review exposes a text-or-JSON format option"
-manual = true
+title = "Review defaults to human-readable output"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "use human-readable output when --json is omitted"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-002"
+title = "Review accepts JSON output"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "accept --json for review"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-003"
+title = "JSON output uses one shared option"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "use --json rather than command-specific JSON or format selectors"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-004"
+title = "Check has no command-specific options"
+manual = false
 design = "design/flags.md"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "the bloomery CLI"
-action = "accept --format text or --format json for review with text as the default, expose no command-specific options for check, and provide -h/--help on commands"
+action = "expose no check-specific options beyond shared CLI options"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-005"
+title = "Commands expose help flags"
+manual = false
+design = "design/flags.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "provide -h and --help on commands"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-006"
+title = "Shared-purpose flags are consistent across commands"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "expose the same --json option for check, review, and sync"
