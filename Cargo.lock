@@ -195,18 +195,63 @@ dependencies = [
 ]
 
 [[package]]
-name = "bloomery-cli"
+name = "bloomery-check-command"
 version = "0.1.0"
 dependencies = [
  "bloomery-check",
+ "bloomery-cli-output",
+ "bloomery-cli-types",
+ "bloomery-model",
+ "bloomery-test-macros",
+ "bloomery-workspace",
+ "serde_json",
+]
+
+[[package]]
+name = "bloomery-cli"
+version = "0.1.0"
+dependencies = [
+ "bloomery-cli-app",
+]
+
+[[package]]
+name = "bloomery-cli-app"
+version = "0.1.0"
+dependencies = [
+ "bloomery-check-command",
+ "bloomery-cli-output",
+ "bloomery-cli-parser",
+ "bloomery-cli-types",
  "bloomery-model",
  "bloomery-review",
  "bloomery-sync",
  "bloomery-test-macros",
  "bloomery-workspace",
- "clap",
  "serde_json",
 ]
+
+[[package]]
+name = "bloomery-cli-output"
+version = "0.1.0"
+dependencies = [
+ "bloomery-model",
+ "bloomery-review",
+ "bloomery-sync",
+ "bloomery-test-macros",
+ "serde_json",
+]
+
+[[package]]
+name = "bloomery-cli-parser"
+version = "0.1.0"
+dependencies = [
+ "bloomery-cli-types",
+ "clap",
+]
+
+[[package]]
+name = "bloomery-cli-types"
+version = "0.1.0"
 
 [[package]]
 name = "bloomery-content"
@@ -219,7 +264,13 @@ dependencies = [
 name = "bloomery-docs"
 version = "0.1.0"
 dependencies = [
- "bloomery-content",
+ "bloomery-docs-server",
+]
+
+[[package]]
+name = "bloomery-docs-server"
+version = "0.1.0"
+dependencies = [
  "bloomery-test-macros",
  "bloomery-ui",
  "tokio",

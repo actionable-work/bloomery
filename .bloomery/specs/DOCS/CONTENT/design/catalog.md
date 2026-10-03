@@ -7,7 +7,7 @@ page by slug, and grouping pages into categories for navigation.
 
 The current pages are `overview`, `quickstart`, `architecture`, `profiles`,
 `api`, `overrides`, `matrix`, and `benchmarks`. Their Markdown sources live in
-`packages/rust/crates/content/src/docs/` and are included at compile time.
+`packages/rust/libs/docs/content/src/docs/` and are included at compile time.
 
 The same library provides Markdown-to-HTML rendering for the documentation UI.
 Content data and rendering do not own HTTP routes or server startup; those

@@ -10,7 +10,7 @@
   };
   source = ./.;
   procMacroWorkspace = (import ../mk-workspace.nix {inherit pkgs lib;}) {
-    root = ../../packages/rust/crates/test-macros;
+    root = ../../packages/rust/libs/shared/test-macros;
     source.cargoLock = builtins.toFile "proc-macro-builder-tests-Cargo.lock" ''
       version = 4
 

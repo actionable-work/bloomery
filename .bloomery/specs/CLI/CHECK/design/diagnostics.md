@@ -1,36 +1,78 @@
-# Diagnostics
+# Failure summaries and diagnostics
 
-Diagnostics identify the failed invariant, explain the expected relationship,
-and point to a repository-relative source location where possible. Output is
-stable across runs: paths are normalized to repository-relative form, and
-collections are sorted by area, feature, group, sequence, then source
-location.
+## Static diagnostic vocabulary
 
-The diagnostic vocabulary includes:
+Preserve the existing diagnostic semantics and repository-relative locations:
 
 | Code | Meaning |
 | --- | --- |
-| `DirectoryIdMismatch` | A directory and README `id` disagree. |
-| `MissingDocument` | A required area or feature README is absent. |
-| `MissingDesignFile` | An explicit design path cannot be resolved. |
-| `DanglingDesignAnchor` | A requested Markdown heading anchor is absent. |
-| `SpecIdPathMismatch` | An ID segment disagrees with its physical path. |
-| `DuplicateSpecId` | An ID is declared more than once. |
+| `DirectoryIdMismatch` | Directory and README ID disagree. |
+| `MissingDocument` | Required README is absent. |
+| `MissingDesignFile` | Design path cannot be resolved. |
+| `DanglingDesignAnchor` | Referenced Markdown heading is absent. |
+| `SpecIdPathMismatch` | Requirement ID disagrees with its path. |
+| `DuplicateSpecId` | Requirement ID is declared more than once. |
 | `OrphanTestReference` | Evidence names no declared requirement. |
 | `IllegalManualAutomation` | Evidence references a manual requirement. |
-| `MissingAutomatedTest` | An automated requirement has no evidence. |
+| `MissingAutomatedTest` | Automated requirement has no evidence. |
 | `ParseError` | Configuration, Markdown, TOML, source, or Nix input is invalid. |
 
-The presentation resembles compiler diagnostics:
+Runner failures retain captured Nix check invocation output and the referenced
+store path as seekable task details. `check details` resolves a retained Nix
+store path on demand and includes the derivation log in its detail stream.
+Setup/discovery errors are operational failures, not fabricated test cases.
+Diagnostics do not cause automatic repairs. Preserve complete structured
+messages, locations, and notes in the run store; default output is a summary,
+not the complete compiler-style rendering.
+
+## Bounded summary
+
+Print one aggregate outcome line, a failure page, and one retrieval hint. Do not
+print individual successes, build logs, durations, repeated headings, or expanded
+diagnostic notes by default. Successful full runs need only counts and run ID.
+Subset runs identify partial scope. Non-TTY output has no progress stream. A TTY
+may update one transient status line on stderr without retaining a line per task.
+JSON mode emits no human progress.
+
+Default failure page is at most 20 records and 8 KiB for the whole serialized
+response. Bound UTF-8 bytes and records, not model-dependent token counts. The
+budget includes headings, JSON syntax/escaping, counts, metadata, and retrieval
+hints. Bound individual summary fields so at least one failure fits. Truncation
+must be explicit; the full retained diagnostic remains available through details.
 
 ```text
-ERROR [MissingAutomatedTest]:
-  Requirement marked manual = false has 0 linked tests.
-  --> .bloomery/specs/PARSER/REQUIREMENTS/requirements/AUTH.toml:12
+FAIL  28 passed · 2 failed · 1 blocked
+f1 static:traceability MissingAutomatedTest CLI-CHECK-RUN-001
+f2 nix:x86_64-linux:core:unit-tests BuildFailed
+run r42 · details: bloomery check details f2 --run r42
 ```
 
-Multiple independent failures are reported in one invocation. Human-readable
-output is colorized only for terminal streams and respects `NO_COLOR`. The
-shared `--json` option emits the same stable diagnostic information as a
-machine-readable object; see the [CLI output contract](../../INTERFACE/design/output.md).
-A diagnostic does not trigger an attempted repair; the CLI is read-only.
+Report check outcome counts separately from the total number of failure records:
+one static check may produce many diagnostics. Omitted failures have a count
+and continuation offset; `check failures` retrieves subsequent pages. Notices
+(such as legacy integration exclusions) are bounded too and cannot silently
+consume the failure page. Details are described in [retained runs](details.md).
+
+## JSON
+
+One compact document on stdout; readable keys, absent optional fields omitted,
+no duplicated human prose, no successful-check array, no tool output. Outcome
+counts include passed, failed, blocked, canceled, and not_run, omitting zeros.
+Run status is passed, failed, error, or interrupted. Run identity is absent only
+when failure occurs before creating a run. A scope object is present for partial
+selection. Failure records have id, check, code, and optional subject/location.
+Paging includes total failure records, offset, and nullable next.
+
+```json
+{"run":"r42","status":"failed","counts":{"passed":28,"failed":2,"blocked":1},"total":2,"offset":0,"failures":[{"id":"f1","check":"static:traceability","code":"MissingAutomatedTest","subject":"CLI-CHECK-RUN-001"},{"id":"f2","check":"nix:x86_64-linux:core:unit-tests","code":"BuildFailed"}],"next":null}
+```
+
+Usage/setup errors use a bounded error object with code and message and retain
+the appropriate exit code. JSON retrieval pages use the same failure record
+shape, or a details object with check identity, bounded metadata, display
+records, and offset/next/total. Color is terminal-only and honors `NO_COLOR` and
+`TERM=dumb`. Human and JSON modes convey equivalent outcomes and paging data.
+
+For identical retained results, serialization and ordering are stable. Run IDs,
+completion times, logs, and fail-fast outcomes can differ between executions;
+do not claim byte-identical JSON across separate runs.

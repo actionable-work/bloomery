@@ -1,0 +1,323 @@
+group = "DETAIL"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-001"
+title = "Runs are retained outside source"
+manual = false
+design = "design/details.md#storage-and-identity"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "retain results and captured logs in a workspace-scoped user cache outside tracked source"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-002"
+title = "Completed runs are immutable"
+manual = false
+design = "design/details.md#storage-and-identity"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "leave completed run manifests immutable"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-003"
+title = "Concurrent runs have distinct identities"
+manual = false
+design = "design/details.md#storage-and-identity"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "allocate distinct run identities and storage for concurrent executions"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-004"
+title = "Run retrieval supports explicit selection"
+manual = false
+design = "design/details.md#failures"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check failure retrieval"
+action = "accept --run to select a retained workspace run"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-005"
+title = "Default retrieval uses the latest completed run"
+manual = false
+design = "design/details.md#storage-and-identity"
+
+[requirements.ears]
+type = "event"
+trigger = "--run is omitted"
+system = "bloomery check failure retrieval"
+action = "select the latest completed run for the current workspace"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-006"
+title = "Failure enumeration is paginated"
+manual = false
+design = "design/details.md#failures"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check failures"
+action = "enumerate retained failures using zero-based --offset and positive --limit values"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-007"
+title = "Detail retrieval does not rerun work"
+manual = false
+design = "design/details.md#failures"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check details"
+action = "retrieve retained failure data without rerunning checks or builds"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-008"
+title = "Details support offset seeking"
+manual = false
+design = "design/details.md#detail-stream-and-seek"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check details"
+action = "accept a zero-based --offset into the stable retained display-record stream"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-009"
+title = "Details support line limits"
+manual = false
+design = "design/details.md#detail-stream-and-seek"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check details"
+action = "accept a positive --limit defaulting to 40 display records"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-010"
+title = "Retrieval pages have a byte ceiling"
+manual = false
+design = "design/details.md#detail-stream-and-seek"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check failure retrieval"
+action = "limit each complete serialized human or JSON page to 8 KiB"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-011"
+title = "Retrieval exposes continuation"
+manual = false
+design = "design/details.md#detail-stream-and-seek"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check failure retrieval"
+action = "report actual offset, total records, and a nullable next offset"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-012"
+title = "Default details focus on the failure"
+manual = false
+design = "design/details.md#detail-stream-and-seek"
+
+[requirements.ears]
+type = "event"
+trigger = "no explicit detail offset is supplied"
+system = "bloomery check details"
+action = "return a failure-focused excerpt with its actual starting offset"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-013"
+title = "Oversized lines remain fully seekable"
+manual = false
+design = "design/details.md#detail-stream-and-seek"
+
+[requirements.ears]
+type = "event"
+trigger = "a retained logical line exceeds the page-compatible record size"
+system = "bloomery check details"
+action = "split it into stable bounded display records so every retained part is reachable"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-014"
+title = "Unavailable retained data is explicit"
+manual = false
+design = "design/details.md#failures"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "the requested run or failure is unavailable"
+system = "bloomery check failure retrieval"
+action = "report an explicit retrieval error instead of substituting another result"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-015"
+title = "Display output is terminal safe"
+manual = false
+design = "design/details.md#detail-stream-and-seek"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check details"
+action = "display normalized UTF-8 records without tool-supplied terminal or control escape sequences"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-016"
+title = "End offsets yield empty pages"
+manual = false
+design = "design/details.md#detail-stream-and-seek"
+
+[requirements.ears]
+type = "event"
+trigger = "a retrieval offset is at or beyond the retained stream end"
+system = "bloomery check failure retrieval"
+action = "return an empty page with no continuation"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-017"
+title = "Retrieval success is independent of test outcome"
+manual = false
+design = "design/details.md#detail-stream-and-seek"
+
+[requirements.ears]
+type = "event"
+trigger = "retained failure data is retrieved successfully"
+system = "bloomery check failure retrieval"
+action = "return exit code zero even when the stored check failed"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-018"
+title = "Retained diagnostics preserve full information"
+manual = false
+design = "design/diagnostics.md#static-diagnostic-vocabulary"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "retain complete structured diagnostic messages, locations, and notes despite summary truncation"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-019"
+title = "Cache records are user private"
+manual = false
+design = "design/details.md#storage-and-identity"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "create retained run data with user-private cache permissions"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-020"
+title = "Paging makes forward progress"
+manual = false
+design = "design/details.md#detail-stream-and-seek"
+
+[requirements.ears]
+type = "event"
+trigger = "a requested retrieval stream has remaining records"
+system = "bloomery check failure retrieval"
+action = "return at least one bounded record and a continuation advancing beyond it"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-021"
+title = "Run manifests finalize atomically"
+manual = false
+design = "design/details.md#storage-and-identity"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "publish completed run manifests atomically"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-022"
+title = "Available Git revisions are retained"
+manual = false
+design = "design/details.md#storage-and-identity"
+
+[requirements.ears]
+type = "event"
+trigger = "Git provides a revision for the workspace"
+system = "bloomery check"
+action = "record that revision in the retained run"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-023"
+title = "Available Git dirty state is retained"
+manual = false
+design = "design/details.md#storage-and-identity"
+
+[requirements.ears]
+type = "event"
+trigger = "Git provides working-tree status for the workspace"
+system = "bloomery check"
+action = "record whether the workspace has tracked or untracked changes in the retained run"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-024"
+title = "Failed Nix log paths are retained"
+manual = false
+design = "design/details.md#storage-and-identity"
+
+[requirements.ears]
+type = "event"
+trigger = "a failed Nix check output references a derivation log"
+system = "bloomery check"
+action = "retain the referenced Nix store path with the failure record"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-025"
+title = "Nix logs are resolved during detail retrieval"
+manual = false
+design = "design/details.md#detail-stream-and-seek"
+
+[requirements.ears]
+type = "event"
+trigger = "details are first requested for a retained Nix store path without a snapshot"
+system = "bloomery check details"
+action = "load the derivation log and include it in the detail stream"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-026"
+title = "Unavailable Nix logs preserve retained details"
+manual = false
+design = "design/details.md#detail-stream-and-seek"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a referenced Nix derivation log cannot be retrieved"
+system = "bloomery check details"
+action = "preserve captured Nix output and return an explanatory detail record"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-027"
+title = "Derivation log snapshots freeze retrieval outcomes"
+manual = false
+design = "design/details.md#detail-stream-and-seek"
+
+[requirements.ears]
+type = "event"
+trigger = "a derivation log retrieval result has been retained"
+system = "bloomery check details"
+action = "reuse that immutable display-record snapshot including unavailable-log results without invoking nix log again"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-028"
+title = "Concurrent aliases share one derivation snapshot"
+manual = false
+design = "design/details.md#detail-stream-and-seek"
+
+[requirements.ears]
+type = "event"
+trigger = "concurrent detail requests reference the same run-local derivation path"
+system = "bloomery check details"
+action = "resolve and publish one shared snapshot atomically without changing the completed run manifest"

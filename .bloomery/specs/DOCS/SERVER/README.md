@@ -9,10 +9,11 @@ description: |
 
 # Documentation Server
 
-The `bloomery-docs` executable composes the UI router and serves it on the
-loopback interface. It reads `PORT` from the environment and defaults to port
-8080. If a native Topcoat asset bundle is available, the server attaches it;
-absence of the bundle is reported without preventing startup.
+The `bloomery-docs` executable delegates to `bloomery-docs-server`, which
+composes the UI router and serves it on the loopback interface. The server
+library reads `PORT` from the environment and defaults to port 8080. If a
+native Topcoat asset bundle is available, the server attaches it; absence of
+the bundle is reported without preventing startup.
 
 ## Design documents
 

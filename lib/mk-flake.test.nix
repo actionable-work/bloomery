@@ -7,10 +7,7 @@
       pkgs,
       lib,
     }:
-      import ./. {
-        inherit pkgs lib;
-        bloomeryPackageForSystem = _system: pkgs.hello;
-      };
+      import ./. {inherit pkgs lib;};
   };
   mockNixpkgs = {
     inherit lib;
@@ -72,7 +69,7 @@ in {
       hasDefaultPackage = true;
       hasDevShell = true;
       hasChecks = true;
-      hasBloomeryCheck = true;
+      hasBloomeryCheck = false;
     };
   };
 
@@ -93,7 +90,7 @@ in {
     expected = {
       hasExplicitBinary = true;
       hasDuplicateImplicitBinary = false;
-      hasBloomeryCheck = true;
+      hasBloomeryCheck = false;
     };
   };
 

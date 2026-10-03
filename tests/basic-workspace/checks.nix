@@ -1,7 +1,4 @@
-{
-  nixpkgs,
-  bloomery,
-}: {
+{nixpkgs}: {
   eachSystem,
   perSystemWorkspace,
 }: {
@@ -12,9 +9,11 @@
     in
       workspace.checks
       // {
-        validate-basic-workspace = assert builtins.hasAttr "bloomery:check" workspace.checks;
+        validate-basic-workspace = assert !(builtins.hasAttr "bloomery:check" workspace.checks);
+        assert builtins.hasAttr "workspace:lock" workspace.checks;
+        assert builtins.hasAttr "bin-calc:test" workspace.checks;
+        assert builtins.hasAttr "bin-calc:bin" workspace.checks;
         assert !(builtins.hasAttr "bloomery" workspace.packages);
-        assert builtins.elem bloomery.packages.${system}.bloomery workspace.checks."bloomery:check".nativeBuildInputs;
         assert builtins.hasAttr "bin-calc" workspace.packages;
         assert builtins.hasAttr "bin-report" workspace.packages;
         assert builtins.hasAttr "lib-calc:lib" workspace.packages;
@@ -35,19 +34,6 @@
             mkdir $out
             echo "OK" > $out/success
           '';
-
-        validate-bloomery-check-runs-at-the-workspace-root = let
-          check = workspace.checks."bloomery:check";
-        in
-          assert !(builtins.hasAttr "bloomery" workspace.packages);
-          assert builtins.elem bloomery.packages.${system}.bloomery check.nativeBuildInputs;
-            pkgs.runCommand "validate-bloomery-check-runs-at-the-workspace-root" {} ''
-              # The fixture has Bloomery metadata but no local bloomery binary.
-              # Building this output runs the input-flake CLI from the fixture root.
-              test -e "${check}"
-              mkdir "$out"
-              echo "OK" > "$out/success"
-            '';
       }
   );
 }

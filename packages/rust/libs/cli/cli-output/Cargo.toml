@@ -1,0 +1,13 @@
+[dependencies]
+bloomery-model = { path = "../../shared/model" }
+bloomery-review = { path = "../review" }
+bloomery-sync = { path = "../sync" }
+serde_json = "1.0"
+
+[dev-dependencies]
+bloomery-test-macros.workspace = true
+
+[package]
+name = "bloomery-cli-output"
+version = "0.1.0"
+edition = "2024"

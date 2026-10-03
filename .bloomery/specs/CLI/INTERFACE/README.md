@@ -22,8 +22,10 @@ and how the target repository root is selected.
 
 ## Responsibilities
 
-- Expose the `check`, `review`, and `sync` subcommands and parser-generated help.
+- Expose `check`, its `list`/`failures`/`details` commands, `review`, `sync`, and
+  parser-generated help.
 - Resolve the repository root from the process's current working directory.
-- Specify the shared `--json` flag and command-specific `sync --update` values.
+- Specify shared `--json`, check selection/execution/retrieval options, and
+  command-specific `sync --update` values.
 - Define human-readable terminal coloring and stable JSON output contracts.
 - Keep command syntax distinct from check, review, and sync semantics.

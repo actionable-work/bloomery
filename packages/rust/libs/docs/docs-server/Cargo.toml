@@ -1,0 +1,23 @@
+[dependencies]
+bloomery-ui = { path = "../ui" }
+tokio = { version = "1", default-features = false, features = [
+  "macros",
+  "net",
+  "rt",
+  "rt-multi-thread",
+] }
+topcoat = { version = "0.9.0", default-features = false, features = [
+  "view",
+  "router",
+  "serve",
+  "compression",
+  "asset",
+] }
+
+[dev-dependencies]
+bloomery-test-macros.workspace = true
+
+[package]
+name = "bloomery-docs-server"
+version = "0.1.0"
+edition = "2024"

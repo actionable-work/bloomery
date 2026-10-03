@@ -1,0 +1,274 @@
+use bloomery_cli_types::{
+    CheckArgs, CheckOperation, CliCommand, CliInvocation, DEFAULT_PAGE_LIMIT, DETAIL_PAGE_LIMIT,
+    DetailsArgs, FailureArgs, ListArgs,
+};
+use clap::{ArgAction, Args, Parser, Subcommand, error::ErrorKind};
+use std::ffi::OsString;
+use std::fmt;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParseErrorKind {
+    DisplayHelp,
+    DisplayVersion,
+    Usage,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseError {
+    kind: ParseErrorKind,
+    exit_code: u8,
+    json_mode: bool,
+    command: Option<&'static str>,
+    message: String,
+}
+
+impl ParseError {
+    pub fn kind(&self) -> ParseErrorKind {
+        self.kind
+    }
+
+    pub fn exit_code(&self) -> u8 {
+        self.exit_code
+    }
+
+    pub fn json_mode(&self) -> bool {
+        self.json_mode
+    }
+
+    pub fn command(&self) -> Option<&'static str> {
+        self.command
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for ParseError {}
+
+/// Parse process-style arguments into a command request without executing it.
+pub fn parse_from<I, T>(arguments: I) -> Result<CliInvocation, ParseError>
+where
+    I: IntoIterator<Item = T>,
+    T: Into<OsString> + Clone,
+{
+    let arguments = arguments
+        .into_iter()
+        .map(Into::into)
+        .collect::<Vec<OsString>>();
+    let json_mode = requests_json_output(&arguments);
+    let command = command_from_arguments(&arguments);
+
+    let parsed = RawCli::try_parse_from(arguments).map_err(|error| ParseError {
+        kind: match error.kind() {
+            ErrorKind::DisplayHelp => ParseErrorKind::DisplayHelp,
+            ErrorKind::DisplayVersion => ParseErrorKind::DisplayVersion,
+            _ => ParseErrorKind::Usage,
+        },
+        exit_code: error.exit_code() as u8,
+        json_mode,
+        command,
+        message: error.to_string(),
+    })?;
+
+    Ok(CliInvocation {
+        json_mode: parsed.json,
+        command: parsed.command.into(),
+    })
+}
+
+fn requests_json_output(arguments: &[OsString]) -> bool {
+    arguments
+        .iter()
+        .any(|argument| argument == "--json" || argument.to_string_lossy().starts_with("--json="))
+}
+
+fn command_from_arguments(arguments: &[OsString]) -> Option<&'static str> {
+    arguments
+        .iter()
+        .find_map(|argument| match argument.to_str()? {
+            "check" => Some("check"),
+            "review" => Some("review"),
+            "sync" => Some("sync"),
+            _ => None,
+        })
+}
+
+#[derive(Debug, Parser)]
+#[command(
+    name = "bloomery",
+    about = "Workspace checks, requirements review, and lockfile synchronization"
+)]
+struct RawCli {
+    /// Emit machine-readable JSON instead of human-readable output.
+    #[arg(long, global = true)]
+    json: bool,
+    #[command(subcommand)]
+    command: RawCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum RawCommand {
+    /// Run static validation and selected Nix checks, or retrieve retained results.
+    Check(RawCheckArgs),
+    /// Print requirements that require human review.
+    Review,
+    /// Reconcile Cargo and Bloomery locks, optionally updating dependencies.
+    Sync {
+        /// Update all applicable ecosystems, or a comma-separated list of nix and rust.
+        #[arg(
+            long,
+            value_name = "LIST",
+            num_args = 0..=1,
+            default_missing_value = "__bloomery_bare_update__",
+            action = ArgAction::Set
+        )]
+        update: Option<String>,
+    },
+}
+
+impl From<RawCommand> for CliCommand {
+    fn from(command: RawCommand) -> Self {
+        match command {
+            RawCommand::Check(args) => Self::Check(args.into()),
+            RawCommand::Review => Self::Review,
+            RawCommand::Sync { update } => Self::Sync { update },
+        }
+    }
+}
+
+#[derive(Debug, Args)]
+struct RawCheckArgs {
+    #[command(subcommand)]
+    operation: Option<RawCheckOperation>,
+
+    /// Select checks by exact ID or case-sensitive * and ? glob.
+    #[arg(long = "check", value_name = "ID_OR_GLOB", action = ArgAction::Append)]
+    selectors: Vec<String>,
+
+    /// Select a Nix system; may be repeated.
+    #[arg(long = "system", value_name = "SYSTEM", action = ArgAction::Append)]
+    systems: Vec<String>,
+
+    /// Maximum number of Bloomery-owned check tasks running at once.
+    #[arg(long, value_name = "N")]
+    jobs: Option<usize>,
+
+    /// Stop admitting checks after the first observed check failure.
+    #[arg(long)]
+    fail_fast: bool,
+}
+
+impl From<RawCheckArgs> for CheckArgs {
+    fn from(args: RawCheckArgs) -> Self {
+        Self {
+            operation: args.operation.map(Into::into),
+            selectors: args.selectors,
+            systems: args.systems,
+            jobs: args.jobs,
+            fail_fast: args.fail_fast,
+        }
+    }
+}
+
+#[derive(Debug, Subcommand)]
+enum RawCheckOperation {
+    /// List selectable check IDs without running them.
+    List(RawListArgs),
+    /// Page through failures from a retained run.
+    Failures(RawFailureArgs),
+    /// Retrieve the retained details for one failure ID.
+    Details(RawDetailsArgs),
+}
+
+impl From<RawCheckOperation> for CheckOperation {
+    fn from(operation: RawCheckOperation) -> Self {
+        match operation {
+            RawCheckOperation::List(args) => Self::List(args.into()),
+            RawCheckOperation::Failures(args) => Self::Failures(args.into()),
+            RawCheckOperation::Details(args) => Self::Details(args.into()),
+        }
+    }
+}
+
+#[derive(Debug, Args)]
+struct RawListArgs {
+    /// Filter IDs by exact selector or case-sensitive * and ? glob.
+    #[arg(long = "check", value_name = "ID_OR_GLOB", action = ArgAction::Append)]
+    selectors: Vec<String>,
+    /// Select a Nix system; may be repeated.
+    #[arg(long = "system", value_name = "SYSTEM", action = ArgAction::Append)]
+    systems: Vec<String>,
+    /// Zero-based ID offset.
+    #[arg(long, default_value_t = 0)]
+    offset: usize,
+    /// Maximum number of IDs to return.
+    #[arg(long, default_value_t = DEFAULT_PAGE_LIMIT)]
+    limit: usize,
+}
+
+impl From<RawListArgs> for ListArgs {
+    fn from(args: RawListArgs) -> Self {
+        Self {
+            selectors: args.selectors,
+            systems: args.systems,
+            offset: args.offset,
+            limit: args.limit,
+        }
+    }
+}
+
+#[derive(Debug, Args)]
+struct RawFailureArgs {
+    /// Retained run ID; omitted selects the latest completed run.
+    #[arg(long, value_name = "RUN")]
+    run: Option<String>,
+    /// Zero-based failure offset.
+    #[arg(long, default_value_t = 0)]
+    offset: usize,
+    /// Maximum number of failure records to return.
+    #[arg(long, default_value_t = DEFAULT_PAGE_LIMIT)]
+    limit: usize,
+}
+
+impl From<RawFailureArgs> for FailureArgs {
+    fn from(args: RawFailureArgs) -> Self {
+        Self {
+            run: args.run,
+            offset: args.offset,
+            limit: args.limit,
+        }
+    }
+}
+
+#[derive(Debug, Args)]
+struct RawDetailsArgs {
+    /// Failure ID such as f1.
+    failure: String,
+    /// Retained run ID; omitted selects the latest completed run.
+    #[arg(long, value_name = "RUN")]
+    run: Option<String>,
+    /// Zero-based detail-record offset; omitted selects a failure-focused excerpt.
+    #[arg(long)]
+    offset: Option<usize>,
+    /// Maximum number of display records to return.
+    #[arg(long, default_value_t = DETAIL_PAGE_LIMIT)]
+    limit: usize,
+}
+
+impl From<RawDetailsArgs> for DetailsArgs {
+    fn from(args: RawDetailsArgs) -> Self {
+        Self {
+            failure: args.failure,
+            run: args.run,
+            offset: args.offset,
+            limit: args.limit,
+        }
+    }
+}

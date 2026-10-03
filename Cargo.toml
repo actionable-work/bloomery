@@ -3,16 +3,22 @@ resolver = "2"
 members = [
   "packages/rust/bins/cli",
   "packages/rust/bins/docs",
-  "packages/rust/crates/check",
-  "packages/rust/crates/ui",
-  "packages/rust/crates/content",
-  "packages/rust/crates/model",
-  "packages/rust/crates/review",
-  "packages/rust/crates/scanning",
-  "packages/rust/crates/sync",
-  "packages/rust/crates/workspace",
-  "packages/rust/crates/test-macros",
+  "packages/rust/libs/cli/cli-app",
+  "packages/rust/libs/cli/cli-output",
+  "packages/rust/libs/cli/cli-parser",
+  "packages/rust/libs/cli/cli-types",
+  "packages/rust/libs/cli/check-command",
+  "packages/rust/libs/cli/review",
+  "packages/rust/libs/cli/sync",
+  "packages/rust/libs/docs/content",
+  "packages/rust/libs/docs/docs-server",
+  "packages/rust/libs/docs/ui",
+  "packages/rust/libs/shared/check",
+  "packages/rust/libs/shared/model",
+  "packages/rust/libs/shared/scanning",
+  "packages/rust/libs/shared/test-macros",
+  "packages/rust/libs/shared/workspace",
 ]
 
 [workspace.dependencies]
-bloomery-test-macros = { path = "packages/rust/crates/test-macros" }
+bloomery-test-macros = { path = "packages/rust/libs/shared/test-macros" }

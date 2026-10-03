@@ -1,0 +1,211 @@
+group = "RUN"
+
+[[requirements]]
+id = "CLI-CHECK-RUN-001"
+title = "Static and Nix work execute concurrently"
+manual = false
+design = "design/execution.md#scheduler"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "permit independent static and Nix tasks to execute concurrently"
+
+[[requirements]]
+id = "CLI-CHECK-RUN-002"
+title = "Independent Nix checks execute concurrently"
+manual = false
+design = "design/execution.md#scheduler"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "permit independent Nix check realizations to execute concurrently"
+
+[[requirements]]
+id = "CLI-CHECK-RUN-003"
+title = "Active check tasks are bounded"
+manual = false
+design = "design/execution.md#scheduler"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "limit active check tasks to the positive --jobs value"
+
+[[requirements]]
+id = "CLI-CHECK-RUN-004"
+title = "Default concurrency derives from CPU availability"
+manual = false
+design = "design/execution.md#scheduler"
+
+[requirements.ears]
+type = "event"
+trigger = "--jobs is omitted"
+system = "bloomery check"
+action = "default the task limit to available logical CPUs with a minimum of one"
+
+[[requirements]]
+id = "CLI-CHECK-RUN-005"
+title = "Default execution continues after failure"
+manual = false
+design = "design/execution.md#scheduler"
+
+[requirements.ears]
+type = "event"
+trigger = "a selected check fails and --fail-fast is absent"
+system = "bloomery check"
+action = "continue attempting all independent selected checks"
+
+[[requirements]]
+id = "CLI-CHECK-RUN-006"
+title = "Invalid specifications do not suppress Nix execution"
+manual = false
+design = "design/execution.md#check-catalog"
+
+[requirements.ears]
+type = "event"
+trigger = "static validation fails in default execution mode"
+system = "bloomery check"
+action = "continue selected Nix checks independently of the specification failure"
+
+[[requirements]]
+id = "CLI-CHECK-RUN-007"
+title = "Fail-fast stops admission"
+manual = false
+design = "design/execution.md#scheduler"
+
+[requirements.ears]
+type = "event"
+trigger = "the first failure is observed with --fail-fast selected"
+system = "bloomery check"
+action = "stop admitting new check tasks"
+
+[[requirements]]
+id = "CLI-CHECK-RUN-008"
+title = "Fail-fast requests task cancellation"
+manual = false
+design = "design/execution.md#scheduler"
+
+[requirements.ears]
+type = "event"
+trigger = "the first failure is observed with --fail-fast selected"
+system = "bloomery check"
+action = "request cancellation of its running tasks without terminating unrelated clients"
+
+[[requirements]]
+id = "CLI-CHECK-RUN-009"
+title = "Failed prerequisites block dependent checks"
+manual = false
+design = "design/execution.md#scheduler"
+
+[requirements.ears]
+type = "event"
+trigger = "a prerequisite fails"
+system = "bloomery check"
+action = "record prevented dependent checks as blocked with their causal failure"
+
+[[requirements]]
+id = "CLI-CHECK-RUN-010"
+title = "Cancellation differs from never-started work"
+manual = false
+design = "design/execution.md#scheduler"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "distinguish canceled started tasks from not_run queued tasks"
+
+[[requirements]]
+id = "CLI-CHECK-RUN-011"
+title = "Task output is isolated"
+manual = false
+design = "design/execution.md#exit-and-setup-failures"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "capture output separately for each task"
+
+[[requirements]]
+id = "CLI-CHECK-RUN-012"
+title = "Interruption retains completed outcomes"
+manual = false
+design = "design/execution.md#exit-and-setup-failures"
+
+[requirements.ears]
+type = "event"
+trigger = "execution is interrupted by the user"
+system = "bloomery check"
+action = "retain completed outcomes in the interrupted run"
+
+[[requirements]]
+id = "CLI-CHECK-RUN-013"
+title = "Interruption has a distinct exit code"
+manual = false
+design = "design/execution.md#exit-and-setup-failures"
+
+[requirements.ears]
+type = "event"
+trigger = "execution is interrupted by the user"
+system = "bloomery check"
+action = "return exit code 130"
+
+[[requirements]]
+id = "CLI-CHECK-RUN-014"
+title = "Setup failures are not check failures"
+manual = false
+design = "design/execution.md#exit-and-setup-failures"
+
+[requirements.ears]
+type = "event"
+trigger = "invocation or runner setup fails"
+system = "bloomery check"
+action = "return exit code 2 with an operational error"
+
+[[requirements]]
+id = "CLI-CHECK-RUN-015"
+title = "Check failures return failure"
+manual = false
+design = "design/execution.md#exit-and-setup-failures"
+
+[requirements.ears]
+type = "event"
+trigger = "a selected check fails or its failure prevents selected work completing"
+system = "bloomery check"
+action = "return exit code 1"
+
+[[requirements]]
+id = "CLI-CHECK-RUN-016"
+title = "Cache finalization failure cannot pass"
+manual = false
+design = "design/execution.md#exit-and-setup-failures"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "the retained run cannot be finalized"
+system = "bloomery check"
+action = "report an operational failure rather than exit successfully"
+
+[[requirements]]
+id = "CLI-CHECK-RUN-017"
+title = "Check leaves repository source unchanged"
+manual = false
+design = "README.md#boundaries"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "leave repository source files and lockfiles unchanged"
+
+[[requirements]]
+id = "CLI-CHECK-RUN-018"
+title = "Traceability admission depends only on structure"
+manual = false
+design = "design/execution.md#scheduler"
+
+[requirements.ears]
+type = "event"
+trigger = "structure passes while selected Nix work remains"
+system = "bloomery check"
+action = "admit traceability in the shared scheduler at the next available slot ahead of queued independent work"

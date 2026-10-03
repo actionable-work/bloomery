@@ -16,6 +16,6 @@
       root = ./.;
       createLibPackages = true;
       createDevPackages = true;
-      extraOutputs = import ./checks.nix {inherit nixpkgs bloomery;};
+      extraOutputs = import ./checks.nix {inherit nixpkgs;};
     };
 }

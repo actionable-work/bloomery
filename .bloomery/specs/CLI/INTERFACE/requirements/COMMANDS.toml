@@ -54,3 +54,36 @@ design = "design/commands.md"
 type = "ubiquitous"
 system = "bloomery"
 action = "resolve repository commands against the repository rooted at the process's current working directory"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-006"
+title = "Check exposes catalog listing"
+manual = false
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "expose the list subcommand"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-007"
+title = "Check exposes failure enumeration"
+manual = false
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "expose the failures subcommand"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-008"
+title = "Check exposes failure details"
+manual = false
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "expose the details subcommand"

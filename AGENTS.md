@@ -1,0 +1,13 @@
+- This is still a proof of concept with no releases used by others.  Backwards compatibility is not a priority when making changes, prefer getting the interfaces ergonomic.
+- Always make sure changes are fully reflected in the .bloomery/specs design and requirements files.
+- `bloomery check` is intended to be the main testing entry point.  If that is green, you can consider the workspace ready to merge.
+- We use jujutsu for git management with conventional commits.
+- Do not create commits or push to git remotes, let me do that manually.
+- For code, focus on readability and maintainability over clever code.  Prefer writing our own code over pulling in a small dependency. When adding a dependency, make sure to confirm with the user.
+- When changing dependencies or crate layout, make sure to run `bloomery sync` to update lockfiles
+- For design documents, prefer terse prose.
+- For requirements, each requirement should focus on only one story.  Prefer creating multiple requirements if they are validating different things, even if they are very similar.
+- Never update bloomery design docs to reference lack of implementation evidence.  We follow red-green spec design processes, so MissingAutomatedTest errors are always expected at the end of a design phase.
+- Design files should always capture the desired state.  Never include prose about current state or the path to get to the desired state.
+- Requirements should only be marked as manual if there is no possible way to test them automatically.  Great effort should be put into keeping the list of manual checks as small as possible.
+- When iterating on bloomery, make sure to use the nix dev outputs, ex. `nix run .#bloomery:dev -- check`
