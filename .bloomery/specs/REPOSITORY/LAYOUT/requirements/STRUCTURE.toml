@@ -1,0 +1,12 @@
+group = "STRUCTURE"
+
+[[requirements]]
+id = "REPOSITORY-LAYOUT-STRUCTURE-001"
+title = "The documented repository layout matches the physical workspace"
+manual = true
+design = "design/repository-layout.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery repository"
+action = "keep Rust binaries and libraries under packages/rust, reusable Nix code under lib, flake checks under nix/checks, integration workspaces under tests, and repository-local specifications under .bloomery"

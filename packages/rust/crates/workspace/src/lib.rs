@@ -19,7 +19,7 @@ mod tests {
             .expect("clock")
             .as_nanos();
         let root = std::env::temp_dir().join(format!("bloomery-workspace-{suffix}"));
-        let feature = root.join(".bloomery/specs/CLI/WORKSPACE");
+        let feature = root.join(".bloomery/specs/PARSER/WORKSPACE");
         fs::create_dir_all(feature.join("design")).expect("design");
         fs::create_dir_all(feature.join("requirements")).expect("requirements");
         fs::write(
@@ -28,8 +28,8 @@ mod tests {
         )
         .expect("config");
         fs::write(
-            root.join(".bloomery/specs/CLI/README.md"),
-            "---\nid: CLI\nname: CLI\ntagline: CLI\ndescription: Service\n---\n# CLI\n",
+            root.join(".bloomery/specs/PARSER/README.md"),
+            "---\nid: PARSER\nname: PARSER\ntagline: PARSER\ndescription: Service\n---\n# PARSER\n",
         )
         .expect("service README");
         fs::write(
@@ -40,7 +40,7 @@ mod tests {
         fs::write(feature.join("design/overview.md"), "# Overview\n").expect("design");
         fs::write(
             feature.join("requirements/STRUCTURE.toml"),
-            "group = \"STRUCTURE\"\n\n[[requirements]]\nid = \"CLI-WORKSPACE-STRUCTURE-001\"\ntitle = \"Structure\"\nmanual = true\n\n[requirements.ears]\ntype = \"ubiquitous\"\nsystem = \"workspace\"\naction = \"retain structure\"\n",
+            "group = \"STRUCTURE\"\n\n[[requirements]]\nid = \"PARSER-WORKSPACE-STRUCTURE-001\"\ntitle = \"Structure\"\nmanual = true\n\n[requirements.ears]\ntype = \"ubiquitous\"\nsystem = \"workspace\"\naction = \"retain structure\"\n",
         )
         .expect("requirements");
         root
@@ -56,7 +56,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CONFIGURATION-OPTIONAL-004")]
+    #[bloomery("PARSER-CONFIGURATION-OPTIONAL-004")]
     fn loads_a_valid_workspace_without_a_configuration_file() {
         let root = fixture();
         fs::remove_file(root.join(".bloomery/config.toml")).expect("remove config");
@@ -74,7 +74,7 @@ mod tests {
     #[test]
     fn rejects_a_feature_without_requirement_groups() {
         let root = fixture();
-        fs::remove_file(root.join(".bloomery/specs/CLI/WORKSPACE/requirements/STRUCTURE.toml"))
+        fs::remove_file(root.join(".bloomery/specs/PARSER/WORKSPACE/requirements/STRUCTURE.toml"))
             .expect("requirements");
         let diagnostics = load(&root).expect_err("workspace should fail");
         assert!(

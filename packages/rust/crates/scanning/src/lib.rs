@@ -61,12 +61,12 @@ mod tests {
         fs::create_dir_all(root.join("e2e")).expect("e2e");
         fs::write(
             root.join("tests/example.rs"),
-            "#[bloomery(\"CLI-WORKSPACE-CHECK-001\")]\n#[test]\nfn example() {}\n",
+            "#[bloomery(\"PARSER-SCANNING-TESTS-001\")]\n#[test]\nfn example() {}\n",
         )
         .expect("Rust source");
         fs::write(
             root.join("e2e/example.spec.ts"),
-            "test('example', { tag: ['@bloomery:CLI-WORKSPACE-CHECK-002'] }, async () => {});\n",
+            "test('example', { tag: ['@bloomery:PARSER-SCANNING-TESTS-002'] }, async () => {});\n",
         )
         .expect("Playwright source");
         let context = Context {
@@ -95,12 +95,12 @@ mod tests {
         assert!(
             evidence
                 .iter()
-                .any(|item| item.id == "CLI-WORKSPACE-CHECK-001")
+                .any(|item| item.id == "PARSER-SCANNING-TESTS-001")
         );
         assert!(
             evidence
                 .iter()
-                .any(|item| item.id == "CLI-WORKSPACE-CHECK-002")
+                .any(|item| item.id == "PARSER-SCANNING-TESTS-002")
         );
         let _ = fs::remove_dir_all(root);
     }

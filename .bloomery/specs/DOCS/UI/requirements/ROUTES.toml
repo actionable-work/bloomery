@@ -1,0 +1,12 @@
+group = "ROUTES"
+
+[[requirements]]
+id = "DOCS-UI-ROUTES-001"
+title = "The documentation UI registers the home and catalog pages"
+manual = true
+design = "design/routes-and-rendering.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery documentation UI"
+action = "register the home page and expose catalog pages through their short and /docs routes using the shared site presentation"

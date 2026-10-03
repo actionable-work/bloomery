@@ -1,0 +1,12 @@
+group = "COMMANDS"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-001"
+title = "The CLI exposes check and review commands"
+manual = true
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery"
+action = "expose check and review subcommands, provide the CLI parser's help command, and resolve verification commands against the repository rooted at the current working directory"
