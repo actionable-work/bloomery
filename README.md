@@ -1,18 +1,18 @@
 # bloomery
 
-A pure Nix library for building Rust applications and workspaces directly from `Cargo.lock` and `rustc`, completely bypassing `cargo`.
+A pure Nix library for building Rust applications and workspaces directly from `Cargo.lock` and `rustc`, completely bypassing Cargo during builds. The Bloomery CLI separately provides `bloomery sync` to reconcile lockfiles before evaluation.
 
 Inspired by `oxalica/nocargo`, this flake:
 - **Direct `Cargo.lock` parsing**: Reads package versions and dependency trees purely in Nix using `builtins.fromTOML` (no external code generation).
 - **Zero Git index inputs**: Eliminates the multi-gigabyte `crates.io-index` git repository input entirely.
-- **Isolated resolution via `bloomery.lock`**: Generates a static, lightweight lock manifest (`nix run bloomery#lock`) pinning active features and dependencies with instant (<1ms) evaluation.
+- **Isolated resolution via `bloomery.lock`**: The `bloomery sync` CLI generates a static, lightweight lock manifest pinning active features and dependencies for instant (<1ms) evaluation.
 - **Direct source fetching with zero IFD**: Downloads crates.io dependencies via `pkgs.fetchurl` using the SHA-256 checksums already recorded in `Cargo.lock`.
 - **Pure `rustc` compiler driver**:
   - Compiles `.rlib` dependencies and `proc-macro` crates independently.
   - Automatically compiles and executes build scripts (`build.rs`), capturing generated environment variables, `cargo:rustc-cfg`, and native library link search paths.
   - Links rlib dependencies and workspace binaries using `rustc --crate-type bin` with default high-performance linkers (`lld` on Linux).
 - **Checks without cargo**: Generates independent CI checks for unit tests (`rustc --test`), clippy (`clippy-driver`), documentation (`rustdoc`), and doctests (`rustdoc --test`). If a workspace has a `.bloomery/` directory, it also gets a check that runs `bloomery check` using the Bloomery flake input's `packages.${system}.bloomery` output; a local Bloomery binary is not required.
-- **Built-in DevShell & Apps**: Every workspace automatically generates a development shell (with `rustc`, `cargo`, `clippy`, `nix-fast-build`, direnv support) and a `lock` app.
+- **Built-in DevShell & Apps**: Every workspace automatically generates a development shell (with `rustc`, `cargo`, `clippy`, `nix-fast-build`, direnv support) and runnable apps for its binaries and documentation.
 
 ---
 
@@ -40,7 +40,7 @@ The fastest way to package a Rust workspace:
 ```
 
 This automatically generates `packages`, `apps`, `checks`, and `devShells` across standard systems (`x86_64-linux`, `aarch64-linux`, `aarch64-darwin`).
-The generated `apps.lock` runs Bloomery's lock generator; invoke it with `nix run .#lock` from the workspace root.
+Synchronize locks from a workspace with the Bloomery CLI package, for example `nix run github:actionable-work/bloomery#bloomery -- sync`. `bloomery sync` reconciles `Cargo.lock` and writes `bloomery.lock`; use `--update=rust`, `--update=nix`, or bare `--update` to request ecosystem updates.
 
 ### 2. Standard Flake (`bloomery.lib.${system}.mkWorkspace`)
 
@@ -239,7 +239,7 @@ In addition to top-level `overrides`, Bloomery automatically discovers and loads
 Calling `mkWorkspace` returns an attribute set with:
 
 - `packages`: Derivations for workspace member binaries, plus optional library and dev outputs.
-- `apps`: Runnable app specifications for binaries, optional dev binaries, documentation, and `lock`.
+- `apps`: Runnable app specifications for binaries, optional dev binaries, and documentation.
 - `checks`: Independent CI check derivations (`crate:test`, `crate:clippy`, `crate:doc`, `crate:doctest`, `crate:bin`, `crate:lib`, `workspace:lock`), plus `bloomery:check` when the workspace has a `.bloomery/` directory. The check uses the Bloomery flake input's `packages.${system}.bloomery` output.
 - `devShell`: Preconfigured development shell with rustc, clippy, cargo, nix-fast-build, and lld.
 - `crates`: DAG attribute set of all built `.rlib` crates.

@@ -101,27 +101,53 @@ impl Default for NixScannerConfig {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct LoadedConfig {
+    pub config: Config,
+    /// The user-authored TOML tree, before typed defaults are inserted.
+    /// `None` means that the configuration file does not exist.
+    pub raw: Option<toml::Value>,
+}
+
 #[allow(clippy::result_large_err)]
 pub fn load(root: &Path) -> Result<Config, Diagnostic> {
+    load_with_raw(root).map(|loaded| loaded.config)
+}
+
+#[allow(clippy::result_large_err)]
+pub fn load_with_raw(root: &Path) -> Result<LoadedConfig, Diagnostic> {
     let path = root.join(".bloomery/config.toml");
-    let config = match fs::read_to_string(&path) {
-        Ok(contents) => toml::from_str(&contents).map_err(|error| {
-            Diagnostic::new(
-                "ConfigurationError",
-                format!("Unable to parse configuration: {error}"),
-            )
-            .at(
-                path.clone(),
-                Some(error_span_line(&contents, error.to_string())),
-            )
-        })?,
+    let (config, raw) = match fs::read_to_string(&path) {
+        Ok(contents) => {
+            let raw = toml::from_str::<toml::Value>(&contents).map_err(|error| {
+                Diagnostic::new(
+                    "ConfigurationError",
+                    format!("Unable to parse configuration: {error}"),
+                )
+                .at(
+                    path.clone(),
+                    Some(error_span_line(&contents, error.to_string())),
+                )
+            })?;
+            let config = toml::from_str(&contents).map_err(|error| {
+                Diagnostic::new(
+                    "ConfigurationError",
+                    format!("Unable to parse configuration: {error}"),
+                )
+                .at(
+                    path.clone(),
+                    Some(error_span_line(&contents, error.to_string())),
+                )
+            })?;
+            (config, Some(raw))
+        }
         Err(error)
             if error.kind() == std::io::ErrorKind::NotFound
                 && fs::symlink_metadata(&path).is_err_and(|metadata_error| {
                     metadata_error.kind() == std::io::ErrorKind::NotFound
                 }) =>
         {
-            Config::default()
+            (Config::default(), None)
         }
         Err(error) => {
             return Err(Diagnostic::new(
@@ -132,7 +158,7 @@ pub fn load(root: &Path) -> Result<Config, Diagnostic> {
         }
     };
     config.validate()?;
-    Ok(config)
+    Ok(LoadedConfig { config, raw })
 }
 
 impl Config {

@@ -120,21 +120,22 @@
 
   # Collect all errors
   errors =
-    (lib.optional (!cargoLockExists) "Cargo.lock not found at ${toString cargoLock}")
+    (lib.optional (!cargoLockExists)
+      "Cargo.lock not found at ${toString cargoLock}. Run 'bloomery sync' to create it.")
     ++ (lib.optional (!bloomeryLockExists)
-      "bloomery.lock not found at ${toString (root + "/bloomery.lock")}. Run 'nix run <bloomery>#lock' to generate it.")
+      "bloomery.lock not found at ${toString (root + "/bloomery.lock")}. Run 'bloomery sync' to generate it.")
     ++ (lib.optional (bloomeryLockExists && cargoLockExists && recordedCargoHash != cargoLockHash)
-      "bloomery.lock is out of date with Cargo.lock.\n  Cargo.lock sha256:    ${cargoLockHash}\n  bloomery.lock sha256: ${toString recordedCargoHash}\nRun 'nix run <bloomery>#lock' to update it.")
+      "bloomery.lock is out of date with Cargo.lock.\n  Cargo.lock sha256:    ${cargoLockHash}\n  bloomery.lock sha256: ${toString recordedCargoHash}\nRun 'bloomery sync' to update it.")
     ++ (lib.optional (missingFromBloomery != [])
-      "The following packages in Cargo.lock are missing from bloomery.lock: ${builtins.concatStringsSep ", " missingFromBloomery}. Run 'nix run <bloomery>#lock' to update it.")
+      "The following packages in Cargo.lock are missing from bloomery.lock: ${builtins.concatStringsSep ", " missingFromBloomery}. Run 'bloomery sync' to update it.")
     ++ (lib.concatMap (
         mc:
           (lib.optional (!mc.inCargoLock)
-            "Workspace member '${mc.pkgName}' is declared in Cargo.toml but missing from Cargo.lock. Run 'cargo update' or 'cargo generate-lockfile'.")
+            "Workspace member '${mc.pkgName}' is declared in Cargo.toml but missing from Cargo.lock. Run 'bloomery sync' to reconcile Cargo.lock and generate bloomery.lock.")
           ++ (lib.optional (mc.inCargoLock && !mc.versionMatches)
-            "Workspace member '${mc.pkgName}' version '${mc.pkgVersion}' in Cargo.toml does not match Cargo.lock ('${mc.cargoLockVersion}'). Run 'cargo update' or 'cargo generate-lockfile'.")
+            "Workspace member '${mc.pkgName}' version '${mc.pkgVersion}' in Cargo.toml does not match Cargo.lock ('${mc.cargoLockVersion}'). Run 'bloomery sync' to reconcile Cargo.lock and generate bloomery.lock.")
           ++ (map (
-              dep: "Dependency '${dep}' in '${mc.cname}/Cargo.toml' is missing from Cargo.lock. Run 'cargo update' or 'cargo generate-lockfile'."
+              dep: "Dependency '${dep}' in '${mc.cname}/Cargo.toml' is missing from Cargo.lock. Run 'bloomery sync' to reconcile Cargo.lock and generate bloomery.lock."
             )
             mc.missingDeps)
       )

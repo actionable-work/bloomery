@@ -62,12 +62,16 @@ in {
     expr = {
       hasPackages = builtins.hasAttr "bin-calc" (evalResult.config.perSystem.packages or {});
       hasLockApp = builtins.hasAttr "lock" (evalResult.config.perSystem.apps or {});
+      hasSyncApp = builtins.hasAttr "sync" (evalResult.config.perSystem.apps or {});
+      hasBinaryApp = builtins.hasAttr "bin-calc" (evalResult.config.perSystem.apps or {});
       hasDevShell = builtins.hasAttr "default" (evalResult.config.perSystem.devShells or {});
       hasChecks = builtins.hasAttr "bin-calc:bin" (evalResult.config.perSystem.checks or {});
     };
     expected = {
       hasPackages = true;
-      hasLockApp = true;
+      hasLockApp = false;
+      hasSyncApp = false;
+      hasBinaryApp = true;
       hasDevShell = true;
       hasChecks = true;
     };

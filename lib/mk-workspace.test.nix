@@ -6,6 +6,9 @@
     inherit pkgs lib;
     bloomeryPackage = pkgs.hello;
   };
+  library = import ./default.nix {inherit pkgs lib;};
+  lockCheckSource = builtins.readFile ./workspace/lock-check.nix;
+  workspaceSource = builtins.readFile ./mk-workspace.nix;
   metadataWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
   };
@@ -71,5 +74,48 @@ in {
     in
       result.success && result.value;
     expected = true;
+  };
+
+  testMkWorkspaceOmitsLegacyAndReplacementSyncApps = {
+    expr = {
+      hasLockApp = builtins.hasAttr "lock" metadataWorkspace.apps;
+      hasSyncApp = builtins.hasAttr "sync" metadataWorkspace.apps;
+      hasBinaryApp = builtins.hasAttr "bin-calc" metadataWorkspace.apps;
+      hasDefaultApp = builtins.hasAttr "default" metadataWorkspace.apps;
+    };
+    expected = {
+      hasLockApp = false;
+      hasSyncApp = false;
+      hasBinaryApp = true;
+      hasDefaultApp = true;
+    };
+  };
+
+  testMkLibDoesNotExportLockGeneratorTools = {
+    expr = {
+      hasLockTools = builtins.hasAttr "lock" library;
+      hasAppsAlias = builtins.hasAttr "apps" library;
+      keepsPureLockParser = builtins.hasAttr "parseLock" library;
+    };
+    expected = {
+      hasLockTools = false;
+      hasAppsAlias = false;
+      keepsPureLockParser = true;
+    };
+  };
+
+  testLockValidationStaysReadOnlyAndRepairsUseSync = {
+    expr = {
+      hasSyncRepairGuidance = lib.hasInfix "Run 'bloomery sync'" lockCheckSource;
+      hasOldLockAppGuidance = lib.hasInfix "nix run <bloomery>#lock" lockCheckSource;
+      hasWriteOperation = lib.hasInfix "builtins.writeFile" lockCheckSource;
+      hasLockScriptExport = lib.hasInfix "lockScript" workspaceSource;
+    };
+    expected = {
+      hasSyncRepairGuidance = true;
+      hasOldLockAppGuidance = false;
+      hasWriteOperation = false;
+      hasLockScriptExport = false;
+    };
   };
 }

@@ -201,6 +201,8 @@ dependencies = [
  "bloomery-check",
  "bloomery-model",
  "bloomery-review",
+ "bloomery-sync",
+ "bloomery-test-macros",
  "bloomery-workspace",
  "clap",
  "serde_json",
@@ -248,6 +250,18 @@ dependencies = [
  "oxc_span",
  "serde_json",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "bloomery-sync"
+version = "0.1.0"
+dependencies = [
+ "bloomery-model",
+ "bloomery-test-macros",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "toml",
 ]
 
 [[package]]

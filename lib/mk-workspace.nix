@@ -23,7 +23,6 @@ in
     rustc = cfg.toolchain.rustc;
     clippy = cfg.toolchain.clippy;
     cargo = cfg.toolchain.cargo;
-    lockTools = import ./lock {inherit pkgs lib cargo;};
     mold = cfg.toolchain.mold;
     lld = cfg.toolchain.lld;
     defaultLinker = cfg.toolchain.linker;
@@ -207,7 +206,7 @@ in
         actualHash = lockData."cargo-lock-hash" or lockData.cargo_lock_hash or null;
       in
         if throwOnOutOfDate && actualHash != null && actualHash != expectedHash
-        then throw "bloomery: Lock manifest '${lockName}' is out of date with '${toString cargoLock}'. Run 'nix run <bloomery>#lock' to update it."
+        then throw "bloomery: Lock manifest '${lockName}' is out of date with '${toString cargoLock}'. Run 'bloomery sync' to update it."
         else lockData
       else null;
 
@@ -246,7 +245,7 @@ in
           inherit root cargoTomlPath discoveredMembers unifyFeatures cratesIoIndex;
           lockPackages = parsed.packages;
         }
-      else throw "bloomery: Lock manifest '${toString (root + "/bloomery.lock")}' not found. Please run 'nix run <bloomery>#lock' to generate it.";
+      else throw "bloomery: Lock manifest '${toString (root + "/bloomery.lock")}' not found. Please run 'bloomery sync' to generate it.";
 
     # Resolve binary compilation profile (e.g. from [profile.release] in Cargo.toml)
     rootToml =
@@ -836,7 +835,6 @@ in
         }
       )
       workspaceDocs;
-    lockApp = lockTools.lockApp;
     firstBin =
       if workspaceBinaries != []
       then let
@@ -850,9 +848,6 @@ in
     apps =
       binApps
       // docApps
-      // {
-        lock = lockApp;
-      }
       // lib.optionalAttrs (workspaceBinaries != []) {
         default = binApps.default or firstBin;
       };
@@ -911,7 +906,6 @@ in
               rustc
               clippy
               cargo
-              pkgs.jq
               pkgs.nix-fast-build
             ]
             ++ (lib.optional (defaultLinker == "lld") lld)
@@ -940,7 +934,7 @@ in
         default = defaultPackage;
       };
 
-    # Runnable apps (binaries, doc servers, and lock updater)
+    # Runnable apps (binaries, documentation servers, and default app)
     inherit apps;
 
     # Standardized CI checks (crate:test, crate:clippy, crate:doc, crate:doctest, crate:bin, crate:lib, lock-check)

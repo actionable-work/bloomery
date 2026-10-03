@@ -42,6 +42,8 @@ in {
       hasLibCalcDocApp = builtins.hasAttr "lib-calc:doc" flakeOutputs.apps.${pkgs.system};
       hasLibCalcDashDocApp = builtins.hasAttr "lib-calc-doc" flakeOutputs.apps.${pkgs.system};
       hasLockApp = builtins.hasAttr "lock" flakeOutputs.apps.${pkgs.system};
+      hasSyncApp = builtins.hasAttr "sync" flakeOutputs.apps.${pkgs.system};
+      hasBinCalcApp = builtins.hasAttr "bin-calc" flakeOutputs.apps.${pkgs.system};
       hasDefaultApp = builtins.hasAttr "default" flakeOutputs.apps.${pkgs.system};
       hasDefaultPackage = builtins.hasAttr "default" flakeOutputs.packages.${pkgs.system};
       hasDevShell = builtins.hasAttr "default" flakeOutputs.devShells.${pkgs.system};
@@ -63,7 +65,9 @@ in {
       hasBinCalcDevDashApp = false;
       hasLibCalcDocApp = true;
       hasLibCalcDashDocApp = false;
-      hasLockApp = true;
+      hasLockApp = false;
+      hasSyncApp = false;
+      hasBinCalcApp = true;
       hasDefaultApp = true;
       hasDefaultPackage = true;
       hasDevShell = true;
