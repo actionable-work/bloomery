@@ -3,9 +3,9 @@ id: INTERFACE
 name: Bloomery CLI Interface
 tagline: Define the user-visible command syntax and options for the bloomery executable.
 description: |
-  The interface feature specifies the command tree, invocation root, and
-  command-specific flags exposed by the `bloomery` executable. Command behavior
-  is specified separately by the CHECK, REVIEW, and planned SYNC features.
+  The interface feature specifies the command tree, invocation root, shared
+  and command-specific flags, and output modes exposed by `bloomery`. Command behavior
+  is specified separately by the CHECK, REVIEW, and SYNC features.
 ---
 
 # CLI Interface
@@ -18,10 +18,12 @@ and how the target repository root is selected.
 
 - [Commands and invocation](design/commands.md)
 - [Flags and option values](design/flags.md)
+- [Human and machine-readable output](design/output.md)
 
 ## Responsibilities
 
-- Expose the `check`, `review`, and planned `sync` subcommands and parser-generated help.
+- Expose the `check`, `review`, and `sync` subcommands and parser-generated help.
 - Resolve the repository root from the process's current working directory.
-- Specify `review --format` and planned `sync --update` values and defaults.
+- Specify the shared `--json` flag and command-specific `sync --update` values.
+- Define human-readable terminal coloring and stable JSON output contracts.
 - Keep command syntax distinct from check, review, and sync semantics.

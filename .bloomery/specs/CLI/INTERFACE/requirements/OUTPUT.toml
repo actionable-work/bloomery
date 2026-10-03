@@ -1,0 +1,84 @@
+group = "OUTPUT"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-001"
+title = "Human-readable terminal output is colored"
+manual = false
+design = "design/output.md#human-readable-output"
+
+[requirements.ears]
+type = "event"
+trigger = "a command writes human-readable output to a terminal and NO_COLOR is not set"
+system = "the bloomery CLI"
+action = "colorize statuses, labels, source locations, progress, warnings, and failures to improve readability"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-002"
+title = "Color is disabled for redirected and machine output"
+manual = false
+design = "design/output.md#human-readable-output"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "the current output stream is not a terminal, NO_COLOR is non-empty, TERM is dumb, or --json is selected"
+system = "the bloomery CLI"
+action = "omit ANSI color codes from output"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-003"
+title = "Every application command accepts JSON output"
+manual = false
+design = "design/output.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "accept --json for check, review, and sync"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-004"
+title = "Check JSON includes structured diagnostics"
+manual = false
+design = "design/output.md#json-contracts"
+
+[requirements.ears]
+type = "event"
+trigger = "check is invoked with --json"
+system = "bloomery check"
+action = "emit one JSON object with status and structured repository-relative diagnostics"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-005"
+title = "Review JSON emits the stable review catalog"
+manual = false
+design = "design/output.md#json-contracts"
+
+[requirements.ears]
+type = "event"
+trigger = "review is invoked with --json"
+system = "bloomery review"
+action = "emit the stable JSON array of manual review items"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-006"
+title = "Sync JSON emits a structured result or failure"
+manual = false
+design = "design/output.md#json-contracts"
+
+[requirements.ears]
+type = "event"
+trigger = "sync is invoked with --json"
+system = "bloomery sync"
+action = "emit structured lock, update, notice, stage, or failure information"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-007"
+title = "JSON mode does not mix in human progress output"
+manual = false
+design = "design/output.md"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "an application command is invoked with --json"
+system = "the bloomery CLI"
+action = "refrain from writing human-formatted progress, banners, or diagnostics to stdout"

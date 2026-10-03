@@ -29,5 +29,8 @@ ERROR [MissingAutomatedTest]:
   --> .bloomery/specs/PARSER/REQUIREMENTS/requirements/AUTH.toml:12
 ```
 
-Multiple independent failures are reported in one invocation. A diagnostic
-does not trigger an attempted repair; the CLI is read-only.
+Multiple independent failures are reported in one invocation. Human-readable
+output is colorized only for terminal streams and respects `NO_COLOR`. The
+shared `--json` option emits the same stable diagnostic information as a
+machine-readable object; see the [CLI output contract](../../INTERFACE/design/output.md).
+A diagnostic does not trigger an attempted repair; the CLI is read-only.

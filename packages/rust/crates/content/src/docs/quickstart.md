@@ -100,6 +100,8 @@ nix run github:actionable-work/bloomery#bloomery -- sync
 
 This runs Cargo's normal workspace resolution, preserving compatible locked versions where possible. Request upgrades explicitly with `--update=rust`, `--update=nix`, or bare `--update` to update all applicable ecosystems. Sync requires `cargo`; it requires `nix` only when updating a flake. It does not require a specification tree or create configuration files.
 
+The `check`, `review`, and `sync` commands all accept the same `--json` flag for machine-readable output. Human-readable output is colorized when writing to a terminal and respects `NO_COLOR`.
+
 Commit the generated `Cargo.lock` (if newly created), `bloomery.lock`, and any selected `flake.lock` update to version control.
 
 ---

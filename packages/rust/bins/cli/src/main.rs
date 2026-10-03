@@ -1,5 +1,10 @@
+mod output;
+
 use bloomery_model::{render_diagnostics, sort_diagnostics};
-use clap::{ArgAction, Parser, Subcommand, ValueEnum};
+use clap::{ArgAction, Parser, Subcommand};
+use serde_json::{Value, json};
+use std::ffi::OsString;
+use std::io::{self, Write};
 use std::process::ExitCode;
 
 #[derive(Debug, Parser)]
@@ -8,6 +13,9 @@ use std::process::ExitCode;
     about = "Requirements traceability, review, and workspace synchronization"
 )]
 struct Cli {
+    /// Emit machine-readable JSON instead of human-readable output.
+    #[arg(long, global = true)]
+    json: bool,
     #[command(subcommand)]
     command: Command,
 }
@@ -17,10 +25,7 @@ enum Command {
     /// Validate workspace structure, requirement records, and static evidence.
     Check,
     /// Print requirements that require human review.
-    Review {
-        #[arg(long, value_enum, default_value_t = OutputFormat::Text)]
-        format: OutputFormat,
-    },
+    Review,
     /// Reconcile Cargo and Bloomery locks, optionally updating dependencies.
     Sync {
         /// Update all applicable ecosystems, or a comma-separated list of nix and rust.
@@ -35,97 +40,289 @@ enum Command {
     },
 }
 
-#[derive(Debug, Clone, Copy, ValueEnum)]
-enum OutputFormat {
-    Text,
-    Json,
-}
-
 fn main() -> ExitCode {
-    let cli = Cli::parse();
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        Err(error) => return report_parse_error(error),
+    };
     match cli.command {
-        Command::Sync { update } => run_sync(update.as_deref()),
-        command => run_workspace_command(command),
+        Command::Sync { update } => run_sync(update.as_deref(), cli.json),
+        command => run_workspace_command(command, cli.json),
     }
 }
 
-fn run_sync(update: Option<&str>) -> ExitCode {
+fn report_parse_error(error: clap::Error) -> ExitCode {
+    let exit_code = error.exit_code() as u8;
+    if matches!(
+        error.kind(),
+        clap::error::ErrorKind::DisplayHelp | clap::error::ErrorKind::DisplayVersion
+    ) {
+        let _ = error.print();
+        return ExitCode::from(exit_code);
+    }
+
+    let arguments = std::env::args_os().collect::<Vec<_>>();
+    if arguments
+        .iter()
+        .any(|argument| argument == "--json" || argument.to_string_lossy().starts_with("--json="))
+    {
+        let command = command_from_arguments(&arguments);
+        let document = output::usage_error_json(command, &error.to_string());
+        if print_json(&document).is_err() {
+            eprintln!("bloomery: unable to render JSON usage error");
+            return ExitCode::from(1);
+        }
+    } else {
+        let _ = error.print();
+    }
+    ExitCode::from(exit_code)
+}
+
+fn command_from_arguments(arguments: &[OsString]) -> Option<&'static str> {
+    arguments
+        .iter()
+        .find_map(|argument| match argument.to_str()? {
+            "check" => Some("check"),
+            "review" => Some("review"),
+            "sync" => Some("sync"),
+            _ => None,
+        })
+}
+
+fn run_sync(update: Option<&str>, json_mode: bool) -> ExitCode {
     let selection = match bloomery_sync::parse_cli_update(update) {
         Ok(selection) => selection,
         Err(error) => {
-            eprintln!("error: {error}\nUsage: bloomery sync [--update[=nix,rust]]");
+            if json_mode {
+                let document = output::usage_error_json(Some("sync"), &error.to_string());
+                if print_json(&document).is_err() {
+                    eprintln!("bloomery: unable to render JSON usage error");
+                    return ExitCode::from(1);
+                }
+            } else {
+                eprintln!(
+                    "{}",
+                    output::colorize_error(
+                        &format!("error: {error}\nUsage: bloomery sync [--update[=nix,rust]]"),
+                        output::color_enabled(output::Stream::Stderr, false)
+                    )
+                );
+            }
             return ExitCode::from(error.exit_code());
         }
     };
     let root = match std::env::current_dir() {
         Ok(root) => root,
         Err(error) => {
-            eprintln!("bloomery: unable to determine workspace root: {error}");
-            return ExitCode::from(1);
+            return report_runtime_error("sync", &error.to_string(), json_mode);
         }
     };
+
     let mut runner = bloomery_sync::SystemCommandRunner;
-    let stdout = std::io::stdout();
-    let stderr = std::io::stderr();
-    match bloomery_sync::run(
-        &root,
-        &selection,
-        &mut runner,
-        &mut stdout.lock(),
-        &mut stderr.lock(),
-    ) {
-        Ok(()) => ExitCode::SUCCESS,
+    if json_mode {
+        let mut progress = Vec::new();
+        let mut diagnostics = Vec::new();
+        return match bloomery_sync::run(
+            &root,
+            &selection,
+            &mut runner,
+            &mut progress,
+            &mut diagnostics,
+        ) {
+            Ok(report) => {
+                if print_json(&output::sync_success_json(&report)).is_err() {
+                    eprintln!("bloomery: unable to render JSON sync result");
+                    ExitCode::from(1)
+                } else {
+                    ExitCode::SUCCESS
+                }
+            }
+            Err(error) => {
+                let exit_code = error.exit_code();
+                let document = output::sync_failure_json(
+                    error.stage(),
+                    error.message(),
+                    error.completed_stages(),
+                    error.may_be_partially_synchronized(),
+                    &String::from_utf8_lossy(&diagnostics),
+                );
+                if print_json(&document).is_err() {
+                    eprintln!("bloomery: unable to render JSON sync error");
+                    ExitCode::from(1)
+                } else {
+                    ExitCode::from(exit_code)
+                }
+            }
+        };
+    }
+
+    let mut stdout = output::ColorWriter::stdout(
+        io::stdout().lock(),
+        output::color_enabled(output::Stream::Stdout, false),
+    );
+    let mut stderr = output::ColorWriter::stderr(
+        io::stderr().lock(),
+        output::color_enabled(output::Stream::Stderr, false),
+    );
+    let result = bloomery_sync::run(&root, &selection, &mut runner, &mut stdout, &mut stderr);
+    let _ = stdout.flush();
+    let _ = stderr.flush();
+    drop(stdout);
+    drop(stderr);
+    match result {
+        Ok(_) => ExitCode::SUCCESS,
         Err(error) => {
-            eprintln!("error: {error}");
+            eprintln!(
+                "{}",
+                output::colorize_error(
+                    &format!("error: {error}"),
+                    output::color_enabled(output::Stream::Stderr, false)
+                )
+            );
             ExitCode::from(error.exit_code())
         }
     }
 }
 
-fn run_workspace_command(command: Command) -> ExitCode {
+fn run_workspace_command(command: Command, json_mode: bool) -> ExitCode {
+    let name = match command {
+        Command::Check => "check",
+        Command::Review => "review",
+        Command::Sync { .. } => unreachable!("sync is dispatched before workspace loading"),
+    };
     let root = match std::env::current_dir() {
         Ok(root) => root,
-        Err(error) => {
-            eprintln!("bloomery: unable to determine repository root: {error}");
-            return ExitCode::from(1);
-        }
+        Err(error) => return report_runtime_error(name, &error.to_string(), json_mode),
     };
     let context = match bloomery_workspace::load(&root) {
         Ok(context) => context,
         Err(mut diagnostics) => {
             sort_diagnostics(&mut diagnostics);
-            eprint!("{}", render_diagnostics(&root, &diagnostics));
+            if json_mode {
+                let document = output::diagnostics_json(name, "failed", &root, &diagnostics);
+                if print_json(&document).is_err() {
+                    eprintln!("bloomery: unable to render JSON diagnostics");
+                    return ExitCode::from(1);
+                }
+            } else {
+                let rendered = render_diagnostics(&root, &diagnostics);
+                eprint!(
+                    "{}",
+                    output::colorize_check(
+                        &rendered,
+                        output::color_enabled(output::Stream::Stderr, false)
+                    )
+                );
+            }
             return ExitCode::from(1);
         }
     };
+
     match command {
         Command::Check => match bloomery_check::run(&context) {
+            Ok(()) if json_mode => {
+                let document = output::diagnostics_json("check", "passed", &root, &[]);
+                if print_json(&document).is_err() {
+                    eprintln!("bloomery: unable to render JSON check result");
+                    ExitCode::from(1)
+                } else {
+                    ExitCode::SUCCESS
+                }
+            }
             Ok(()) => {
-                println!("PASS: traceability verification succeeded.");
+                let message = "PASS: traceability verification succeeded.\n";
+                print!(
+                    "{}",
+                    output::colorize_check(
+                        message,
+                        output::color_enabled(output::Stream::Stdout, false)
+                    )
+                );
                 ExitCode::SUCCESS
             }
             Err(mut diagnostics) => {
                 sort_diagnostics(&mut diagnostics);
-                eprint!("{}", render_diagnostics(&root, &diagnostics));
-                ExitCode::from(1)
+                if json_mode {
+                    let document = output::diagnostics_json("check", "failed", &root, &diagnostics);
+                    if print_json(&document).is_err() {
+                        eprintln!("bloomery: unable to render JSON diagnostics");
+                        ExitCode::from(1)
+                    } else {
+                        ExitCode::from(1)
+                    }
+                } else {
+                    let rendered = render_diagnostics(&root, &diagnostics);
+                    eprint!(
+                        "{}",
+                        output::colorize_check(
+                            &rendered,
+                            output::color_enabled(output::Stream::Stderr, false)
+                        )
+                    );
+                    ExitCode::from(1)
+                }
             }
         },
-        Command::Review { format } => {
+        Command::Review => {
             let items = bloomery_review::items(&context);
-            match format {
-                OutputFormat::Text => print!("{}", bloomery_review::render_text(&items)),
-                OutputFormat::Json => match serde_json::to_string_pretty(&items) {
-                    Ok(json) => println!("{json}"),
-                    Err(error) => {
-                        eprintln!("bloomery: unable to render JSON: {error}");
-                        return ExitCode::from(1);
+            if json_mode {
+                match serde_json::to_value(&items) {
+                    Ok(document) => {
+                        if print_json(&document).is_err() {
+                            eprintln!("bloomery: unable to render JSON review catalog");
+                            ExitCode::from(1)
+                        } else {
+                            ExitCode::SUCCESS
+                        }
                     }
-                },
+                    Err(error) => {
+                        let document = output::usage_error_json(Some("review"), &error.to_string());
+                        let _ = print_json(&document);
+                        ExitCode::from(1)
+                    }
+                }
+            } else {
+                let rendered = bloomery_review::render_text(&items);
+                print!(
+                    "{}",
+                    output::colorize_review(
+                        &rendered,
+                        output::color_enabled(output::Stream::Stdout, false)
+                    )
+                );
+                ExitCode::SUCCESS
             }
-            ExitCode::SUCCESS
         }
         Command::Sync { .. } => unreachable!("sync is dispatched before workspace loading"),
     }
+}
+
+fn report_runtime_error(command: &str, message: &str, json_mode: bool) -> ExitCode {
+    if json_mode {
+        let document = json!({
+            "command": command,
+            "status": "failed",
+            "error": { "kind": "runtime", "message": message },
+        });
+        if print_json(&document).is_err() {
+            eprintln!("bloomery: unable to render JSON error");
+            return ExitCode::from(1);
+        }
+    } else {
+        eprintln!(
+            "{}",
+            output::colorize_error(
+                &format!("error: bloomery: {message}"),
+                output::color_enabled(output::Stream::Stderr, false)
+            )
+        );
+    }
+    ExitCode::from(1)
+}
+
+fn print_json(value: &Value) -> Result<(), serde_json::Error> {
+    println!("{}", serde_json::to_string_pretty(value)?);
+    Ok(())
 }
 
 #[cfg(test)]
@@ -139,6 +336,10 @@ mod tests {
             Command::Sync { update } => Ok(update),
             _ => panic!("expected sync command"),
         }
+    }
+
+    fn parse_json(args: &[&str]) -> Result<bool, clap::Error> {
+        Cli::try_parse_from(args).map(|cli| cli.json)
     }
 
     #[test]
@@ -192,5 +393,20 @@ mod tests {
         let error =
             Cli::try_parse_from(["bloomery", "lock"]).expect_err("lock must not be a CLI command");
         assert_eq!(error.exit_code(), 2);
+    }
+
+    #[test]
+    #[bloomery("CLI-INTERFACE-OUTPUT-003")]
+    #[bloomery("CLI-INTERFACE-FLAGS-006")]
+    fn all_application_commands_accept_the_same_json_flag() {
+        for command in [
+            ["bloomery", "check", "--json"],
+            ["bloomery", "review", "--json"],
+            ["bloomery", "sync", "--json"],
+        ] {
+            assert!(parse_json(&command).expect("--json parses"));
+        }
+        assert!(parse_json(&["bloomery", "--json", "check"]).expect("global --json"));
+        assert!(Cli::try_parse_from(["bloomery", "review", "--format", "json"]).is_err());
     }
 }

@@ -2,36 +2,36 @@ group = "FLAGS"
 
 [[requirements]]
 id = "CLI-INTERFACE-FLAGS-001"
-title = "Review accepts text output"
+title = "Review defaults to human-readable output"
 manual = true
-design = "design/flags.md"
+design = "design/flags.md#shared-purpose-options"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "the bloomery CLI"
-action = "accept --format text for review"
+action = "use human-readable output when --json is omitted"
 
 [[requirements]]
 id = "CLI-INTERFACE-FLAGS-002"
 title = "Review accepts JSON output"
 manual = true
-design = "design/flags.md"
+design = "design/flags.md#shared-purpose-options"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "the bloomery CLI"
-action = "accept --format json for review"
+action = "accept --json for review"
 
 [[requirements]]
 id = "CLI-INTERFACE-FLAGS-003"
-title = "Review defaults to text output"
+title = "JSON output uses one shared option"
 manual = true
-design = "design/flags.md"
+design = "design/flags.md#shared-purpose-options"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "the bloomery CLI"
-action = "use text output for review when --format is omitted"
+action = "use --json rather than command-specific JSON or format selectors"
 
 [[requirements]]
 id = "CLI-INTERFACE-FLAGS-004"
@@ -42,7 +42,7 @@ design = "design/flags.md"
 [requirements.ears]
 type = "ubiquitous"
 system = "the bloomery CLI"
-action = "expose no command-specific options for check"
+action = "expose no check-specific options beyond shared CLI options"
 
 [[requirements]]
 id = "CLI-INTERFACE-FLAGS-005"
@@ -54,3 +54,14 @@ design = "design/flags.md"
 type = "ubiquitous"
 system = "the bloomery CLI"
 action = "provide -h and --help on commands"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-006"
+title = "Shared-purpose flags are consistent across commands"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "expose the same --json option for check, review, and sync"

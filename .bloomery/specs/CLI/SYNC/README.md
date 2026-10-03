@@ -13,8 +13,7 @@ description: |
 
 Sync is the workspace maintenance command, not a traceability check. It replaces
 Bloomery's Nix `lock` app with a CLI command; there is no replacement Nix `sync`
-app. Its design and requirements describe planned behavior, not an implemented
-command.
+app. Its design and requirements define the implemented CLI behavior.
 
 ## Design documents
 
@@ -41,9 +40,8 @@ Recommendations are advisory. Sync neither enables features nor writes config,
 manifests, specifications, or source code. The recommendation catalog is built
 into Bloomery and can grow over time without storing notification history.
 
-## Verification intent
+## Verification
 
-All requirements in this feature are automated (`manual = false`). They have
-no implementation evidence yet, so `bloomery check` is expected to fail until
-implementation and covering tests land. Do not add placeholder evidence or
-reclassify these requirements as manual to make the check pass.
+All requirements in this feature are automated (`manual = false`) and covered
+by unit tests using temporary workspaces and injectable tool runners. The sync
+command is also exercised directly against the repository during development.

@@ -40,7 +40,7 @@ The fastest way to package a Rust workspace:
 ```
 
 This automatically generates `packages`, `apps`, `checks`, and `devShells` across standard systems (`x86_64-linux`, `aarch64-linux`, `aarch64-darwin`).
-Synchronize locks from a workspace with the Bloomery CLI package, for example `nix run github:actionable-work/bloomery#bloomery -- sync`. `bloomery sync` reconciles `Cargo.lock` and writes `bloomery.lock`; use `--update=rust`, `--update=nix`, or bare `--update` to request ecosystem updates.
+Synchronize locks from a workspace with the Bloomery CLI package, for example `nix run github:actionable-work/bloomery#bloomery -- sync`. `bloomery sync` reconciles `Cargo.lock` and writes `bloomery.lock`; use `--update=rust`, `--update=nix`, or bare `--update` to request ecosystem updates. The `check`, `review`, and `sync` commands share `--json` for machine-readable output; human terminal output is colorized automatically and honors `NO_COLOR`.
 
 ### 2. Standard Flake (`bloomery.lib.${system}.mkWorkspace`)
 

@@ -1,18 +1,28 @@
 # Flags and option values
 
-The command-specific options are:
+## Shared-purpose options
+
+Shared-purpose flags use the same name and behavior across the application
+commands:
 
 | Command | Option | Accepted values | Default |
 | --- | --- | --- | --- |
-| `check` | none | — | — |
-| `review` | `--format` | `text`, `json` | `text` |
-| `sync` (planned) | `--update[=LIST]` | optional comma-separated `nix`, `rust` list | no upgrades; reconcile Cargo and Bloomery locks |
+| `check` | `--json` | flag | human-readable text |
+| `review` | `--json` | flag | human-readable text |
+| `sync` | `--json` | flag | human-readable text |
+| `sync` | `--update[=LIST]` | optional comma-separated `nix`, `rust` list | no upgrades; reconcile Cargo and Bloomery locks |
 | all commands | `-h`, `--help` | — | — |
 
-The format option controls only the rendering of the review catalog. Bloomery
-does not expose a command-specific repository-root flag; check and review use
-the current working directory, as does sync. The CLI parser also supplies the
-`help` subcommand for displaying command help.
+`--json` is a shared global option, accepted before or after the subcommand. It
+selects machine-readable output for check, review, and sync; no command-specific
+`--format` or alternate JSON spelling is exposed. Human-readable output is the
+default. Terminal color behavior is automatic and consistent across commands;
+non-empty `NO_COLOR`, redirected streams, and JSON mode suppress ANSI styling.
+See the [output contract](output.md).
+
+Bloomery does not expose a command-specific repository-root flag; check and
+review use the current working directory, as does sync. The CLI parser also
+supplies the `help` subcommand for displaying command help.
 
 For sync, bare `--update` updates Rust dependencies and any existing Nix flake.
 An explicit list updates only those ecosystems; explicit `nix` requires

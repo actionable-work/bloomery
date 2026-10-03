@@ -31,6 +31,8 @@ specification model, and evidence registry produced by the
 - Return exit code `0` only for an entirely valid snapshot and `1` for a
   validation failure.
 - Preserve deterministic ordering and source locations in diagnostics.
+- Support the shared `--json` machine-readable output mode and color human
+  terminal diagnostics consistently with the other CLI commands.
 
 ## Non-responsibilities
 

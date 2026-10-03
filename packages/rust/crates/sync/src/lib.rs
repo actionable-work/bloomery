@@ -16,7 +16,8 @@ pub use selection::{
 
 use bloomery_model::config::{LoadedConfig, load_with_raw};
 use lockfile::{PublicationOutcome, publish_candidate, serialize_candidate};
-use recommendations::write_recommendations;
+use recommendations::{missing_recommendations, recommendation_key};
+use serde::Serialize;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::io::Write;
@@ -57,8 +58,16 @@ impl SyncError {
         &self.stage
     }
 
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
     pub fn completed_stages(&self) -> &[String] {
         &self.completed_stages
+    }
+
+    pub fn may_be_partially_synchronized(&self) -> bool {
+        self.may_be_partially_synchronized
     }
 
     pub fn exit_code(&self) -> u8 {
@@ -96,6 +105,31 @@ impl std::error::Error for SyncError {}
 struct RunState {
     completed: Vec<String>,
     may_be_partially_synchronized: bool,
+    tool_stderr: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct SyncRecommendation {
+    pub key: String,
+    pub benefit: String,
+    pub guidance: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct SyncReport {
+    pub reconciled_locks: Vec<String>,
+    pub updated_ecosystems: Vec<String>,
+    pub skipped_updates: Vec<String>,
+    pub completed_stages: Vec<String>,
+    pub warnings: Vec<String>,
+    pub recommendations: Vec<SyncRecommendation>,
+    pub tool_stderr: Vec<String>,
+}
+
+#[derive(Debug, Default)]
+struct Advisories {
+    warnings: Vec<String>,
+    recommendations: Vec<SyncRecommendation>,
 }
 
 impl RunState {
@@ -117,9 +151,10 @@ pub fn run(
     runner: &mut impl CommandRunner,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
-) -> Result<(), SyncError> {
+) -> Result<SyncReport, SyncError> {
     let (plan, loaded_config) = preflight(root, selection, runner)?;
-    emit_advisories(&loaded_config, stderr)?;
+    let advisories = collect_advisories(&loaded_config);
+    emit_advisories(&advisories, stderr)?;
 
     let mut state = RunState::default();
     if plan.update_nix {
@@ -139,6 +174,7 @@ pub fn run(
             &state,
         )?;
         state.completed("Nix input update");
+        record_tool_stderr(&mut state, &output.stderr);
         forward_stream(&output.stderr, stderr, "Nix input update stderr", &state)?;
         forward_stream(&output.stdout, stdout, "Nix input update output", &state)?;
     }
@@ -166,6 +202,7 @@ pub fn run(
             &state,
         )?;
         state.completed("Rust dependency update");
+        record_tool_stderr(&mut state, &output.stderr);
         forward_stream(&output.stderr, stderr, "Cargo update stderr", &state)?;
         forward_stream(&output.stdout, stdout, "Cargo update output", &state)?;
     } else {
@@ -186,6 +223,7 @@ pub fn run(
             &state,
         )?;
         state.completed("Cargo lock reconciliation");
+        record_tool_stderr(&mut state, &output.stderr);
         forward_stream(&output.stderr, stderr, "Cargo metadata stderr", &state)?;
     }
 
@@ -205,6 +243,7 @@ pub fn run(
         &state,
     )?;
     state.completed("final locked Cargo metadata");
+    record_tool_stderr(&mut state, &final_metadata.stderr);
     forward_stream(
         &final_metadata.stderr,
         stderr,
@@ -239,8 +278,32 @@ pub fn run(
         PublicationOutcome::Unchanged => state.completed("Bloomery lock already current"),
     }
 
+    let report = SyncReport {
+        reconciled_locks: if plan.update_nix {
+            vec!["Cargo.lock", "bloomery.lock", "flake.lock"]
+        } else {
+            vec!["Cargo.lock", "bloomery.lock"]
+        }
+        .into_iter()
+        .map(str::to_owned)
+        .collect(),
+        updated_ecosystems: plan
+            .selected_names()
+            .into_iter()
+            .map(str::to_owned)
+            .collect(),
+        skipped_updates: if plan.skip_nix {
+            vec!["nix".to_owned()]
+        } else {
+            Vec::new()
+        },
+        completed_stages: state.completed.clone(),
+        warnings: advisories.warnings,
+        recommendations: advisories.recommendations,
+        tool_stderr: state.tool_stderr.clone(),
+    };
     write_completion(stdout, &plan, &state)?;
-    Ok(())
+    Ok(report)
 }
 
 fn preflight(
@@ -300,15 +363,47 @@ fn format_diagnostic(root: &Path, diagnostic: &bloomery_model::Diagnostic) -> St
     message
 }
 
-fn emit_advisories(loaded: &LoadedConfig, stderr: &mut impl Write) -> Result<(), SyncError> {
+fn collect_advisories(loaded: &LoadedConfig) -> Advisories {
     match &loaded.raw {
-        Some(raw) => write_recommendations(raw, stderr)
-            .map_err(|error| SyncError::new("recommendations", error.to_string())),
-        None => writeln!(
-            stderr,
-            "warning: .bloomery/config.toml is missing; create it to configure Bloomery's recommended features or explicitly disable them. Lock synchronization will continue."
-        )
-        .map_err(|error| SyncError::new("configuration warning", error.to_string())),
+        Some(raw) => Advisories {
+            warnings: Vec::new(),
+            recommendations: missing_recommendations(raw)
+                .into_iter()
+                .map(|recommendation| SyncRecommendation {
+                    key: recommendation_key(recommendation),
+                    benefit: recommendation.benefit.to_owned(),
+                    guidance: recommendation.guidance.to_owned(),
+                })
+                .collect(),
+        },
+        None => Advisories {
+            warnings: vec![".bloomery/config.toml is missing; create it to configure Bloomery's recommended features or explicitly disable them. Lock synchronization will continue.".to_owned()],
+            recommendations: Vec::new(),
+        },
+    }
+}
+
+fn emit_advisories(advisories: &Advisories, stderr: &mut impl Write) -> Result<(), SyncError> {
+    for warning in &advisories.warnings {
+        writeln!(stderr, "warning: {warning}")
+            .map_err(|error| SyncError::new("configuration warning", error.to_string()))?;
+    }
+    for recommendation in &advisories.recommendations {
+        let message = format!(
+            "recommended feature not yet configured: `{}` — {} {}",
+            recommendation.key, recommendation.benefit, recommendation.guidance
+        );
+        writeln!(stderr, "recommendation: {message}")
+            .map_err(|error| SyncError::new("recommendations", error.to_string()))?;
+    }
+    Ok(())
+}
+
+fn record_tool_stderr(state: &mut RunState, contents: &[u8]) {
+    if !contents.is_empty() {
+        state
+            .tool_stderr
+            .push(String::from_utf8_lossy(contents).trim_end().to_owned());
     }
 }
 
@@ -409,7 +504,7 @@ fn write_completion(
 
 #[cfg(test)]
 mod tests {
-    use super::{CommandOutput, CommandRunner, SyncError, run};
+    use super::{CommandOutput, CommandRunner, SyncError, SyncReport, run};
     use crate::{UpdateSelection, parse_update_list};
     use bloomery_test_macros::bloomery;
     use std::collections::BTreeSet;
@@ -601,7 +696,7 @@ mod tests {
         fixture: &Fixture,
         selection: &UpdateSelection,
         runner: &mut FakeRunner,
-    ) -> (Result<(), SyncError>, String, String) {
+    ) -> (Result<SyncReport, SyncError>, String, String) {
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
         let result = run(&fixture.root, selection, runner, &mut stdout, &mut stderr);

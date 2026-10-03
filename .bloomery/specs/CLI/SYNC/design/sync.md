@@ -8,8 +8,7 @@ Nix lock generator while leaving Nix's pure lock parsing and validation intact.
 The Rust CLI orchestrates tools and owns Bloomery lock generation; running sync
 must not depend on evaluating or building the workspace's Nix outputs.
 
-This is a proposed design. No implementation or evidence is supplied in this
-change.
+This design is implemented by the Rust CLI and its automated tests.
 
 ## Invocation and update selection
 
@@ -181,9 +180,10 @@ stderr, and do not report completion or run later stages after a failure.
 Use stdout for stage progress and completion, stderr for warnings,
 recommendations, and failures. A successful summary identifies reconciled locks,
 selected update ecosystems, and skipped Nix updates when bare `--update` runs
-without a flake. No JSON output mode or interactive confirmation is introduced.
-Invoke subprocesses with structured arguments rather than interpolated shell
-commands.
+without a flake. `sync --json` emits the structured success or failure contract
+specified by [CLI output design](../../INTERFACE/design/output.md). No
+interactive confirmation is introduced. Invoke subprocesses with structured
+arguments rather than interpolated shell commands.
 
 There is no cross-lock transaction: Cargo and Nix own their writes. If a later
 stage fails, earlier lockfile updates may remain. Report completed stages and
@@ -200,12 +200,10 @@ flake and workspace construction APIs, including `mkFlake`, `mkWorkspace`,
 `apps.sync`, a `lock` alias, or a `bloomery lock` subcommand. This is a deliberate
 breaking removal; unrelated app outputs are unaffected.
 
-The future implementation must replace lock-generation examples, shell/tooling
-references, and lock-validator repair messages with `bloomery sync`, and document
-how consumers obtain the CLI from the Bloomery package. The existing README and
-Nix code still describe current behavior until implementation lands. Nix lock
-validation remains read-only and does not invoke sync automatically during
-builds or evaluation.
+Documentation and lock-validator repair messages use `bloomery sync`; consumers
+obtain the command from Bloomery's `bloomery` package. Nix lock validation
+remains read-only and does not invoke sync automatically during builds or
+evaluation.
 
 ## Verification plan
 

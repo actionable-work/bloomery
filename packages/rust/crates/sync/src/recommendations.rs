@@ -1,3 +1,4 @@
+#[cfg(test)]
 use std::io::{self, Write};
 
 /// Increment this when the built-in recommendation catalog changes.
@@ -37,17 +38,30 @@ pub(crate) fn missing_recommendations(raw: &toml::Value) -> Vec<&'static Recomme
     missing
 }
 
+#[cfg(test)]
 pub(crate) fn write_recommendations(raw: &toml::Value, stderr: &mut impl Write) -> io::Result<()> {
     for recommendation in missing_recommendations(raw) {
         writeln!(
             stderr,
-            "recommendation: recommended feature not yet configured: `{}` — {} {}",
-            path_string(recommendation),
-            recommendation.benefit,
-            recommendation.guidance
+            "recommendation: {}",
+            recommendation_message(recommendation)
         )?;
     }
     Ok(())
+}
+
+pub(crate) fn recommendation_key(recommendation: &Recommendation) -> String {
+    path_string(recommendation)
+}
+
+#[cfg(test)]
+pub(crate) fn recommendation_message(recommendation: &Recommendation) -> String {
+    format!(
+        "recommended feature not yet configured: `{}` — {} {}",
+        path_string(recommendation),
+        recommendation.benefit,
+        recommendation.guidance
+    )
 }
 
 fn contains_path(raw: &toml::Value, path: &[&str]) -> bool {

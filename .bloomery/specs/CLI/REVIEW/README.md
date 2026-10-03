@@ -24,7 +24,7 @@ and downstream workflow systems.
 - Filter to manual requirements.
 - Sort by area, feature, group, and numeric sequence.
 - Render the canonical EARS statement and design reference.
-- Support human-readable tree output and machine-readable JSON.
+- Support the shared `--json` option and a human-readable, colorized tree output.
 - Return a deterministic empty result when no manual records exist.
 
 ## Non-responsibilities
