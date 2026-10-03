@@ -34,9 +34,8 @@ in
     assert checkNames != [];
       lib.nameValuePair "tests:${name}" (pkgs.runCommand "bloomery-${name}-checks" {
           passthru.bloomery = lib.optionals (name == "basic-workspace") [
-            "CLI-CHECK-NIX-001"
-            "CLI-CHECK-NIX-002"
-            "CLI-CHECK-NIX-003"
+            "CLI-CHECK-NIX-004"
+            "CLI-CHECK-NIX-005"
           ];
         } ''
           echo "All checks for ${name} passed."

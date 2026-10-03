@@ -1,37 +1,159 @@
 group = "NIX"
 
 [[requirements]]
-id = "CLI-CHECK-NIX-001"
-title = "Bloomery metadata enables the Nix check"
+id = "CLI-CHECK-NIX-004"
+title = "Workspace builders omit the recursive check"
 manual = false
-design = "design/workspace-check.md"
+design = "design/workspace-check.md#integration-direction"
 
 [requirements.ears]
-type = "optional"
-feature = "the Rust workspace contains a .bloomery/ directory"
-system = "mkWorkspace and mkFlake"
-action = "include a bloomery:check Nix check"
+type = "ubiquitous"
+system = "mkWorkspace, mkFlake, and flake-module integration"
+action = "omit the generated bloomery:check output regardless of metadata presence"
 
 [[requirements]]
-id = "CLI-CHECK-NIX-002"
-title = "The Nix check uses the input flake package"
+id = "CLI-CHECK-NIX-005"
+title = "Other generated checks remain available"
 manual = false
-design = "design/workspace-check.md"
+design = "design/workspace-check.md#integration-direction"
 
 [requirements.ears]
-type = "optional"
-feature = "the Rust workspace contains a .bloomery/ directory"
-system = "mkWorkspace and mkFlake"
-action = "run the bloomery package from the Bloomery input flake in bloomery:check"
+type = "ubiquitous"
+system = "the Nix workspace builders"
+action = "preserve other generated checks under their existing enable and package-inclusion options"
 
 [[requirements]]
-id = "CLI-CHECK-NIX-003"
-title = "The Nix check targets the workspace root"
+id = "CLI-CHECK-NIX-006"
+title = "Every selected-system check is discoverable"
 manual = false
-design = "design/workspace-check.md"
+design = "design/workspace-check.md#internal-wrapper"
 
 [requirements.ears]
-type = "optional"
-feature = "the Rust workspace contains a .bloomery/ directory"
-system = "mkWorkspace and mkFlake"
-action = "run bloomery:check against the workspace root"
+type = "ubiquitous"
+system = "bloomery check"
+action = "discover every non-legacy check attribute under each selected checks system output"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-007"
+title = "Selected derivations are realized"
+manual = false
+design = "design/workspace-check.md#internal-wrapper"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "realize every selected valid check derivation whose execution is not prevented"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-008"
+title = "Shared derivations use native store deduplication"
+manual = false
+design = "design/workspace-check.md#internal-wrapper"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "allow Nix store locks to realize shared derivations only once when selected attributes alias them"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-009"
+title = "Aliases retain individual outcomes"
+manual = false
+design = "design/workspace-check.md#internal-wrapper"
+
+[requirements.ears]
+type = "event"
+trigger = "multiple selected check attributes resolve to one derivation"
+system = "bloomery check"
+action = "record the shared realization outcome for each selected check ID"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-010"
+title = "Selected attribute evaluation failures are check failures"
+manual = false
+design = "design/workspace-check.md#internal-wrapper"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a discovered selected attribute cannot evaluate to a check derivation"
+system = "bloomery check"
+action = "record a check failure when Nix cannot evaluate a selected build installable"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-011"
+title = "Nix-fast-build is not required"
+manual = false
+design = "design/workspace-check.md#internal-wrapper"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "orchestrate Nix directly without requiring or invoking nix-fast-build"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-012"
+title = "Missing Nix is explicit"
+manual = false
+design = "design/workspace-check.md#internal-wrapper"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "Nix execution is selected but the Nix CLI is unavailable"
+system = "bloomery check"
+action = "report an operational error rather than silently skip Nix checks"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-013"
+title = "Check does not update flake locks"
+manual = false
+design = "design/workspace-check.md#internal-wrapper"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "disable lockfile writes and updates in its Nix operations"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-014"
+title = "Check does not create result links"
+manual = false
+design = "design/workspace-check.md#internal-wrapper"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "avoid creating repository result links during Nix realization"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-015"
+title = "Legacy recursive outputs are excluded explicitly"
+manual = false
+design = "design/workspace-check.md#integration-direction"
+
+[requirements.ears]
+type = "event"
+trigger = "an external flake exposes a bloomery:check attribute"
+system = "bloomery check"
+action = "exclude that legacy recursive attribute with a bounded notice"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-016"
+title = "Attribute names are passed safely"
+manual = false
+design = "design/workspace-check.md#internal-wrapper"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "pass each check attribute through an argument-safe quoted Nix installable path"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-017"
+title = "Nix evaluation remains pure"
+manual = false
+design = "design/workspace-check.md#internal-wrapper"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "run Nix operations without impure evaluation mode"

@@ -1,0 +1,18 @@
+[dependencies]
+bloomery-check-command = { path = "../check-command" }
+bloomery-cli-output = { path = "../cli-output" }
+bloomery-cli-parser = { path = "../cli-parser" }
+bloomery-cli-types = { path = "../cli-types" }
+bloomery-model = { path = "../../shared/model" }
+bloomery-review = { path = "../review" }
+bloomery-sync = { path = "../sync" }
+bloomery-workspace = { path = "../../shared/workspace" }
+serde_json = "1.0"
+
+[dev-dependencies]
+bloomery-test-macros.workspace = true
+
+[package]
+name = "bloomery-cli-app"
+version = "0.1.0"
+edition = "2024"

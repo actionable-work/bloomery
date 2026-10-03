@@ -1,0 +1,8 @@
+[dependencies]
+bloomery-cli-types = { path = "../cli-types" }
+clap = { version = "4.6", features = ["derive"] }
+
+[package]
+name = "bloomery-cli-parser"
+version = "0.1.0"
+edition = "2024"

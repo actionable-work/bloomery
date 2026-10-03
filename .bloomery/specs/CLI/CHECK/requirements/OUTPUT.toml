@@ -1,0 +1,135 @@
+group = "OUTPUT"
+
+[[requirements]]
+id = "CLI-CHECK-OUTPUT-001"
+title = "Summary reports outcome counts"
+manual = false
+design = "design/diagnostics.md#bounded-summary"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "report aggregate check outcome counts separately from failure-record totals"
+
+[[requirements]]
+id = "CLI-CHECK-OUTPUT-002"
+title = "Individual successes are omitted"
+manual = false
+design = "design/diagnostics.md#bounded-summary"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "omit individual successful checks from default summaries"
+
+[[requirements]]
+id = "CLI-CHECK-OUTPUT-003"
+title = "Initial failure page has a record ceiling"
+manual = false
+design = "design/diagnostics.md#bounded-summary"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "include at most 20 failure records in its initial summary"
+
+[[requirements]]
+id = "CLI-CHECK-OUTPUT-004"
+title = "Summary has a serialized byte ceiling"
+manual = false
+design = "design/diagnostics.md#bounded-summary"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "limit the complete serialized human or JSON summary to 8 KiB"
+
+[[requirements]]
+id = "CLI-CHECK-OUTPUT-005"
+title = "Omitted failures are visible"
+manual = false
+design = "design/diagnostics.md#bounded-summary"
+
+[requirements.ears]
+type = "event"
+trigger = "failures remain beyond the summary page"
+system = "bloomery check"
+action = "report the omitted count and continuation offset"
+
+[[requirements]]
+id = "CLI-CHECK-OUTPUT-006"
+title = "Every failure has a retrieval identity"
+manual = false
+design = "design/details.md#failures"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "assign each retained failure a short run-local retrieval ID"
+
+[[requirements]]
+id = "CLI-CHECK-OUTPUT-007"
+title = "Failure order does not depend on completion order"
+manual = false
+design = "design/details.md#failures"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "sort failures deterministically independently of task completion order"
+
+[[requirements]]
+id = "CLI-CHECK-OUTPUT-008"
+title = "JSON summaries are compact single documents"
+manual = false
+design = "design/diagnostics.md#json"
+
+[requirements.ears]
+type = "event"
+trigger = "--json is selected"
+system = "bloomery check"
+action = "emit one compact JSON document with readable keys and absent optional fields omitted"
+
+[[requirements]]
+id = "CLI-CHECK-OUTPUT-009"
+title = "Default output excludes tool logs"
+manual = false
+design = "design/diagnostics.md#bounded-summary"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "retain tool logs without streaming them into default human or JSON output"
+
+[[requirements]]
+id = "CLI-CHECK-OUTPUT-010"
+title = "Human and JSON outcomes agree"
+manual = false
+design = "design/diagnostics.md#json"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "represent equivalent outcomes and continuation data in human and JSON modes"
+
+[[requirements]]
+id = "CLI-CHECK-OUTPUT-011"
+title = "Success requires all selected checks to pass"
+manual = false
+design = "design/execution.md#exit-and-setup-failures"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "return exit code zero only when every selected check passes"
+
+[[requirements]]
+id = "CLI-CHECK-OUTPUT-012"
+title = "Blocked checks do not duplicate causal failures"
+manual = false
+design = "design/details.md#failures"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "represent blocked checks through outcome counts and causal links rather than duplicate failure records"

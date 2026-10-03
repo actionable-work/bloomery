@@ -2,7 +2,6 @@
   pkgs,
   lib ? pkgs.lib,
   cratesIoIndex ? null,
-  bloomeryPackageForSystem ? (_system: null),
 }: rec {
   # Submodules
   builders = import ./builders {inherit pkgs lib;};
@@ -14,13 +13,12 @@
   tests = import ./tests.nix {inherit pkgs lib;};
   modules = {
     flake = args:
-      import ./modules/flake-module.nix (args // {inherit bloomeryPackageForSystem;});
+      import ./modules/flake-module.nix args;
   };
 
   # High-level workspace builder
   mkWorkspace = import ./mk-workspace.nix {
     inherit pkgs lib cratesIoIndex;
-    bloomeryPackage = bloomeryPackageForSystem pkgs.stdenv.buildPlatform.system;
   };
 
   # Zero-boilerplate flake builder
@@ -29,7 +27,7 @@
       pkgs,
       lib ? pkgs.lib,
     }:
-      import ./. {inherit pkgs lib bloomeryPackageForSystem;};
+      import ./. {inherit pkgs lib;};
   };
 
   # Convenience re-exports

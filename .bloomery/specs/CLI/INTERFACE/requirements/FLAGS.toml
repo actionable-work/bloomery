@@ -34,17 +34,6 @@ system = "the bloomery CLI"
 action = "use --json rather than command-specific JSON or format selectors"
 
 [[requirements]]
-id = "CLI-INTERFACE-FLAGS-004"
-title = "Check has no command-specific options"
-manual = false
-design = "design/flags.md"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the bloomery CLI"
-action = "expose no check-specific options beyond shared CLI options"
-
-[[requirements]]
 id = "CLI-INTERFACE-FLAGS-005"
 title = "Commands expose help flags"
 manual = false
@@ -65,3 +54,37 @@ design = "design/flags.md#shared-purpose-options"
 type = "ubiquitous"
 system = "the bloomery CLI"
 action = "expose the same --json option for check, review, and sync"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-007"
+title = "Nested check commands share JSON selection"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "accept the global --json flag before or after nested check subcommands"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-008"
+title = "Execution flags are not retrieval flags"
+manual = false
+design = "design/flags.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "reject execution-only check options on retained-result retrieval commands"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-009"
+title = "Invalid numeric options are rejected"
+manual = false
+design = "design/flags.md"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "jobs or limit is not a positive integer, or offset is not a nonnegative integer"
+system = "the bloomery CLI"
+action = "return a usage error"

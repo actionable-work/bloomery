@@ -1,6 +1,8 @@
-# Validation pipeline
+# Static validation pipeline
 
-The command runs ordered passes so each check operates on a known model:
+The static branch retains ordered passes so each check operates on a known model.
+The independent Nix branch runs concurrently; see [execution](execution.md).
+`static:structure` covers passes 1–3, and `static:traceability` covers passes 4–5:
 
 1. **Configuration ingestion** — parse `.bloomery/config.toml`, resolve roots,
    and validate scanner settings.
@@ -14,8 +16,8 @@ The command runs ordered passes so each check operates on a known model:
    scanners and merge their references.
 5. **Relational verification** — compare declared requirements and discovered
    references.
-6. **Diagnostic reporting** — emit all deterministic diagnostics and select the
-   process exit code.
+6. **Diagnostic retention** — retain all deterministic diagnostics, then produce
+   the bounded [failure summary](diagnostics.md) and overall runner exit code.
 
 Let:
 

@@ -1,22 +1,9 @@
-[dependencies]
-bloomery-content = { path = "../../crates/content" }
-bloomery-ui = { path = "../../crates/ui" }
-tokio = { version = "1", default-features = false, features = [
-  "macros",
-  "net",
-  "rt",
-  "rt-multi-thread",
-] }
-topcoat = { version = "0.9.0", default-features = false, features = [
-  "view",
-  "router",
-  "serve",
-  "compression",
-  "asset",
-] }
+[[bin]]
+name = "bloomery-docs"
+path = "src/main.rs"
 
-[dev-dependencies]
-bloomery-test-macros.workspace = true
+[dependencies]
+bloomery-docs-server = { path = "../../libs/docs/docs-server" }
 
 [package]
 name = "bloomery-docs"

@@ -7,7 +7,14 @@ commands:
 
 | Command | Option | Accepted values | Default |
 | --- | --- | --- | --- |
-| `check` | `--json` | flag | human-readable text |
+| `check` and nested commands | `--json` | flag | human-readable text |
+| `check`, `check list` | `--check` | repeatable exact ID or quoted glob | all available checks |
+| `check`, `check list` | `--system` | repeatable system name | host Nix system |
+| `check` | `--jobs` | positive integer | logical CPU count, minimum 1 |
+| `check` | `--fail-fast` | flag | finish all selected checks |
+| `check failures`, `check details` | `--run` | retained run ID | latest completed workspace run |
+| `check list`, `check failures` | `--offset`, `--limit` | nonnegative offset, positive limit | offset 0, limit 20 |
+| `check details` | `--offset`, `--limit` | nonnegative offset, positive limit | failure-focused offset, limit 40 |
 | `review` | `--json` | flag | human-readable text |
 | `sync` | `--json` | flag | human-readable text |
 | `sync` | `--update[=LIST]` | optional comma-separated `nix`, `rust` list | no upgrades; reconcile Cargo and Bloomery locks |
@@ -23,6 +30,13 @@ See the [output contract](output.md).
 Bloomery does not expose a command-specific repository-root flag; check and
 review use the current working directory, as does sync. The CLI parser also
 supplies the `help` subcommand for displaying command help.
+
+Check selectors form a union and must each match. `*` and `?` are the supported
+case-sensitive anchored glob operators. Offsets are zero-based; limits remain
+subject to an 8 KiB serialized-output ceiling. Invalid numbers are usage errors.
+Execution-only flags are not accepted on retrieval commands. See
+[selection](../../CHECK/design/execution.md) and
+[seeking](../../CHECK/design/details.md).
 
 For sync, bare `--update` updates Rust dependencies and any existing Nix flake.
 An explicit list updates only those ecosystems; explicit `nix` requires

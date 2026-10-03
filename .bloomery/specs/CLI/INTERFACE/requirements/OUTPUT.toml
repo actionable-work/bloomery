@@ -37,7 +37,7 @@ action = "accept --json for check, review, and sync"
 
 [[requirements]]
 id = "CLI-INTERFACE-OUTPUT-004"
-title = "Check JSON includes structured diagnostics"
+title = "Check JSON reports status"
 manual = false
 design = "design/output.md#json-contracts"
 
@@ -45,7 +45,7 @@ design = "design/output.md#json-contracts"
 type = "event"
 trigger = "check is invoked with --json"
 system = "bloomery check"
-action = "emit one JSON object with status and structured repository-relative diagnostics"
+action = "emit one JSON object identifying the run status"
 
 [[requirements]]
 id = "CLI-INTERFACE-OUTPUT-005"

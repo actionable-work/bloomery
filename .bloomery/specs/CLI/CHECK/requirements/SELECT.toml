@@ -1,0 +1,242 @@
+group = "SELECT"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-001"
+title = "Default selection includes all available checks"
+manual = false
+design = "design/execution.md#selection"
+
+[requirements.ears]
+type = "event"
+trigger = "no check selectors are supplied"
+system = "bloomery check"
+action = "select both static checks and every available Nix check for the default system"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-002"
+title = "Exact selectors are repeatable"
+manual = false
+design = "design/execution.md#selection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "accept repeatable --check exact-ID selectors"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-003"
+title = "Glob selectors match the catalog"
+manual = false
+design = "design/execution.md#selection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "accept anchored case-sensitive check selectors using * and ? globs"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-004"
+title = "Selectors form a deduplicated union"
+manual = false
+design = "design/execution.md#selection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "combine selector matches by union without duplicate check execution"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-005"
+title = "Unmatched selectors are rejected"
+manual = false
+design = "design/execution.md#selection"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "any supplied selector matches no catalog entry"
+system = "bloomery check"
+action = "report a usage error before executing checks"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-006"
+title = "Selected checks include prerequisites"
+manual = false
+design = "design/execution.md#selection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "include prerequisites required by selected checks"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-007"
+title = "Listing does not execute checks"
+manual = false
+design = "design/execution.md#selection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check list"
+action = "discover selectable check IDs without executing tests or builds"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-008"
+title = "Listing applies selectors"
+manual = false
+design = "design/execution.md#selection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check list"
+action = "apply the execution command's selector matching semantics"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-009"
+title = "Default Nix scope is the host system"
+manual = false
+design = "design/execution.md#selection"
+
+[requirements.ears]
+type = "event"
+trigger = "no --system option is supplied"
+system = "bloomery check"
+action = "limit Nix discovery to the host Nix system"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-010"
+title = "Explicit system scope is repeatable"
+manual = false
+design = "design/execution.md#selection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "accept repeatable --system values as a deduplicated system selection"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-011"
+title = "Unavailable explicit systems are errors"
+manual = false
+design = "design/execution.md#selection"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "an explicitly selected system has no checks output"
+system = "bloomery check"
+action = "report an error rather than silently skipping that system"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-012"
+title = "Partial selection is identified"
+manual = false
+design = "design/execution.md#exit-and-setup-failures"
+
+[requirements.ears]
+type = "event"
+trigger = "check selectors or explicit system selection are supplied"
+system = "bloomery check"
+action = "identify the selected scope rather than claim a default full-suite result"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-013"
+title = "Default execution supports workspaces without flakes"
+manual = false
+design = "design/execution.md#check-catalog"
+
+[requirements.ears]
+type = "event"
+trigger = "the workspace has no flake.nix and no selectors are supplied"
+system = "bloomery check"
+action = "select only the static checks"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-014"
+title = "Empty execution selection is rejected"
+manual = false
+design = "design/execution.md#exit-and-setup-failures"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "execution selection contains zero checks"
+system = "bloomery check"
+action = "return a usage error rather than report success"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-015"
+title = "Explicit Nix selection requires a flake"
+manual = false
+design = "design/execution.md#check-catalog"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "Nix checks are explicitly selected in a workspace without flake.nix"
+system = "bloomery check"
+action = "report an error rather than skip the requested checks"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-016"
+title = "Catalog listing is seekable"
+manual = false
+design = "design/execution.md#selection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check list"
+action = "page check IDs using zero-based offset and positive limit values"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-017"
+title = "Catalog listing exposes continuation"
+manual = false
+design = "design/execution.md#selection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check list"
+action = "report actual offset, total IDs, and nullable next offset in both output formats"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-018"
+title = "Catalog listing has a byte ceiling"
+manual = false
+design = "design/execution.md#selection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check list"
+action = "limit each complete serialized human or JSON page to 8 KiB"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-019"
+title = "Catalog listing is sorted"
+manual = false
+design = "design/execution.md#selection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check list"
+action = "order discovered check IDs lexicographically before paging"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-020"
+title = "Empty system check catalogs are valid"
+manual = false
+design = "design/execution.md#selection"
+
+[requirements.ears]
+type = "event"
+trigger = "an explicitly selected system exposes an empty checks set"
+system = "bloomery check"
+action = "accept the empty catalog rather than report the system output as missing"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-021"
+title = "Unrepresentable catalog IDs are explicit errors"
+manual = false
+design = "design/execution.md#selection"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "the next catalog ID exceeds 4 KiB or cannot fit alone in the bounded response"
+system = "bloomery check list"
+action = "return an operational error at that offset instead of truncating the ID or returning a non-advancing continuation"

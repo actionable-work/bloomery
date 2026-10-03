@@ -2,10 +2,7 @@
   pkgs,
   lib ? pkgs.lib,
 }: let
-  mkWorkspace = import ./mk-workspace.nix {
-    inherit pkgs lib;
-    bloomeryPackage = pkgs.hello;
-  };
+  mkWorkspace = import ./mk-workspace.nix {inherit pkgs lib;};
   library = import ./default.nix {inherit pkgs lib;};
   lockCheckSource = builtins.readFile ./workspace/lock-check.nix;
   workspaceSource = builtins.readFile ./mk-workspace.nix;
@@ -15,65 +12,58 @@
   workspaceWithoutMetadata = mkWorkspace {
     root = ../tests/single-crate-workspace;
   };
-  workspaceWithoutBloomeryPackage = (import ./mk-workspace.nix {inherit pkgs lib;}) {
+  workspaceWithoutPackageChecks = mkWorkspace {
     root = ../tests/basic-workspace;
+    checks.includePackageChecks = false;
+  };
+  workspaceWithChecksDisabled = mkWorkspace {
+    root = ../tests/basic-workspace;
+    checks.enable = false;
   };
   crossPkgs = pkgs.pkgsCross.aarch64-multiplatform;
   crossLibrary = import ./default.nix {
     pkgs = crossPkgs;
-    bloomeryPackageForSystem = system:
-      if system == crossPkgs.stdenv.buildPlatform.system
-      then pkgs.hello
-      else throw "Expected Bloomery package for build platform, got ${system}.";
+    inherit lib;
   };
   crossWorkspace = crossLibrary.mkWorkspace {
     root = ../tests/basic-workspace;
   };
 in {
-  testMkWorkspaceAddsBloomeryCheckWhenMetadataDirectoryExists = {
+  testMkWorkspaceOmitsRecursiveCheckRegardlessOfMetadata = {
     expr = {
-      hasCheck = builtins.hasAttr "bloomery:check" metadataWorkspace.checks;
+      hasCheckWithMetadata = builtins.hasAttr "bloomery:check" metadataWorkspace.checks;
+      hasCheckWithoutMetadata = builtins.hasAttr "bloomery:check" workspaceWithoutMetadata.checks;
       hasLocalBloomeryBinary = builtins.hasAttr "bloomery" metadataWorkspace.packages;
-      usesInjectedBloomery = builtins.elem pkgs.hello metadataWorkspace.checks."bloomery:check".nativeBuildInputs;
     };
     expected = {
-      hasCheck = true;
+      hasCheckWithMetadata = false;
+      hasCheckWithoutMetadata = false;
       hasLocalBloomeryBinary = false;
-      usesInjectedBloomery = true;
     };
   };
 
-  testMkWorkspaceOmitsBloomeryCheckWithoutMetadataDirectory = {
+  testMkWorkspacePreservesOtherGeneratedChecksAndOptions = {
     expr = {
-      hasCheck = builtins.hasAttr "bloomery:check" workspaceWithoutMetadata.checks;
-      hasLocalBloomeryBinary = builtins.hasAttr "bloomery" workspaceWithoutMetadata.packages;
+      hasWorkspaceLock = builtins.hasAttr "workspace:lock" metadataWorkspace.checks;
+      hasPackageBuild = builtins.hasAttr "bin-calc:bin" metadataWorkspace.checks;
+      keepsUnitChecksWhenPackageChecksAreDisabled = builtins.hasAttr "bin-calc:test" workspaceWithoutPackageChecks.checks;
+      omitsPackageChecksWhenDisabled = !(builtins.hasAttr "bin-calc:bin" workspaceWithoutPackageChecks.checks);
+      keepsLockCheckWhenPackageChecksAreDisabled = builtins.hasAttr "workspace:lock" workspaceWithoutPackageChecks.checks;
+      disablesAllChecks = workspaceWithChecksDisabled.checks == {};
     };
     expected = {
-      hasCheck = false;
-      hasLocalBloomeryBinary = true;
+      hasWorkspaceLock = true;
+      hasPackageBuild = true;
+      keepsUnitChecksWhenPackageChecksAreDisabled = true;
+      omitsPackageChecksWhenDisabled = true;
+      keepsLockCheckWhenPackageChecksAreDisabled = true;
+      disablesAllChecks = true;
     };
   };
 
-  testMkWorkspaceRequiresBloomeryPackageWhenMetadataExists = {
-    expr = let
-      result = builtins.tryEval (
-        builtins.hasAttr "bloomery:check" workspaceWithoutBloomeryPackage.checks
-      );
-    in
-      result.success;
+  testMkWorkspaceOmitsRecursiveCheckOnCrossSystems = {
+    expr = builtins.hasAttr "bloomery:check" crossWorkspace.checks;
     expected = false;
-  };
-
-  testMkWorkspaceUsesBuildPlatformBloomeryPackage = {
-    expr = let
-      result = builtins.tryEval (
-        if crossPkgs.stdenv.buildPlatform.system == crossPkgs.stdenv.hostPlatform.system
-        then true
-        else builtins.elem pkgs.hello crossWorkspace.checks."bloomery:check".nativeBuildInputs
-      );
-    in
-      result.success && result.value;
-    expected = true;
   };
 
   testMkWorkspaceOmitsLegacyAndReplacementSyncApps = {

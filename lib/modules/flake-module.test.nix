@@ -2,8 +2,7 @@
   pkgs,
   lib ? pkgs.lib,
 }: let
-  flakeModule = args:
-    import ./flake-module.nix (args // {bloomeryPackageForSystem = _system: pkgs.hello;});
+  flakeModule = args: import ./flake-module.nix args;
 
   # Helper module providing standard flake-parts perSystem options
   mockFlakeParts = {
@@ -66,6 +65,7 @@ in {
       hasBinaryApp = builtins.hasAttr "bin-calc" (evalResult.config.perSystem.apps or {});
       hasDevShell = builtins.hasAttr "default" (evalResult.config.perSystem.devShells or {});
       hasChecks = builtins.hasAttr "bin-calc:bin" (evalResult.config.perSystem.checks or {});
+      hasRecursiveCheck = builtins.hasAttr "bloomery:check" (evalResult.config.perSystem.checks or {});
     };
     expected = {
       hasPackages = true;
@@ -74,6 +74,7 @@ in {
       hasBinaryApp = true;
       hasDevShell = true;
       hasChecks = true;
+      hasRecursiveCheck = false;
     };
   };
 

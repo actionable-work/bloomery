@@ -1,0 +1,15 @@
+[dependencies]
+bloomery-check = { path = "../../shared/check" }
+bloomery-cli-output = { path = "../cli-output" }
+bloomery-cli-types = { path = "../cli-types" }
+bloomery-model = { path = "../../shared/model" }
+bloomery-workspace = { path = "../../shared/workspace" }
+serde_json = "1.0"
+
+[dev-dependencies]
+bloomery-test-macros.workspace = true
+
+[package]
+name = "bloomery-check-command"
+version = "0.1.0"
+edition = "2024"

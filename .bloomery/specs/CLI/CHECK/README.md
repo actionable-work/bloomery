@@ -1,41 +1,42 @@
 ---
 id: CHECK
-name: Traceability Check
-tagline: Deterministic validation of structure, grammar, references, and automated coverage.
+name: Parallel Check Runner
+tagline: All selected static and Nix checks, with bounded failure output.
 description: |
-  The check feature combines the shared PARSER area with relational
-  verification and the `bloomery check` command. It succeeds only when every
-  declared invariant holds and emits rustc-style diagnostics when validation
-  fails.
+  Check is the workspace testing entry point. It runs static specification
+  validation and Nix check derivations concurrently, completes all selected
+  checks by default, and retains failures for bounded, seekable retrieval.
 ---
 
 # `bloomery check`
 
-Check is the enforcing command. It validates the repository snapshot without
-running its tests or build system. It consumes the configuration, resolved
-specification model, and evidence registry produced by the
-[PARSER area](../../PARSER/README.md).
+A full successful run is the workspace readiness gate. A successful subset run
+certifies only its selection. Static evidence remains necessary but is not a
+substitute for executing the selected Nix checks.
 
 ## Design documents
 
-- [Validation pipeline](design/pipeline.md)
-- [Diagnostics](design/diagnostics.md)
-- [Nix workspace check](design/workspace-check.md)
+- [Static validation pipeline](design/pipeline.md)
+- [Selection and parallel execution](design/execution.md)
+- [Failure summaries and diagnostics](design/diagnostics.md)
+- [Retained runs and seekable details](design/details.md)
+- [Nix orchestration and integration removal](design/workspace-check.md)
 
 ## Responsibilities
 
-- Orchestrate configuration and workspace loading, requirement validation,
-  static evidence extraction, and relational checks.
-- Reject orphan references, automated requirements without evidence, and
-  evidence attached to manual requirements.
-- Return exit code `0` only for an entirely valid snapshot and `1` for a
-  validation failure.
-- Preserve deterministic ordering and source locations in diagnostics.
-- Support the shared `--json` machine-readable output mode and color human
-  terminal diagnostics consistently with the other CLI commands.
+- Preserve structure, grammar, design-link, scanner, and traceability validation
+  from the [PARSER area](../../PARSER/README.md).
+- Run independent static and Nix work concurrently with bounded scheduling.
+- Complete all selected checks unless fail-fast or interruption is requested.
+- Report bounded failure summaries in human and JSON formats.
+- Retain immutable results and logs for paginated retrieval without rerunning.
+- Leave repository source and lockfiles unchanged.
 
-## Non-responsibilities
+## Boundaries
 
-Check does not schedule reviews, execute tests, build derivations, mutate
-documents, or maintain lifecycle state. The Rust command stays read-only; Nix
-workspace orchestration is an external integration documented separately.
+Check executes tests and builds through Nix and writes a private workspace-scoped
+user cache. Retained logs can contain sensitive build output and are not removed
+automatically; delete the workspace cache to remove them. Check may use the
+network through Nix. It does not repair specifications, maintain locks, schedule
+human reviews, or implement a second Nix dependency scheduler.
+Generated Nix checks must not invoke the top-level runner recursively.

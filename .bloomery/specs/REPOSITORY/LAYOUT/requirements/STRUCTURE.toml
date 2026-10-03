@@ -13,14 +13,14 @@ action = "keep Rust binaries under packages/rust"
 
 [[requirements]]
 id = "REPOSITORY-LAYOUT-STRUCTURE-002"
-title = "Rust libraries reside under packages/rust"
+title = "Rust library crates reside under packages/rust/libs"
 manual = false
 design = "design/repository-layout.md"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "the Bloomery repository"
-action = "keep Rust libraries under packages/rust"
+action = "keep Rust libraries under packages/rust/libs"
 
 [[requirements]]
 id = "REPOSITORY-LAYOUT-STRUCTURE-003"
@@ -65,3 +65,25 @@ design = "design/repository-layout.md"
 type = "ubiquitous"
 system = "the Bloomery repository"
 action = "keep repository-local specifications under .bloomery"
+
+[[requirements]]
+id = "REPOSITORY-LAYOUT-STRUCTURE-007"
+title = "Rust binaries delegate application behavior to library crates"
+manual = false
+design = "design/architecture.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "each Rust binary"
+action = "delegate application behavior to library crates"
+
+[[requirements]]
+id = "REPOSITORY-LAYOUT-STRUCTURE-008"
+title = "Rust library crates use ownership categories"
+manual = false
+design = "design/repository-layout.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "each Rust library crate"
+action = "reside under the shared, cli, or docs category"

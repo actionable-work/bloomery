@@ -3,7 +3,11 @@
   manifest = builtins.fromTOML (builtins.readFile (root + "/Cargo.toml"));
   members = manifest.workspace.members;
   binaryMembers = builtins.filter (member: lib.hasPrefix "packages/rust/bins/" member) members;
-  libraryMembers = builtins.filter (member: lib.hasPrefix "packages/rust/crates/" member) members;
+  libraryMembers = builtins.filter (member: lib.hasPrefix "packages/rust/libs/" member) members;
+  libraryCategories = ["shared" "cli" "docs"];
+  libraryCategoryPrefix = category: "packages/rust/libs/${category}/";
+  hasLibraryCategory = category:
+    builtins.any (member: lib.hasPrefix (libraryCategoryPrefix category) member) libraryMembers;
   fixtureDirs = builtins.attrNames (lib.filterAttrs (
     name: type: type == "directory" && builtins.pathExists (root + "/tests/${name}/flake.nix")
   ) (builtins.readDir (root + "/tests")));
@@ -18,13 +22,24 @@ in {
     expected = true;
   };
 
-  testRustLibrariesResideUnderPackagesRust = {
+  testRustLibrariesResideUnderPackagesRustLibs = {
     expr =
       libraryMembers
       != []
       && builtins.all (member: builtins.pathExists (root + "/${member}/Cargo.toml")) libraryMembers
-      && builtins.elem "packages/rust/crates/model" libraryMembers
-      && builtins.elem "packages/rust/crates/workspace" libraryMembers;
+      && builtins.all (
+        member: builtins.any (category: lib.hasPrefix (libraryCategoryPrefix category) member) libraryCategories
+      )
+      libraryMembers
+      && builtins.elem "packages/rust/libs/shared/model" libraryMembers
+      && builtins.elem "packages/rust/libs/shared/workspace" libraryMembers
+      && builtins.elem "packages/rust/libs/cli/cli-app" libraryMembers
+      && builtins.elem "packages/rust/libs/docs/ui" libraryMembers;
+    expected = true;
+  };
+
+  testRustLibrariesUseOwnershipCategories = {
+    expr = builtins.all hasLibraryCategory libraryCategories;
     expected = true;
   };
 
