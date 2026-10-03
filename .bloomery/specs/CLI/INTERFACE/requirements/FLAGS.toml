@@ -2,11 +2,55 @@ group = "FLAGS"
 
 [[requirements]]
 id = "CLI-INTERFACE-FLAGS-001"
-title = "Review exposes a text-or-JSON format option"
+title = "Review accepts text output"
 manual = true
 design = "design/flags.md"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "the bloomery CLI"
-action = "accept --format text or --format json for review with text as the default, expose no command-specific options for check, and provide -h/--help on commands"
+action = "accept --format text for review"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-002"
+title = "Review accepts JSON output"
+manual = true
+design = "design/flags.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "accept --format json for review"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-003"
+title = "Review defaults to text output"
+manual = true
+design = "design/flags.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "use text output for review when --format is omitted"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-004"
+title = "Check has no command-specific options"
+manual = true
+design = "design/flags.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "expose no command-specific options for check"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-005"
+title = "Commands expose help flags"
+manual = true
+design = "design/flags.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "provide -h and --help on commands"

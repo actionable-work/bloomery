@@ -5,7 +5,7 @@ tagline: Define the user-visible command syntax and options for the bloomery exe
 description: |
   The interface feature specifies the command tree, invocation root, and
   command-specific flags exposed by the `bloomery` executable. Command behavior
-  is specified separately by the CHECK and REVIEW features.
+  is specified separately by the CHECK, REVIEW, and planned SYNC features.
 ---
 
 # CLI Interface
@@ -21,8 +21,7 @@ and how the target repository root is selected.
 
 ## Responsibilities
 
-- Expose the `check` and `review` subcommands and parser-generated help.
-- Resolve the repository root from the process's current working directory for
-  verification commands.
-- Specify `review --format` values and its default.
-- Keep command syntax distinct from check and review semantics.
+- Expose the `check`, `review`, and planned `sync` subcommands and parser-generated help.
+- Resolve the repository root from the process's current working directory.
+- Specify `review --format` and planned `sync --update` values and defaults.
+- Keep command syntax distinct from check, review, and sync semantics.

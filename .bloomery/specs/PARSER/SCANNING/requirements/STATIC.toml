@@ -2,11 +2,33 @@ group = "STATIC"
 
 [[requirements]]
 id = "PARSER-SCANNING-STATIC-001"
-title = "Enabled scanners extract static requirement evidence"
+title = "Enabled scanners extract requirement references"
 manual = true
 design = "design/overview.md"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "enabled scanners"
-action = "extract source-located requirement references without executing the referenced tests"
+action = "extract requirement references from supported source files"
+
+[[requirements]]
+id = "PARSER-SCANNING-STATIC-002"
+title = "Extracted evidence retains source locations"
+manual = true
+design = "design/overview.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "enabled scanners"
+action = "associate each extracted requirement reference with its source location"
+
+[[requirements]]
+id = "PARSER-SCANNING-STATIC-003"
+title = "Static scanning does not execute tests"
+manual = true
+design = "design/overview.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "enabled scanners"
+action = "refrain from executing the referenced tests"

@@ -2,11 +2,33 @@ group = "STRUCTURE"
 
 [[requirements]]
 id = "PARSER-WORKSPACE-STRUCTURE-001"
-title = "Every feature has a complete document and requirement structure"
+title = "Every feature has a README"
 manual = true
 design = "design/layout.md"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "workspace loader"
-action = "require each feature to contain its README, design directory, and at least one grouped TOML requirements file"
+action = "require each feature to contain its README"
+
+[[requirements]]
+id = "PARSER-WORKSPACE-STRUCTURE-002"
+title = "Every feature has a design directory"
+manual = true
+design = "design/layout.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "workspace loader"
+action = "require each feature to contain a design directory"
+
+[[requirements]]
+id = "PARSER-WORKSPACE-STRUCTURE-003"
+title = "Every feature has grouped requirements"
+manual = true
+design = "design/layout.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "workspace loader"
+action = "require each feature to contain at least one grouped TOML requirements file"

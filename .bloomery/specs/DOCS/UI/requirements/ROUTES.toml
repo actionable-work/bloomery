@@ -2,11 +2,44 @@ group = "ROUTES"
 
 [[requirements]]
 id = "DOCS-UI-ROUTES-001"
-title = "The documentation UI registers the home and catalog pages"
+title = "The documentation UI registers the home page"
 manual = true
 design = "design/routes-and-rendering.md"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "the Bloomery documentation UI"
-action = "register the home page and expose catalog pages through their short and /docs routes using the shared site presentation"
+action = "register the home page"
+
+[[requirements]]
+id = "DOCS-UI-ROUTES-002"
+title = "Catalog pages have short routes"
+manual = true
+design = "design/routes-and-rendering.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery documentation UI"
+action = "expose catalog pages through their short routes"
+
+[[requirements]]
+id = "DOCS-UI-ROUTES-003"
+title = "Catalog pages have docs routes"
+manual = true
+design = "design/routes-and-rendering.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery documentation UI"
+action = "expose catalog pages through /docs/<slug> routes"
+
+[[requirements]]
+id = "DOCS-UI-ROUTES-004"
+title = "Pages use shared site presentation"
+manual = true
+design = "design/routes-and-rendering.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery documentation UI"
+action = "render its pages using the shared site presentation"

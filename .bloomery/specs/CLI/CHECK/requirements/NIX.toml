@@ -2,7 +2,7 @@ group = "NIX"
 
 [[requirements]]
 id = "CLI-CHECK-NIX-001"
-title = "Optional Bloomery metadata enables the Nix check"
+title = "Bloomery metadata enables the Nix check"
 manual = true
 design = "design/workspace-check.md"
 
@@ -10,4 +10,28 @@ design = "design/workspace-check.md"
 type = "optional"
 feature = "the Rust workspace contains a .bloomery/ directory"
 system = "mkWorkspace and mkFlake"
-action = "include a bloomery:check Nix check that runs the bloomery package from the input flake against the workspace root"
+action = "include a bloomery:check Nix check"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-002"
+title = "The Nix check uses the input flake package"
+manual = true
+design = "design/workspace-check.md"
+
+[requirements.ears]
+type = "optional"
+feature = "the Rust workspace contains a .bloomery/ directory"
+system = "mkWorkspace and mkFlake"
+action = "run the bloomery package from the Bloomery input flake in bloomery:check"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-003"
+title = "The Nix check targets the workspace root"
+manual = true
+design = "design/workspace-check.md"
+
+[requirements.ears]
+type = "optional"
+feature = "the Rust workspace contains a .bloomery/ directory"
+system = "mkWorkspace and mkFlake"
+action = "run bloomery:check against the workspace root"

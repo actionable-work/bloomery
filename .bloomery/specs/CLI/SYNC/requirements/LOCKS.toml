@@ -1,0 +1,489 @@
+group = "LOCKS"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-001"
+title = "Normal sync reconciles Cargo.lock"
+manual = false
+design = "design/sync.md#execution-pipeline"
+
+[requirements.ears]
+type = "event"
+trigger = "sync runs without selecting Rust updates"
+system = "bloomery sync"
+action = "create or reconcile Cargo.lock against workspace manifests"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-002"
+title = "Rust updates run cargo update"
+manual = false
+design = "design/sync.md#execution-pipeline"
+
+[requirements.ears]
+type = "event"
+trigger = "Rust updates are selected"
+system = "bloomery sync"
+action = "run cargo update for the workspace"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-003"
+title = "Selected Nix updates run nix flake update"
+manual = false
+design = "design/sync.md#execution-pipeline"
+
+[requirements.ears]
+type = "event"
+trigger = "Nix updates are selected and flake.nix exists"
+system = "bloomery sync"
+action = "invoke nix flake update in the workspace root"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-004"
+title = "Every successful sync generates a version-1 Bloomery lock"
+manual = false
+design = "design/sync.md#bloomery-lock-format-and-publication"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "generate a version-1 bloomery.lock on every successful invocation"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-005"
+title = "Package keys are sorted"
+manual = false
+design = "design/sync.md#bloomery-lock-format-and-publication"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery lock generator"
+action = "sort Bloomery lock package keys"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-006"
+title = "Candidate locks are validated before publication"
+manual = false
+design = "design/sync.md#bloomery-lock-format-and-publication"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "validate the complete candidate Bloomery lock before publication"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-007"
+title = "Sync does not load specifications"
+manual = false
+design = "design/sync.md#execution-pipeline"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "operate without loading or validating specification records"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-008"
+title = "Missing manifest fails preflight"
+manual = false
+design = "design/sync.md#execution-pipeline"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "Cargo.toml is absent"
+system = "bloomery sync"
+action = "report the missing manifest before invoking mutating tools"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-009"
+title = "Operational failures return exit code 1"
+manual = false
+design = "design/sync.md#failures-and-output"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a tool, lock generation, or publication stage fails"
+system = "bloomery sync"
+action = "return exit code 1"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-010"
+title = "Successful sync returns exit code 0"
+manual = false
+design = "design/sync.md#failures-and-output"
+
+[requirements.ears]
+type = "event"
+trigger = "all applicable stages succeed"
+system = "bloomery sync"
+action = "return exit code 0"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-011"
+title = "Normal sync preserves compatible versions"
+manual = false
+design = "design/sync.md#execution-pipeline"
+
+[requirements.ears]
+type = "event"
+trigger = "sync runs without selecting Rust updates"
+system = "bloomery sync"
+action = "preserve compatible locked Rust dependency versions where possible"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-012"
+title = "Sync leaves manifest constraints unchanged"
+manual = false
+design = "design/sync.md#execution-pipeline"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "leave Cargo.toml dependency constraints unchanged"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-013"
+title = "Rust updates precede final metadata"
+manual = false
+design = "design/sync.md#execution-pipeline"
+
+[requirements.ears]
+type = "event"
+trigger = "Rust updates are selected"
+system = "bloomery sync"
+action = "complete cargo update before obtaining final locked metadata"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-014"
+title = "Nix updates precede Cargo resolution"
+manual = false
+design = "design/sync.md#execution-pipeline"
+
+[requirements.ears]
+type = "event"
+trigger = "a Nix update will run"
+system = "bloomery sync"
+action = "complete the Nix update stage before Cargo resolution"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-015"
+title = "Unselected Nix locks are untouched"
+manual = false
+design = "design/sync.md#execution-pipeline"
+
+[requirements.ears]
+type = "event"
+trigger = "no Nix update will run"
+system = "bloomery sync"
+action = "leave flake.lock untouched"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-016"
+title = "Nix is optional outside Nix updates"
+manual = false
+design = "design/sync.md#execution-pipeline"
+
+[requirements.ears]
+type = "event"
+trigger = "no Nix update will run"
+system = "bloomery sync"
+action = "operate without requiring a Nix executable"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-017"
+title = "Bloomery resolution uses final locked metadata"
+manual = false
+design = "design/sync.md#bloomery-lock-format-and-publication"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "derive resolved package records from final Cargo metadata obtained with --locked"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-018"
+title = "Bloomery lock hashes final Cargo.lock"
+manual = false
+design = "design/sync.md#bloomery-lock-format-and-publication"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "record the SHA-256 of final Cargo.lock with CRLF normalized to LF in cargo-lock-hash"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-019"
+title = "Feature names are sorted"
+manual = false
+design = "design/sync.md#bloomery-lock-format-and-publication"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery lock generator"
+action = "sort Bloomery lock feature names"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-020"
+title = "Dependency identifiers are canonicalized"
+manual = false
+design = "design/sync.md#bloomery-lock-format-and-publication"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery lock generator"
+action = "sort and deduplicate Bloomery lock dependency identifiers"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-021"
+title = "TOML strings are escaped"
+manual = false
+design = "design/sync.md#bloomery-lock-format-and-publication"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery lock generator"
+action = "escape Bloomery lock TOML strings correctly"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-022"
+title = "Colliding package identities are rejected"
+manual = false
+design = "design/sync.md#bloomery-lock-format-and-publication"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "distinct Cargo package identities collide on a name-version key"
+system = "the Bloomery lock generator"
+action = "reject the resolution with an actionable error"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-023"
+title = "Bloomery lock publication is atomic"
+manual = false
+design = "design/sync.md#bloomery-lock-format-and-publication"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "publish bloomery.lock through an atomic rename of a sibling temporary file"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-024"
+title = "Identical Bloomery locks remain untouched"
+manual = false
+design = "design/sync.md#bloomery-lock-format-and-publication"
+
+[requirements.ears]
+type = "event"
+trigger = "the generated Bloomery lock is byte-identical to the existing lock"
+system = "bloomery sync"
+action = "leave the existing bloomery.lock unchanged"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-025"
+title = "Failed publication preserves the previous lock"
+manual = false
+design = "design/sync.md#bloomery-lock-format-and-publication"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "generation or publication fails before atomic replacement"
+system = "bloomery sync"
+action = "preserve the previous bloomery.lock or leave it absent if none existed"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-026"
+title = "Failure cleans temporary locks"
+manual = false
+design = "design/sync.md#bloomery-lock-format-and-publication"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "lock generation or publication fails"
+system = "bloomery sync"
+action = "remove any temporary Bloomery lock files created by the invocation"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-027"
+title = "Sync does not scan evidence"
+manual = false
+design = "design/sync.md#execution-pipeline"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "refrain from scanning requirement evidence"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-028"
+title = "Sync does not require existing locks"
+manual = false
+design = "design/sync.md#execution-pipeline"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "operate without requiring existing lockfiles"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-029"
+title = "Sync does not require a specification tree"
+manual = false
+design = "design/sync.md#execution-pipeline"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "operate without requiring a .bloomery/specs tree"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-030"
+title = "Sync requires Cargo.toml"
+manual = false
+design = "design/sync.md#execution-pipeline"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "require Cargo.toml in the current working directory"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-031"
+title = "Missing required tools fail preflight"
+manual = false
+design = "design/sync.md#execution-pipeline"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "Cargo or an executable needed for selected updates is unavailable"
+system = "bloomery sync"
+action = "report the missing executable before invoking mutating tools"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-032"
+title = "Broken present config fails preflight"
+manual = false
+design = "design/sync.md#execution-pipeline"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a present configuration is unreadable, malformed, or invalid"
+system = "bloomery sync"
+action = "report a configuration error before invoking mutating tools"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-033"
+title = "Operational failures identify the stage"
+manual = false
+design = "design/sync.md#failures-and-output"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a tool, lock generation, or publication stage fails"
+system = "bloomery sync"
+action = "identify the failing stage with useful diagnostics"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-034"
+title = "Operational failures stop later stages"
+manual = false
+design = "design/sync.md#failures-and-output"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a tool, lock generation, or publication stage fails"
+system = "bloomery sync"
+action = "stop subsequent pipeline stages"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-035"
+title = "Operational failures preserve tool-owned changes"
+manual = false
+design = "design/sync.md#failures-and-output"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a tool, lock generation, or publication stage fails"
+system = "bloomery sync"
+action = "preserve changes already made by Cargo or Nix"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-036"
+title = "Partial synchronization reports completed stages"
+manual = false
+design = "design/sync.md#failures-and-output"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a stage fails after earlier lock mutations"
+system = "bloomery sync"
+action = "report which stages completed before the failure"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-037"
+title = "Partial synchronization provides recovery guidance"
+manual = false
+design = "design/sync.md#failures-and-output"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a stage fails after earlier lock mutations"
+system = "bloomery sync"
+action = "advise rerunning bloomery sync after fixing the error"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-038"
+title = "Completion summarizes reconciled locks"
+manual = false
+design = "design/sync.md#failures-and-output"
+
+[requirements.ears]
+type = "event"
+trigger = "all applicable stages succeed"
+system = "bloomery sync"
+action = "summarize reconciled locks on stdout"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-039"
+title = "Completion summarizes selected updates"
+manual = false
+design = "design/sync.md#failures-and-output"
+
+[requirements.ears]
+type = "event"
+trigger = "all applicable stages succeed"
+system = "bloomery sync"
+action = "summarize selected update ecosystems on stdout"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-040"
+title = "Completion reports absent-flake skips"
+manual = false
+design = "design/sync.md#failures-and-output"
+
+[requirements.ears]
+type = "event"
+trigger = "bare --update succeeds without flake.nix"
+system = "bloomery sync"
+action = "report the skipped Nix update on stdout"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-041"
+title = "Advisory notices use stderr"
+manual = false
+design = "design/sync.md#failures-and-output"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery sync"
+action = "emit warnings and recommendations on stderr"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-042"
+title = "Partial synchronization warns about lock consistency"
+manual = false
+design = "design/sync.md#failures-and-output"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a stage fails after earlier lock mutations"
+system = "bloomery sync"
+action = "warn that locks may be partially synchronized"

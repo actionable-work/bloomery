@@ -30,6 +30,31 @@ Unknown types and missing fields are grammar errors. The canonical statement is
 derived from structured fields for review output; it is not stored as a second,
 potentially divergent string.
 
+## Requirement granularity
+
+Each requirement specifies one independently verifiable obligation. Split
+command exposure, argument syntax, defaults, mutation policy, output, and
+failure handling into separate records rather than combining them in one
+`action`. Sharing a trigger or design reference does not make independent
+obligations one requirement.
+
+For example, exposing `check`, exposing `review`, exposing `sync`, providing
+help, and selecting the repository root are five requirements. Returning a
+failure code, stopping later stages, and reporting recovery guidance are also
+separate requirements.
+
+Keep closely related inputs together when they exercise the same obligation:
+several invalid-config conditions may all require the same `ConfigurationError`,
+and sorting plus deduplication may define one canonical collection. Do not
+split merely at every conjunction; split where a behavior can pass or fail
+independently. Test cases may cover several requirements, but each requirement
+must remain independently traceable.
+
+When decomposing an existing record, retain its ID for one narrowed obligation
+and allocate new IDs for the others without renumbering unrelated records.
+Preserve verification modes; decomposition does not justify placeholder test
+evidence or changing an automated requirement to manual.
+
 ## Verification modes
 
 `manual = false` means the requirement must have at least one statically
