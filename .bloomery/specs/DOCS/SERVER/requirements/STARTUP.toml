@@ -1,0 +1,12 @@
+group = "STARTUP"
+
+[[requirements]]
+id = "DOCS-SERVER-STARTUP-001"
+title = "The docs server serves registered pages on a configurable local port"
+manual = true
+design = "design/server.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery docs server"
+action = "serve registered routes on 127.0.0.1 using PORT or port 8080 by default and attach a native asset bundle when one is available"

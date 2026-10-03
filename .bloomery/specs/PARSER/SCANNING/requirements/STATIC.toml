@@ -1,0 +1,12 @@
+group = "STATIC"
+
+[[requirements]]
+id = "PARSER-SCANNING-STATIC-001"
+title = "Enabled scanners extract static requirement evidence"
+manual = true
+design = "design/overview.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "enabled scanners"
+action = "extract source-located requirement references without executing the referenced tests"

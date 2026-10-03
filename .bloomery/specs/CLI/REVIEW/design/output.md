@@ -6,12 +6,12 @@ The default output presents the hierarchy as a tree and includes the title,
 canonical EARS statement, and design path for each manual requirement:
 
 ```text
-CLI
+PARSER
 └── REQUIREMENTS
     └── AUTH
-        └── [CLI-REQUIREMENTS-AUTH-001] Human review title
+        └── [PARSER-REQUIREMENTS-AUTH-001] Human review title
             While the account is locked, the login UI shall ...
-            Design: .bloomery/specs/CLI/REQUIREMENTS/README.md
+            Design: .bloomery/specs/PARSER/REQUIREMENTS/README.md
 
 Total manual requirements requiring review: 1
 ```
@@ -23,13 +23,13 @@ Total manual requirements requiring review: 1
 ```json
 [
   {
-    "service": "CLI",
+    "service": "PARSER",
     "feature": "REQUIREMENTS",
     "group": "AUTH",
-    "id": "CLI-REQUIREMENTS-AUTH-001",
+    "id": "PARSER-REQUIREMENTS-AUTH-001",
     "title": "Human review title",
     "statement": "While the account is locked, the login UI shall ...",
-    "design_ref": ".bloomery/specs/CLI/REQUIREMENTS/README.md"
+    "design_ref": ".bloomery/specs/PARSER/REQUIREMENTS/README.md"
   }
 ]
 ```

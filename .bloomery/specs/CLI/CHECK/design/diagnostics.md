@@ -26,7 +26,7 @@ The presentation resembles compiler diagnostics:
 ```text
 ERROR [MissingAutomatedTest]:
   Requirement marked manual = false has 0 linked tests.
-  --> .bloomery/specs/CLI/REQUIREMENTS/requirements/AUTH.toml:12
+  --> .bloomery/specs/PARSER/REQUIREMENTS/requirements/AUTH.toml:12
 ```
 
 Multiple independent failures are reported in one invocation. A diagnostic

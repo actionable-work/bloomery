@@ -281,7 +281,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CONFIGURATION-OPTIONAL-001")]
+    #[bloomery("PARSER-CONFIGURATION-OPTIONAL-001")]
     fn missing_configuration_uses_validated_defaults() {
         let root = root();
         let config = load(&root).expect("missing configuration should use defaults");
@@ -300,7 +300,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CONFIGURATION-OPTIONAL-002")]
+    #[bloomery("PARSER-CONFIGURATION-OPTIONAL-002")]
     fn partial_configuration_uses_defaults_for_omitted_tables_and_keys() {
         let root = root();
         let config_path = root.join(".bloomery/config.toml");
@@ -342,7 +342,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CONFIGURATION-OPTIONAL-003")]
+    #[bloomery("PARSER-CONFIGURATION-OPTIONAL-003")]
     fn present_malformed_unreadable_or_invalid_configuration_is_an_error() {
         let root = root();
         let config_path = root.join(".bloomery/config.toml");

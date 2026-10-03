@@ -1,0 +1,12 @@
+group = "FLAGS"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-001"
+title = "Review exposes a text-or-JSON format option"
+manual = true
+design = "design/flags.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "accept --format text or --format json for review with text as the default, expose no command-specific options for check, and provide -h/--help on commands"

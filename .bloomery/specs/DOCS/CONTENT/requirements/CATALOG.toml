@@ -1,0 +1,12 @@
+group = "CATALOG"
+
+[[requirements]]
+id = "DOCS-CONTENT-CATALOG-001"
+title = "Documentation pages have stable catalog metadata"
+manual = true
+design = "design/catalog.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery documentation content catalog"
+action = "provide each published Markdown page with a stable slug and the metadata needed for lookup, categorization, and display"
