@@ -50,15 +50,13 @@ pub struct PlaywrightScannerConfig {
     pub tag_prefix: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct NixScannerConfig {
     #[serde(default)]
     pub enabled: bool,
-    #[serde(default = "default_checks_attr")]
-    pub checks_attr: String,
     #[serde(default)]
-    pub systems: Vec<String>,
+    pub paths: Vec<String>,
 }
 
 fn default_specs_dir() -> String {
@@ -67,10 +65,6 @@ fn default_specs_dir() -> String {
 
 fn default_tag_prefix() -> String {
     "@bloomery:".to_owned()
-}
-
-fn default_checks_attr() -> String {
-    ".#checks".to_owned()
 }
 
 impl Default for SpecsConfig {
@@ -87,16 +81,6 @@ impl Default for PlaywrightScannerConfig {
             enabled: false,
             paths: Vec::new(),
             tag_prefix: default_tag_prefix(),
-        }
-    }
-}
-
-impl Default for NixScannerConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            checks_attr: default_checks_attr(),
-            systems: Vec::new(),
         }
     }
 }
@@ -181,26 +165,7 @@ impl Config {
                 "scanners.playwright.tag_prefix must not be empty",
             ));
         }
-        if self.scanners.nix.enabled {
-            if self.scanners.nix.checks_attr.trim().is_empty() {
-                return Err(Diagnostic::new(
-                    "ConfigurationError",
-                    "scanners.nix.checks_attr must not be empty",
-                ));
-            }
-            if self
-                .scanners
-                .nix
-                .systems
-                .iter()
-                .any(|system| system.trim().is_empty())
-            {
-                return Err(Diagnostic::new(
-                    "ConfigurationError",
-                    "scanners.nix.systems must not contain empty values",
-                ));
-            }
-        }
+        validate_file_scanner("nix", self.scanners.nix.enabled, &self.scanners.nix.paths)?;
         Ok(())
     }
 
@@ -297,8 +262,7 @@ mod tests {
         assert!(playwright.paths.is_empty());
         assert_eq!(playwright.tag_prefix, "@bloomery:");
         assert!(!nix.enabled);
-        assert_eq!(nix.checks_attr, ".#checks");
-        assert!(nix.systems.is_empty());
+        assert!(nix.paths.is_empty());
     }
 
     fn assert_configuration_error(root: &Path) {
@@ -392,7 +356,18 @@ mod tests {
             &config_path,
             "[scanners.rust]\nenabled = true\npaths = []\n",
         )
-        .expect("invalid config");
+        .expect("invalid Rust scanner config");
+        assert_configuration_error(&root);
+
+        fs::write(&config_path, "[scanners.nix]\nenabled = true\npaths = []\n")
+            .expect("Nix scanner without paths");
+        assert_configuration_error(&root);
+
+        fs::write(
+            &config_path,
+            "[scanners.nix]\nenabled = true\npaths = [\"../checks.nix\"]\n",
+        )
+        .expect("Nix scanner with an escaping path");
         assert_configuration_error(&root);
         let _ = fs::remove_dir_all(root);
     }

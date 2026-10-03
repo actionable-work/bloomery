@@ -35,6 +35,19 @@
             mkdir $out
             echo "OK" > $out/success
           '';
+
+        validate-bloomery-check-runs-at-the-workspace-root = let
+          check = workspace.checks."bloomery:check";
+        in
+          assert !(builtins.hasAttr "bloomery" workspace.packages);
+          assert builtins.elem bloomery.packages.${system}.bloomery check.nativeBuildInputs;
+            pkgs.runCommand "validate-bloomery-check-runs-at-the-workspace-root" {} ''
+              # The fixture has Bloomery metadata but no local bloomery binary.
+              # Building this output runs the input-flake CLI from the fixture root.
+              test -e "${check}"
+              mkdir "$out"
+              echo "OK" > "$out/success"
+            '';
       }
   );
 }

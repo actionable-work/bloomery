@@ -3,7 +3,7 @@ group = "CATALOG"
 [[requirements]]
 id = "CLI-REVIEW-CATALOG-001"
 title = "Review includes exactly manual requirements"
-manual = true
+manual = false
 design = "design/manual-catalog.md"
 
 [requirements.ears]
@@ -14,7 +14,7 @@ action = "include exactly the declared manual requirements in the review catalog
 [[requirements]]
 id = "CLI-REVIEW-CATALOG-002"
 title = "Review catalog ordering is deterministic"
-manual = true
+manual = false
 design = "design/manual-catalog.md"
 
 [requirements.ears]

@@ -47,11 +47,15 @@ mod tests {
         NixScannerConfig, PlaywrightScannerConfig, RustScannerConfig, ScannersConfig, SpecsConfig,
     };
     use bloomery_model::{Config, Context};
+    use bloomery_test_macros::bloomery;
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
-    fn extracts_rust_and_playwright_references() {
+    #[bloomery("PARSER-SCANNING-STATIC-001")]
+    #[bloomery("PARSER-SCANNING-STATIC-002")]
+    #[bloomery("PARSER-SCANNING-STATIC-003")]
+    fn extracts_static_references_with_locations_without_running_tests() {
         let suffix = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("clock")
@@ -61,14 +65,39 @@ mod tests {
         fs::create_dir_all(root.join("e2e")).expect("e2e");
         fs::write(
             root.join("tests/example.rs"),
-            "#[bloomery(\"PARSER-SCANNING-TESTS-001\")]\n#[test]\nfn example() {}\n",
+            "#[bloomery(\"PARSER-SCANNING-TESTS-001\")]\n#[test]\nfn example() { panic!(\"scanner must not execute source tests\") }\n",
         )
         .expect("Rust source");
         fs::write(
             root.join("e2e/example.spec.ts"),
-            "test('example', { tag: ['@bloomery:PARSER-SCANNING-TESTS-002'] }, async () => {});\n",
+            "test('example', { tag: ['@bloomery:PARSER-SCANNING-TESTS-002'] }, async () => { throw new Error('scanner must not execute source tests'); });\n",
         )
         .expect("Playwright source");
+        fs::write(
+            root.join("checks.nix"),
+            r#"# passthru.bloomery = [ "PARSER-SCANNING-TESTS-999" ];
+let decoy = "passthru.bloomery = [ PARSER-SCANNING-TESTS-998 ];";
+in builtins.seq (builtins.abort "scanner must not evaluate Nix") {
+  nested = {
+    passthru = {
+      bloomery = [
+        "PARSER-SCANNING-TESTS-003"
+      ];
+    };
+  };
+  direct = {
+    passthru.bloomery = lib.optionals (name == "basic-workspace") [
+      "PARSER-SCANNING-TESTS-004"
+    ];
+  };
+  indented = ''
+    passthru.bloomery = [ "PARSER-SCANNING-TESTS-997" ];
+    ''${notMetadata}
+  '';
+}
+"#,
+        )
+        .expect("Nix source");
         let context = Context {
             root: root.clone(),
             config: Config {
@@ -85,23 +114,47 @@ mod tests {
                         paths: vec!["e2e/**/*.spec.ts".into()],
                         tag_prefix: "@bloomery:".into(),
                     },
-                    nix: NixScannerConfig::default(),
+                    nix: NixScannerConfig {
+                        enabled: true,
+                        paths: vec!["checks.nix".into()],
+                    },
                 },
             },
             areas: Vec::new(),
         };
         let evidence = scan_all(&context).expect("scanners should succeed");
-        assert_eq!(evidence.len(), 2);
-        assert!(
-            evidence
-                .iter()
-                .any(|item| item.id == "PARSER-SCANNING-TESTS-001")
-        );
-        assert!(
-            evidence
-                .iter()
-                .any(|item| item.id == "PARSER-SCANNING-TESTS-002")
-        );
+        assert_eq!(evidence.len(), 4);
+        let rust = evidence
+            .iter()
+            .find(|item| item.id == "PARSER-SCANNING-TESTS-001")
+            .expect("Rust test reference");
+        assert_eq!(rust.scanner, "rust");
+        assert_eq!(rust.location.path, root.join("tests/example.rs"));
+        assert_eq!(rust.location.line, Some(1));
+
+        let playwright = evidence
+            .iter()
+            .find(|item| item.id == "PARSER-SCANNING-TESTS-002")
+            .expect("Playwright test reference");
+        assert_eq!(playwright.scanner, "playwright");
+        assert_eq!(playwright.location.path, root.join("e2e/example.spec.ts"));
+        assert_eq!(playwright.location.line, Some(1));
+
+        let nix_nested = evidence
+            .iter()
+            .find(|item| item.id == "PARSER-SCANNING-TESTS-003")
+            .expect("nested Nix metadata reference");
+        assert_eq!(nix_nested.scanner, "nix");
+        assert_eq!(nix_nested.location.path, root.join("checks.nix"));
+        assert_eq!(nix_nested.location.line, Some(7));
+
+        let nix_direct = evidence
+            .iter()
+            .find(|item| item.id == "PARSER-SCANNING-TESTS-004")
+            .expect("direct Nix metadata reference");
+        assert_eq!(nix_direct.scanner, "nix");
+        assert_eq!(nix_direct.location.path, root.join("checks.nix"));
+        assert_eq!(nix_direct.location.line, Some(13));
         let _ = fs::remove_dir_all(root);
     }
 }

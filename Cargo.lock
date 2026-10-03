@@ -211,12 +211,16 @@ dependencies = [
 [[package]]
 name = "bloomery-content"
 version = "0.1.0"
+dependencies = [
+ "bloomery-test-macros",
+]
 
 [[package]]
 name = "bloomery-docs"
 version = "0.1.0"
 dependencies = [
  "bloomery-content",
+ "bloomery-test-macros",
  "bloomery-ui",
  "tokio",
  "topcoat",
@@ -236,6 +240,7 @@ name = "bloomery-review"
 version = "0.1.0"
 dependencies = [
  "bloomery-model",
+ "bloomery-test-macros",
  "serde",
 ]
 
@@ -244,6 +249,7 @@ name = "bloomery-scanning"
 version = "0.1.0"
 dependencies = [
  "bloomery-model",
+ "bloomery-test-macros",
  "oxc_allocator",
  "oxc_ast",
  "oxc_parser",
@@ -273,6 +279,7 @@ name = "bloomery-ui"
 version = "0.1.0"
 dependencies = [
  "bloomery-content",
+ "bloomery-test-macros",
  "topcoat",
 ]
 

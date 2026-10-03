@@ -2,27 +2,33 @@
 
 ## Reference metadata
 
-Nix checks expose requirement IDs through a `passthru.bloomery` list. The
-scanner evaluates the configured checks attribute and reads that metadata:
+Nix checks expose requirement IDs through a `passthru.bloomery` list of string
+literals:
 
 ```nix
-checks.x86_64-linux.auth-integration = pkgs.testers.runNixOSTest {
-  name = "auth-integration";
+checks.x86_64-linux.auth-integration = pkgs.runCommand "auth-integration" {
   passthru.bloomery = [
     "CLI-EXAMPLE-AUTH-001"
     "CLI-EXAMPLE-AUTH-002"
   ];
-};
+} ''
+  run-auth-integration-tests
+'';
 ```
 
-For each configured system, the scanner performs the equivalent of a JSON
-metadata evaluation against the configured checks attribute. It reads
-`passthru.bloomery` values and emits the check attribute and system as source
-context.
+The scanner walks the repository-relative `scanners.nix.paths` globs and
+statically tokenizes matching Nix source files. It extracts literal IDs from
+both `passthru.bloomery = [ ... ];` and a nested
+`passthru = { bloomery = [ ... ]; };` attribute set, retaining each string's
+source file and line. Comments and Nix strings outside the metadata list do not
+create evidence.
+
+Metadata should contain literal, contract-valid requirement IDs. Dynamically
+computed IDs cannot be discovered statically and are not evidence.
 
 ## Static boundary
 
-Nix evaluation must not instantiate or execute check derivations. It must not
-run test scripts or build outputs, and it must not use the evaluator to fetch
-missing inputs. Evaluation failures are scanner diagnostics rather than an
-empty result.
+The Nix scanner reads source text only. It does not invoke `nix eval`, evaluate
+flakes, instantiate or build derivations, fetch inputs, or execute check
+scripts. File-read and malformed metadata diagnostics are reported as scanner
+errors rather than silently treated as empty evidence.

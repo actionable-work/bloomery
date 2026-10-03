@@ -3,7 +3,7 @@ group = "CATALOG"
 [[requirements]]
 id = "DOCS-CONTENT-CATALOG-001"
 title = "Documentation pages have stable slugs"
-manual = true
+manual = false
 design = "design/catalog.md"
 
 [requirements.ears]
@@ -14,7 +14,7 @@ action = "provide each published Markdown page with a stable slug"
 [[requirements]]
 id = "DOCS-CONTENT-CATALOG-002"
 title = "Documentation pages support slug lookup"
-manual = true
+manual = false
 design = "design/catalog.md"
 
 [requirements.ears]
@@ -25,7 +25,7 @@ action = "support looking up each published page by its slug"
 [[requirements]]
 id = "DOCS-CONTENT-CATALOG-003"
 title = "Documentation pages carry category metadata"
-manual = true
+manual = false
 design = "design/catalog.md"
 
 [requirements.ears]
@@ -36,7 +36,7 @@ action = "provide category metadata for each published page"
 [[requirements]]
 id = "DOCS-CONTENT-CATALOG-004"
 title = "Documentation pages carry titles"
-manual = true
+manual = false
 design = "design/catalog.md"
 
 [requirements.ears]
@@ -47,7 +47,7 @@ action = "provide a title for each published page"
 [[requirements]]
 id = "DOCS-CONTENT-CATALOG-005"
 title = "Documentation pages carry descriptions"
-manual = true
+manual = false
 design = "design/catalog.md"
 
 [requirements.ears]
@@ -58,7 +58,7 @@ action = "provide a description for each published page"
 [[requirements]]
 id = "DOCS-CONTENT-CATALOG-006"
 title = "Documentation pages carry display order"
-manual = true
+manual = false
 design = "design/catalog.md"
 
 [requirements.ears]

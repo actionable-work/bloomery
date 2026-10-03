@@ -3,7 +3,7 @@ group = "FLAGS"
 [[requirements]]
 id = "CLI-INTERFACE-FLAGS-001"
 title = "Review defaults to human-readable output"
-manual = true
+manual = false
 design = "design/flags.md#shared-purpose-options"
 
 [requirements.ears]
@@ -14,7 +14,7 @@ action = "use human-readable output when --json is omitted"
 [[requirements]]
 id = "CLI-INTERFACE-FLAGS-002"
 title = "Review accepts JSON output"
-manual = true
+manual = false
 design = "design/flags.md#shared-purpose-options"
 
 [requirements.ears]
@@ -25,7 +25,7 @@ action = "accept --json for review"
 [[requirements]]
 id = "CLI-INTERFACE-FLAGS-003"
 title = "JSON output uses one shared option"
-manual = true
+manual = false
 design = "design/flags.md#shared-purpose-options"
 
 [requirements.ears]
@@ -36,7 +36,7 @@ action = "use --json rather than command-specific JSON or format selectors"
 [[requirements]]
 id = "CLI-INTERFACE-FLAGS-004"
 title = "Check has no command-specific options"
-manual = true
+manual = false
 design = "design/flags.md"
 
 [requirements.ears]
@@ -47,7 +47,7 @@ action = "expose no check-specific options beyond shared CLI options"
 [[requirements]]
 id = "CLI-INTERFACE-FLAGS-005"
 title = "Commands expose help flags"
-manual = true
+manual = false
 design = "design/flags.md"
 
 [requirements.ears]

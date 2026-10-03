@@ -3,7 +3,7 @@ group = "STATIC"
 [[requirements]]
 id = "PARSER-SCANNING-STATIC-001"
 title = "Enabled scanners extract requirement references"
-manual = true
+manual = false
 design = "design/overview.md"
 
 [requirements.ears]
@@ -14,7 +14,7 @@ action = "extract requirement references from supported source files"
 [[requirements]]
 id = "PARSER-SCANNING-STATIC-002"
 title = "Extracted evidence retains source locations"
-manual = true
+manual = false
 design = "design/overview.md"
 
 [requirements.ears]
@@ -25,7 +25,7 @@ action = "associate each extracted requirement reference with its source locatio
 [[requirements]]
 id = "PARSER-SCANNING-STATIC-003"
 title = "Static scanning does not execute tests"
-manual = true
+manual = false
 design = "design/overview.md"
 
 [requirements.ears]

@@ -83,7 +83,13 @@ impl<'ast> Visit<'ast> for Visitor<'_> {
                         let line = self
                             .contents
                             .find(&needle)
-                            .map(|offset| self.contents[..offset].lines().count() + 1)
+                            .map(|offset| {
+                                self.contents[..offset]
+                                    .bytes()
+                                    .filter(|byte| *byte == b'\n')
+                                    .count()
+                                    + 1
+                            })
                             .unwrap_or(1);
                         self.evidence.push(Evidence {
                             id: value.value(),

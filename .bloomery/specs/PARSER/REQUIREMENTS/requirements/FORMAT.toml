@@ -3,7 +3,7 @@ group = "FORMAT"
 [[requirements]]
 id = "PARSER-REQUIREMENTS-FORMAT-001"
 title = "Requirement identifiers are validated"
-manual = true
+manual = false
 design = "design/format.md"
 
 [requirements.ears]
@@ -14,7 +14,7 @@ action = "validate each grouped record's identifier against its contract"
 [[requirements]]
 id = "PARSER-REQUIREMENTS-FORMAT-002"
 title = "EARS fields are validated"
-manual = true
+manual = false
 design = "design/format.md"
 
 [requirements.ears]
@@ -25,7 +25,7 @@ action = "validate each grouped record's EARS fields against the selected gramma
 [[requirements]]
 id = "PARSER-REQUIREMENTS-FORMAT-003"
 title = "Design references are resolved"
-manual = true
+manual = false
 design = "design/format.md"
 
 [requirements.ears]

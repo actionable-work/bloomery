@@ -24,8 +24,8 @@ const CATALOG: &[Recommendation] = &[
     },
     Recommendation {
         path: &["scanners", "nix", "enabled"],
-        benefit: "Nix evidence scanning links check metadata to requirements.",
-        guidance: "Review `checks_attr` and optional `systems` when enabling this scanner.",
+        benefit: "Nix evidence scanning links static check metadata to requirements.",
+        guidance: "Configure repository-relative `paths` for `passthru.bloomery` metadata.",
     },
 ];
 

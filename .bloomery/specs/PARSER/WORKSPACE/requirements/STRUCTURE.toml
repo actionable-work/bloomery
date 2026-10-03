@@ -3,7 +3,7 @@ group = "STRUCTURE"
 [[requirements]]
 id = "PARSER-WORKSPACE-STRUCTURE-001"
 title = "Every feature has a README"
-manual = true
+manual = false
 design = "design/layout.md"
 
 [requirements.ears]
@@ -14,7 +14,7 @@ action = "require each feature to contain its README"
 [[requirements]]
 id = "PARSER-WORKSPACE-STRUCTURE-002"
 title = "Every feature has a design directory"
-manual = true
+manual = false
 design = "design/layout.md"
 
 [requirements.ears]
@@ -25,7 +25,7 @@ action = "require each feature to contain a design directory"
 [[requirements]]
 id = "PARSER-WORKSPACE-STRUCTURE-003"
 title = "Every feature has grouped requirements"
-manual = true
+manual = false
 design = "design/layout.md"
 
 [requirements.ears]

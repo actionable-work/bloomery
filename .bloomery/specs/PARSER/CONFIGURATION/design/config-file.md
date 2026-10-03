@@ -11,12 +11,10 @@ contained an empty configuration and validates the resulting defaults:
 
 - `specs.dir` is `"specs"`, resolving to `.bloomery/specs`.
 - Rust, Playwright, and Nix scanners are disabled.
-- Rust and Playwright scanner paths and Nix systems are empty.
+- Rust, Playwright, and Nix scanner path lists are empty.
 - `scanners.playwright.tag_prefix` is `"@bloomery:"`.
-- `scanners.nix.checks_attr` is `".#checks"`.
 
-The empty Nix systems list preserves the scanner's host-system fallback if a
-workspace enables Nix scanning later.
+An enabled scanner requires at least one repository-relative path pattern.
 
 ## Partial configuration
 
@@ -49,16 +47,15 @@ tag_prefix = "@bloomery:"
 
 [scanners.nix]
 enabled = true
-checks_attr = ".#checks"
-systems = ["x86_64-linux", "aarch64-darwin"]
+paths = ["*.nix", "nix/**/*.nix", "tests/**/*.nix"]
 ```
 
 ## Resolution rules
 
 - `specs.dir` is relative to `.bloomery/`.
-- Rust and Playwright paths are relative to the repository root.
-- `checks_attr` identifies the flake output passed to the Nix scanner.
-- An empty Nix `systems` list uses the host-system fallback.
+- Rust, Playwright, and Nix paths are relative to the repository root.
+- The Nix scanner extracts literal requirement IDs from `passthru.bloomery`
+  metadata in matched Nix source files; it does not evaluate the flake.
 - A disabled scanner contributes no references and performs no tool lookup.
 - A configured scanner with an invalid path or option is a configuration error,
   not an empty scan.

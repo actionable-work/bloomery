@@ -3,7 +3,7 @@ group = "STRUCTURE"
 [[requirements]]
 id = "REPOSITORY-LAYOUT-STRUCTURE-001"
 title = "Rust binaries reside under packages/rust"
-manual = true
+manual = false
 design = "design/repository-layout.md"
 
 [requirements.ears]
@@ -14,7 +14,7 @@ action = "keep Rust binaries under packages/rust"
 [[requirements]]
 id = "REPOSITORY-LAYOUT-STRUCTURE-002"
 title = "Rust libraries reside under packages/rust"
-manual = true
+manual = false
 design = "design/repository-layout.md"
 
 [requirements.ears]
@@ -25,7 +25,7 @@ action = "keep Rust libraries under packages/rust"
 [[requirements]]
 id = "REPOSITORY-LAYOUT-STRUCTURE-003"
 title = "Reusable Nix code resides under lib"
-manual = true
+manual = false
 design = "design/repository-layout.md"
 
 [requirements.ears]
@@ -36,7 +36,7 @@ action = "keep reusable Nix code under lib"
 [[requirements]]
 id = "REPOSITORY-LAYOUT-STRUCTURE-004"
 title = "Flake checks reside under nix/checks"
-manual = true
+manual = false
 design = "design/repository-layout.md"
 
 [requirements.ears]
@@ -47,7 +47,7 @@ action = "keep flake checks under nix/checks"
 [[requirements]]
 id = "REPOSITORY-LAYOUT-STRUCTURE-005"
 title = "Integration workspaces reside under tests"
-manual = true
+manual = false
 design = "design/repository-layout.md"
 
 [requirements.ears]
@@ -58,7 +58,7 @@ action = "keep integration workspaces under tests"
 [[requirements]]
 id = "REPOSITORY-LAYOUT-STRUCTURE-006"
 title = "Repository specifications reside under .bloomery"
-manual = true
+manual = false
 design = "design/repository-layout.md"
 
 [requirements.ears]

@@ -3,7 +3,7 @@ group = "COMMANDS"
 [[requirements]]
 id = "CLI-INTERFACE-COMMANDS-001"
 title = "The CLI exposes check"
-manual = true
+manual = false
 design = "design/commands.md"
 
 [requirements.ears]
@@ -14,7 +14,7 @@ action = "expose the check subcommand"
 [[requirements]]
 id = "CLI-INTERFACE-COMMANDS-002"
 title = "The CLI exposes review"
-manual = true
+manual = false
 design = "design/commands.md"
 
 [requirements.ears]
@@ -25,7 +25,7 @@ action = "expose the review subcommand"
 [[requirements]]
 id = "CLI-INTERFACE-COMMANDS-003"
 title = "The CLI exposes sync"
-manual = true
+manual = false
 design = "design/commands.md"
 
 [requirements.ears]
@@ -36,7 +36,7 @@ action = "expose the sync subcommand"
 [[requirements]]
 id = "CLI-INTERFACE-COMMANDS-004"
 title = "The CLI exposes parser-generated help"
-manual = true
+manual = false
 design = "design/commands.md"
 
 [requirements.ears]
@@ -47,7 +47,7 @@ action = "provide the CLI parser's help subcommand"
 [[requirements]]
 id = "CLI-INTERFACE-COMMANDS-005"
 title = "Repository commands use the current working directory"
-manual = true
+manual = false
 design = "design/commands.md"
 
 [requirements.ears]

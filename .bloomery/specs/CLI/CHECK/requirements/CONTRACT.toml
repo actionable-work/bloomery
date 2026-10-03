@@ -3,7 +3,7 @@ group = "CONTRACT"
 [[requirements]]
 id = "CLI-CHECK-CONTRACT-001"
 title = "Check rejects invalid workspace structure"
-manual = true
+manual = false
 design = "design/pipeline.md"
 
 [requirements.ears]
@@ -14,7 +14,7 @@ action = "return failure when workspace structure invariants are invalid"
 [[requirements]]
 id = "CLI-CHECK-CONTRACT-002"
 title = "Check rejects invalid traceability"
-manual = true
+manual = false
 design = "design/pipeline.md"
 
 [requirements.ears]

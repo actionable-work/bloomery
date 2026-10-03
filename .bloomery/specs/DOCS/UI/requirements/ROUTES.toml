@@ -3,7 +3,7 @@ group = "ROUTES"
 [[requirements]]
 id = "DOCS-UI-ROUTES-001"
 title = "The documentation UI registers the home page"
-manual = true
+manual = false
 design = "design/routes-and-rendering.md"
 
 [requirements.ears]
@@ -14,7 +14,7 @@ action = "register the home page"
 [[requirements]]
 id = "DOCS-UI-ROUTES-002"
 title = "Catalog pages have short routes"
-manual = true
+manual = false
 design = "design/routes-and-rendering.md"
 
 [requirements.ears]
@@ -25,7 +25,7 @@ action = "expose catalog pages through their short routes"
 [[requirements]]
 id = "DOCS-UI-ROUTES-003"
 title = "Catalog pages have docs routes"
-manual = true
+manual = false
 design = "design/routes-and-rendering.md"
 
 [requirements.ears]
@@ -36,7 +36,7 @@ action = "expose catalog pages through /docs/<slug> routes"
 [[requirements]]
 id = "DOCS-UI-ROUTES-004"
 title = "Pages use shared site presentation"
-manual = true
+manual = false
 design = "design/routes-and-rendering.md"
 
 [requirements.ears]

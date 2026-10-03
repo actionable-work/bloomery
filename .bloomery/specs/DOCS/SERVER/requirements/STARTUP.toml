@@ -3,7 +3,7 @@ group = "STARTUP"
 [[requirements]]
 id = "DOCS-SERVER-STARTUP-001"
 title = "The docs server serves registered routes"
-manual = true
+manual = false
 design = "design/server.md"
 
 [requirements.ears]
@@ -14,7 +14,7 @@ action = "serve the routes registered by the documentation UI"
 [[requirements]]
 id = "DOCS-SERVER-STARTUP-002"
 title = "The docs server binds to localhost"
-manual = true
+manual = false
 design = "design/server.md"
 
 [requirements.ears]
@@ -25,7 +25,7 @@ action = "bind its listener to 127.0.0.1"
 [[requirements]]
 id = "DOCS-SERVER-STARTUP-003"
 title = "A valid PORT selects the server port"
-manual = true
+manual = false
 design = "design/server.md"
 
 [requirements.ears]
@@ -37,7 +37,7 @@ action = "use the port specified by PORT"
 [[requirements]]
 id = "DOCS-SERVER-STARTUP-004"
 title = "Missing or invalid PORT uses the default"
-manual = true
+manual = false
 design = "design/server.md"
 
 [requirements.ears]
@@ -49,7 +49,7 @@ action = "use port 8080"
 [[requirements]]
 id = "DOCS-SERVER-STARTUP-005"
 title = "Available native assets are attached"
-manual = true
+manual = false
 design = "design/server.md"
 
 [requirements.ears]

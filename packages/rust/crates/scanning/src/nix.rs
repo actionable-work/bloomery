@@ -1,104 +1,32 @@
+use crate::files::expand_globs;
 use bloomery_model::{Diagnostic, Evidence, SourceLocation, config::NixScannerConfig};
-use serde_json::Value;
+use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 pub fn scan(root: &Path, config: &NixScannerConfig) -> Result<Vec<Evidence>, Vec<Diagnostic>> {
-    let systems = if config.systems.is_empty() {
-        vec![host_system()]
-    } else {
-        config.systems.clone()
+    let paths = match expand_globs(root, &config.paths) {
+        Ok(paths) => paths,
+        Err(error) => return Err(vec![Diagnostic::new("ScannerError", error)]),
     };
     let mut evidence = Vec::new();
     let mut diagnostics = Vec::new();
-    for system in systems {
-        let attribute = format!("{}.{}", config.checks_attr.trim_end_matches('.'), system);
-        let output = Command::new("nix")
-            .current_dir(root)
-            .args([
-                "eval",
-                &attribute,
-                "--json",
-                "--apply",
-                "builtins.mapAttrs (name: drv: drv.bloomery or [])",
-            ])
-            .output();
-        let output = match output {
-            Ok(output) => output,
+    for path in paths {
+        let contents = match fs::read_to_string(&path) {
+            Ok(contents) => contents,
             Err(error) => {
                 diagnostics.push(
                     Diagnostic::new(
                         "NixScanError",
-                        format!("Unable to invoke nix eval: {error}"),
+                        format!("Unable to read Nix source: {error}"),
                     )
-                    .at(root.join("flake.nix"), Some(1)),
+                    .at(path, Some(1)),
                 );
                 continue;
             }
         };
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            diagnostics.push(
-                Diagnostic::new(
-                    "NixScanError",
-                    format!("nix eval failed for {attribute}: {}", stderr.trim()),
-                )
-                .at(root.join("flake.nix"), Some(1)),
-            );
-            continue;
-        }
-        let json: Value = match serde_json::from_slice(&output.stdout) {
-            Ok(json) => json,
-            Err(error) => {
-                diagnostics.push(
-                    Diagnostic::new(
-                        "NixScanError",
-                        format!("nix eval returned invalid JSON: {error}"),
-                    )
-                    .at(root.join("flake.nix"), Some(1)),
-                );
-                continue;
-            }
-        };
-        let Some(checks) = json.as_object() else {
-            diagnostics.push(
-                Diagnostic::new(
-                    "NixScanError",
-                    "nix checks evaluation did not return an object",
-                )
-                .at(root.join("flake.nix"), Some(1)),
-            );
-            continue;
-        };
-        for (check, ids) in checks {
-            let Some(ids) = ids.as_array() else {
-                diagnostics.push(
-                    Diagnostic::new(
-                        "NixScanError",
-                        format!("Check '{check}' bloomery metadata is not an array"),
-                    )
-                    .at(root.join("flake.nix"), Some(1)),
-                );
-                continue;
-            };
-            for id in ids {
-                let Some(id) = id.as_str() else {
-                    diagnostics.push(
-                        Diagnostic::new(
-                            "NixScanError",
-                            format!("Check '{check}' contains a non-string requirement ID"),
-                        )
-                        .at(root.join("flake.nix"), Some(1)),
-                    );
-                    continue;
-                };
-                evidence.push(Evidence {
-                    id: id.to_owned(),
-                    location: SourceLocation::new(root.join("flake.nix"), None),
-                    scanner: "nix",
-                });
-            }
-        }
+        let (found, errors) = scan_source(root, &path, &contents);
+        evidence.extend(found);
+        diagnostics.extend(errors);
     }
     if diagnostics.is_empty() {
         Ok(evidence)
@@ -107,10 +35,384 @@ pub fn scan(root: &Path, config: &NixScannerConfig) -> Result<Vec<Evidence>, Vec
     }
 }
 
-fn host_system() -> String {
-    let operating_system = match std::env::consts::OS {
-        "macos" => "darwin",
-        other => other,
-    };
-    format!("{}-{operating_system}", std::env::consts::ARCH)
+fn scan_source(root: &Path, path: &Path, source: &str) -> (Vec<Evidence>, Vec<Diagnostic>) {
+    let tokens = tokenize(source);
+    let mut evidence = Vec::new();
+    let mut diagnostics = Vec::new();
+    let mut index = 0;
+
+    while index < tokens.len() {
+        if is_direct_metadata_assignment(&tokens, index) {
+            let (ids, errors, next) = metadata_rhs(&tokens, index + 4, path);
+            evidence.extend(ids.into_iter().map(|(id, line)| Evidence {
+                id,
+                location: SourceLocation::new(path, Some(line)),
+                scanner: "nix",
+            }));
+            diagnostics.extend(errors);
+            index = next;
+            continue;
+        }
+
+        if is_nested_passthru_assignment(&tokens, index) {
+            let (ids, errors, next) = nested_metadata(&tokens, index + 2, path);
+            evidence.extend(ids.into_iter().map(|(id, line)| Evidence {
+                id,
+                location: SourceLocation::new(path, Some(line)),
+                scanner: "nix",
+            }));
+            diagnostics.extend(errors);
+            index = next;
+            continue;
+        }
+        index += 1;
+    }
+
+    if !path.starts_with(root) {
+        diagnostics.push(
+            Diagnostic::new(
+                "NixScanError",
+                "Nix source path escaped the repository root",
+            )
+            .at(path, Some(1)),
+        );
+    }
+    (evidence, diagnostics)
+}
+
+fn is_direct_metadata_assignment(tokens: &[Token], index: usize) -> bool {
+    matches!(
+        tokens.get(index..index + 4),
+        Some([
+            Token {
+                kind: TokenKind::Identifier(passthru),
+                ..
+            },
+            Token {
+                kind: TokenKind::Punctuation('.'),
+                ..
+            },
+            Token {
+                kind: TokenKind::Identifier(bloomery),
+                ..
+            },
+            Token {
+                kind: TokenKind::Punctuation('='),
+                ..
+            }
+        ]) if passthru == "passthru" && bloomery == "bloomery"
+    )
+}
+
+fn is_nested_passthru_assignment(tokens: &[Token], index: usize) -> bool {
+    matches!(
+        tokens.get(index..index + 3),
+        Some([
+            Token {
+                kind: TokenKind::Identifier(passthru),
+                ..
+            },
+            Token {
+                kind: TokenKind::Punctuation('='),
+                ..
+            },
+            Token {
+                kind: TokenKind::Punctuation('{'),
+                ..
+            }
+        ]) if passthru == "passthru"
+    )
+}
+
+fn nested_metadata(
+    tokens: &[Token],
+    open_brace: usize,
+    path: &Path,
+) -> (Vec<(String, usize)>, Vec<Diagnostic>, usize) {
+    let mut ids = Vec::new();
+    let mut diagnostics = Vec::new();
+    let mut depth = 1usize;
+    let mut index = open_brace + 1;
+    while index < tokens.len() && depth > 0 {
+        if depth == 1 && is_nested_bloomery_assignment(tokens, index) {
+            let (found, errors, next) = metadata_rhs(tokens, index + 2, path);
+            ids.extend(found);
+            diagnostics.extend(errors);
+            index = next;
+            continue;
+        }
+        match tokens[index].kind {
+            TokenKind::Punctuation('{') => depth += 1,
+            TokenKind::Punctuation('}') => depth -= 1,
+            _ => {}
+        }
+        index += 1;
+    }
+    (ids, diagnostics, index)
+}
+
+fn is_nested_bloomery_assignment(tokens: &[Token], index: usize) -> bool {
+    matches!(
+        tokens.get(index..index + 2),
+        Some([
+            Token {
+                kind: TokenKind::Identifier(bloomery),
+                ..
+            },
+            Token {
+                kind: TokenKind::Punctuation('='),
+                ..
+            }
+        ]) if bloomery == "bloomery"
+    )
+}
+
+fn metadata_rhs(
+    tokens: &[Token],
+    start: usize,
+    path: &Path,
+) -> (Vec<(String, usize)>, Vec<Diagnostic>, usize) {
+    let mut ids = Vec::new();
+    let mut diagnostics = Vec::new();
+    let mut paren_depth = 0usize;
+    let mut list_depth = 0usize;
+    let mut attr_depth = 0usize;
+    let mut index = start;
+
+    while index < tokens.len() {
+        let token = &tokens[index];
+        match &token.kind {
+            TokenKind::String(value) if list_depth > 0 => {
+                if is_requirement_id(value) {
+                    ids.push((value.clone(), token.line));
+                } else {
+                    diagnostics.push(
+                        Diagnostic::new(
+                            "NixReferenceError",
+                            format!(
+                                "passthru.bloomery contains a string that is not a requirement ID: {value}"
+                            ),
+                        )
+                        .at(path, Some(token.line)),
+                    );
+                }
+            }
+            TokenKind::Punctuation(';')
+                if paren_depth == 0 && list_depth == 0 && attr_depth == 0 =>
+            {
+                return (ids, diagnostics, index + 1);
+            }
+            TokenKind::Punctuation('(') => paren_depth += 1,
+            TokenKind::Punctuation(')') => paren_depth = paren_depth.saturating_sub(1),
+            TokenKind::Punctuation('[') => list_depth += 1,
+            TokenKind::Punctuation(']') => list_depth = list_depth.saturating_sub(1),
+            TokenKind::Punctuation('{') => attr_depth += 1,
+            TokenKind::Punctuation('}') if attr_depth > 0 => attr_depth -= 1,
+            TokenKind::Punctuation('}')
+                if paren_depth == 0 && list_depth == 0 && attr_depth == 0 =>
+            {
+                return (ids, diagnostics, index);
+            }
+            _ => {}
+        }
+        index += 1;
+    }
+    (ids, diagnostics, index)
+}
+
+fn is_requirement_id(value: &str) -> bool {
+    let segments = value.split('-').collect::<Vec<_>>();
+    segments.len() == 4
+        && segments[..3].iter().all(|segment| {
+            !segment.is_empty()
+                && segment.chars().all(|character| {
+                    character.is_ascii_uppercase() || character.is_ascii_digit() || character == '_'
+                })
+        })
+        && (segments[3].len() == 3 || segments[3].len() == 4)
+        && segments[3]
+            .chars()
+            .all(|character| character.is_ascii_digit())
+}
+
+#[derive(Debug)]
+struct Token {
+    kind: TokenKind,
+    line: usize,
+}
+
+#[derive(Debug)]
+enum TokenKind {
+    Identifier(String),
+    String(String),
+    Punctuation(char),
+}
+
+fn tokenize(source: &str) -> Vec<Token> {
+    let bytes = source.as_bytes();
+    let mut tokens = Vec::new();
+    let mut index = 0;
+    let mut line = 1;
+
+    while index < bytes.len() {
+        if bytes[index].is_ascii_whitespace() {
+            if bytes[index] == b'\n' {
+                line += 1;
+            }
+            index += 1;
+            continue;
+        }
+        if bytes[index] == b'#' {
+            index = skip_line_comment(bytes, index);
+            continue;
+        }
+        if bytes[index..].starts_with(b"/*") {
+            index = skip_block_comment(bytes, index, &mut line);
+            continue;
+        }
+        if bytes[index..].starts_with(b"''") {
+            index = skip_indented_string(bytes, index, &mut line);
+            continue;
+        }
+        if bytes[index] == b'"' {
+            let token_line = line;
+            let (value, next) = read_string(source, index, &mut line);
+            if let Some(value) = value {
+                tokens.push(Token {
+                    kind: TokenKind::String(value),
+                    line: token_line,
+                });
+            }
+            index = next;
+            continue;
+        }
+
+        let character = source[index..]
+            .chars()
+            .next()
+            .expect("valid UTF-8 at token boundary");
+        if identifier_start(character) {
+            let start = index;
+            index += character.len_utf8();
+            while index < bytes.len() {
+                let next = source[index..]
+                    .chars()
+                    .next()
+                    .expect("valid UTF-8 at token boundary");
+                if !identifier_continue(next) {
+                    break;
+                }
+                index += next.len_utf8();
+            }
+            tokens.push(Token {
+                kind: TokenKind::Identifier(source[start..index].to_owned()),
+                line,
+            });
+            continue;
+        }
+
+        if character.is_ascii_punctuation() {
+            tokens.push(Token {
+                kind: TokenKind::Punctuation(character),
+                line,
+            });
+        }
+        index += character.len_utf8();
+    }
+    tokens
+}
+
+fn read_string(source: &str, start: usize, line: &mut usize) -> (Option<String>, usize) {
+    let bytes = source.as_bytes();
+    let mut index = start + 1;
+    let content_start = index;
+    while index < bytes.len() {
+        let character = source[index..]
+            .chars()
+            .next()
+            .expect("valid UTF-8 at string boundary");
+        match character {
+            '\\' => {
+                index += character.len_utf8();
+                if index < bytes.len() {
+                    let escaped = source[index..]
+                        .chars()
+                        .next()
+                        .expect("valid UTF-8 after string escape");
+                    if escaped == '\n' {
+                        *line += 1;
+                    }
+                    index += escaped.len_utf8();
+                }
+            }
+            '"' => return (Some(source[content_start..index].to_owned()), index + 1),
+            '\n' => {
+                *line += 1;
+                index += character.len_utf8();
+            }
+            _ => index += character.len_utf8(),
+        }
+    }
+    (None, index)
+}
+
+fn skip_line_comment(bytes: &[u8], mut index: usize) -> usize {
+    while index < bytes.len() && bytes[index] != b'\n' {
+        index += 1;
+    }
+    index
+}
+
+fn skip_block_comment(bytes: &[u8], mut index: usize, line: &mut usize) -> usize {
+    let mut depth = 1usize;
+    index += 2;
+    while index < bytes.len() && depth > 0 {
+        if bytes[index..].starts_with(b"/*") {
+            depth += 1;
+            index += 2;
+        } else if bytes[index..].starts_with(b"*/") {
+            depth -= 1;
+            index += 2;
+        } else {
+            if bytes[index] == b'\n' {
+                *line += 1;
+            }
+            index += 1;
+        }
+    }
+    index
+}
+
+fn skip_indented_string(bytes: &[u8], mut index: usize, line: &mut usize) -> usize {
+    index += 2;
+    while index < bytes.len() {
+        if bytes[index..].starts_with(b"'''") {
+            index += 3;
+        } else if bytes[index..].starts_with(b"''${") {
+            index += 4;
+        } else if bytes[index..].starts_with(b"''\"") {
+            index += 3;
+        } else if bytes[index..].starts_with(b"''\\") && index + 3 < bytes.len() {
+            if bytes[index + 3] == b'\n' {
+                *line += 1;
+            }
+            index += 4;
+        } else if bytes[index..].starts_with(b"''") {
+            return index + 2;
+        } else {
+            if bytes[index] == b'\n' {
+                *line += 1;
+            }
+            index += 1;
+        }
+    }
+    index
+}
+
+fn identifier_start(character: char) -> bool {
+    character.is_ascii_alphabetic() || character == '_'
+}
+
+fn identifier_continue(character: char) -> bool {
+    character.is_ascii_alphanumeric() || matches!(character, '_' | '-' | '\'')
 }
