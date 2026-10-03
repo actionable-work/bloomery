@@ -22,7 +22,7 @@ and downstream workflow systems.
 ## Responsibilities
 
 - Filter to manual requirements.
-- Sort by service, feature, group, and numeric sequence.
+- Sort by area, feature, group, and numeric sequence.
 - Render the canonical EARS statement and design reference.
 - Support human-readable tree output and machine-readable JSON.
 - Return a deterministic empty result when no manual records exist.

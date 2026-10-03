@@ -9,7 +9,7 @@ below the repository's top-level `.bloomery/` directory:
 .bloomery/
 ├── config.toml                       # optional
 └── specs/
-    └── <SERVICE>/
+    └── <AREA>/
         ├── README.md
         └── <FEATURE>/
             ├── README.md
@@ -29,8 +29,8 @@ or empty.
 
 ## Hierarchy
 
-- A service is a domain boundary and owns cross-cutting invariants.
-- A feature is a cohesive capability within one service.
+- An area groups related responsibilities and owns their shared rules.
+- A feature is a cohesive capability within one area.
 - A feature README is its overview and default design target.
 - Files under `design/` hold focused architecture, flow, state, protocol, and
   trade-off documents. Nested directories are allowed.
@@ -39,14 +39,14 @@ or empty.
 
 In this repository, `CLI` describes command-facing capabilities and `PARSER`
 contains shared input and evidence-processing capabilities. These names are
-examples of the hierarchy, not reserved service names.
+examples of the hierarchy, not reserved area names.
 
 ## Path rules
 
 Directory names are identifiers, not display labels. A discovered path is
 retained verbatim and compared by exact string equality. The CLI must not
-silently lowercase, uppercase, trim, transliterate, or otherwise normalize a
-service, feature, group, or document path.
+silently lowercase, uppercase, trim, transliterate, or otherwise normalize an
+area, feature, group, or document path.
 
 Design references are relative to the owning feature directory. A reference
 may point at the feature README or at any Markdown file below `design/`; an

@@ -127,7 +127,7 @@ pub struct Feature {
 }
 
 #[derive(Debug, Clone)]
-pub struct Service {
+pub struct Area {
     pub id: String,
     pub path: PathBuf,
     pub frontmatter: MarkdownFrontmatter,
@@ -145,18 +145,18 @@ pub struct Evidence {
 pub struct Context {
     pub root: PathBuf,
     pub config: Config,
-    pub services: Vec<Service>,
+    pub areas: Vec<Area>,
 }
 
 impl Context {
-    pub fn requirements(&self) -> impl Iterator<Item = (&Service, &Feature, &Requirement)> {
-        self.services.iter().flat_map(|service| {
-            service.features.iter().flat_map(move |feature| {
+    pub fn requirements(&self) -> impl Iterator<Item = (&Area, &Feature, &Requirement)> {
+        self.areas.iter().flat_map(|area| {
+            area.features.iter().flat_map(move |feature| {
                 feature.groups.iter().flat_map(move |group| {
                     group
                         .requirements
                         .iter()
-                        .map(move |requirement| (service, feature, requirement))
+                        .map(move |requirement| (area, feature, requirement))
                 })
             })
         })

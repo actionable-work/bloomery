@@ -3,7 +3,7 @@
 Every requirement identifier has four hyphen-separated segments:
 
 ```text
-<SERVICE>-<FEATURE>-<GROUP>-<SEQUENCE>
+<AREA>-<FEATURE>-<GROUP>-<SEQUENCE>
 ```
 
 The intended grammar is:
@@ -14,7 +14,7 @@ The intended grammar is:
 
 | Segment | Source of truth | Physical match |
 | --- | --- | --- |
-| `SERVICE` | Service directory and README `id` | `.bloomery/specs/<SERVICE>/` |
+| `AREA` | Area directory and README `id` | `.bloomery/specs/<AREA>/` |
 | `FEATURE` | Feature directory and README `id` | `.../<FEATURE>/` |
 | `GROUP` | Requirement file stem and TOML `group` | `.../requirements/<GROUP>.toml` |
 | `SEQUENCE` | Numeric record sequence | Unique within the feature group |

@@ -3,7 +3,7 @@ id: CHECK
 name: Traceability Check
 tagline: Deterministic validation of structure, grammar, references, and automated coverage.
 description: |
-  The check feature combines the shared PARSER service with relational
+  The check feature combines the shared PARSER area with relational
   verification and the `bloomery check` command. It succeeds only when every
   declared invariant holds and emits rustc-style diagnostics when validation
   fails.
@@ -14,7 +14,7 @@ description: |
 Check is the enforcing command. It validates the repository snapshot without
 running its tests or build system. It consumes the configuration, resolved
 specification model, and evidence registry produced by the
-[PARSER service](../../PARSER/README.md).
+[PARSER area](../../PARSER/README.md).
 
 ## Design documents
 

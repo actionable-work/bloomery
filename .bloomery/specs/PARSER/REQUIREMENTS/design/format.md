@@ -3,7 +3,7 @@
 Each requirement group is a TOML file at:
 
 ```text
-.bloomery/specs/<SERVICE>/<FEATURE>/requirements/<GROUP>.toml
+.bloomery/specs/<AREA>/<FEATURE>/requirements/<GROUP>.toml
 ```
 
 The root `group` string must equal the file stem. The file contains one or more

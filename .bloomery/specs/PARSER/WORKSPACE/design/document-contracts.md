@@ -1,12 +1,12 @@
-# Service and feature document contracts
+# Area and feature document contracts
 
-Service and feature entry points are Markdown files with YAML frontmatter.
+Area and feature entry points are Markdown files with YAML frontmatter.
 They are intentionally human-readable while exposing a small machine-readable
 contract for discovery and CLI summaries.
 
 ## Required frontmatter
 
-Every service and feature README contains these string keys:
+Every area and feature README contains these string keys:
 
 | Key | Meaning |
 | --- | --- |
@@ -18,11 +18,11 @@ Every service and feature README contains these string keys:
 The `id` is compared verbatim with its directory. The other fields are content,
 not alternate identity sources.
 
-## Service README
+## Area README
 
-A service README describes the domain boundary, ownership, major invariants,
-and the features below it. It should explain what the service does and what it
-deliberately leaves to external systems.
+An area README describes the scope, ownership, and major invariants of a broad
+part of the product or repository, along with the features below it. It should
+explain what the area covers and what it deliberately leaves outside its scope.
 
 ## Feature README
 
@@ -40,6 +40,6 @@ The checker validates both the file and the anchor when a link is explicit.
 ## Living-document invariant
 
 Architecture is committed alongside the records and code it explains. Bloomery
-does not accept a requirement as a detached list item with no service or
+does not accept a requirement as a detached list item with no area or
 feature context. Lifecycle state belongs to Git branches and pull requests,
 not to frontmatter.

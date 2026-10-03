@@ -6,11 +6,8 @@ pub fn run(context: &Context) -> Result<(), Vec<Diagnostic>> {
     let evidence = scan_all(context)?;
     let mut diagnostics = Vec::new();
     let mut declared = BTreeMap::new();
-    for (service, feature, requirement) in context.requirements() {
-        declared.insert(
-            requirement.entry.id.clone(),
-            (service, feature, requirement),
-        );
+    for (area, feature, requirement) in context.requirements() {
+        declared.insert(requirement.entry.id.clone(), (area, feature, requirement));
     }
     let mut references = BTreeMap::new();
     for item in &evidence {
@@ -52,7 +49,7 @@ pub fn run(context: &Context) -> Result<(), Vec<Diagnostic>> {
             }
         }
     }
-    for (service, feature, requirement) in context.requirements() {
+    for (area, feature, requirement) in context.requirements() {
         if !requirement.entry.manual && !references.contains_key(&requirement.entry.id) {
             diagnostics.push(
                 bloomery_model::Diagnostic::new(
@@ -63,7 +60,7 @@ pub fn run(context: &Context) -> Result<(), Vec<Diagnostic>> {
                     ),
                 )
                 .at(requirement.path.clone(), Some(requirement.line))
-                .note(format!("Owner: {}/{}", service.id, feature.id)),
+                .note(format!("Owner: {}/{}", area.id, feature.id)),
             );
         }
     }

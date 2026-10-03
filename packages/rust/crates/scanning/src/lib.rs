@@ -88,7 +88,7 @@ mod tests {
                     nix: NixScannerConfig::default(),
                 },
             },
-            services: Vec::new(),
+            areas: Vec::new(),
         };
         let evidence = scan_all(&context).expect("scanners should succeed");
         assert_eq!(evidence.len(), 2);

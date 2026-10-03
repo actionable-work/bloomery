@@ -3,7 +3,7 @@
 Diagnostics identify the failed invariant, explain the expected relationship,
 and point to a repository-relative source location where possible. Output is
 stable across runs: paths are normalized to repository-relative form, and
-collections are sorted by service, feature, group, sequence, then source
+collections are sorted by area, feature, group, sequence, then source
 location.
 
 The diagnostic vocabulary includes:
@@ -11,7 +11,7 @@ The diagnostic vocabulary includes:
 | Code | Meaning |
 | --- | --- |
 | `DirectoryIdMismatch` | A directory and README `id` disagree. |
-| `MissingDocument` | A required service or feature README is absent. |
+| `MissingDocument` | A required area or feature README is absent. |
 | `MissingDesignFile` | An explicit design path cannot be resolved. |
 | `DanglingDesignAnchor` | A requested Markdown heading anchor is absent. |
 | `SpecIdPathMismatch` | An ID segment disagrees with its physical path. |

@@ -1,21 +1,21 @@
 ---
 id: PARSER
-name: Bloomery Parsing and Evidence Service
+name: Bloomery Parsing and Evidence Area
 tagline: Resolve repository specifications and statically extract requirement evidence.
 description: |
-  The PARSER service defines the shared input contracts used by Bloomery
+  The PARSER area defines the shared input contracts used by Bloomery
   commands: configuration, grouped requirements, workspace documents, and
   source-evidence references. It resolves these inputs into a common model while
   retaining stable identities, source locations, and structured diagnostics.
 ---
 
-# PARSER Service
+# PARSER Area
 
 PARSER owns the reusable ingestion path shared by `bloomery check` and
 `bloomery review`. It interprets configuration and specification documents,
 constructs the resolved requirement model, and extracts evidence from configured
 source inputs. Command-level validation and review behavior remain in the
-[CLI service](../CLI/README.md).
+[CLI area](../CLI/README.md).
 
 ## Features
 

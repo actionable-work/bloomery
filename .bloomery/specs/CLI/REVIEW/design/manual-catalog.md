@@ -6,7 +6,7 @@ errors owned by `bloomery check`.
 
 Each selected item contains:
 
-- service, feature, and group identity;
+- area, feature, and group identity;
 - the full requirement ID and title;
 - the generated EARS statement;
 - the resolved design reference, including an anchor when supplied.
@@ -15,7 +15,7 @@ Each selected item contains:
 
 The catalogue is deterministic and hierarchical:
 
-1. service directory name, ascending;
+1. area directory name, ascending;
 2. feature directory name, ascending;
 3. group name, ascending;
 4. sequence, ascending numerically (`001` before `010`).
