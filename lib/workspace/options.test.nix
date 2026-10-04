@@ -99,4 +99,35 @@ in {
       hasSrc = true;
     };
   };
+
+  testTestOverrideSubmoduleIsSeparateFromCommonInputs = {
+    expr = let
+      cfg = options.evalWorkspaceOptions {
+        root = ./.;
+        overrides = {
+          foo-sys = {
+            nativeBuildInputs = [pkgs.hello];
+            test = {
+              buildInputs = [pkgs.zlib];
+              env = {FOO_TEST = "1";};
+              fileset = ./options.test.nix;
+            };
+          };
+        };
+      };
+    in {
+      commonNativeDeps = builtins.length cfg.overrides.foo-sys.nativeBuildInputs;
+      testBuildDeps = builtins.length cfg.overrides.foo-sys.test.buildInputs;
+      testEnv = cfg.overrides.foo-sys.test.env.FOO_TEST;
+      hasTestFileset = cfg.overrides.foo-sys.test.fileset != null;
+      testNativeDepsDefault = cfg.overrides.foo-sys.test.nativeBuildInputs;
+    };
+    expected = {
+      commonNativeDeps = 1;
+      testBuildDeps = 1;
+      testEnv = "1";
+      hasTestFileset = true;
+      testNativeDepsDefault = [];
+    };
+  };
 }

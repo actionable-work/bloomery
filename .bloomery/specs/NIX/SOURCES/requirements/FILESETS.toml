@@ -1,0 +1,114 @@
+group = "FILESETS"
+
+[[requirements]]
+id = "NIX-SOURCES-FILESETS-001"
+title = "Default sources retain manifest and Rust entrypoints"
+manual = false
+design = "design/filesets.md#default-member-sources"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Nix workspace builder"
+action = "include each member's Cargo.toml, Rust source entrypoints including root-level, symlinked, and manifest-declared paths, and the sibling module directories those root-level entrypoints resolve, in its default compilation fileset"
+
+[[requirements]]
+id = "NIX-SOURCES-FILESETS-002"
+title = "Embedded non-Rust content survives filtering"
+manual = false
+design = "design/filesets.md#default-member-sources"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Nix workspace builder"
+action = "preserve all files and relative layout within selected source directories so Rust compilation can consume embedded Markdown and binary data"
+
+[[requirements]]
+id = "NIX-SOURCES-FILESETS-003"
+title = "Unselected repository files are excluded"
+manual = false
+design = "design/filesets.md#default-member-sources"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Nix workspace builder"
+action = "exclude unreferenced crate-root README files, standalone documentation, Bloomery metadata, VCS and editor state, build outputs, result links, and development-environment state from default Rust sources"
+
+[[requirements]]
+id = "NIX-SOURCES-FILESETS-004"
+title = "Root packages do not absorb other members"
+manual = false
+design = "design/filesets.md#default-member-sources"
+
+[requirements.ears]
+type = "event"
+trigger = "a workspace contains a package at its root"
+system = "the Nix workspace builder"
+action = "select that package's inputs without implicitly including nested workspace members or unrelated workspace trees"
+
+[[requirements]]
+id = "NIX-SOURCES-FILESETS-005"
+title = "Test sources retain fixtures"
+manual = false
+design = "design/filesets.md#default-member-sources"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Nix workspace builder"
+action = "provide consuming test derivations with their selected integration-test sources and fixture files regardless of file extension"
+
+[[requirements]]
+id = "NIX-SOURCES-FILESETS-006"
+title = "Explicit sources take precedence"
+manual = false
+design = "design/filesets.md#explicit-selection"
+
+[requirements.ears]
+type = "event"
+trigger = "a member has an explicit src override"
+system = "the Nix workspace builder"
+action = "use that source instead of an explicit fileset or default source selection without re-filtering an explicit source derivation"
+
+[[requirements]]
+id = "NIX-SOURCES-FILESETS-007"
+title = "Custom filesets replace default selection"
+manual = false
+design = "design/filesets.md#explicit-selection"
+
+[requirements.ears]
+type = "event"
+trigger = "a member has an explicit fileset and no explicit src override"
+system = "the Nix workspace builder"
+action = "materialize exactly that fileset with the required crate-relative layout, including explicitly selected files excluded by the default policy"
+
+[[requirements]]
+id = "NIX-SOURCES-FILESETS-008"
+title = "Crate assets survive filtering"
+manual = false
+design = "design/filesets.md#default-member-sources"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Nix workspace builder"
+action = "retain crate-local assets, static, public, and configured assetDirs consumed by builders so their contents remain available for installation"
+
+[[requirements]]
+id = "NIX-SOURCES-FILESETS-009"
+title = "Workspace assets have isolated sources"
+manual = false
+design = "design/filesets.md#assets-and-auxiliary-trees"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Nix workspace builder"
+action = "materialize workspace assets, static, and public as independent source trees before passing their paths to consuming derivations"
+
+[[requirements]]
+id = "NIX-SOURCES-FILESETS-010"
+title = "Repository test support selects inspected files"
+manual = false
+design = "design/filesets.md#assets-and-auxiliary-trees"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery repository's Nix test-support builders"
+action = "materialize only the manifest, entrypoints, and Nix API files inspected by their respective tests before constructing scripts or symlink targets"

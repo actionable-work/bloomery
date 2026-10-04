@@ -1,0 +1,119 @@
+group = "IDENTITY"
+
+[[requirements]]
+id = "NIX-SOURCES-IDENTITY-001"
+title = "Selected content determines source identity"
+manual = false
+design = "design/identity.md#content-identity"
+
+[requirements.ears]
+type = "event"
+trigger = "two workspace snapshots have identical selected source contents and layout but different enclosing snapshot paths"
+system = "the Nix workspace builder"
+action = "produce identical store paths for their corresponding filtered source trees"
+
+[[requirements]]
+id = "NIX-SOURCES-IDENTITY-002"
+title = "Build-time references do not leak the flake root"
+manual = false
+design = "design/identity.md#content-identity"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Nix workspace builder and repository test-support builders"
+action = "reference isolated source trees rather than unfiltered enclosing flake paths in derivation attributes, scripts, environment values, and symlink targets"
+
+[[requirements]]
+id = "NIX-SOURCES-IDENTITY-003"
+title = "Unrelated Markdown leaves Rust derivations unchanged"
+manual = false
+design = "design/identity.md#invalidation-boundaries"
+
+[requirements.ears]
+type = "event"
+trigger = "only unselected README, standalone Markdown, or Bloomery specification content changes while effective build configuration remains unchanged"
+system = "the Nix workspace builder"
+action = "preserve derivation paths for all generated release and dev Rust packages, unit and integration tests, clippy, rustdoc, and doctests"
+
+[[requirements]]
+id = "NIX-SOURCES-IDENTITY-004"
+title = "Source changes invalidate active dependents"
+manual = false
+design = "design/identity.md#invalidation-boundaries"
+
+[requirements.ears]
+type = "event"
+trigger = "a member's selected Rust source changes"
+system = "the Nix workspace builder"
+action = "change derivation identities for the member's consuming builds and active transitive dependents while preserving identities of unrelated members"
+
+[[requirements]]
+id = "NIX-SOURCES-IDENTITY-005"
+title = "Embedded Markdown invalidates its consumers"
+manual = false
+design = "design/identity.md#invalidation-boundaries"
+
+[requirements.ears]
+type = "event"
+trigger = "Markdown embedded by a member's Rust source changes"
+system = "the Nix workspace builder"
+action = "change derivation identities for the member's consuming builds and active transitive dependents while preserving identities of unrelated members"
+
+[[requirements]]
+id = "NIX-SOURCES-IDENTITY-006"
+title = "Test-only inputs do not invalidate production packages"
+manual = false
+design = "design/identity.md#invalidation-boundaries"
+
+[requirements.ears]
+type = "event"
+trigger = "only a selected test-only fixture or repository test-support input changes"
+system = "the Nix workspace builder"
+action = "change the consuming test derivation identities while preserving production package identities"
+
+[[requirements]]
+id = "NIX-SOURCES-IDENTITY-007"
+title = "Asset changes invalidate only asset consumers"
+manual = false
+design = "design/identity.md#invalidation-boundaries"
+
+[requirements.ears]
+type = "event"
+trigger = "a selected bundled asset changes"
+system = "the Nix workspace builder"
+action = "change derivation identities for asset consumers and their dependents while preserving unrelated crate compilation identities"
+
+[[requirements]]
+id = "NIX-SOURCES-IDENTITY-008"
+title = "Explicit local inputs isolate their selected subtree"
+manual = false
+design = "design/filesets.md#explicit-selection"
+
+[requirements.ears]
+type = "event"
+trigger = "a member uses an explicit local src or asset path and only files outside that selected subtree change"
+system = "the Nix workspace builder"
+action = "preserve the corresponding consuming derivation identities when other effective inputs remain unchanged"
+
+[[requirements]]
+id = "NIX-SOURCES-IDENTITY-009"
+title = "External dependencies remain independent of local prose"
+manual = false
+design = "design/identity.md#content-identity"
+
+[requirements.ears]
+type = "event"
+trigger = "only unrelated local workspace content changes"
+system = "the Nix workspace builder"
+action = "preserve registry and pinned Git crate derivation identities when their resolved metadata and build configuration remain unchanged"
+
+[[requirements]]
+id = "NIX-SOURCES-IDENTITY-010"
+title = "All workspace integrations preserve source isolation"
+manual = false
+design = "design/identity.md#automated-verification"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "mkWorkspace, mkFlake, and the flake-parts integration"
+action = "preserve source and Rust derivation identity across equivalent workspace snapshots that differ only in unselected content"

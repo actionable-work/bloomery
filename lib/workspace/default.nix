@@ -5,6 +5,7 @@
   discover = import ./discover.nix {inherit lib;};
   features = import ./features.nix {inherit lib;};
   parseLock = import ./parse-lock.nix {inherit lib;};
+  sources = import ./sources.nix {inherit lib pkgs;};
   options =
     if pkgs != null
     then import ./options.nix {inherit pkgs lib;}
@@ -20,6 +21,7 @@ in {
   inherit (discover) discoverWorkspaceCrates;
   inherit (features) extractFeaturesFromToml unifyWorkspaceFeatures resolveFeatures;
   inherit (parseLock) parseDepString parseLock;
+  inherit sources;
   inherit options;
   tests = discoverTests // featuresTests // parseLockTests // optionsTests;
 }

@@ -2,9 +2,12 @@
   pkgs,
   lib ? pkgs.lib,
   cratesIoIndex ? null,
+  # Seam for the pinned-Git fetch so source-isolation tests can exercise the
+  # production selection and build branch against a deterministic local tree.
+  gitFetch ? args: builtins.fetchGit (args // {allRefs = true;}),
 }: let
   builders = import ./builders {inherit pkgs lib;};
-  workspace = import ./workspace {inherit lib;};
+  workspace = import ./workspace {inherit pkgs lib;};
   profileMod = import ./profile {inherit lib;};
   defaultOverrides = import ./overrides {inherit pkgs lib;};
   optionsMod = import ./workspace/options.nix {inherit pkgs lib;};
@@ -81,6 +84,16 @@ in
 
     colocatedOverrides = lib.mapAttrs (_cname: crateDir: loadColocatedOverride crateDir) rawDiscoveredMembers;
 
+    mergeTestOverrides = a: b: {
+      nativeBuildInputs = (a.nativeBuildInputs or []) ++ (b.nativeBuildInputs or []);
+      buildInputs = (a.buildInputs or []) ++ (b.buildInputs or []);
+      env = (a.env or {}) // (b.env or {});
+      fileset =
+        if b ? fileset && b.fileset != null
+        then b.fileset
+        else a.fileset or null;
+    };
+
     mergeOverrides = a: b: let
       mergedFeats =
         if b ? features && b.features != null
@@ -89,25 +102,28 @@ in
         then a.features
         else null;
     in
-      a
-      // b
-      // {
-        nativeBuildInputs = (a.nativeBuildInputs or []) ++ (b.nativeBuildInputs or []);
-        buildInputs = (a.buildInputs or []) ++ (b.buildInputs or []);
-        rustcFlags = (a.rustcFlags or []) ++ (b.rustcFlags or []);
-        rustdocFlags = (a.rustdocFlags or []) ++ (b.rustdocFlags or []);
-        env = (a.env or {}) // (b.env or {});
-        profile = (a.profile or {}) // (b.profile or {});
-        profileDev = (a.profileDev or {}) // (b.profileDev or {});
-        src =
-          if b ? src && b.src != null
-          then b.src
-          else a.src or null;
-        fileset =
-          if b ? fileset && b.fileset != null
-          then b.fileset
-          else a.fileset or null;
-      }
+      lib.removeAttrs
+      (a
+        // b
+        // {
+          nativeBuildInputs = (a.nativeBuildInputs or []) ++ (b.nativeBuildInputs or []);
+          buildInputs = (a.buildInputs or []) ++ (b.buildInputs or []);
+          rustcFlags = (a.rustcFlags or []) ++ (b.rustcFlags or []);
+          rustdocFlags = (a.rustdocFlags or []) ++ (b.rustdocFlags or []);
+          env = (a.env or {}) // (b.env or {});
+          profile = (a.profile or {}) // (b.profile or {});
+          profileDev = (a.profileDev or {}) // (b.profileDev or {});
+          src =
+            if b ? src && b.src != null
+            then b.src
+            else a.src or null;
+          fileset =
+            if b ? fileset && b.fileset != null
+            then b.fileset
+            else a.fileset or null;
+          test = mergeTestOverrides (a.test or {}) (b.test or {});
+        })
+      ["features"]
       // lib.optionalAttrs (mergedFeats != null) {
         features = mergedFeats;
       };
@@ -143,36 +159,49 @@ in
       then byId
       else getOverride name;
 
-    cleanWorkspaceSource = p:
-      if builtins.isAttrs p && p ? _isLibCleanSourceWith
-      then p
-      else if builtins.isPath p
-      then
-        lib.fileset.toSource {
-          root = p;
-          fileset = lib.fileset.difference p (lib.fileset.unions [
-            (lib.fileset.maybeMissing (p + "/target"))
-            (lib.fileset.maybeMissing (p + "/result"))
-            (lib.fileset.maybeMissing (p + "/.git"))
-            (lib.fileset.maybeMissing (p + "/.direnv"))
-          ]);
-        }
-      else p;
-
-    resolveMemberSource = cname: crateDir: let
-      cOverride = getOverride cname;
+    testOverridesFor = nameOrId: let
+      base = getOverride nameOrId;
+      test = base.test or {};
     in
-      if cOverride ? src && cOverride.src != null
-      then cOverride.src
-      else if cOverride ? fileset && cOverride.fileset != null
-      then
-        lib.fileset.toSource {
-          root = crateDir;
-          fileset = cOverride.fileset;
-        }
-      else cleanWorkspaceSource crateDir;
+      base
+      // {
+        nativeBuildInputs = (base.nativeBuildInputs or []) ++ (test.nativeBuildInputs or []);
+        buildInputs = (base.buildInputs or []) ++ (test.buildInputs or []);
+        env = (base.env or {}) // (test.env or {});
+      };
 
-    discoveredMembers = lib.mapAttrs resolveMemberSource rawDiscoveredMembers;
+    getTestFileset = nameOrId: (getOverride nameOrId).test.fileset or null;
+
+    resolveMemberSource = cname: crateDir:
+      workspace.sources.resolve {
+        inherit crateDir;
+        override = getOverride cname;
+        excludeDirs = workspace.sources.nestedMemberPaths crateDir rawDiscoveredMembers;
+      };
+
+    resolveTestMemberSource = cname: crateDir:
+      workspace.sources.resolve {
+        inherit crateDir;
+        override = getOverride cname;
+        includeTests = true;
+        testFileset = getTestFileset cname;
+        excludeDirs = workspace.sources.nestedMemberPaths crateDir rawDiscoveredMembers;
+      };
+
+    # Resolved source plus library availability for every member. Library
+    # detection reads the authoritative effective selection so default and
+    # custom filesets, explicit local paths, and accepted path strings reflect
+    # the entrypoints that will compile. An opaque source derivation falls back
+    # to the raw member manifest.
+    memberSourceInfo = lib.mapAttrs resolveMemberSource rawDiscoveredMembers;
+    testMemberSourceInfo = lib.mapAttrs resolveTestMemberSource rawDiscoveredMembers;
+    discoveredMembers = lib.mapAttrs (_: info: info.evalSrc) memberSourceInfo;
+    # `src` is the build source; it may materialize symlinked entrypoint
+    # targets, so evaluation keeps using `discovered*` (the `evalSrc` trees).
+    buildMembers = lib.mapAttrs (_: info: info.src) memberSourceInfo;
+    buildTestMembers = lib.mapAttrs (_: info: info.src) testMemberSourceInfo;
+    memberHasLib = name: (memberSourceInfo.${name} or {}).hasLibrary or false;
+    testMemberHasLib = name: (testMemberSourceInfo.${name} or {}).hasLibrary or false;
 
     builderCrate = builders.buildCrateWith {inherit rustc stdenv mold lld defaultLinker;};
     builderBin = builders.buildBinWith {inherit rustc stdenv mold lld defaultLinker;};
@@ -290,28 +319,12 @@ in
       then lib.filter (depId: builtins.elem depId defaultDepIds) resolvedFeatures.__activeDeps.${id}
       else defaultDepIds;
 
-    parseGitSource = srcStr: let
-      noPrefix = lib.removePrefix "git+" srcStr;
-      parts = lib.splitString "#" noPrefix;
-      urlAndParams = builtins.elemAt parts 0;
-      rev =
-        if builtins.length parts > 1
-        then builtins.elemAt parts 1
-        else null;
-      url = builtins.head (lib.splitString "?" urlAndParams);
-    in {
-      inherit url rev;
-    };
-
     fetchGitCrate = {
       url,
       rev,
       name,
     }: let
-      repo = builtins.fetchGit {
-        inherit url rev;
-        allRefs = true;
-      };
+      repo = gitFetch {inherit url rev;};
       rootToml = repo + "/Cargo.toml";
       isRoot =
         builtins.pathExists rootToml
@@ -351,7 +364,7 @@ in
         id: pkg: let
           src =
             if pkg.isWorkspace
-            then discoveredMembers.${pkg.name} or (throw "Workspace crate '${pkg.name}' path not found in workspace")
+            then buildMembers.${pkg.name} or (throw "Workspace crate '${pkg.name}' path not found in workspace")
             else if pkg.isRegistry
             then
               pkgs.fetchurl {
@@ -361,7 +374,7 @@ in
               }
             else if pkg.isGit
             then let
-              gitInfo = parseGitSource pkg.source;
+              gitInfo = workspace.sources.parseGitSource pkg.source;
             in
               fetchGitCrate {
                 inherit (gitInfo) url rev;
@@ -409,7 +422,7 @@ in
             if !pkg.isWorkspace
             then crates.${id}
             else let
-              src = discoveredMembers.${pkg.name} or (throw "Workspace crate '${pkg.name}' path not found in workspace");
+              src = buildMembers.${pkg.name} or (throw "Workspace crate '${pkg.name}' path not found in workspace");
               depDrvs = map (depId: devCrates.${depId}) (getDepIds id pkg.depIds);
               cOverride = getCrateOverride id pkg.name;
               pkgLock =
@@ -447,24 +460,27 @@ in
       lib.concatMap (
         wpkg: let
           cratePath = discoveredMembers.${wpkg.name} or null;
+          buildPath = buildMembers.${wpkg.name} or null;
           depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
           depDevDrvs =
             if createDevPackages
             then map (depId: devCrates.${depId}) (getDepIds wpkg.id wpkg.depIds)
             else depDrvs;
           cOverride = getOverride wpkg.name;
-          cOverrideDev =
+          materializedOverride =
             cOverride
+            // {
+              assets = map (asset: {
+                path = workspace.sources.materializeAsset asset;
+                name = workspace.sources.assetName asset;
+              }) (cOverride.assets or []);
+            };
+          cOverrideDev =
+            materializedOverride
             // {
               profile = cOverride.profileDev or {};
             };
-          hasLib =
-            cratePath
-            != null
-            && (
-              builtins.pathExists (cratePath + "/src/lib.rs")
-              || builtins.pathExists (cratePath + "/lib.rs")
-            );
+          hasLib = memberHasLib wpkg.name;
           crateDrv =
             if hasLib
             then (crates.${wpkg.id} or null)
@@ -479,18 +495,9 @@ in
             else {};
           edition = pkgLock.edition or null;
 
-          workspaceAssets =
-            if builtins.pathExists (root + "/assets")
-            then (root + "/assets")
-            else null;
-          workspaceStatic =
-            if builtins.pathExists (root + "/static")
-            then (root + "/static")
-            else null;
-          workspacePublic =
-            if builtins.pathExists (root + "/public")
-            then (root + "/public")
-            else null;
+          workspaceAssets = workspace.sources.materializeOptionalTree (root + "/assets");
+          workspaceStatic = workspace.sources.materializeOptionalTree (root + "/static");
+          workspacePublic = workspace.sources.materializeOptionalTree (root + "/public");
 
           buildBinary = {
             binName,
@@ -500,11 +507,11 @@ in
             drv = builderBin {
               inherit binName entry;
               pkg = wpkg;
-              src = cratePath;
+              src = buildPath;
               inherit crateDrv edition;
               inherit workspaceAssets workspaceStatic workspacePublic;
               dependencies = depDrvs;
-              override = cOverride;
+              override = materializedOverride;
               profile = effectiveBinaryProfile;
               inherit defaultRustcFlags;
             };
@@ -514,7 +521,7 @@ in
                 builderBin {
                   inherit binName entry;
                   pkg = wpkg;
-                  src = cratePath;
+                  src = buildPath;
                   crateDrv = crateDevDrv;
                   inherit edition;
                   inherit workspaceAssets workspaceStatic workspacePublic;
@@ -623,14 +630,7 @@ in
     libraryPackages =
       lib.foldl' (
         acc: wpkg: let
-          cratePath = discoveredMembers.${wpkg.name} or null;
-          hasLib =
-            cratePath
-            != null
-            && (
-              builtins.pathExists (cratePath + "/src/lib.rs")
-              || builtins.pathExists (cratePath + "/lib.rs")
-            );
+          hasLib = memberHasLib wpkg.name;
         in
           if hasLib
           then
@@ -647,16 +647,10 @@ in
     workspaceTests = lib.listToAttrs (
       map (
         wpkg: let
-          cratePath = discoveredMembers.${wpkg.name};
+          cratePath = buildTestMembers.${wpkg.name};
           depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
-          cOverride = getOverride wpkg.name;
-          hasLib =
-            cratePath
-            != null
-            && (
-              builtins.pathExists (cratePath + "/src/lib.rs")
-              || builtins.pathExists (cratePath + "/lib.rs")
-            );
+          cOverride = testOverridesFor wpkg.name;
+          hasLib = testMemberHasLib wpkg.name;
           crateDrv =
             if hasLib
             then (crates.${wpkg.id} or null)
@@ -686,7 +680,7 @@ in
     workspaceClippy = lib.listToAttrs (
       map (
         wpkg: let
-          cratePath = discoveredMembers.${wpkg.name};
+          cratePath = buildMembers.${wpkg.name};
           depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
           cOverride = getOverride wpkg.name;
           pkgLock =
@@ -714,7 +708,7 @@ in
     workspaceDocs = lib.listToAttrs (
       map (
         wpkg: let
-          cratePath = discoveredMembers.${wpkg.name};
+          cratePath = buildMembers.${wpkg.name};
           depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
           cOverride = getOverride wpkg.name;
           pkgLock =
@@ -743,14 +737,8 @@ in
       builtins.filter (x: x != null) (
         map (
           wpkg: let
-            cratePath = discoveredMembers.${wpkg.name};
-            hasLib =
-              cratePath
-              != null
-              && (
-                builtins.pathExists (cratePath + "/src/lib.rs")
-                || builtins.pathExists (cratePath + "/lib.rs")
-              );
+            cratePath = buildMembers.${wpkg.name};
+            hasLib = memberHasLib wpkg.name;
             depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
             cOverride = getOverride wpkg.name;
             pkgLock =

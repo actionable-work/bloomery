@@ -1,0 +1,1 @@
+variant embedded markdown

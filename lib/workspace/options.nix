@@ -5,6 +5,34 @@
   types = lib.types;
   profileTypes = import ../profile/types.nix {inherit lib;};
 
+  # Submodule for test-only crate overrides. These inputs are overlaid on the
+  # test builder only; they never participate in production compilation or
+  # packaging.
+  testOverrideOptionModule = {
+    options = {
+      nativeBuildInputs = lib.mkOption {
+        type = types.listOf types.package;
+        default = [];
+        description = "Build-time native tools available to test compilation and execution only.";
+      };
+      buildInputs = lib.mkOption {
+        type = types.listOf types.package;
+        default = [];
+        description = "Target native libraries available to test compilation and execution only.";
+      };
+      env = lib.mkOption {
+        type = types.attrsOf types.str;
+        default = {};
+        description = "Environment variables set while compiling and running tests only.";
+      };
+      fileset = lib.mkOption {
+        type = types.nullOr types.raw;
+        default = null;
+        description = "Additive fixture fileset included in test sources only.";
+      };
+    };
+  };
+
   # Submodule for individual crate overrides
   overrideOptionModule = {
     options = {
@@ -67,6 +95,11 @@
         type = types.listOf types.str;
         default = [];
         description = "Custom asset directory names to collect from the crate source (in addition to assets, static, public).";
+      };
+      test = lib.mkOption {
+        type = types.submodule testOverrideOptionModule;
+        default = {};
+        description = "Test-only overrides (native inputs, environment, additive fixture fileset).";
       };
     };
   };
@@ -313,5 +346,5 @@
   in
     eval.config;
 in {
-  inherit workspaceOptionModule evalWorkspaceOptions overrideOptionModule;
+  inherit workspaceOptionModule evalWorkspaceOptions overrideOptionModule testOverrideOptionModule;
 }

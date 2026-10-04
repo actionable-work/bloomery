@@ -1,11 +1,24 @@
-{pkgs, ...}: let
-  sourceRoot = ./../../../../..;
-  migrationSources = pkgs.runCommand "bloomery-sync-migration-test-sources" {} ''
-    mkdir -p "$out"
-    ln -s ${sourceRoot}/lib "$out/lib"
-  '';
+{
+  lib,
+  # Overridable so identity tests can exercise the actual filtering against
+  # paired enclosing repository snapshots.
+  sourceRoot ? ./../../../../..,
+  ...
+}: let
+  # Only the Nix API files inspected by the migration tests enter the support
+  # tree. lib/lock/default.nix is intentionally absent.
+  migrationSources = lib.fileset.toSource {
+    root = sourceRoot;
+    fileset = lib.fileset.unions [
+      (sourceRoot + "/lib/default.nix")
+      (sourceRoot + "/lib/mk-workspace.nix")
+      (sourceRoot + "/lib/mk-flake.nix")
+      (sourceRoot + "/lib/modules/flake-module.nix")
+      (sourceRoot + "/lib/workspace/lock-check.nix")
+    ];
+  };
 in {
-  # Keep the Nix API sources available to the isolated migration tests.
-  nativeBuildInputs = [migrationSources];
-  env.BLOOMERY_SOURCE_ROOT = "${migrationSources}";
+  test = {
+    env.BLOOMERY_SOURCE_ROOT = "${migrationSources}";
+  };
 }

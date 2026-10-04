@@ -397,12 +397,22 @@ in
             fi
           done
 
-          # 4. Explicit extra asset paths from overrides.nix
-          ${lib.concatMapStringsSep "\n" (assetPath: ''
-            if [ -e "${assetPath}" ]; then
+          # 4. Explicit extra asset paths from overrides.nix. Entries are
+          # normally { path, name } after workspace materialization; raw paths
+          # are accepted for direct builder use.
+          ${lib.concatMapStringsSep "\n" (entry: let
+            asset =
+              if builtins.isAttrs entry && entry ? path
+              then entry
+              else {
+                path = entry;
+                name = builtins.baseNameOf (toString entry);
+              };
+          in ''
+            if [ -e "${asset.path}" ]; then
               mkdir -p "$out/bin/assets" "$out/share/$BIN_NAME/assets"
-              cp -r "${assetPath}" "$out/bin/assets/" 2>/dev/null || true
-              cp -r "${assetPath}" "$out/share/$BIN_NAME/assets/" 2>/dev/null || true
+              cp -r "${asset.path}" "$out/bin/assets/${asset.name}" 2>/dev/null || true
+              cp -r "${asset.path}" "$out/share/$BIN_NAME/assets/${asset.name}" 2>/dev/null || true
             fi
           '') (override.assets or [])}
 

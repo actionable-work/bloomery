@@ -44,3 +44,5 @@ The Nix workspace-check integration is described with
 [CLI/CHECK](../../../CLI/CHECK/design/workspace-check.md). This layout map
 records where that integration and the broader Nix library live; the detailed
 contracts of those Nix subsystems remain outside this feature's scope.
+[Source isolation](../../../NIX/SOURCES/README.md) owns fileset selection and
+rebuild boundaries for the reusable builders and repository test-support inputs.

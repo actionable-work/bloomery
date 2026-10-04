@@ -9,9 +9,18 @@
   flakeModuleTests = import ./modules/flake-module.test.nix {inherit pkgs lib;};
   builderTests = import ./builders/builders.test.nix {inherit pkgs lib;};
   repositoryLayoutTests = import ./repository-layout.test.nix {inherit lib;};
+  sourceIsolationTests = import ./source-isolation.test.nix {inherit pkgs lib;};
 
   # Aggregate all colocated unit tests
-  testCases = profile.tests // workspace.tests // mkFlakeTests // mkWorkspaceTests // flakeModuleTests // builderTests // repositoryLayoutTests;
+  testCases =
+    profile.tests
+    // workspace.tests
+    // mkFlakeTests
+    // mkWorkspaceTests
+    // flakeModuleTests
+    // builderTests
+    // repositoryLayoutTests
+    // sourceIsolationTests;
 
   failedTests = lib.runTests testCases;
 in {
@@ -29,6 +38,16 @@ in {
           "REPOSITORY-LAYOUT-STRUCTURE-004"
           "REPOSITORY-LAYOUT-STRUCTURE-005"
           "REPOSITORY-LAYOUT-STRUCTURE-006"
+          "NIX-SOURCES-IDENTITY-001"
+          "NIX-SOURCES-IDENTITY-002"
+          "NIX-SOURCES-IDENTITY-003"
+          "NIX-SOURCES-IDENTITY-004"
+          "NIX-SOURCES-IDENTITY-005"
+          "NIX-SOURCES-IDENTITY-006"
+          "NIX-SOURCES-IDENTITY-007"
+          "NIX-SOURCES-IDENTITY-008"
+          "NIX-SOURCES-IDENTITY-009"
+          "NIX-SOURCES-IDENTITY-010"
         ];
       };
     } ''
