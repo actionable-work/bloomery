@@ -1,6 +1,7 @@
 use super::interrupt::{CancellationToken, InterruptFlag};
 use std::collections::VecDeque;
-use std::sync::Mutex;
+use std::sync::{Arc, Condvar, Mutex};
+use std::time::Duration;
 
 pub enum ScheduledState<T> {
     Completed(T),
@@ -17,17 +18,85 @@ pub struct ScheduleReport<T> {
     pub results: Vec<ScheduledResult<T>>,
 }
 
+/// Tracks worker completion so a caller-thread progress consumer knows when no
+/// further events can be produced. Workers hold a guard that decrements the
+/// count as their last action.
+pub(super) struct WorkerTracker {
+    state: Arc<(Mutex<usize>, Condvar)>,
+}
+
+impl WorkerTracker {
+    fn new(count: usize) -> Self {
+        Self {
+            state: Arc::new((Mutex::new(count), Condvar::new())),
+        }
+    }
+
+    fn guard(&self) -> WorkerGuard {
+        WorkerGuard {
+            state: self.state.clone(),
+        }
+    }
+
+    /// Wait up to `timeout` for all workers to finish. Returns `true` once idle.
+    pub(super) fn wait_timeout(&self, timeout: Duration) -> bool {
+        let (lock, condvar) = &*self.state;
+        let guard = lock.lock().expect("worker tracker lock");
+        if *guard == 0 {
+            return true;
+        }
+        let (guard, _timeout_result) = condvar
+            .wait_timeout(guard, timeout)
+            .expect("worker tracker wait");
+        *guard == 0
+    }
+}
+
+struct WorkerGuard {
+    state: Arc<(Mutex<usize>, Condvar)>,
+}
+
+impl Drop for WorkerGuard {
+    fn drop(&mut self) {
+        let (lock, condvar) = &*self.state;
+        let mut count = lock.lock().expect("worker tracker lock");
+        *count = count.saturating_sub(1);
+        condvar.notify_all();
+    }
+}
+
 pub(super) type Task<'scope, T> = Box<dyn FnOnce(CancellationToken) -> T + Send + 'scope>;
 
 struct Scheduler<'scope, T> {
     ids: Vec<String>,
     queue: VecDeque<(usize, Task<'scope, T>)>,
     slots: Vec<Slot<T>>,
+    admission_stopped: bool,
 }
 enum Slot<T> {
     Queued,
     Running,
     Completed(T),
+}
+
+impl<T> Scheduler<'_, T> {
+    /// Permanently stop admission and return the IDs whose queued work can now
+    /// never run. Called once per scheduling run under the state lock.
+    fn stop_admission(&mut self) -> Vec<String> {
+        if self.admission_stopped {
+            return Vec::new();
+        }
+        self.admission_stopped = true;
+        let queued = self
+            .slots
+            .iter()
+            .enumerate()
+            .filter(|(_, slot)| matches!(slot, Slot::Queued))
+            .map(|(index, _)| self.ids[index].clone())
+            .collect();
+        self.queue.clear();
+        queued
+    }
 }
 
 #[cfg(test)]
@@ -52,23 +121,40 @@ where
         interrupt,
         |result| fail_fast && is_failure(result),
         |_| Vec::new(),
+        |_id, _result| {},
+        |_queued| {},
+        |_tracker| {},
     )
 }
 
 /// Admit newly ready dependencies ahead of queued independent work. Admission
 /// and failure-triggered cancellation share a lock, so no task is admitted
 /// after the scheduler observes a stopping failure.
-pub(super) fn run_with_followups<'scope, T, Stop, Followups>(
+///
+/// `on_complete` runs once per completed task and is where live outcome events
+/// are published. `on_stopped` runs once with the queued task IDs when failure
+/// or interruption permanently stops admission, so callers can publish their
+/// final not_run outcomes without waiting for active workers to join.
+/// `on_spawned` runs on the calling thread after every worker is started; it is
+/// the single-owner drain point for progress events.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn run_with_followups<'scope, T, Stop, Followups, OnComplete, OnStopped, OnSpawned>(
     tasks: Vec<(String, Task<'scope, T>)>,
     jobs: usize,
     interrupt: InterruptFlag,
     should_stop: Stop,
     followups: Followups,
+    on_complete: OnComplete,
+    on_stopped: OnStopped,
+    on_spawned: OnSpawned,
 ) -> ScheduleReport<T>
 where
     T: Send + 'scope,
     Stop: Fn(&T) -> bool + Sync + 'scope,
     Followups: Fn(&mut T) -> Vec<(String, Task<'scope, T>)> + Sync + 'scope,
+    OnComplete: Fn(&str, &T) + Sync + 'scope,
+    OnStopped: Fn(&[String]) + Sync + 'scope,
+    OnSpawned: FnOnce(&WorkerTracker),
 {
     let count = tasks.len();
     if count == 0 {
@@ -87,9 +173,11 @@ where
         ids,
         queue,
         slots: (0..count).map(|_| Slot::Queued).collect(),
+        admission_stopped: false,
     });
     let token = CancellationToken::new(interrupt);
     let worker_count = jobs.max(1).min(count);
+    let tracker = WorkerTracker::new(worker_count);
 
     std::thread::scope(|scope| {
         for _ in 0..worker_count {
@@ -97,18 +185,34 @@ where
             let scheduler = &scheduler;
             let should_stop = &should_stop;
             let followups = &followups;
+            let on_complete = &on_complete;
+            let on_stopped = &on_stopped;
+            let guard = tracker.guard();
             scope.spawn(move || {
+                let _guard = guard;
                 loop {
                     if token.interrupted() {
                         token.cancel();
                     }
                     if token.is_canceled() {
+                        let queued = {
+                            let mut scheduler = scheduler.lock().expect("scheduler state lock");
+                            scheduler.stop_admission()
+                        };
+                        if !queued.is_empty() {
+                            on_stopped(&queued);
+                        }
                         break;
                     }
 
                     let next = {
                         let mut scheduler = scheduler.lock().expect("scheduler state lock");
                         if token.is_canceled() {
+                            let queued = scheduler.stop_admission();
+                            drop(scheduler);
+                            if !queued.is_empty() {
+                                on_stopped(&queued);
+                            }
                             break;
                         }
                         let next = scheduler.queue.pop_front();
@@ -134,10 +238,13 @@ where
                             scheduler.queue.push_front((index, task));
                         }
                     }
+                    let completed_id = scheduler.ids[index].clone();
+                    on_complete(&completed_id, &result);
                     scheduler.slots[index] = Slot::Completed(result);
                 }
             });
         }
+        on_spawned(&tracker);
     });
 
     let scheduler = scheduler.into_inner().expect("scheduler state lock");
@@ -207,6 +314,8 @@ mod tests {
                 Box::new(|_| panic!("queued work admitted before followup")),
             ),
         ];
+        let queued_not_run = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let observed_queued = queued_not_run.clone();
         let report = run_with_followups(
             tasks,
             2,
@@ -220,6 +329,21 @@ mod tests {
                     Vec::new()
                 }
             },
+            |_id, _result| {},
+            |queued| {
+                observed_queued
+                    .lock()
+                    .expect("queued outcome lock")
+                    .extend_from_slice(queued);
+            },
+            |_tracker| {},
+        );
+        assert_eq!(
+            queued_not_run
+                .lock()
+                .expect("queued outcome lock")
+                .as_slice(),
+            &["queued-nix".to_owned()]
         );
         assert!(matches!(
             report.results[1].state,

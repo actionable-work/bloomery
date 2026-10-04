@@ -313,6 +313,7 @@ fn evaluation_failures_are_check_failures_and_store_failures_are_operational() {
             backend: &backend,
             interrupt: InterruptFlag::for_test(),
             cache_base: Some(&blocked_cache),
+            terminal: crate::output::TerminalFacts::default(),
         },
         &mut stdout,
         &mut stderr,

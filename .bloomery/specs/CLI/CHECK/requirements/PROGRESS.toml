@@ -1,0 +1,364 @@
+group = "PROGRESS"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-001"
+title = "User terminals receive live metrics"
+manual = false
+design = "design/progress.md#eligibility"
+
+[requirements.ears]
+type = "state"
+state = "check execution uses human mode with terminal stderr, a non-dumb TERM, and no active CI marker"
+system = "bloomery check"
+action = "display live check and derivation metrics on stderr"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-002"
+title = "Redirected progress streams stay quiet"
+manual = false
+design = "design/progress.md#eligibility"
+
+[requirements.ears]
+type = "state"
+state = "stderr is not a terminal"
+system = "bloomery check"
+action = "emit no live progress text or cursor controls on either output stream"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-003"
+title = "CI suppresses progress even with a terminal"
+manual = false
+design = "design/progress.md#eligibility"
+
+[requirements.ears]
+type = "state"
+state = "a CI marker is active under the progress eligibility policy"
+system = "bloomery check"
+action = "emit no live progress text or cursor controls even when stderr is a terminal"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-004"
+title = "JSON mode suppresses progress"
+manual = false
+design = "design/progress.md#eligibility"
+
+[requirements.ears]
+type = "state"
+state = "JSON output is selected"
+system = "bloomery check"
+action = "emit no live progress text or cursor controls on either output stream"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-005"
+title = "Dumb terminals suppress progress"
+manual = false
+design = "design/progress.md#eligibility"
+
+[requirements.ears]
+type = "state"
+state = "TERM is dumb"
+system = "bloomery check"
+action = "emit no live progress text or cursor controls"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-006"
+title = "Color suppression preserves progress"
+manual = false
+design = "design/progress.md#eligibility"
+
+[requirements.ears]
+type = "state"
+state = "progress is eligible and NO_COLOR is non-empty"
+system = "bloomery check"
+action = "display progress without color styling"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-007"
+title = "Catalog and retrieval commands have no live progress"
+manual = false
+design = "design/progress.md#eligibility"
+
+[requirements.ears]
+type = "state"
+state = "the list, failures, or details check subcommand is selected"
+system = "bloomery check"
+action = "emit no live progress updates"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-008"
+title = "Check totals include selected prerequisites"
+manual = false
+design = "design/progress.md#check-metrics"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the check progress aggregator"
+action = "use the deduplicated selected check count including implicit prerequisites as its fixed completion denominator"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-009"
+title = "Final outcomes advance completion during execution"
+manual = false
+design = "design/progress.md#check-metrics"
+
+[requirements.ears]
+type = "event"
+trigger = "a selected check acquires a final passed, failed, blocked, canceled, or not_run outcome"
+system = "the check progress aggregator"
+action = "increment completion exactly once at finalization without waiting for all active checks to finish"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-010"
+title = "Queued checks remain incomplete"
+manual = false
+design = "design/progress.md#check-metrics"
+
+[requirements.ears]
+type = "state"
+state = "a selected check is queued or running without a final outcome"
+system = "the check progress aggregator"
+action = "exclude that check from its completion count"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-011"
+title = "Alias checks retain separate completion units"
+manual = false
+design = "design/progress.md#check-metrics"
+
+[requirements.ears]
+type = "event"
+trigger = "selected Nix attributes alias one derivation"
+system = "the check progress aggregator"
+action = "count each selected check identity separately toward check completion"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-012"
+title = "Shared dependency work is counted once"
+manual = false
+design = "design/progress.md#derivation-metrics"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the check progress aggregator"
+action = "deduplicate selected Nix dependency work by canonical derivation store path across clients, systems, and required outputs"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-013"
+title = "Built counts require successful builds"
+manual = false
+design = "design/progress.md#derivation-metrics"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the check progress aggregator"
+action = "count as built only known derivations successfully built locally or remotely during the run"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-014"
+title = "Remaining build work includes unfinished attempts"
+manual = false
+design = "design/progress.md#derivation-metrics"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the check progress aggregator"
+action = "count as to build every known derivation assigned to building without successful completion, including active, failed, and canceled attempts"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-015"
+title = "Cache counts require completed substitution"
+manual = false
+design = "design/progress.md#derivation-metrics"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the check progress aggregator"
+action = "count as cached a derivation only after all its required missing outputs have been successfully substituted during the run"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-016"
+title = "Outstanding substitutions remain visible"
+manual = false
+design = "design/progress.md#derivation-metrics"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the check progress aggregator"
+action = "count as to fetch each known derivation assigned to substitution with required missing outputs still outstanding"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-017"
+title = "Cache fallback reclassifies work"
+manual = false
+design = "design/progress.md#derivation-metrics"
+
+[requirements.ears]
+type = "event"
+trigger = "a derivation falls back from substitution to building"
+system = "the check progress aggregator"
+action = "reclassify that derivation as build work without duplicating it in substitution counts"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-018"
+title = "Totals describe known realization work"
+manual = false
+design = "design/progress.md#derivation-metrics"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the check progress aggregator"
+action = "report known total as the distinct known derivations requiring build or substitution, equal to the four work category counts when those counts are fully known"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-019"
+title = "Existing store reuse is not cache work"
+manual = false
+design = "design/progress.md#derivation-metrics"
+
+[requirements.ears]
+type = "event"
+trigger = "a selected check reuses outputs already present in the store"
+system = "the check progress aggregator"
+action = "exclude that reuse from derivation build and substitution work counts"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-020"
+title = "Unavailable metrics are not fabricated zeros"
+manual = false
+design = "design/progress.md#derivation-metrics"
+
+[requirements.ears]
+type = "state"
+state = "sufficient structured information for a derivation metric is unavailable"
+system = "the check progress renderer"
+action = "display that metric as unknown rather than zero or an inferred exact count"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-021"
+title = "Static-only runs have zero derivation work"
+manual = false
+design = "design/progress.md#derivation-metrics"
+
+[requirements.ears]
+type = "state"
+state = "only static checks are selected"
+system = "the check progress aggregator"
+action = "report zero for all derivation work metrics"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-022"
+title = "Metrics use structured Nix information"
+manual = false
+design = "design/progress.md#event-collection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Nix progress collector"
+action = "derive realization metrics from structured activity and metadata rather than parsing human diagnostics or summing overlapping per-client totals"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-023"
+title = "Progress parsing does not change check results"
+manual = false
+design = "design/progress.md#event-collection"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "Nix progress information is malformed or unsupported"
+system = "bloomery check"
+action = "preserve normal check execution and outcome semantics independently of progress parsing"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-024"
+title = "Changed metric snapshots trigger redraws"
+manual = false
+design = "design/progress.md#rendering"
+
+[requirements.ears]
+type = "complex"
+state = "terminal progress is eligible"
+trigger = "the displayed metric tuple differs from the last rendered tuple or no tuple has yet been rendered"
+system = "the check progress renderer"
+action = "render the new metric snapshot"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-025"
+title = "Unchanged metrics produce no terminal updates"
+manual = false
+design = "design/progress.md#rendering"
+
+[requirements.ears]
+type = "state"
+state = "the displayed metric tuple including availability is unchanged"
+system = "the check progress renderer"
+action = "perform no progress writes for duplicate events, unrelated events, idle polling, or elapsed time"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-026"
+title = "Updates occupy one transient line"
+manual = false
+design = "design/progress.md#rendering"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the check progress renderer"
+action = "replace one transient stderr status line without accumulating event lines or wrapping on narrow terminals"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-027"
+title = "Concurrent events have one rendering order"
+manual = false
+design = "design/progress.md#rendering"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the check progress renderer"
+action = "serialize concurrent metric updates without interleaved writes or stale snapshots"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-028"
+title = "Final reporting clears transient progress"
+manual = false
+design = "design/progress.md#rendering"
+
+[requirements.ears]
+type = "event"
+trigger = "execution reaches final summary, error, or interruption reporting"
+system = "the check progress renderer"
+action = "clear the transient status and restore a clean terminal line without repeating an unchanged snapshot"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-029"
+title = "Progress sink failures disable live rendering"
+manual = false
+design = "design/progress.md#rendering"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "the live progress sink fails"
+system = "bloomery check"
+action = "disable live rendering while retaining check results and attempting normal final reporting"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-030"
+title = "Completion summary closes with final work metrics on user terminals"
+manual = false
+design = "design/progress.md#final-metrics"
+
+[requirements.ears]
+type = "state"
+state = "check execution completes under the eligible user-terminal progress policy"
+system = "bloomery check"
+action = "close the completion summary with the built, cached, and total derivation work metrics"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-031"
+title = "Completion output omits metrics without a user terminal"
+manual = false
+design = "design/progress.md#final-metrics"
+
+[requirements.ears]
+type = "state"
+state = "the progress eligibility policy suppresses live progress"
+system = "bloomery check"
+action = "omit final metrics from the completion output"

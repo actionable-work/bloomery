@@ -19,7 +19,12 @@ is plain text by default. Users can always disable colors by setting a non-empty
 The check command emits aggregate counts and a bounded failure page, highlighting
 status, failure IDs, check IDs, and source locations. Expanded messages, notes,
 and logs are retrieved separately. It does not stream build logs or successful
-check records by default; see [check summaries](../../CHECK/design/diagnostics.md). Review retains its indented requirement tree while
+check records by default. Live check metrics use one transient stderr line only
+on eligible user terminals, never in CI or JSON mode, and redraw only when metrics
+change. Redirecting stdout alone does not suppress terminal stderr progress;
+`NO_COLOR` disables its styling, not the updates. See
+[check progress](../../CHECK/design/progress.md) and
+[check summaries](../../CHECK/design/diagnostics.md). Review retains its indented requirement tree while
 highlighting area/feature/group labels, IDs, and the final count. Sync highlights
 stage progress and completion on stdout, and warnings, recommendations, and
 failures on stderr. Color never changes the textual content or ordering.

@@ -6,13 +6,16 @@ use super::model::{
     select_ids,
 };
 use super::output;
-use super::scheduler::{ScheduledState, run_with_followups};
+use super::progress::{ProgressEvent, ProgressReducer, ProgressReporter, ProgressSink};
+use super::scheduler::{ScheduledState, WorkerTracker, run_with_followups};
 use super::store;
 use bloomery_model::{Diagnostic, sort_diagnostics as sort_model_diagnostics};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Write;
 use std::path::Path;
 use std::process::ExitCode;
+use std::sync::mpsc;
+use std::time::Duration;
 
 pub(super) fn validate_execution_selection(selected: &[String]) -> Result<(), CheckError> {
     if selected.is_empty() {
@@ -90,6 +93,18 @@ pub(super) fn run_checks(
     let started_at = store::timestamp_millis();
     let jobs = args.jobs.unwrap_or_else(default_jobs).max(1);
 
+    let has_nix_checks = selected.iter().any(|id| id.starts_with("nix:"));
+    let eligible = context.terminal.progress_eligible(json_mode);
+    let mut progress = ProgressReporter::new(
+        ProgressReducer::new(selected.len(), has_nix_checks),
+        &mut *stderr,
+        eligible,
+        context.terminal.width(),
+        context.terminal.progress_styled(),
+    );
+    // Render the initialized snapshot before workers start; the reducer is the
+    // single source of displayed metrics, so later writes stay change-only.
+    progress.start();
     let execution = execute_selected(
         root,
         &selected,
@@ -98,7 +113,15 @@ pub(super) fn run_checks(
         interrupt.clone(),
         jobs,
         args.fail_fast,
+        &mut progress,
     );
+    // Snapshot the last applied tuple before cleanup so the completion summary
+    // can repeat it. Metrics are only collected when live progress was eligible.
+    let final_metrics = eligible.then(|| progress.final_metrics());
+    // Clear the transient line before any summary, error, or interruption
+    // report. Cleanup is not a metric event and never repeats a snapshot.
+    progress.finish();
+    drop(progress);
     let completed_at = store::timestamp_millis();
     let (record, operational_error) = match execution {
         Ok(mut execution) => {
@@ -218,7 +241,7 @@ pub(super) fn run_checks(
         output::run_summary_json(&record).bytes
     } else {
         crate::output::colorize_check(
-            &output::run_summary_text(&record),
+            &output::run_summary_text(&record, final_metrics.as_deref()),
             crate::output::color_enabled(crate::output::Stream::Stdout, false),
         )
         .into_bytes()
@@ -293,7 +316,8 @@ enum InitialState {
     NotRun,
 }
 
-fn execute_selected(
+#[allow(clippy::too_many_arguments)]
+fn execute_selected<W: Write>(
     root: &Path,
     selected: &BTreeSet<String>,
     allocation: &store::RunAllocation,
@@ -301,6 +325,7 @@ fn execute_selected(
     interrupt: InterruptFlag,
     jobs: usize,
     fail_fast: bool,
+    progress: &mut ProgressReporter<W>,
 ) -> Result<ExecutionResults, String> {
     let mut outcomes = selected
         .iter()
@@ -330,6 +355,8 @@ fn execute_selected(
         .collect::<Vec<_>>();
 
     let mut initial_tasks: Vec<InitialWork<'_>> = Vec::new();
+    let (event_sender, event_receiver) = mpsc::channel();
+    let sink = ProgressSink::new(event_sender, progress.is_enabled());
     if selected.contains("static:structure") {
         let root = root.to_path_buf();
         initial_tasks.push((
@@ -343,6 +370,7 @@ fn execute_selected(
         let check = check.clone();
         let root = root.to_path_buf();
         let allocation = allocation.clone();
+        let sink = sink.clone();
         initial_tasks.push((
             check.id.clone(),
             Box::new(move |cancellation| {
@@ -354,6 +382,7 @@ fn execute_selected(
                         &check.attribute,
                         &log_path,
                         cancellation,
+                        &sink,
                     ),
                     Err(message) => NixTaskResult::OperationalError(message),
                 };
@@ -386,6 +415,48 @@ fn execute_selected(
                 vec![work]
             } else {
                 Vec::new()
+            }
+        },
+        |id, task| {
+            if let Some(outcome) = completed_outcome(task) {
+                sink.emit(ProgressEvent::CheckFinalized {
+                    id: id.to_owned(),
+                    outcome,
+                });
+            }
+            // A failed structure prerequisite finalizes traceability as blocked
+            // as soon as the failure is known, without waiting for unrelated
+            // Nix workers to join.
+            if id == "static:structure"
+                && matches!(&task.result, InitialTaskResult::Structure(Err(_)))
+                && selected.contains("static:traceability")
+            {
+                sink.emit(ProgressEvent::CheckFinalized {
+                    id: "static:traceability".to_owned(),
+                    outcome: Outcome::Blocked,
+                });
+            }
+        },
+        |queued: &[String]| {
+            // Queued work can never run once admission is permanently stopped;
+            // publish its final not_run outcomes while active workers join.
+            for id in queued {
+                sink.emit(ProgressEvent::CheckFinalized {
+                    id: id.clone(),
+                    outcome: Outcome::NotRun,
+                });
+            }
+        },
+        |tracker: &WorkerTracker| {
+            // Drain on the caller thread so a single owner performs all
+            // progress writes. Delivery failure never stops check work.
+            while !tracker.wait_timeout(Duration::from_millis(5)) {
+                while let Ok(event) = event_receiver.try_recv() {
+                    progress.apply(event);
+                }
+            }
+            while let Ok(event) = event_receiver.try_recv() {
+                progress.apply(event);
             }
         },
     );
@@ -491,11 +562,41 @@ fn execute_selected(
         outcome.logs.dedup();
     }
 
+    // Reconcile every selected ID. Final transitions were published live when
+    // known; this deduplicated pass is the safety net for any outcome that was
+    // only determined after its worker joined.
+    for (id, record) in &outcomes {
+        sink.emit(ProgressEvent::CheckFinalized {
+            id: id.clone(),
+            outcome: record.outcome,
+        });
+    }
+    while let Ok(event) = event_receiver.try_recv() {
+        progress.apply(event);
+    }
+
     Ok(ExecutionResults {
         outcomes,
         failures,
         operational_error,
     })
+}
+
+fn completed_outcome(task: &InitialTask) -> Option<Outcome> {
+    match &task.result {
+        InitialTaskResult::Structure(Ok(_)) | InitialTaskResult::Traceability(Ok(())) => {
+            Some(Outcome::Passed)
+        }
+        InitialTaskResult::Structure(Err(_)) | InitialTaskResult::Traceability(Err(_)) => {
+            Some(Outcome::Failed)
+        }
+        InitialTaskResult::NixCheck { result, .. } => match result {
+            NixTaskResult::Succeeded(()) => Some(Outcome::Passed),
+            NixTaskResult::Failed { .. } => Some(Outcome::Failed),
+            NixTaskResult::Canceled => Some(Outcome::Canceled),
+            NixTaskResult::OperationalError(_) => Some(Outcome::Canceled),
+        },
+    }
 }
 
 fn initial_task_stops_admission(task: &InitialTask, fail_fast: bool) -> bool {

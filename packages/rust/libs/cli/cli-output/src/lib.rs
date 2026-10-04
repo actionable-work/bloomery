@@ -1,3 +1,7 @@
+mod terminal;
+
+pub use terminal::{TerminalFacts, TransientLine};
+
 use bloomery_model::{Diagnostic, diagnostics::SourceLocation};
 use bloomery_sync::SyncReport;
 use serde_json::{Value, json};

@@ -1,5 +1,7 @@
 use super::interrupt::CancellationToken;
 use super::model::{Notice, valid_system_name};
+use super::nix_progress::NixProgressCollector;
+use super::progress::ProgressSink;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::ffi::OsString;
@@ -30,6 +32,7 @@ pub trait NixBackend: Send + Sync {
         attribute: &str,
         log_path: &Path,
         cancellation: CancellationToken,
+        progress: &ProgressSink,
     ) -> NixTaskResult<()>;
     fn read_derivation_log(&self, root: &Path, store_path: &str) -> Result<Vec<u8>, String>;
 }
@@ -55,6 +58,7 @@ struct LoggedCommand<'a> {
     capture_stdout: bool,
     failure_code: Option<&'a str>,
     failure_description: &'a str,
+    progress: Option<&'a NixProgressCollector>,
 }
 
 impl NixCli {
@@ -122,6 +126,7 @@ impl NixCli {
             capture_stdout,
             failure_code,
             failure_description,
+            progress,
         } = command;
         let mut log = match open_private_log(log_path) {
             Ok(file) => file,
@@ -131,20 +136,23 @@ impl NixCli {
                 ));
             }
         };
-        let stderr = match log.try_clone() {
-            Ok(file) => file,
-            Err(error) => {
-                return NixTaskResult::OperationalError(format!(
-                    "unable to prepare retained task log: {error}"
-                ));
-            }
-        };
+        let collector = progress.cloned().filter(NixProgressCollector::is_active);
 
         let mut command = Command::new(&self.executable);
-        command
-            .args(args)
-            .current_dir(root)
-            .stderr(Stdio::from(stderr));
+        command.args(args).current_dir(root);
+        if collector.is_some() {
+            command.stderr(Stdio::piped());
+        } else {
+            let stderr = match log.try_clone() {
+                Ok(file) => file,
+                Err(error) => {
+                    return NixTaskResult::OperationalError(format!(
+                        "unable to prepare retained task log: {error}"
+                    ));
+                }
+            };
+            command.stderr(Stdio::from(stderr));
+        }
         if capture_stdout {
             command.stdout(Stdio::piped());
         } else {
@@ -179,15 +187,37 @@ impl NixCli {
             None
         };
 
+        let stderr_reader = match (collector, child.stderr.take()) {
+            (Some(collector), Some(pipe)) => match log.try_clone() {
+                Ok(log_for_stderr) => Some(thread::spawn(move || {
+                    drain_progress_stderr(pipe, log_for_stderr, &collector)
+                })),
+                Err(error) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return NixTaskResult::OperationalError(format!(
+                        "unable to prepare retained task log: {error}"
+                    ));
+                }
+            },
+            _ => None,
+        };
+
         let status = loop {
             if cancellation.is_canceled() {
                 let _ = child.kill();
                 let _ = child.wait();
+                let stderr_result = join_progress_stderr(stderr_reader);
                 let captured = join_stdout(stdout_reader);
                 if let Some(bytes) = captured {
                     let _ = log.write_all(&bytes);
                 }
                 let _ = log.flush();
+                if let Err(error) = stderr_result {
+                    return NixTaskResult::OperationalError(format!(
+                        "unable to retain Nix task log: {error}"
+                    ));
+                }
                 return NixTaskResult::Canceled;
             }
             match child.try_wait() {
@@ -196,12 +226,14 @@ impl NixCli {
                 Err(error) => {
                     let _ = child.kill();
                     let _ = child.wait();
+                    let _ = join_progress_stderr(stderr_reader);
                     return NixTaskResult::OperationalError(format!(
                         "unable to wait for Nix task: {error}"
                     ));
                 }
             }
         };
+        let stderr_result = join_progress_stderr(stderr_reader);
 
         let stdout = match stdout_reader {
             Some(reader) => match reader.join() {
@@ -221,6 +253,11 @@ impl NixCli {
         };
         if log.write_all(&stdout).is_err() || log.flush().is_err() {
             return NixTaskResult::OperationalError("unable to retain Nix task output".to_owned());
+        }
+        if let Err(error) = stderr_result {
+            return NixTaskResult::OperationalError(format!(
+                "unable to retain Nix task log: {error}"
+            ));
         }
         if status.success() {
             NixTaskResult::Succeeded(stdout)
@@ -274,22 +311,119 @@ impl NixBackend for NixCli {
         attribute: &str,
         log_path: &Path,
         cancellation: CancellationToken,
+        progress: &ProgressSink,
     ) -> NixTaskResult<()> {
+        let collector = NixProgressCollector::new(progress.clone());
+        let active = collector.is_active();
+        if active {
+            collector.set_output_metadata(
+                self.load_output_metadata(root, system, attribute)
+                    .unwrap_or_default(),
+            );
+        }
+        let mut args = build_args(system, attribute);
+        if active {
+            args.push(OsString::from("--log-format"));
+            args.push(OsString::from("internal-json"));
+        }
         let result = self.run_logged_command(LoggedCommand {
             root,
-            args: &build_args(system, attribute),
+            args: &args,
             log_path,
             cancellation,
             capture_stdout: false,
             failure_code: Some("NixCheckFailed"),
             failure_description: "Nix check failed",
+            progress: active.then_some(&collector),
         });
         match result {
-            NixTaskResult::Succeeded(_) => NixTaskResult::Succeeded(()),
-            NixTaskResult::Failed { code, message } => NixTaskResult::Failed { code, message },
-            NixTaskResult::Canceled => NixTaskResult::Canceled,
-            NixTaskResult::OperationalError(message) => NixTaskResult::OperationalError(message),
+            NixTaskResult::Succeeded(_) => {
+                collector.finish_success();
+                NixTaskResult::Succeeded(())
+            }
+            NixTaskResult::Failed { code, message } => {
+                collector.finish_failure();
+                NixTaskResult::Failed { code, message }
+            }
+            NixTaskResult::Canceled => {
+                collector.finish_canceled();
+                NixTaskResult::Canceled
+            }
+            NixTaskResult::OperationalError(message) => {
+                collector.finish_failure();
+                NixTaskResult::OperationalError(message)
+            }
         }
+    }
+}
+
+impl NixCli {
+    /// Best-effort structured metadata mapping output store paths to the
+    /// derivations that produce them. Any failure leaves substitution metrics
+    /// unavailable without affecting the check.
+    fn load_output_metadata(
+        &self,
+        root: &Path,
+        system: &str,
+        attribute: &str,
+    ) -> Result<BTreeMap<String, String>, String> {
+        let installable = format!(
+            ".#checks.{system}.{}",
+            installable_attribute_path(attribute)
+        );
+        let drv_path = String::from_utf8(self.run_catalog_command(
+            root,
+            &[
+                OsString::from("eval"),
+                OsString::from("--raw"),
+                OsString::from("--no-write-lock-file"),
+                OsString::from("--no-update-lock-file"),
+                OsString::from(format!("{installable}.drvPath")),
+            ],
+            "derivation path evaluation",
+        )?)
+        .map_err(|error| format!("Nix derivation path is not UTF-8: {error}"))?;
+        let drv_path = drv_path.trim();
+        if !valid_nix_derivation_path(drv_path) {
+            return Err(format!("unexpected derivation path '{drv_path}'"));
+        }
+        let output = self.run_catalog_command(
+            root,
+            &[
+                OsString::from("derivation"),
+                OsString::from("show"),
+                OsString::from("--recursive"),
+                OsString::from(drv_path),
+            ],
+            "derivation metadata",
+        )?;
+        let value: Value = serde_json::from_slice(&output)
+            .map_err(|error| format!("Nix derivation metadata is not JSON: {error}"))?;
+        let derivations = value
+            .get("derivations")
+            .and_then(Value::as_object)
+            .ok_or_else(|| "Nix derivation metadata has no derivations map".to_owned())?;
+        let mut metadata = BTreeMap::new();
+        for (drv_name, derivation) in derivations {
+            let drv = full_store_path(drv_name);
+            let Some(outputs) = derivation.get("outputs").and_then(Value::as_object) else {
+                continue;
+            };
+            for output in outputs.values() {
+                if let Some(path) = output.get("path").and_then(Value::as_str) {
+                    metadata.insert(full_store_path(path), drv.clone());
+                }
+            }
+        }
+        Ok(metadata)
+    }
+}
+
+fn full_store_path(value: &str) -> String {
+    if value.starts_with("/nix/store/") {
+        value.to_owned()
+    } else {
+        format!("/nix/store/{value}")
     }
 }
 
@@ -556,6 +690,41 @@ fn join_stdout(
     reader.and_then(|reader| reader.join().ok().map(|(bytes, _)| bytes))
 }
 
+/// Continuously drain a Nix progress pipe into the retained log and parser.
+/// The first read, write, or flush failure is returned so retention failures
+/// become operational errors; parser errors stay best-effort inside the
+/// collector and cannot change the returned result.
+fn drain_progress_stderr<R: Read, W: Write>(
+    mut pipe: R,
+    mut log: W,
+    collector: &NixProgressCollector,
+) -> io::Result<()> {
+    let mut buffer = [0u8; 8192];
+    loop {
+        match pipe.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(count) => {
+                log.write_all(&buffer[..count])?;
+                collector.consume(&buffer[..count]);
+            }
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    log.flush()
+}
+
+fn join_progress_stderr(reader: Option<thread::JoinHandle<io::Result<()>>>) -> io::Result<()> {
+    match reader {
+        None => Ok(()),
+        Some(reader) => reader.join().unwrap_or_else(|_| {
+            Err(io::Error::other(
+                "Nix stderr reader terminated unexpectedly",
+            ))
+        }),
+    }
+}
+
 fn nix_start_error(operation: &str, error: io::Error) -> String {
     if error.kind() == io::ErrorKind::NotFound {
         "Nix execution is selected but the 'nix' CLI is unavailable".to_owned()
@@ -593,14 +762,18 @@ fn bounded_process_error(bytes: &[u8]) -> String {
 mod tests {
     use super::{
         NixBackend, NixCli, NixTaskResult, build_args, discover_args, discover_catalog,
-        host_nix_system, nix_log_store_path, nix_string_literal, parse_nix_id, target_nix_system,
+        drain_progress_stderr, host_nix_system, nix_log_store_path, nix_string_literal,
+        parse_nix_id, target_nix_system,
     };
     use crate::check_command::interrupt::{CancellationToken, InterruptFlag};
     use crate::check_command::model::valid_system_name;
+    use crate::check_command::nix_progress::NixProgressCollector;
+    use crate::check_command::progress::ProgressSink;
     use crate::check_command::test_support::{fixture, nix_is_available};
     use bloomery_test_macros::bloomery;
     use std::ffi::OsString;
     use std::fs;
+    use std::io::{self, Read, Write};
     use std::path::Path;
 
     struct CatalogStub {
@@ -623,6 +796,7 @@ mod tests {
             _attribute: &str,
             _log_path: &Path,
             _cancellation: CancellationToken,
+            _progress: &crate::check_command::progress::ProgressSink,
         ) -> NixTaskResult<()> {
             unreachable!("catalog test does not realize checks")
         }
@@ -744,6 +918,8 @@ mod tests {
         let discovered = backend
             .discover(&root, &system)
             .expect("discover unusual Nix attributes");
+        let (event_sender, _event_receiver) = std::sync::mpsc::channel();
+        let progress = super::super::progress::ProgressSink::new(event_sender, false);
         let mut sorted_attributes = attributes.clone();
         sorted_attributes.sort();
         assert_eq!(discovered, sorted_attributes);
@@ -755,6 +931,7 @@ mod tests {
                 attribute,
                 &root.join(format!("nix-attribute-{index}.log")),
                 CancellationToken::new(InterruptFlag::for_test()),
+                &progress,
             );
             assert_eq!(
                 result,
@@ -776,6 +953,41 @@ mod tests {
             .discover(Path::new("."), "x86_64-linux")
             .expect_err("missing executable");
         assert!(error.contains("nix"));
+    }
+
+    #[test]
+    fn retained_stderr_write_failures_are_reported() {
+        struct FailingWriter;
+        impl Write for FailingWriter {
+            fn write(&mut self, _buffer: &[u8]) -> io::Result<usize> {
+                Err(io::Error::other("log full"))
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let collector = disabled_collector();
+        let mut pipe = io::Cursor::new(b"@nix garbage\n".to_vec());
+        assert!(drain_progress_stderr(&mut pipe, FailingWriter, &collector).is_err());
+    }
+
+    #[test]
+    fn retained_stderr_read_failures_are_reported() {
+        struct FailingReader;
+        impl Read for FailingReader {
+            fn read(&mut self, _buffer: &mut [u8]) -> io::Result<usize> {
+                Err(io::Error::other("pipe broken"))
+            }
+        }
+
+        let collector = disabled_collector();
+        assert!(drain_progress_stderr(FailingReader, Vec::new(), &collector).is_err());
+    }
+
+    fn disabled_collector() -> NixProgressCollector {
+        let (sender, _receiver) = std::sync::mpsc::channel();
+        NixProgressCollector::new(ProgressSink::new(sender, false))
     }
 
     #[test]

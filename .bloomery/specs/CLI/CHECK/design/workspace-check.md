@@ -32,7 +32,9 @@ add a small orchestration dependency solely for scheduling.
 2. Invoke one argument-safe `nix build --no-link` for each selected check
    installable; Nix evaluates that attribute as part of the build request.
 3. Schedule bounded concurrent build requests and capture output separately
-   for each selected check.
+   for each selected check. Consume structured Nix activity for run-scoped
+   [derivation metrics](progress.md#derivation-metrics), preserving retained
+   diagnostic and builder logs without forwarding activity to terminal output.
 4. Map outcomes to their check IDs. Nix store locking deduplicates realization
    when aliases resolve to one derivation.
 

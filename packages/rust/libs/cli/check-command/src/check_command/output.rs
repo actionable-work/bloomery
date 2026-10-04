@@ -320,7 +320,7 @@ fn run_summary_document(record: &RunRecord, failure_count: usize) -> Value {
     value
 }
 
-pub fn run_summary_text(record: &RunRecord) -> String {
+pub fn run_summary_text(record: &RunRecord, metrics: Option<&str>) -> String {
     let page = run_summary_json(record);
     let mut shown = page
         .value
@@ -328,7 +328,7 @@ pub fn run_summary_text(record: &RunRecord) -> String {
         .and_then(Value::as_array)
         .map_or(0, Vec::len);
     loop {
-        let mut text = run_summary_text_with_count(record, shown);
+        let mut text = run_summary_text_with_count(record, shown, metrics);
         if human_output_fits(&text) || shown == 0 {
             if !text.ends_with('\n') {
                 text.push('\n');
@@ -339,7 +339,7 @@ pub fn run_summary_text(record: &RunRecord) -> String {
     }
 }
 
-fn run_summary_text_with_count(record: &RunRecord, shown: usize) -> String {
+fn run_summary_text_with_count(record: &RunRecord, shown: usize, metrics: Option<&str>) -> String {
     let counts = record.counts();
     let mut output = format!(
         "{}  {} · {} failure record{}",
@@ -427,6 +427,12 @@ fn run_summary_text_with_count(record: &RunRecord, shown: usize) -> String {
             safe_field(&failure.id, 32),
             safe_field(&record.id, 128)
         ));
+    }
+    // The metrics close the completion message as the last line, keeping the
+    // final snapshot visually distinct from the live progress line.
+    if let Some(metrics) = metrics {
+        output.push('\n');
+        output.push_str(metrics);
     }
     output
 }
@@ -817,7 +823,26 @@ mod tests {
             summary.value["failures"].as_array().unwrap().len()
         );
         assert_eq!(summary.value["total"], 80);
-        assert!(run_summary_text(&large).len() <= OUTPUT_BYTE_LIMIT);
+        assert!(run_summary_text(&large, None).len() <= OUTPUT_BYTE_LIMIT);
+    }
+
+    #[test]
+    #[bloomery("CLI-CHECK-PROGRESS-030")]
+    #[bloomery("CLI-CHECK-OUTPUT-004")]
+    fn summary_includes_final_metrics_and_stays_within_its_ceiling() {
+        let metrics = "built 8 · cached 16 · total 30";
+        let with_metrics = run_summary_text(&record(80), Some(metrics));
+        assert!(with_metrics.contains(metrics));
+        assert_eq!(
+            with_metrics.trim_end().lines().last(),
+            Some(metrics),
+            "the final metrics close the completion message"
+        );
+        assert!(with_metrics.len() <= OUTPUT_BYTE_LIMIT);
+
+        // Without an eligible terminal the completion output has no metrics line.
+        let without_metrics = run_summary_text(&record(80), None);
+        assert!(!without_metrics.contains("total"));
     }
 
     #[test]

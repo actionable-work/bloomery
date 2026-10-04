@@ -1,6 +1,9 @@
 use super::catalog::{NixBackend, NixTaskResult};
 use super::command::{CheckArgs, CheckContext, run_at_with};
 use super::interrupt::{CancellationToken, InterruptFlag};
+use super::progress::{DerivationEvent, ProgressSink};
+use crate::output::TerminalFacts;
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -29,6 +32,17 @@ pub(super) struct FakeNix {
     pub(super) nix_log_requests: AtomicUsize,
     pub(super) active: AtomicUsize,
     pub(super) maximum_active: AtomicUsize,
+    /// Derivation events emitted for every realization request. Tests use this
+    /// to exercise progress wiring without a real Nix daemon.
+    pub(super) scripted_events: Mutex<Vec<DerivationEvent>>,
+    /// Events emitted only when the realized attribute matches the key.
+    pub(super) events_by_attribute: Mutex<BTreeMap<String, Vec<DerivationEvent>>>,
+    /// When set, realize_check blocks until the test releases this barrier so a
+    /// run can be observed while one Nix task is still active.
+    pub(super) hold_until_released: Option<std::sync::Arc<std::sync::Barrier>>,
+    /// When set, realize_check blocks until the run is canceled so tests can
+    /// observe a completed check while another task is still active.
+    pub(super) complete_after_cancellation: bool,
 }
 
 impl NixBackend for FakeNix {
@@ -54,6 +68,7 @@ impl NixBackend for FakeNix {
         attribute: &str,
         log_path: &Path,
         cancellation: CancellationToken,
+        progress: &ProgressSink,
     ) -> NixTaskResult<()> {
         self.evaluations.fetch_add(1, Ordering::SeqCst);
         self.build_commands.fetch_add(1, Ordering::SeqCst);
@@ -78,6 +93,24 @@ impl NixBackend for FakeNix {
         if let Some(interrupt) = &self.interrupt_on_evaluation {
             interrupt.interrupt_for_test();
         }
+        let emitted = self
+            .events_by_attribute
+            .lock()
+            .expect("scripted event lock")
+            .get(attribute)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .chain(
+                self.scripted_events
+                    .lock()
+                    .expect("scripted event lock")
+                    .clone(),
+            )
+            .collect::<Vec<_>>();
+        for event in &emitted {
+            progress.work(event.clone());
+        }
         // Model Nix's output lock: aliases issue separate client requests,
         // but share one realization attempt.
         let first_realization = self
@@ -92,7 +125,7 @@ impl NixBackend for FakeNix {
             std::thread::sleep(Duration::from_millis(10));
             self.active.fetch_sub(1, Ordering::SeqCst);
         }
-        if self.wait_for_cancellation {
+        if self.wait_for_cancellation || self.complete_after_cancellation {
             // A bounded wait makes delayed traceability admission fail the test
             // instead of hanging the suite indefinitely.
             let deadline = std::time::Instant::now() + Duration::from_secs(3);
@@ -100,12 +133,29 @@ impl NixBackend for FakeNix {
                 std::thread::sleep(Duration::from_millis(1));
             }
         }
+        if let Some(barrier) = &self.hold_until_released {
+            barrier.wait();
+        }
         if cancellation.is_canceled() {
             return NixTaskResult::Canceled;
         }
-        self.realization_result
+        let result = self
+            .realization_result
             .clone()
-            .unwrap_or(NixTaskResult::Succeeded(()))
+            .unwrap_or(NixTaskResult::Succeeded(()));
+        if matches!(result, NixTaskResult::Succeeded(())) && progress.is_enabled() {
+            let mut saw_build = false;
+            for event in &emitted {
+                if let DerivationEvent::BuildStarted { drv } = event {
+                    saw_build = true;
+                    progress.work(DerivationEvent::BuildSucceeded { drv: drv.clone() });
+                }
+            }
+            if !saw_build {
+                progress.emit(super::progress::ProgressEvent::DerivationMetadataAvailable);
+            }
+        }
+        result
     }
 
     fn read_derivation_log(&self, _root: &Path, store_path: &str) -> Result<Vec<u8>, String> {
@@ -184,6 +234,27 @@ pub(super) fn invoke_with_interrupt(
     json: bool,
     interrupt: InterruptFlag,
 ) -> (std::process::ExitCode, Vec<u8>, Vec<u8>) {
+    invoke_with_terminal(
+        args,
+        root,
+        cache,
+        backend,
+        json,
+        interrupt,
+        TerminalFacts::default(),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn invoke_with_terminal(
+    args: CheckArgs,
+    root: &Path,
+    cache: &Path,
+    backend: &dyn NixBackend,
+    json: bool,
+    interrupt: InterruptFlag,
+    terminal: TerminalFacts,
+) -> (std::process::ExitCode, Vec<u8>, Vec<u8>) {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let code = run_at_with(
@@ -194,6 +265,7 @@ pub(super) fn invoke_with_interrupt(
             backend,
             interrupt,
             cache_base: Some(cache),
+            terminal,
         },
         &mut stdout,
         &mut stderr,

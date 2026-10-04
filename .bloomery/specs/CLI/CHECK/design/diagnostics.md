@@ -27,12 +27,15 @@ not the complete compiler-style rendering.
 
 ## Bounded summary
 
-Print one aggregate outcome line, a failure page, and one retrieval hint. Do not
+Print one aggregate outcome line, a failure page, and one retrieval hint. On
+eligible user terminals, close the summary with the final derivation work metrics
+from [terminal progress](progress.md#final-metrics). Do not
 print individual successes, build logs, durations, repeated headings, or expanded
 diagnostic notes by default. Successful full runs need only counts and run ID.
-Subset runs identify partial scope. Non-TTY output has no progress stream. A TTY
-may update one transient status line on stderr without retaining a line per task.
-JSON mode emits no human progress.
+Subset runs identify partial scope. Eligible user terminals display one transient
+stderr line for changing check and derivation metrics; CI, non-TTY, and JSON output
+have no progress stream. See [terminal progress](progress.md). Transient updates
+are separate from the bounded final summary and do not retain a line per task.
 
 Default failure page is at most 20 records and 8 KiB for the whole serialized
 response. Bound UTF-8 bytes and records, not model-dependent token counts. The
@@ -45,6 +48,7 @@ FAIL  28 passed · 2 failed · 1 blocked
 f1 static:traceability MissingAutomatedTest CLI-CHECK-RUN-001
 f2 nix:x86_64-linux:core:unit-tests BuildFailed
 run r42 · details: bloomery check details f2 --run r42
+built 12 · cached 4 · total 18
 ```
 
 Report check outcome counts separately from the total number of failure records:

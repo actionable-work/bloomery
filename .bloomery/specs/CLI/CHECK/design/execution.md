@@ -56,7 +56,9 @@ or all builders and dependencies inside the Nix daemon. Do not override users'
 Nix builder configuration to imply a global process bound.
 
 Track each selected check as passed, failed, blocked, canceled, or not_run.
-Queued/running are intermediate states. Default execution attempts every
+Queued/running are intermediate states. Publish final-outcome transitions during
+execution to the [progress aggregator](progress.md#check-metrics); provisional
+not_run records do not mark queued work complete. Default execution attempts every
 selected check whose prerequisites permit execution; independent work continues
 after validation, evaluation, or build failures. A failed prerequisite leaves
 its dependents blocked with a link to the causal failure, not extra duplicate

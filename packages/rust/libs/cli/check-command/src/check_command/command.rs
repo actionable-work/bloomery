@@ -4,6 +4,7 @@ use super::interrupt::InterruptFlag;
 use super::model::{Notice, selector_may_match_prefix, valid_system_name};
 use super::output;
 use super::retrieval::{run_details, run_failures, run_list};
+use crate::output::TerminalFacts;
 pub use bloomery_cli_types::{CheckArgs, CheckOperation, DetailsArgs, FailureArgs, ListArgs};
 use std::collections::BTreeSet;
 use std::fs;
@@ -23,6 +24,7 @@ pub(super) struct CheckContext<'a> {
     pub(super) backend: &'a dyn NixBackend,
     pub(super) interrupt: InterruptFlag,
     pub(super) cache_base: Option<&'a Path>,
+    pub(super) terminal: TerminalFacts,
 }
 
 impl CheckError {
@@ -75,6 +77,7 @@ pub fn run(args: CheckArgs, json_mode: bool) -> ExitCode {
             backend: &backend,
             interrupt,
             cache_base: None,
+            terminal: TerminalFacts::from_environment(),
         },
         &mut stdout,
         &mut stderr,
@@ -97,6 +100,7 @@ pub fn run_at(
             backend: &backend,
             interrupt: InterruptFlag::install(),
             cache_base: None,
+            terminal: TerminalFacts::from_environment(),
         },
         stdout,
         stderr,
@@ -120,6 +124,7 @@ pub fn run_at_with_cache(
             backend: &backend,
             interrupt: InterruptFlag::install(),
             cache_base: Some(cache_base),
+            terminal: TerminalFacts::from_environment(),
         },
         stdout,
         stderr,
@@ -141,6 +146,7 @@ pub(super) fn run_at_with(
         backend,
         interrupt,
         cache_base,
+        terminal,
     } = context;
     let root = match fs::canonicalize(requested_root) {
         Ok(root) => root,
@@ -161,6 +167,7 @@ pub(super) fn run_at_with(
         backend,
         interrupt,
         cache_base,
+        terminal,
     };
     let CheckArgs {
         operation,
