@@ -1,0 +1,48 @@
+group = "REQUIRED"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-REQUIRED-001"
+title = "Missing configuration is an error"
+manual = false
+design = "design/config-file.md#required-file"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = ".bloomery/config.toml is absent"
+system = "Bloomery"
+action = "report a ConfigurationError instead of substituting defaults"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-REQUIRED-002"
+title = "Partial configuration inherits defaults"
+manual = false
+design = "design/config-file.md#partial-configuration"
+
+[requirements.ears]
+type = "event"
+trigger = "a present configuration file omits a table or key"
+system = "Bloomery"
+action = "use the same default value as an empty configuration"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-REQUIRED-003"
+title = "Build tables are accepted as valid configuration"
+manual = false
+design = "design/config-file.md#build-tables"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the configuration parser"
+action = "accept the build tables carried by .bloomery/config.toml as valid configuration"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-REQUIRED-004"
+title = "Invalid present configuration remains an error"
+manual = false
+design = "design/config-file.md#error-handling"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a present configuration file is unreadable, malformed, or invalid"
+system = "Bloomery"
+action = "report a ConfigurationError instead of substituting defaults"

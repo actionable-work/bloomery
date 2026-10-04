@@ -45,9 +45,9 @@ pub static PROFILES: DocPage = DocPage {
 
 pub static API: DocPage = DocPage {
     slug: "api",
-    title: "mkWorkspace API Reference",
+    title: "mkFlake API Reference",
     category: "Configuration",
-    description: "Categorized options reference for source, toolchain, profile, flags, and checks.",
+    description: "Categorized config.toml reference for source, toolchain, profile, flags, and checks.",
     order: 4,
     markdown: include_str!("docs/api.md"),
 };

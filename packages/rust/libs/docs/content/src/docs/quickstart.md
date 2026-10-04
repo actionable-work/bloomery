@@ -27,66 +27,51 @@ For standard workspaces, `bloomery.mkFlake` sets up complete packages, runnable 
 > - `checks.${system}.<name>:<test|clippy|doc|doctest>` and `checks.${system}.workspace:lock`; run `bloomery check` directly to combine static specification validation and selected Nix checks.
 > - `devShells.${system}.default` (with `rustc`, `clippy`, `cargo`, and fast-build tools)
 
+> [!IMPORTANT]
+> `mkFlake` requires `.bloomery/config.toml`. Create it next to `flake.nix`:
+>
+> ```toml
+> [build]
+> libPackages = false
+> devPackages = true
+>
+> [profile.release]
+> optLevel = 3
+> lto = "thin"
+> codegenUnits = 1
+>
+> [toolchain]
+> linker = "lld"
+>
+> [checks]
+> enable = true
+> ```
+>
+> Every workspace setting lives in `config.toml`; `mkFlake` receives only
+> `nixpkgs`, `root`, an optional `systems` list, an optional `overrides` set,
+> and an optional `extraOutputs` callback.
+
 ---
 
-## Alternative Integration Styles
+## Configuration Tables
 
-### 1. Categorized Workspace (`mkWorkspace`)
+All build settings are read from `.bloomery/config.toml`:
 
-When building inside an existing per-system function or custom flake layout, call `bloomery.lib.${system}.mkWorkspace`:
+| Table | Purpose |
+| --- | --- |
+| `[build]` | Source paths, member selection, `profileName`, `libPackages`, `devPackages` |
+| `[toolchain]` | `rustc`, `clippy`, `cargo`, `lld`, `mold`, `stdenv`, and `linker` |
+| `[profile.release]`, `[profile.dev]` | Optimization, LTO, codegen units, panic, strip, debug info, CPU target |
+| `[flags]` | Extra `rustc`, `test`, `clippy`, `doc`, and `doctest` flags |
+| `[devShell]` | `enable`, extra `packages`, and `shellHook` |
+| `[checks]` | `enable`, `includePackageChecks`, `throwOnOutOfDate` |
+| `[features]` | `unify` and `cratesIoIndex` |
 
-```nix
-{
-  outputs = { nixpkgs, bloomery, ... }: let
-    system = "x86_64-linux";
-    pkgs = nixpkgs.legacyPackages.${system};
-    ws = bloomery.lib.${system}.mkWorkspace {
-      root = ./.;
-      profile = { optLevel = 3; lto = "thin"; };
-    };
-  in {
-    packages.${system} = ws.packages;
-    checks.${system} = ws.checks;
-    devShells.${system}.default = ws.devShell;
-  };
-}
-```
-
-### 2. Flake-Parts Integration (`flakeModules.default`)
-
-Integrate Bloomery cleanly into `flake-parts` modules:
-
-```nix
-{
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-parts.url = "github:hercules-ci/flake-parts";
-    bloomery.url = "github:actionable-work/bloomery";
-  };
-
-  outputs = inputs@{ flake-parts, bloomery, ... }:
-    flake-parts.lib.mkFlake { inherit inputs; } {
-      imports = [ bloomery.flakeModules.default ];
-      systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
-      perSystem = { pkgs, ... }: {
-        bloomery.workspace = {
-          root = ./.;
-        };
-      };
-    };
-}
-```
-
-### 3. Custom Lib Constructor (`bloomery.mkLib`)
-
-If you pass customized Nixpkgs instances, overlays, or stdenv cross-compilers:
-
-```nix
-let
-  bl = bloomery.mkLib pkgs;
-  ws = bl.mkWorkspace { root = ./.; };
-in ws.packages.my-bin
-```
+Package-valued settings are written as nixpkgs attribute paths (for example
+`linker = "mold"` or `packages = ["rust-analyzer"]`); path-valued settings are
+relative to the workspace root. Per-crate overrides stay in Nix: pass them to
+`mkFlake` through the `overrides` argument or place an `overrides.nix` next to a
+crate's `Cargo.toml`.
 
 ---
 
@@ -98,7 +83,7 @@ Bloomery resolves crate features and dependency edges without Import-From-Deriva
 nix run github:actionable-work/bloomery#bloomery -- sync
 ```
 
-This runs Cargo's normal workspace resolution, preserving compatible locked versions where possible. Request upgrades explicitly with `--update=rust`, `--update=nix`, or bare `--update` to update all applicable ecosystems. Sync requires `cargo`; it requires `nix` only when updating a flake. It does not require a specification tree or create configuration files.
+This runs Cargo's normal workspace resolution, preserving compatible locked versions where possible. Request upgrades explicitly with `--update=rust`, `--update=nix`, or bare `--update` to update all applicable ecosystems. Sync requires `cargo`; it requires `nix` only when updating a flake. It requires `.bloomery/config.toml` and does not create or edit it.
 
 The `check`, `review`, and `sync` commands all accept the same `--json` flag for machine-readable output. Human-readable output is colorized when writing to a terminal and respects `NO_COLOR`.
 

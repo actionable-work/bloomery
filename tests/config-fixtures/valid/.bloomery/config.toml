@@ -1,0 +1,9 @@
+[build]
+libPackages = true
+devPackages = true
+
+[profile.release]
+optLevel = 2
+
+[toolchain]
+linker = "mold"

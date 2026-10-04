@@ -1,7 +1,4 @@
-{
-  nixpkgs,
-  bloomery,
-}: {
+{nixpkgs}: {
   eachSystem,
   perSystemWorkspace,
 }: let
@@ -11,30 +8,31 @@ in {
     system: let
       pkgs = nixpkgs.legacyPackages.${system};
       lib = pkgs.lib;
+      bl = import ../../lib {inherit pkgs lib;};
       mkFixture = name:
-        bloomery.lib.${system}.mkWorkspace {
+        bl.mkWorkspace {
           root = fixtures + "/${name}";
           createLibPackages = true;
           createDevPackages = true;
         };
       workspace = perSystemWorkspace.${system};
       base = mkFixture "base";
-      custom = bloomery.lib.${system}.mkWorkspace {
+      custom = bl.mkWorkspace {
         root = fixtures + "/base";
         overrides.app.fileset = lib.fileset.unions [
           (fixtures + "/base/crates/app/Cargo.toml")
           (fixtures + "/base/crates/app/README.md")
         ];
       };
-      explicit = bloomery.lib.${system}.mkWorkspace {
+      explicit = bl.mkWorkspace {
         root = fixtures + "/base";
         overrides.app.src = fixtures + "/base/crates/app";
       };
-      explicitAssets = bloomery.lib.${system}.mkWorkspace {
+      explicitAssets = bl.mkWorkspace {
         root = fixtures + "/base";
         overrides.app.assets = [./explicit-assets];
       };
-      explicitLibrary = bloomery.lib.${system}.mkWorkspace {
+      explicitLibrary = bl.mkWorkspace {
         root = ../../tests/single-crate-workspace;
         createLibPackages = true;
         createDevPackages = true;
@@ -60,7 +58,7 @@ in {
           }).test.env.BLOOMERY_SOURCE_ROOT;
       };
       supportConsumer = name:
-        bloomery.lib.${system}.mkWorkspace {
+        bl.mkWorkspace {
           root = fixtures + "/base";
           createLibPackages = true;
           createDevPackages = true;

@@ -46,21 +46,21 @@ in
   testFlakes
   // {
     "interface:exports" = assert bloomery ? mkFlake;
-    assert bloomery ? mkLib;
-    assert bloomery ? flakeModules;
-    assert bloomery.flakeModules ? default;
-    assert bloomery ? flakeModule;
-    assert bloomery.lib ? parseLock;
-    assert bloomery.lib.${system} ? mkWorkspace;
-    assert bloomery.mkLib.${system} ? mkWorkspace;
+    assert !(bloomery ? mkLib);
+    assert !(bloomery ? flakeModules);
+    assert !(bloomery ? flakeModule);
+    assert !(bloomery ? lib);
       pkgs.runCommand "bloomery-interface-exports" {
         passthru.bloomery = [
           "NIXLIB-FLAKE-ENTRYPOINTS-001"
           "NIXLIB-FLAKE-ENTRYPOINTS-002"
+          "NIXLIB-FLAKE-ENTRYPOINTS-010"
           "NIXLIB-FLAKE-ENTRYPOINTS-011"
+          "NIXLIB-FLAKE-ENTRYPOINTS-012"
+          "NIXLIB-FLAKE-ENTRYPOINTS-013"
         ];
       } ''
-        echo "Bloomery flake exports are present."
+        echo "Bloomery flake exports a single mkFlake constructor."
         mkdir "$out"
         echo "passed" > "$out/success"
       '';

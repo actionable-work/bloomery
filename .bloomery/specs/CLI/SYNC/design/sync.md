@@ -120,10 +120,11 @@ The initial catalog targets existing check/evidence scanner switches:
 | `scanners.playwright.enabled` | Playwright evidence scanning; configure repository-relative `paths` when enabling |
 | `scanners.nix.enabled` | Nix check evidence scanning; configure repository-relative `paths` for `passthru.bloomery` metadata when enabling |
 
-These are the existing configuration keys associated with checks; there is no
-new `[checks]` table. Recommendations suggest evaluating applicability, not
-blindly enabling every scanner. No repository-language heuristics filter this
-initial catalog.
+These are the existing scanner keys associated with check evidence. The Nix
+build `[checks]` table is a separate build configuration surface and is not part
+of this recommendation catalog. Recommendations suggest evaluating
+applicability, not blindly enabling every scanner. No repository-language
+heuristics filter this initial catalog.
 
 Parse the config into a raw TOML value tree as well as the validated typed
 configuration. Compare each catalog path to the raw tree **before default
@@ -155,18 +156,17 @@ new catalog entries naturally appear for absent keys after a CLI upgrade.
 
 ## Missing configuration
 
-If `.bloomery/config.toml` is absent, emit one non-fatal warning identifying the
-path and recommending creation of the file to configure or explicitly disable
-recommended features. Use validated defaults and continue lock synchronization.
-Suppress individual missing-key notices in this case to avoid a redundant wall
-of recommendations. Do not create `.bloomery/` or the config automatically.
-Missing specs do not change this behavior. A dangling config symlink or another
-read failure is not a missing-file default.
+`.bloomery/config.toml` is required. When it is absent, sync stops before
+reconciliation and reports a `ConfigurationError` naming the path and
+recommending creation of the file. Sync does not create or edit `.bloomery/` or
+the config automatically. A dangling config symlink or another read failure is
+also an error, not a missing-file default. Missing specs do not change this
+behavior.
 
-Example warning:
+Example error:
 
 ```text
-warning: .bloomery/config.toml is missing; create it to configure Bloomery's recommended features or explicitly disable them. Lock synchronization will continue.
+error: .bloomery/config.toml is required; create it to configure Bloomery before running sync.
 ```
 
 ## Failures and output
@@ -195,8 +195,7 @@ in this initial design; callers must serialize them.
 ## Nix migration
 
 Remove `apps.lock` and the old lock-app/script exports throughout Bloomery's
-flake and workspace construction APIs, including `mkFlake`, `mkWorkspace`,
-`mkLib`, and the flake-parts integration where applicable. Do not introduce
+flake and workspace construction API, including `mkFlake`. Do not introduce
 `apps.sync`, a `lock` alias, or a `bloomery lock` subcommand. This is a deliberate
 breaking removal; unrelated app outputs are unaffected.
 

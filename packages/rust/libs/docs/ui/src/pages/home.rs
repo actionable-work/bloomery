@@ -83,23 +83,23 @@ pub async fn home() -> Result<impl View, Error> {
                             <tbody>
                                 <tr>
                                     <td><code>"tests/basic-workspace"</code></td>
-                                    <td><span class="pill emerald">"Style 1: Zero-Boilerplate"</span></td>
-                                    <td>"Evaluates bloomery.mkFlake testing multi-crate workspace compilation, libs, binaries, and tests."</td>
+                                    <td><span class="pill emerald">"Config-driven mkFlake"</span></td>
+                                    <td>"Evaluates bloomery.mkFlake with .bloomery/config.toml testing multi-crate workspace compilation, libs, binaries, and tests."</td>
                                 </tr>
                                 <tr>
                                     <td><code>"tests/axum-workspace"</code></td>
-                                    <td><span class="pill cyan">"Style 2: Categorized mkWorkspace"</span></td>
-                                    <td>"Full real-world Axum web server and Clap CLI with mold/lld linker settings and profiles."</td>
+                                    <td><span class="pill cyan">"Config-driven mkFlake"</span></td>
+                                    <td>"Full real-world Axum web server and Clap CLI with linker settings and profiles from config.toml."</td>
                                 </tr>
                                 <tr>
-                                    <td><code>"tests/mklib-workspace"</code></td>
-                                    <td><span class="pill forge">"Style 3: Custom Lib Constructor"</span></td>
-                                    <td>"Constructor bloomery.mkLib pkgs with custom Nixpkgs instances, overlays, and system overrides."</td>
+                                    <td><code>"tests/single-crate-workspace"</code></td>
+                                    <td><span class="pill forge">"Nix overrides argument"</span></td>
+                                    <td>"Single-crate workspace exercising the overrides argument accepted by mkFlake."</td>
                                 </tr>
                                 <tr>
                                     <td><code>"tests/flake-parts-workspace"</code></td>
-                                    <td><span class="pill">"Style 4: Flake-Parts Module"</span></td>
-                                    <td>"Clean integration into flake-parts modules using bloomery.flakeModules.default."</td>
+                                    <td><span class="pill">"Internal flake-parts module"</span></td>
+                                    <td>"Exercises the internal flake-parts module directly; the public interface is mkFlake."</td>
                                 </tr>
                                 <tr>
                                     <td><code>"tests/overrides-workspace"</code></td>

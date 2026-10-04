@@ -366,22 +366,23 @@ fn format_diagnostic(root: &Path, diagnostic: &bloomery_model::Diagnostic) -> St
 }
 
 fn collect_advisories(loaded: &LoadedConfig) -> Advisories {
-    match &loaded.raw {
-        Some(raw) => Advisories {
-            warnings: Vec::new(),
-            recommendations: missing_recommendations(raw)
+    let recommendations = loaded
+        .raw
+        .as_ref()
+        .map(|raw| {
+            missing_recommendations(raw)
                 .into_iter()
                 .map(|recommendation| SyncRecommendation {
                     key: recommendation_key(recommendation),
                     benefit: recommendation.benefit.to_owned(),
                     guidance: recommendation.guidance.to_owned(),
                 })
-                .collect(),
-        },
-        None => Advisories {
-            warnings: vec![".bloomery/config.toml is missing; create it to configure Bloomery's recommended features or explicitly disable them. Lock synchronization will continue.".to_owned()],
-            recommendations: Vec::new(),
-        },
+                .collect()
+        })
+        .unwrap_or_default();
+    Advisories {
+        warnings: Vec::new(),
+        recommendations,
     }
 }
 
@@ -723,25 +724,26 @@ mod tests {
     #[bloomery("CLI-SYNC-LOCKS-028")]
     #[bloomery("CLI-SYNC-LOCKS-029")]
     #[bloomery("CLI-SYNC-LOCKS-030")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-004")]
     #[bloomery("CLI-SYNC-RECOMMENDATIONS-005")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-021")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-022")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-023")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-024")]
     #[bloomery("CLI-SYNC-RECOMMENDATIONS-025")]
     #[bloomery("CLI-SYNC-RECOMMENDATIONS-026")]
     #[bloomery("CLI-SYNC-RECOMMENDATIONS-027")]
     #[bloomery("CLI-SYNC-RECOMMENDATIONS-028")]
-    fn normal_sync_creates_missing_locks_without_specs_or_config_directory() {
+    fn normal_sync_creates_missing_locks_without_specs_directory() {
         let fixture = Fixture::new();
+        fixture.write_config("");
+        let config_before = fs::read(fixture.root.join(".bloomery/config.toml")).expect("config");
         let mut runner = FakeRunner::default();
         let (result, stdout, stderr) = run_fixture(&fixture, &UpdateSelection::None, &mut runner);
 
-        result.expect("sync should succeed without pre-existing lock/spec/config files");
+        result.expect("sync should succeed with a config file present");
         assert!(fixture.root.join("Cargo.lock").is_file());
         assert!(fixture.root.join("bloomery.lock").is_file());
-        assert!(!fixture.root.join(".bloomery").exists());
+        assert!(!fixture.root.join(".bloomery/specs").exists());
+        assert_eq!(
+            fs::read(fixture.root.join(".bloomery/config.toml")).expect("config"),
+            config_before
+        );
         assert_eq!(runner.calls.len(), 2);
         assert_eq!(runner.calls[0].arguments[0], "metadata");
         assert!(
@@ -758,8 +760,26 @@ mod tests {
         );
         assert!(runner.calls.iter().all(|call| call.executable == "cargo"));
         assert!(stdout.contains("Cargo.lock and bloomery.lock"));
-        assert!(stderr.contains(".bloomery/config.toml is missing"));
-        assert!(stderr.contains("Lock synchronization will continue"));
+        assert!(!stderr.contains("missing"));
+    }
+
+    #[test]
+    #[bloomery("CLI-SYNC-RECOMMENDATIONS-004")]
+    #[bloomery("CLI-SYNC-RECOMMENDATIONS-021")]
+    #[bloomery("CLI-SYNC-RECOMMENDATIONS-022")]
+    #[bloomery("CLI-SYNC-RECOMMENDATIONS-023")]
+    #[bloomery("CLI-SYNC-RECOMMENDATIONS-024")]
+    fn absent_configuration_fails_sync_before_lock_operations() {
+        let fixture = Fixture::new();
+        let mut runner = FakeRunner::default();
+        let (result, _stdout, _stderr) = run_fixture(&fixture, &UpdateSelection::None, &mut runner);
+
+        let error = result.expect_err("missing config should fail");
+        assert_eq!(error.stage(), "configuration preflight");
+        assert!(error.to_string().contains("config.toml"));
+        assert!(runner.calls.is_empty());
+        assert!(!fixture.root.join("Cargo.lock").exists());
+        assert!(!fixture.root.join("bloomery.lock").exists());
     }
 
     #[test]
@@ -942,6 +962,7 @@ mod tests {
     #[bloomery("CLI-SYNC-LOCKS-031")]
     fn unavailable_required_executables_fail_before_any_mutation() {
         let fixture = Fixture::new();
+        fixture.write_config("");
         let mut runner = FakeRunner::default();
         runner.available.remove("cargo");
         let result = run_fixture(&fixture, &UpdateSelection::None, &mut runner).0;
@@ -1166,6 +1187,7 @@ mod tests {
     #[test]
     fn preflight_and_reconciliation_do_not_modify_the_manifest_or_spec_tree() {
         let fixture = Fixture::new();
+        fixture.write_config("");
         let manifest = fs::read(fixture.root.join("Cargo.toml")).expect("manifest");
         let mut runner = FakeRunner::default();
         let (result, _stdout, _stderr) = run_fixture(&fixture, &UpdateSelection::None, &mut runner);

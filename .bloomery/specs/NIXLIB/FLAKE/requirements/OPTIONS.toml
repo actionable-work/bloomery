@@ -9,17 +9,17 @@ design = "design/workspace-options.md#source-and-files"
 [requirements.ears]
 type = "ubiquitous"
 system = "the workspace option module"
-action = "default source.cargoToml and source.cargoLock to paths below root and auto-detect source.bloomeryLock when it exists"
+action = "default build.cargoToml and build.cargoLock to paths below root and auto-detect build.bloomeryLock when it exists"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-OPTIONS-002"
-title = "source.members restricts built members"
+title = "build.members restricts built members"
 manual = false
 design = "design/workspace-options.md#source-and-files"
 
 [requirements.ears]
 type = "event"
-trigger = "source.members lists crate names"
+trigger = "build.members lists crate names"
 system = "the workspace builder"
 action = "restrict generated crate derivations to those workspace members"
 
@@ -54,7 +54,7 @@ design = "design/workspace-options.md#compilation-profiles"
 [requirements.ears]
 type = "ubiquitous"
 system = "the workspace option module"
-action = "type-check profile and profileDev settings for optimization, LTO, codegen units, panic strategy, stripping, debug info, target CPU, overflow checks, linker, and link arguments"
+action = "type-check profile.release and profile.dev settings for optimization, LTO, codegen units, panic strategy, stripping, debug info, target CPU, overflow checks, linker, and link arguments"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-OPTIONS-006"
@@ -81,38 +81,38 @@ action = "use those settings as the base profile while explicit options override
 
 [[requirements]]
 id = "NIXLIB-FLAKE-OPTIONS-008"
-title = "Package visibility toggles and aliases are exposed"
+title = "Package visibility toggles are configurable"
 manual = false
 design = "design/workspace-options.md#package-visibility"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "the workspace option module"
-action = "expose createLibPackages and createDevPackages with libPackages, packages.createLib, devPackages, and packages.createDev aliases"
+action = "expose build.libPackages and build.devPackages as the canonical visibility toggles"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-OPTIONS-009"
-title = "Library visibility aliases take precedence"
+title = "Library visibility controls library packages"
 manual = false
 design = "design/workspace-options.md#package-visibility"
 
 [requirements.ears]
 type = "event"
-trigger = "libPackages and createLibPackages are both set"
-system = "the workspace option module"
-action = "use libPackages and otherwise fall back to packages.createLib and then createLibPackages"
+trigger = "build.libPackages is enabled"
+system = "the workspace builder"
+action = "expose <crate>:lib packages for workspace crates with a library entrypoint"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-OPTIONS-010"
-title = "Dev visibility aliases take precedence"
+title = "Dev visibility controls dev apps"
 manual = false
 design = "design/workspace-options.md#package-visibility"
 
 [requirements.ears]
 type = "event"
-trigger = "devPackages and createDevPackages are both set"
-system = "the workspace option module"
-action = "use devPackages and otherwise fall back to packages.createDev and then createDevPackages"
+trigger = "build.devPackages is enabled"
+system = "the workspace builder"
+action = "generate dev-profile apps for workspace binaries"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-OPTIONS-011"

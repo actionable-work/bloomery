@@ -19,7 +19,7 @@ design = "design/resolution.md#workspace-discovery"
 
 [requirements.ears]
 type = "event"
-trigger = "source.members lists crate names"
+trigger = "build.members lists crate names"
 system = "the workspace builder"
 action = "build exactly those members instead of discovering the manifest workspace"
 

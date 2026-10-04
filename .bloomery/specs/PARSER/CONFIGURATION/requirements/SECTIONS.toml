@@ -1,0 +1,13 @@
+group = "SECTIONS"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-SECTIONS-001"
+title = "Build tables are not scanner configuration"
+manual = false
+design = "design/config-file.md#build-tables"
+
+[requirements.ears]
+type = "event"
+trigger = "the build tables are present"
+system = "the configuration parser"
+action = "load spec and scanner configuration without interpreting the build tables as scanner targets"

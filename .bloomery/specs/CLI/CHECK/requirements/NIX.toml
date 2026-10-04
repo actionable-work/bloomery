@@ -8,7 +8,7 @@ design = "design/workspace-check.md#integration-direction"
 
 [requirements.ears]
 type = "ubiquitous"
-system = "mkWorkspace, mkFlake, and flake-module integration"
+system = "the mkFlake integration"
 action = "omit the generated bloomery:check output regardless of metadata presence"
 
 [[requirements]]

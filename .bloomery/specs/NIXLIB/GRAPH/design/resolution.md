@@ -2,7 +2,7 @@
 
 ## Workspace discovery
 
-Workspace members come from explicit `source.members` or from the workspace
+Workspace members come from explicit `build.members` or from the workspace
 `Cargo.toml`: the root package, `[workspace.dependencies]` entries with a
 `path`, and `[workspace] members` entries including `*` globs, minus
 `[workspace] exclude` entries. A candidate without a manifest containing a

@@ -119,6 +119,7 @@ in builtins.seq (builtins.abort "scanner must not evaluate Nix") {
                         paths: vec!["checks.nix".into()],
                     },
                 },
+                ..Config::default()
             },
             areas: Vec::new(),
         };

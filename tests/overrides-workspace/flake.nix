@@ -11,24 +11,30 @@
     bloomery,
     ...
   }:
-    import ../workspace-flake.nix {
+    bloomery.mkFlake {
       inherit nixpkgs;
-      workspace = system:
-        bloomery.lib.${system}.mkWorkspace {
-          root = ./.;
-          # Top-level overrides merge with the member's colocated overrides.nix.
-          overrides = {
-            bin-calc = {
-              env = {
-                TOP_LEVEL_OVERRIDE_VAR = "injected_from_flake_nix";
-                SHARED_OVERRIDE_VAR = "flake";
-              };
-              rustcFlags = [
-                "--cfg=bloomery_toplevel_override"
-              ];
-            };
+      root = ./.;
+      # Top-level overrides merge with the member's colocated overrides.nix.
+      overrides = {
+        bin-calc = {
+          env = {
+            TOP_LEVEL_OVERRIDE_VAR = "injected_from_flake_nix";
+            SHARED_OVERRIDE_VAR = "flake";
           };
+          rustcFlags = [
+            "--cfg=bloomery_toplevel_override"
+          ];
         };
-      extraChecks = import ./checks.nix {inherit nixpkgs;};
+      };
+      extraOutputs = {
+        eachSystem,
+        perSystemWorkspace,
+      }: {
+        checks = eachSystem (
+          system:
+            perSystemWorkspace.${system}.checks
+            // ((import ./checks.nix {inherit nixpkgs;}) system perSystemWorkspace.${system})
+        );
+      };
     };
 }

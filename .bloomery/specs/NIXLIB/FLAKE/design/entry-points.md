@@ -2,18 +2,24 @@
 
 ## Exported flake attributes
 
-Bloomery exports `mkFlake`, `mkLib`, `flakeModules.default` with a
-`flakeModule` alias, and `lib`. `lib` provides a complete builder interface for
-each supported system plus `mkFlake`, `flakeModules`, `flakeModule`, and
-`parseLock`.
+Bloomery exports `mkFlake` as its only library constructor. It does not export
+`mkLib`, `flakeModules`, `flakeModule`, or per-system builder attributes, and
+it does not expose a public `lib` builder surface.
 
 ## mkFlake
 
-`mkFlake` accepts `nixpkgs`, an optional `systems` list, an optional
-`extraOutputs` callback, and every workspace option. It ignores `self` and
-evaluates one workspace per selected system with that system's
-`nixpkgs.legacyPackages`. Workspace options are passed directly; there is no
-separate option namespace.
+`mkFlake` accepts `nixpkgs`, `root`, an optional `systems` list, an optional
+`overrides` attribute set, and an optional `extraOutputs` callback. It evaluates
+one workspace per selected system
+with that system's `nixpkgs.legacyPackages`. No other workspace option is
+accepted as a constructor argument; every remaining setting comes from the
+configuration file described in [Build configuration](configuration.md).
+
+## Configuration requirement
+
+`mkFlake` reads `root/.bloomery/config.toml`. The file is required. When it is
+missing or unreadable, `mkFlake` fails evaluation with a `bloomery:`-prefixed
+message naming the missing path.
 
 ## Systems and output mapping
 
@@ -29,19 +35,3 @@ function over the selected systems, and `perSystemWorkspace` holds every
 per-system workspace output including `crates`, `lock`, and `config`. The
 returned attribute set is merged after the base flake attributes, so it can add
 or replace outputs.
-
-## mkLib
-
-`mkLib` is applied to a package set (`bloomery.mkLib pkgs`) and returns the
-full builder interface for that package set. Per-system convenience attributes
-are exposed as `bloomery.mkLib.${system}`.
-
-## Flake-parts module
-
-`flakeModules.default` provides `perSystem.bloomery.workspace`, a
-null-or-submodule option defaulting to null, and the internal
-`perSystem.bloomery.outputs` attribute holding the evaluated workspace. When a
-workspace is configured, the module sets `packages` and `apps` as module
-defaults, `checks` when checks are enabled, and `devShells.default` when the
-development shell is enabled. Consumer definitions in the same flake-parts
-configuration override these defaults.

@@ -10,6 +10,22 @@ pub struct Config {
     pub specs: SpecsConfig,
     #[serde(default)]
     pub scanners: ScannersConfig,
+    // Nix build tables. They are owned by the flake interface and kept opaque
+    // to the CLI so a shared config file parses without interpreting them.
+    #[serde(default)]
+    pub build: Option<toml::Value>,
+    #[serde(default)]
+    pub toolchain: Option<toml::Value>,
+    #[serde(default)]
+    pub profile: Option<toml::Value>,
+    #[serde(default)]
+    pub flags: Option<toml::Value>,
+    #[serde(default, rename = "devShell")]
+    pub dev_shell: Option<toml::Value>,
+    #[serde(default)]
+    pub checks: Option<toml::Value>,
+    #[serde(default)]
+    pub features: Option<toml::Value>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -113,7 +129,7 @@ pub fn load_with_raw(root: &Path) -> Result<LoadedConfig, Diagnostic> {
                     Some(error_span_line(&contents, error.to_string())),
                 )
             })?;
-            let config = toml::from_str(&contents).map_err(|error| {
+            let config: Config = toml::from_str(&contents).map_err(|error| {
                 Diagnostic::new(
                     "ConfigurationError",
                     format!("Unable to parse configuration: {error}"),
@@ -131,7 +147,11 @@ pub fn load_with_raw(root: &Path) -> Result<LoadedConfig, Diagnostic> {
                     metadata_error.kind() == std::io::ErrorKind::NotFound
                 }) =>
         {
-            (Config::default(), None)
+            return Err(Diagnostic::new(
+                "ConfigurationError",
+                "config.toml is required; create .bloomery/config.toml to configure Bloomery",
+            )
+            .at(path, Some(1)));
         }
         Err(error) => {
             return Err(Diagnostic::new(
@@ -271,26 +291,15 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("PARSER-CONFIGURATION-OPTIONAL-001")]
-    fn missing_configuration_uses_validated_defaults() {
+    #[bloomery("PARSER-CONFIGURATION-REQUIRED-001")]
+    fn missing_configuration_is_an_error() {
         let root = root();
-        let config = load(&root).expect("missing configuration should use defaults");
-
-        assert_eq!(config.specs.dir, "specs");
-        assert_eq!(
-            config.specs_root(&root).expect("default specs path"),
-            root.join(".bloomery/specs")
-        );
-        assert_default_scanners(
-            &config.scanners.rust,
-            &config.scanners.playwright,
-            &config.scanners.nix,
-        );
+        assert_configuration_error(&root);
         let _ = fs::remove_dir_all(root);
     }
 
     #[test]
-    #[bloomery("PARSER-CONFIGURATION-OPTIONAL-002")]
+    #[bloomery("PARSER-CONFIGURATION-REQUIRED-002")]
     fn partial_configuration_uses_defaults_for_omitted_tables_and_keys() {
         let root = root();
         let config_path = root.join(".bloomery/config.toml");
@@ -332,7 +341,44 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("PARSER-CONFIGURATION-OPTIONAL-003")]
+    #[bloomery("PARSER-CONFIGURATION-REQUIRED-003")]
+    #[bloomery("PARSER-CONFIGURATION-SECTIONS-001")]
+    fn build_tables_are_accepted_as_valid_configuration() {
+        let root = root();
+        let config_path = root.join(".bloomery/config.toml");
+        fs::create_dir_all(config_path.parent().expect("config parent")).expect("config dir");
+
+        fs::write(
+            &config_path,
+            "[build]\ncargoToml = \"Cargo.toml\"\nlibPackages = true\n\
+             [toolchain]\nlinker = \"lld\"\n\
+             [profile.release]\noptLevel = 3\n\
+             [profile.dev]\noptLevel = 0\n\
+             [flags]\ndoc = [\"-Dwarnings\"]\n\
+             [devShell]\nenable = false\n\
+             [checks]\nenable = true\n\
+             [features]\nunify = true\n",
+        )
+        .expect("build tables");
+        let config = load(&root).expect("build tables should be accepted");
+        assert_eq!(config.specs.dir, "specs");
+        assert_default_scanners(
+            &config.scanners.rust,
+            &config.scanners.playwright,
+            &config.scanners.nix,
+        );
+        assert!(config.build.is_some());
+        assert!(config.toolchain.is_some());
+        assert!(config.profile.is_some());
+        assert!(config.flags.is_some());
+        assert!(config.dev_shell.is_some());
+        assert!(config.checks.is_some());
+        assert!(config.features.is_some());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[bloomery("PARSER-CONFIGURATION-REQUIRED-004")]
     fn present_malformed_unreadable_or_invalid_configuration_is_an_error() {
         let root = root();
         let config_path = root.join(".bloomery/config.toml");

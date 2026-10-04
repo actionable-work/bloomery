@@ -1,9 +1,11 @@
-use crate::check_command::catalog::NixCli;
+use crate::check_command::catalog::{NixBackend, NixCli};
 use crate::check_command::command::{
     CheckArgs, CheckOperation, FailureArgs, ListArgs, validate_args,
 };
 use crate::check_command::execution::validate_execution_selection;
-use crate::check_command::test_support::{FakeNix, fixture, invoke, nix_is_available, request};
+use crate::check_command::test_support::{
+    FakeNix, fixture, invoke, lock_fixture_flake, nix_is_available, request,
+};
 use bloomery_test_macros::bloomery;
 use serde_json::Value;
 use std::fs;
@@ -149,13 +151,27 @@ fn real_nix_distinguishes_missing_system_outputs_from_empty_check_sets() {
     }
 
     let (root, cache) = fixture(true);
-    fs::write(
-            root.join("flake.nix"),
-            r#"{ description = "selected-system fixture"; outputs = { self }: { checks.aarch64-linux = {}; }; }
-"#,
-        )
-        .expect("write fixture flake");
     let backend = NixCli::default();
+    let system = backend.host_system(&root).expect("host Nix system");
+    fs::write(
+        root.join("flake.nix"),
+        format!(
+            r#"{{
+  description = "selected-system fixture";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  outputs = {{ self, nixpkgs }}: let
+    pkgs = nixpkgs.legacyPackages."{system}";
+    formatter = pkgs.writeShellScriptBin "noop-formatter" "exit 0";
+  in {{
+    formatter."{system}" = formatter;
+    checks.aarch64-linux = {{}};
+  }};
+}}
+"#
+        ),
+    )
+    .expect("write fixture flake");
+    lock_fixture_flake(&root);
 
     let mut missing = request();
     missing.systems = vec!["aarch64-darwin".to_owned()];

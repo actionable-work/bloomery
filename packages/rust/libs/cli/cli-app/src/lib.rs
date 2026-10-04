@@ -67,6 +67,14 @@ fn flake_present(root: &Path) -> bool {
     root.join("flake.nix").is_file()
 }
 
+/// Commands exempt from the required-configuration preflight. `init` is listed
+/// ahead of the command existing so it is exempt as soon as it is implemented.
+pub(crate) const CONFIGURATION_EXEMPT_COMMANDS: &[&str] = &["help", "init"];
+
+fn configuration_exempt(command: &str) -> bool {
+    CONFIGURATION_EXEMPT_COMMANDS.contains(&command)
+}
+
 fn command_name(command: &CliCommand) -> Option<&'static str> {
     match command {
         CliCommand::Check(_) => Some("check"),
@@ -95,6 +103,62 @@ fn report_missing_flake(
         let _ = writeln!(stderr, "{rendered}");
     }
     ExitCode::from(2)
+}
+
+fn report_configuration_error(
+    command: Option<&str>,
+    root: &Path,
+    diagnostic: bloomery_model::Diagnostic,
+    json_mode: bool,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
+    if json_mode {
+        let document = output::diagnostics_json(
+            command.unwrap_or("bloomery"),
+            "failed",
+            root,
+            std::slice::from_ref(&diagnostic),
+        );
+        if write_json(stdout, &document).is_err() {
+            let _ = writeln!(
+                stderr,
+                "bloomery: unable to render JSON configuration error"
+            );
+            return ExitCode::from(1);
+        }
+    } else {
+        let rendered = render_diagnostics(root, std::slice::from_ref(&diagnostic));
+        let rendered = output::colorize_check(
+            &rendered,
+            output::color_enabled(output::Stream::Stderr, false),
+        );
+        let _ = stderr.write_all(rendered.as_bytes());
+    }
+    ExitCode::from(1)
+}
+
+/// Configuration preflight shared by every repository command that loads a
+/// workspace. Parser help and the future `init` command are exempt, so this is
+/// only called on the command paths that need configuration.
+fn load_configuration_preflight(
+    command: Option<&str>,
+    root: &Path,
+    json_mode: bool,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> Result<(), ExitCode> {
+    if let Some(command) = command
+        && configuration_exempt(command)
+    {
+        return Ok(());
+    }
+    match bloomery_model::config::load(root) {
+        Ok(_) => Ok(()),
+        Err(diagnostic) => Err(report_configuration_error(
+            command, root, diagnostic, json_mode, stdout, stderr,
+        )),
+    }
 }
 
 fn report_parse_error_at(
@@ -145,6 +209,9 @@ fn run_sync_at(
 ) -> ExitCode {
     if !flake_present(root) {
         return report_missing_flake(Some("sync"), json_mode, stdout, stderr);
+    }
+    if let Err(code) = load_configuration_preflight(Some("sync"), root, json_mode, stdout, stderr) {
+        return code;
     }
     let selection = match bloomery_sync::parse_cli_update(update) {
         Ok(selection) => selection,
@@ -249,6 +316,11 @@ fn run_workspace_command_at(
 ) -> ExitCode {
     if !flake_present(root) {
         return report_missing_flake(command_name(&command), json_mode, stdout, stderr);
+    }
+    if let Err(code) =
+        load_configuration_preflight(command_name(&command), root, json_mode, stdout, stderr)
+    {
+        return code;
     }
     match command {
         CliCommand::Check(args) => check_command::run_at(args, json_mode, root, stdout, stderr),
@@ -490,6 +562,11 @@ mod tests {
         fs::create_dir_all(feature.join("requirements")).expect("requirements directory");
         fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
         fs::write(
+            root.join(".bloomery/config.toml"),
+            "[specs]\ndir = \"specs\"\n",
+        )
+        .expect("config");
+        fs::write(
             area.join("README.md"),
             "---\nid: CLI\nname: CLI\ntagline: CLI\ndescription: Area\n---\n# CLI\n",
         )
@@ -604,8 +681,13 @@ mod tests {
     fn repository_commands_resolve_against_the_process_working_directory() {
         let _lock = CURRENT_DIR_LOCK.lock().expect("working-directory lock");
         let root = fixture_root("cwd");
-        fs::create_dir_all(&root).expect("workspace root");
+        fs::create_dir_all(root.join(".bloomery")).expect("config root");
         fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
+        fs::write(
+            root.join(".bloomery/config.toml"),
+            "[specs]\ndir = \"specs\"\n",
+        )
+        .expect("config");
         let previous = std::env::current_dir().expect("original working directory");
         std::env::set_current_dir(&root).expect("set working directory");
         let mut stdout = Vec::new();
@@ -697,8 +779,13 @@ mod tests {
     #[bloomery("CLI-INTERFACE-COMMANDS-009")]
     fn a_present_root_flake_allows_command_dispatch() {
         let root = fixture_root("present-flake");
-        fs::create_dir_all(&root).expect("workspace root");
+        fs::create_dir_all(root.join(".bloomery")).expect("workspace root");
         fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
+        fs::write(
+            root.join(".bloomery/config.toml"),
+            "[specs]\ndir = \"specs\"\n",
+        )
+        .expect("config");
 
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
@@ -718,6 +805,77 @@ mod tests {
         assert_eq!(status, ExitCode::from(1));
         assert!(String::from_utf8_lossy(&stderr).contains("Cargo.toml"));
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[bloomery("CLI-INTERFACE-COMMANDS-010")]
+    fn repository_commands_require_configuration() {
+        for arguments in [
+            &["bloomery", "check"][..],
+            &["bloomery", "check", "list"][..],
+            &["bloomery", "review"][..],
+            &["bloomery", "sync"][..],
+        ] {
+            let root = fixture_root("missing-config");
+            fs::create_dir_all(&root).expect("workspace root");
+            fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
+            let mut stdout = Vec::new();
+            let mut stderr = Vec::new();
+            let status = run_args_at(arguments.iter().copied(), &root, &mut stdout, &mut stderr);
+            assert_eq!(status, ExitCode::from(1), "arguments: {arguments:?}");
+            let text = String::from_utf8_lossy(&stderr);
+            assert!(
+                text.contains("ConfigurationError"),
+                "arguments: {arguments:?}, stderr: {text:?}"
+            );
+            assert!(!root.join("Cargo.lock").exists());
+            assert!(!root.join("bloomery.lock").exists());
+            let _ = fs::remove_dir_all(root);
+        }
+    }
+
+    #[test]
+    #[bloomery("CLI-INTERFACE-COMMANDS-010")]
+    fn missing_configuration_errors_honor_json_mode() {
+        let root = fixture_root("missing-config-json");
+        fs::create_dir_all(&root).expect("workspace root");
+        fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_args_at(
+            ["bloomery", "check", "--json"],
+            &root,
+            &mut stdout,
+            &mut stderr,
+        );
+        assert_eq!(status, ExitCode::from(1));
+        assert!(stderr.is_empty());
+        let document: Value = serde_json::from_slice(&stdout).expect("JSON configuration error");
+        assert_eq!(document["status"], "failed");
+        assert_eq!(document["diagnostics"][0]["code"], "ConfigurationError");
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[bloomery("CLI-INTERFACE-COMMANDS-011")]
+    fn parser_help_does_not_require_configuration() {
+        let root = fixture_root("help-missing-config");
+        fs::create_dir_all(&root).expect("workspace root");
+        fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_args_at(["bloomery", "--help"], &root, &mut stdout, &mut stderr);
+        assert_eq!(status, ExitCode::SUCCESS);
+        assert!(String::from_utf8_lossy(&stdout).contains("Usage: bloomery"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[bloomery("CLI-INTERFACE-COMMANDS-012")]
+    fn init_is_exempt_from_the_configuration_requirement() {
+        assert!(super::configuration_exempt("init"));
+        assert!(super::configuration_exempt("help"));
+        assert!(!super::configuration_exempt("check"));
     }
 
     #[test]

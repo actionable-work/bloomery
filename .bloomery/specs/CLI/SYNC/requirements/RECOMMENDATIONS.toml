@@ -36,7 +36,7 @@ action = "emit at most one advisory notice per absent catalog key per invocation
 
 [[requirements]]
 id = "CLI-SYNC-RECOMMENDATIONS-004"
-title = "Missing config identifies its path"
+title = "Absent config identifies its path"
 manual = false
 design = "design/sync.md#missing-configuration"
 
@@ -44,18 +44,18 @@ design = "design/sync.md#missing-configuration"
 type = "event"
 trigger = ".bloomery/config.toml is absent"
 system = "bloomery sync"
-action = "emit one missing-configuration warning identifying .bloomery/config.toml"
+action = "report a ConfigurationError identifying .bloomery/config.toml"
 
 [[requirements]]
 id = "CLI-SYNC-RECOMMENDATIONS-005"
-title = "Advisory notices do not fail sync"
+title = "Recommendation notices do not fail sync"
 manual = false
-design = "design/sync.md#missing-configuration"
+design = "design/sync.md#recommendations"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "bloomery sync"
-action = "keep warnings and recommendations non-fatal"
+action = "keep recommendation notices non-fatal"
 
 [[requirements]]
 id = "CLI-SYNC-RECOMMENDATIONS-006"
@@ -230,7 +230,7 @@ action = "recommend absent catalog keys regardless of when the feature was intro
 
 [[requirements]]
 id = "CLI-SYNC-RECOMMENDATIONS-021"
-title = "Missing config recommends creation"
+title = "Absent config stops before synchronization"
 manual = false
 design = "design/sync.md#missing-configuration"
 
@@ -238,11 +238,11 @@ design = "design/sync.md#missing-configuration"
 type = "event"
 trigger = ".bloomery/config.toml is absent"
 system = "bloomery sync"
-action = "recommend creating .bloomery/config.toml to configure or explicitly disable recommended features"
+action = "stop before lock synchronization"
 
 [[requirements]]
 id = "CLI-SYNC-RECOMMENDATIONS-022"
-title = "Missing config suppresses individual notices"
+title = "Absent config suppresses recommendation notices"
 manual = false
 design = "design/sync.md#missing-configuration"
 
@@ -250,11 +250,11 @@ design = "design/sync.md#missing-configuration"
 type = "event"
 trigger = ".bloomery/config.toml is absent"
 system = "bloomery sync"
-action = "suppress individual missing-key recommendation notices"
+action = "emit no missing-key recommendation notices"
 
 [[requirements]]
 id = "CLI-SYNC-RECOMMENDATIONS-023"
-title = "Missing config uses validated defaults"
+title = "Absent config does not use validated defaults"
 manual = false
 design = "design/sync.md#missing-configuration"
 
@@ -262,11 +262,11 @@ design = "design/sync.md#missing-configuration"
 type = "event"
 trigger = ".bloomery/config.toml is absent"
 system = "bloomery sync"
-action = "use validated configuration defaults"
+action = "refrain from substituting validated configuration defaults"
 
 [[requirements]]
 id = "CLI-SYNC-RECOMMENDATIONS-024"
-title = "Missing config allows synchronization"
+title = "Absent config fails sync"
 manual = false
 design = "design/sync.md#missing-configuration"
 
@@ -274,7 +274,7 @@ design = "design/sync.md#missing-configuration"
 type = "event"
 trigger = ".bloomery/config.toml is absent"
 system = "bloomery sync"
-action = "continue lock synchronization"
+action = "return a nonzero exit code"
 
 [[requirements]]
 id = "CLI-SYNC-RECOMMENDATIONS-025"

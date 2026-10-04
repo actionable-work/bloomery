@@ -21,34 +21,26 @@ Bloomery features a strongly-typed profile evaluation system. Compiler optimizat
 
 ## Configuring Release and Dev Profiles
 
-You can configure release (`profile`) and dev (`profileDev`) profile settings inside `mkWorkspace` or `mkFlake`:
+You can configure release (`[profile.release]`) and dev (`[profile.dev]`) profile settings in `.bloomery/config.toml`:
 
-```nix
-bloomery.mkWorkspace {
-  root = ./.;
+```toml
+[profile.release]
+optLevel = 3
+lto = "thin"
+codegenUnits = 1
+panic = "abort"
+strip = true
+targetCpu = "x86-64-v3"
 
-  # Release profile configuration (built as packages.<name>)
-  profile = {
-    optLevel = 3;
-    lto = "thin";
-    codegenUnits = 1;
-    panic = "abort";
-    strip = true;
-    targetCpu = "x86-64-v3";
-  };
-
-  # Dev profile configuration (used by apps."<name>:dev")
-  profileDev = {
-    optLevel = 0;
-    lto = "off";
-    codegenUnits = 256;
-    debuginfo = 2;
-  };
-}
+[profile.dev]
+optLevel = 0
+lto = "off"
+codegenUnits = 256
+debuginfo = 2
 ```
 
 > [!NOTE]
-> When `createDevPackages = true`, Bloomery generates fast-compiling dev apps (`apps."<name>:dev"`) without publishing dev derivations as packages.
+> When `build.devPackages = true`, Bloomery generates fast-compiling dev apps (`apps."<name>:dev"`) without publishing dev derivations as packages.
 
 > [!TIP]
 > When `Cargo.toml` specifies `[profile.release]` or `[profile.dev]` sections, Bloomery automatically parses their values as base profiles, allowing Nix overrides without editing `Cargo.toml`.

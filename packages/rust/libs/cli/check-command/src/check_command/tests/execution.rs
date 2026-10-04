@@ -7,7 +7,7 @@ use crate::check_command::interrupt::InterruptFlag;
 use crate::check_command::model::{Outcome, RunStatus};
 use crate::check_command::store::RunStore;
 use crate::check_command::test_support::{
-    FakeNix, fixture, invoke, invoke_with_interrupt, nix_is_available, request,
+    FakeNix, fixture, invoke, invoke_with_interrupt, lock_fixture_flake, nix_is_available, request,
 };
 use bloomery_test_macros::bloomery;
 use serde_json::Value;
@@ -138,8 +138,11 @@ fn real_nix_runner_builds_two_aliases_of_one_low_storage_derivation() {
     let flake = format!(
         r#"{{
   description = "bloomery alias fixture";
-  outputs = {{ self }}:
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  outputs = {{ self, nixpkgs }}:
     let
+      pkgs = nixpkgs.legacyPackages."{system}";
+      formatter = pkgs.writeShellScriptBin "noop-formatter" "exit 0";
       shared = builtins.derivation {{
         name = "bloomery-aliased-check";
         system = "{system}";
@@ -147,6 +150,7 @@ fn real_nix_runner_builds_two_aliases_of_one_low_storage_derivation() {
         args = [ "-c" "echo passed > $out" ];
       }};
     in {{
+      formatter."{system}" = formatter;
       checks."{system}" = {{
         alias-a = shared;
         alias-b = shared;
@@ -155,6 +159,8 @@ fn real_nix_runner_builds_two_aliases_of_one_low_storage_derivation() {
 }}"#
     );
     fs::write(root.join("flake.nix"), flake).expect("write alias fixture");
+    lock_fixture_flake(&root);
+    let flake_lock_before = fs::read(root.join("flake.lock")).expect("fixture lock");
 
     let derivation_path = |attribute: &str| {
         let installable = format!(".#checks.{system}.{attribute}.drvPath");
@@ -191,7 +197,7 @@ fn real_nix_runner_builds_two_aliases_of_one_low_storage_derivation() {
         String::from_utf8_lossy(&stderr)
     );
     let summary: Value = serde_json::from_slice(&stdout).expect("runner summary");
-    assert_eq!(summary["counts"]["passed"], 2);
+    assert_eq!(summary["counts"]["passed"], 3);
 
     let store = RunStore::open(&root, Some(&cache)).expect("retained store");
     let retained = store.latest().expect("retained run").0;
@@ -200,7 +206,10 @@ fn real_nix_runner_builds_two_aliases_of_one_low_storage_derivation() {
             outcome.id == format!("nix:{system}:{attribute}") && outcome.outcome == Outcome::Passed
         }));
     }
-    assert!(!root.join("flake.lock").exists());
+    assert_eq!(
+        fs::read(root.join("flake.lock")).expect("fixture lock"),
+        flake_lock_before
+    );
 
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);

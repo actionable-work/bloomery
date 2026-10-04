@@ -1,0 +1,183 @@
+group = "CONFIGURATION"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-001"
+title = "Configuration is required by mkFlake"
+manual = false
+design = "design/configuration.md#required-configuration"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = ".bloomery/config.toml is absent"
+system = "the mkFlake constructor"
+action = "fail evaluation with a bloomery-prefixed error naming the missing path"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-002"
+title = "Package-valued options resolve nixpkgs attribute paths"
+manual = false
+design = "design/configuration.md#value-encoding"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the build configuration"
+action = "resolve each package-valued string as a nixpkgs attribute path against the selected system's pkgs"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-003"
+title = "Path-valued options resolve below the workspace root"
+manual = false
+design = "design/configuration.md#value-encoding"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the build configuration"
+action = "resolve each path-valued string relative to the workspace root"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-004"
+title = "Build table options are exposed"
+manual = false
+design = "design/configuration.md#build-table"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the build configuration"
+action = "accept build.cargoToml, build.cargoLock, build.bloomeryLock, build.members, build.profileName, build.libPackages, and build.devPackages"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-005"
+title = "Toolchain options are exposed"
+manual = false
+design = "design/configuration.md#toolchain"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the build configuration"
+action = "accept toolchain.rustc, toolchain.clippy, toolchain.cargo, toolchain.lld, toolchain.mold, toolchain.stdenv, and toolchain.linker"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-006"
+title = "Profile options are exposed"
+manual = false
+design = "design/configuration.md#profiles"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the build configuration"
+action = "accept optLevel, lto, codegenUnits, panic, strip, debuginfo, targetCpu, overflowChecks, linker, and linkArgs under profile.release and profile.dev"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-007"
+title = "Per-phase flag options are exposed"
+manual = false
+design = "design/configuration.md#flags"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the build configuration"
+action = "accept rustc, test, clippy, doc, and doctest lists under flags"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-008"
+title = "Development shell options are exposed"
+manual = false
+design = "design/configuration.md#development-shell"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the build configuration"
+action = "accept devShell.enable, devShell.packages, and devShell.shellHook"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-009"
+title = "Check options are exposed"
+manual = false
+design = "design/configuration.md#checks"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the build configuration"
+action = "accept checks.enable, checks.includePackageChecks, and checks.throwOnOutOfDate"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-010"
+title = "Feature resolution options are exposed"
+manual = false
+design = "design/configuration.md#features"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the build configuration"
+action = "accept features.unify and features.cratesIoIndex"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-011"
+title = "Overrides remain a Nix-level setting"
+manual = false
+design = "design/configuration.md#overrides"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the mkFlake constructor"
+action = "accept per-crate overrides as a Nix argument and merge them with colocated overrides.nix files"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-012"
+title = "Non-build tables are ignored by mkFlake"
+manual = false
+design = "design/configuration.md#configuration-source"
+
+[requirements.ears]
+type = "event"
+trigger = "config.toml contains specs or scanners tables"
+system = "the mkFlake constructor"
+action = "ignore those tables when evaluating the workspace"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-013"
+title = "Unknown build keys are evaluation errors"
+manual = false
+design = "design/configuration.md#error-handling"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a build table contains an unknown key"
+system = "the mkFlake constructor"
+action = "fail evaluation with a bloomery-prefixed error"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-014"
+title = "Wrong option value types are evaluation errors"
+manual = false
+design = "design/configuration.md#error-handling"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a build option has the wrong TOML type"
+system = "the mkFlake constructor"
+action = "fail evaluation with a bloomery-prefixed error"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-015"
+title = "Unresolvable package references are evaluation errors"
+manual = false
+design = "design/configuration.md#error-handling"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a package-valued string does not resolve in nixpkgs"
+system = "the mkFlake constructor"
+action = "fail evaluation with a bloomery-prefixed error"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-016"
+title = "Malformed configuration files are evaluation errors"
+manual = false
+design = "design/configuration.md#error-handling"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "config.toml is unreadable or contains invalid TOML"
+system = "the mkFlake constructor"
+action = "fail evaluation with a bloomery-prefixed error instead of substituting defaults"

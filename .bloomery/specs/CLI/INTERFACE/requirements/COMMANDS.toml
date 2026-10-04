@@ -99,3 +99,39 @@ type = "unwanted_behavior"
 trigger = "a command other than init, including parser help, is requested from a current directory without flake.nix"
 system = "the bloomery CLI"
 action = "stop before command handling with a nonzero error instructing the user to set up a Bloomery flake.nix"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-010"
+title = "Repository commands require configuration"
+manual = false
+design = "design/commands.md#configuration-presence"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "check, review, or sync is requested without .bloomery/config.toml"
+system = "the bloomery CLI"
+action = "stop before command-specific work with a nonzero ConfigurationError naming the missing path"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-011"
+title = "Parser help does not require configuration"
+manual = false
+design = "design/commands.md#configuration-presence"
+
+[requirements.ears]
+type = "event"
+trigger = "parser help is requested without .bloomery/config.toml"
+system = "the bloomery CLI"
+action = "return help without a configuration error"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-012"
+title = "Init does not require configuration"
+manual = false
+design = "design/commands.md#configuration-presence"
+
+[requirements.ears]
+type = "event"
+trigger = "init runs without .bloomery/config.toml"
+system = "the bloomery CLI"
+action = "run without a configuration error"

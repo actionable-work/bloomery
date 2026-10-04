@@ -1,9 +1,0 @@
-[workspace]
-members = [
-  "crates/lib-core",
-  "crates/lib-calc",
-  "crates/lib-msg",
-  "crates/bin-calc",
-  "crates/bin-report",
-]
-resolver = "2"

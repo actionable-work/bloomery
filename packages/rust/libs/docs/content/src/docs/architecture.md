@@ -12,7 +12,7 @@ In traditional Nix-Rust tools, determining which optional features and dependenc
    - Exact resolved runtime dependencies
    - Proc-macro flags and Rust editions
    - SHA-256 digest of `Cargo.lock`
-3. During evaluation, `mkWorkspace` reads `bloomery.lock` via pure `builtins.fromTOML` with zero IFD. Lock validation is read-only; repair it by rerunning `bloomery sync`.
+3. During evaluation, `mkFlake` reads `bloomery.lock` via pure `builtins.fromTOML` with zero IFD. Lock validation is read-only; repair it by rerunning `bloomery sync`.
 
 ---
 

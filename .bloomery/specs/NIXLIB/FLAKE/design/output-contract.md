@@ -1,6 +1,7 @@
 # Per-system outputs
 
-Every integration returns the same workspace output set for a system.
+The `mkFlake` constructor returns this workspace output set for each configured
+system.
 
 ## Packages
 
@@ -36,5 +37,5 @@ lock model and `config` exposes the evaluated options.
 
 When enabled, `devShell` is a shell containing `rustc`, `clippy`, `cargo`, and
 `nix-fast-build`, plus the selected linker and user packages, with the
-configured shell hook. When disabled, `devShell` is null and integrations omit
+configured shell hook. When disabled, `devShell` is null and `mkFlake` omits
 the default shell.

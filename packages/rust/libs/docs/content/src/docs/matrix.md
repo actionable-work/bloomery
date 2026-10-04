@@ -1,4 +1,4 @@
-Bloomery verifies its own correctness against 6 dedicated test workspaces, running 68+ automated checks in CI:
+Bloomery verifies its own correctness against dedicated test workspaces, running automated checks in CI:
 
 ---
 
@@ -6,9 +6,9 @@ Bloomery verifies its own correctness against 6 dedicated test workspaces, runni
 
 | Test Workspace | Integration Style | Description & Tested Levers |
 |---|---|---|
-| `tests/basic-workspace` | **Style 1: Zero-Boilerplate** | Evaluates `bloomery.mkFlake` testing multi-crate workspace compilation, libs, binaries, and tests. |
-| `tests/axum-workspace` | **Style 2: Categorized `mkWorkspace`** | Full real-world Axum web server and Clap CLI with mold/lld linker settings and profiles. |
-| `tests/mklib-workspace` | **Style 3: Custom Lib Constructor** | Constructor `bloomery.mkLib pkgs` with custom Nixpkgs instances, overlays, and system overrides. |
-| `tests/flake-parts-workspace` | **Style 4: Flake-Parts Module** | Clean integration into flake-parts modules using `bloomery.flakeModules.default`. |
+| `tests/basic-workspace` | **Config-driven `mkFlake`** | Evaluates `bloomery.mkFlake` with a `.bloomery/config.toml`, testing multi-crate workspace compilation, libs, binaries, and tests. |
+| `tests/axum-workspace` | **Config-driven `mkFlake`** | Full real-world Axum web server and Clap CLI with linker settings and profiles from `config.toml`. |
+| `tests/single-crate-workspace` | **Nix `overrides` argument** | Exercises the `overrides` argument accepted by `mkFlake`. |
+| `tests/flake-parts-workspace` | **Internal flake-parts module** | Exercises the internal flake-parts module directly; the public interface is `mkFlake`. |
 | `tests/overrides-workspace` | **Overrides Validation** | Validates colocated `overrides.nix` files (fileset unions, compilation flags, env) and override merging. |
 | `tests/edge-cases-workspace` | **Edge Cases Validation** | Validates directory tests, multi-file binaries, weak feature syntax, and modern `cargo::` directives. |

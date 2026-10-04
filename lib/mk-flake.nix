@@ -7,18 +7,12 @@
 in
   {
     nixpkgs,
+    root,
     systems ? defaultSystems,
+    overrides ? {},
     extraOutputs ? null,
-    ...
-  } @ args: let
+  }: let
     lib = nixpkgs.lib;
-    workspaceArgs = builtins.removeAttrs args [
-      "self"
-      "nixpkgs"
-      "systems"
-      "extraOutputs"
-    ];
-
     eachSystem = lib.genAttrs systems;
 
     perSystemWorkspace = eachSystem (
@@ -28,8 +22,9 @@ in
           if bloomeryLib != null
           then bloomeryLib {inherit pkgs lib;}
           else import ./. {inherit pkgs lib;};
+        config = import ./build-config.nix {inherit pkgs lib;};
       in
-        bl.mkWorkspace workspaceArgs
+        bl.mkWorkspace (config.load {inherit root overrides;})
     );
 
     baseOutputs = {

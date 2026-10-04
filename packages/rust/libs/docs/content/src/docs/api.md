@@ -1,155 +1,130 @@
-Bloomery provides zero-boilerplate top-level constructors (`bloomery.mkFlake`), per-system workspace builders (`bloomery.lib.${system}.mkWorkspace`), and module integrations (`bloomery.flakeModules.default`).
+Bloomery exposes a single top-level constructor, `bloomery.mkFlake`, and reads all build settings from `.bloomery/config.toml`.
 
 ---
 
-## `mkFlake` Top-Level Constructor
+## `mkFlake` Constructor
 
-`bloomery.mkFlake` accepts the standard workspace options plus flake wrapper parameters:
+`bloomery.mkFlake` accepts the flake wrapper parameters and reads the workspace configuration from `.bloomery/config.toml`:
 
 ```nix
 bloomery.mkFlake {
   inherit nixpkgs;
   systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
-  root = ./.;
+  root = ./.;                 # workspace root containing .bloomery/config.toml
+
+  # Optional Nix-valued per-crate overrides
+  overrides = {};
 
   # Optional extra flake outputs callback: { eachSystem, perSystemWorkspace }
   extraOutputs = { eachSystem, perSystemWorkspace }: {
     # Custom flake attributes
   };
-
-  # ...All mkWorkspace options below can be passed directly
 }
+```
+
+`config.toml` is required. Every other build setting comes from the tables below; no workspace option is accepted as a constructor argument.
+
+---
+
+## Configuration Tables
+
+Package-valued settings are written as nixpkgs attribute paths. Path-valued settings are relative to the workspace root.
+
+```toml
+[build]
+cargoToml = "Cargo.toml"        # defaults to root + "/Cargo.toml"
+cargoLock = "Cargo.lock"        # defaults to root + "/Cargo.lock"
+bloomeryLock = "bloomery.lock"  # omit to auto-detect
+members = ["my-crate"]          # omit to discover all workspace members
+profileName = "release"         # active profile name
+libPackages = false             # expose <crate>:lib packages
+devPackages = true              # generate dev-profile apps (<bin>:dev)
+
+[toolchain]
+rustc = "rustc"                 # nixpkgs attribute path
+clippy = "clippy"
+cargo = "cargo"
+linker = "lld"                  # "lld", "mold", "system", or omit
+lld = "lld"
+mold = "mold"
+stdenv = "stdenv"
+
+[profile.release]
+optLevel = 3                    # 0, 1, 2, 3, "s", "z"
+lto = "thin"                    # "fat", "thin", "off", "full", "none", "yes", "no", bool
+codegenUnits = 1                # positive integer
+panic = "abort"                 # "unwind", "abort"
+strip = true                    # true, false, "symbols", "debuginfo", "none"
+targetCpu = "native"            # e.g. "x86-64-v3", "native"
+debuginfo = 2                   # bool, 0, 1, 2, "limited", "full", "none"
+overflowChecks = false          # bool
+linker = "cc"                   # custom linker executable
+linkArgs = ["-Clink-arg=-fuse-ld=lld"]
+
+[profile.dev]
+optLevel = 0
+lto = "off"
+codegenUnits = 256
+debuginfo = 2
+
+[flags]
+rustc = ["-Copt-level=3"]       # base rustc flags applied to all crates
+test = []                       # extra flags for test runner compilation
+clippy = []                     # extra flags when running clippy-driver
+doc = ["-Dwarnings"]            # extra flags for rustdoc building
+doctest = []                    # extra flags for doctest runner
+
+[devShell]
+enable = true                   # export devShells.default
+packages = ["rust-analyzer"]    # extra shell packages
+shellHook = ""                  # bash setup hook
+
+[checks]
+enable = true                   # generate crate checks and lock validation
+includePackageChecks = true     # build final packages as CI checks
+throwOnOutOfDate = false        # error evaluation if bloomery.lock is out of date
+
+[features]
+unify = true                    # Cargo-style feature unification
+cratesIoIndex = "crates-io-index"
 ```
 
 ---
 
-## `mkWorkspace` Complete Options Schema
+## `overrides` Argument
 
-The primary constructor for customized per-system workspaces is `bloomery.lib.${system}.mkWorkspace`:
+Per-crate overrides carry arbitrary Nix values and stay in Nix. Pass them to `mkFlake` through `overrides` or place an `overrides.nix` next to a crate's `Cargo.toml`:
 
 ```nix
-bloomery.lib.${system}.mkWorkspace {
-  # Top-level required workspace root path
+bloomery.mkFlake {
+  inherit nixpkgs;
   root = ./.;
-
-  # ── Source & Files ──────────────────────────────────
-  source = {
-    cargoToml = ./Cargo.toml;       # defaults to root + "/Cargo.toml"
-    cargoLock = ./Cargo.lock;       # defaults to root + "/Cargo.lock"
-    bloomeryLock = null;            # auto-detected (defaults to root + "/bloomery.lock")
-    members = null;                 # null discovers all workspace members automatically
-  };
-
-  # ── Toolchain & Linker ──────────────────────────────
-  toolchain = {
-    rustc = pkgs.rustc;             # rustc compiler derivation
-    clippy = pkgs.clippy;           # clippy-driver derivation
-    cargo = pkgs.cargo;             # cargo derivation (for development shells)
-    linker = "lld";                 # "lld", "mold", "system", or null
-    lld = pkgs.lld;                 # LLVM lld package
-    mold = pkgs.mold;               # Mold linker package
-    stdenv = pkgs.stdenv;           # base stdenv
-  };
-
-  # ── Profiles & Compilation ──────────────────────────
-  profile = {
-    optLevel = 3;                   # 0, 1, 2, 3, "s", "z"
-    lto = "thin";                   # "fat", "thin", "off", "full", "none", "yes", "no", bool
-    codegenUnits = 1;               # positive integer
-    panic = "abort";                # "unwind", "abort"
-    strip = true;                   # true, false, "symbols", "debuginfo", "none"
-    targetCpu = null;               # e.g. "x86-64-v3", "native"
-    debuginfo = null;               # bool, 0, 1, 2, "limited", "full", "none"
-    overflowChecks = null;          # bool
-    linker = null;                  # custom linker executable binary or path
-    linkArgs = [];                  # extra linker arguments (-Clink-arg=...)
-  };
-
-  profileDev = {
-    optLevel = 0;                   # dev profile optimization level
-    lto = "off";                    # dev profile LTO setting
-    codegenUnits = 256;             # parallel compilation units for fast dev builds
-    debuginfo = 2;                  # full debug symbols for dev
-  };
-
-  profileName = "release";          # active profile name ("release" or "dev")
-
-  # ── Dev Binary Apps ──────────────────────────────────
-  createDevPackages = true;         # generate dev profile apps (<bin>:dev)
-
-  # ── Compiler & Linker Flags ─────────────────────────
-  flags = {
-    rustc = [ "-Copt-level=3" ];    # base rustc flags applied to all crates
-    test = [];                      # extra flags for test runner compilation
-    clippy = [];                    # extra flags when running clippy-driver
-    doc = [ "-Dwarnings" ];         # extra flags for rustdoc building
-    doctest = [];                   # extra flags for doctest runner
-  };
-
-  # ── Crate Overrides ─────────────────────────────────
-  overrides = {
-    openssl-sys = {
-      nativeBuildInputs = [ pkgs.pkg-config ];
-      buildInputs = [ pkgs.openssl ];
-      rustcFlags = [];
-      rustdocFlags = [];
-      env = {};
-      features = null;             # override crate features (null uses resolved)
-      fileset = null;              # lib.fileset for source filtering
-      src = null;                  # custom source derivation or path
-      profile = {};                # per-crate release profile overrides
-      profileDev = {};             # per-crate dev profile overrides
-      assets = [];                 # extra asset files/dirs to copy into $out/bin/assets
-      assetDirs = [];              # custom asset directory names to collect
-    };
-  };
-
-  # ── Development Shell ───────────────────────────────
-  devShell = {
-    enable = true;                  # export devShells.default
-    packages = [];                  # extra shell utility packages
-    shellHook = "";                 # bash setup hook
-  };
-
-  # ── Checks & CI ─────────────────────────────────────
-  checks = {
-    enable = true;                  # generate crate checks and lock validation
-    includePackageChecks = true;    # build final packages as CI checks
-    throwOnOutOfDate = false;       # error evaluation if bloomery.lock is out of date
-  };
-
-  # ── Feature Resolution ──────────────────────────────
-  features = {
-    unify = true;                   # Cargo-style feature unification
-    cratesIoIndex = null;           # custom crates.io index directory
+  overrides.openssl-sys = {
+    nativeBuildInputs = [ pkgs.pkg-config ];
+    buildInputs = [ pkgs.openssl ];
+    rustcFlags = [];
+    rustdocFlags = [];
+    env = {};
+    features = null;             # override crate features (null uses resolved)
+    fileset = null;              # lib.fileset for source filtering
+    src = null;                  # custom source derivation or path
+    profile = {};                # per-crate release profile overrides
+    profileDev = {};             # per-crate dev profile overrides
+    assets = [];                 # extra asset files/dirs to copy into $out/bin/assets
+    assetDirs = [];              # custom asset directory names to collect
   };
 }
-```
-
----
-
-## `flakeModules.default` Schema
-
-For `flake-parts` users, import `bloomery.flakeModules.default` and configure under `perSystem`:
-
-```nix
-perSystem = { pkgs, ... }: {
-  bloomery.workspace = {
-    root = ./.;
-    profile = { optLevel = 3; lto = "thin"; };
-  };
-};
 ```
 
 ---
 
 ## Workspace Return Value
 
-The evaluated workspace attribute set returned by `mkWorkspace` exposes:
+The evaluated workspace attribute set returned by `mkFlake` for each system exposes:
 
 - `packages`: Release derivations for binaries (`<name>`) and, when enabled, libraries (`<crate>:lib`), plus `default` when a binary exists.
-- `apps`: Runnable release/dev binaries, documentation apps (`<crate>:doc`), `lock`, and `default` when a binary exists.
+- `apps`: Runnable release/dev binaries, documentation apps (`<crate>:doc`), and `default` when a binary exists.
 - `checks`: Comprehensive Nix check suite (`name:test`, `name:clippy`, `name:doc`, `name:doctest`, and `workspace:lock`), with optional package build checks. It does not generate a recursive `bloomery:check`; run the Bloomery CLI directly for static validation and check orchestration.
-- `devShell`: Preconfigured `mkShell` environment with Rust toolchain and build utilities.
+- `devShell`: Preconfigured `mkShell` environment with Rust toolchain and build utilities (null when disabled).
 - `crates`: Map of all individual `.rlib` derivations in the dependency DAG.
 - `config`: Fully evaluated options configuration set.

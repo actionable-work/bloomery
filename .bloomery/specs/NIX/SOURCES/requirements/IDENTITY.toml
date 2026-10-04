@@ -115,5 +115,5 @@ design = "design/identity.md#automated-verification"
 
 [requirements.ears]
 type = "ubiquitous"
-system = "mkWorkspace, mkFlake, and the flake-parts integration"
+system = "the mkFlake workspace integration"
 action = "preserve source and Rust derivation identity across equivalent workspace snapshots that differ only in unselected content"

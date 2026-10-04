@@ -1,29 +1,24 @@
 # Configuration file
 
-The configuration file is `.bloomery/config.toml`. It is optional. Its paths
+The configuration file is `.bloomery/config.toml`. It is required. Its paths
 are intentionally relative so a repository can be moved without rewriting the
 design tree.
 
-## Missing file defaults
+## Required file
 
-When `.bloomery/config.toml` does not exist, Bloomery behaves as though it
-contained an empty configuration and validates the resulting defaults:
-
-- `specs.dir` is `"specs"`, resolving to `.bloomery/specs`.
-- Rust, Playwright, and Nix scanners are disabled.
-- Rust, Playwright, and Nix scanner path lists are empty.
-- `scanners.playwright.tag_prefix` is `"@bloomery:"`.
-
-An enabled scanner requires at least one repository-relative path pattern.
+Every repository command requires `.bloomery/config.toml`. The only exemptions
+are parser-generated help and the future `init` command, which bootstraps the
+repository before configuration exists. A missing file is a
+`ConfigurationError`; Bloomery does not substitute defaults.
 
 ## Partial configuration
 
-In a present file, every omitted table and key uses the same default as an
-empty configuration. Defaults are applied before validation, so a partial file
-is not treated differently from an explicitly written configuration with the
-same effective values.
+In a present file, every omitted table and key uses the documented default.
+Defaults are applied before validation, so a partial file is not treated
+differently from an explicitly written configuration with the same effective
+values.
 
-The configuration shape is:
+The scanner and spec configuration shape is:
 
 ```toml
 [specs]
@@ -50,6 +45,15 @@ enabled = true
 paths = ["*.nix", "nix/**/*.nix", "tests/**/*.nix"]
 ```
 
+## Build tables
+
+The same file carries the Nix build tables `[build]`, `[toolchain]`,
+`[profile.release]`, `[profile.dev]`, `[flags]`, `[devShell]`, `[checks]`, and
+`[features]`. Those tables are owned by
+[NIXLIB/FLAKE](../../../NIXLIB/FLAKE/design/configuration.md); the CLI parser
+accepts them as valid configuration and does not interpret them as scanner or
+spec target configuration.
+
 ## Resolution rules
 
 - `specs.dir` is relative to `.bloomery/`.
@@ -62,16 +66,15 @@ paths = ["*.nix", "nix/**/*.nix", "tests/**/*.nix"]
 
 ## Error handling
 
-Only a missing configuration file is optional. A present file that cannot be
-read, cannot be parsed, or fails validation produces a `ConfigurationError`;
-Bloomery must not silently replace a broken file with defaults.
+A missing, unreadable, unparsable, or invalid configuration file produces a
+`ConfigurationError`. Bloomery must not silently replace a broken file with
+defaults. Parser help and `init` are the only commands that succeed without the
+file.
 
-## Workspace loading
-
-Workspace discovery uses the default specs root when the configuration file is
-absent. A valid `.bloomery/specs` tree therefore loads without requiring a
-configuration file.
+## Loading order
 
 Configuration parsing happens before workspace and source scanning. The parsed
 configuration is immutable for the duration of a command so every pipeline
-stage observes one consistent set of targets.
+stage observes one consistent set of targets. The `[build]`-family tables are
+carried through as an opaque section for the flake interface and do not change
+scanner behavior.

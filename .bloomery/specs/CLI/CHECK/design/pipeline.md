@@ -4,8 +4,9 @@ The static branch retains ordered passes so each check operates on a known model
 The independent Nix branch runs concurrently; see [execution](execution.md).
 `static:structure` covers passes 1–3, and `static:traceability` covers passes 4–5:
 
-1. **Configuration ingestion** — parse `.bloomery/config.toml`, resolve roots,
-   and validate scanner settings.
+1. **Configuration ingestion** — require and parse `.bloomery/config.toml`,
+   resolve roots, and validate scanner settings. A missing or invalid file is a
+   `ConfigurationError` that stops the pipeline.
 2. **Workspace and frontmatter** — discover area and feature directories,
    require their READMEs and non-empty `requirements/` directories, and compare
    frontmatter IDs with directory names.

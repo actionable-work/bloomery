@@ -63,7 +63,7 @@ Overrides are merged automatically with the following precedence:
 
 1. **Default built-in sys-crate overrides** (e.g. `openssl-sys`, `sqlite3-sys`, `libpq-sys`, `zstd-sys`, `libgit2-sys`, `libssh2-sys`, `bzip2-sys`, `lz4-sys`, `ring`, `curl-sys`, `libudev-sys`, `prost-build`).
 2. **Colocated `overrides.nix`** files discovered next to member `Cargo.toml` files.
-3. **Flake-level explicit `overrides`** passed to `mkWorkspace` or `mkFlake`.
+3. **Flake-level explicit `overrides`** passed to `mkFlake`.
 
 > [!TIP]
 > Both hyphenated (`openssl-sys`) and underscored (`openssl_sys`) override identifiers are recognized and normalized automatically.

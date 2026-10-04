@@ -35,6 +35,16 @@ With `--json`, emit one structured JSON setup error with the same message. The
 preflight checks file presence only; a present flake is handled by each
 command's own behavior. No upward workspace search is performed.
 
+## Configuration presence
+
+After the flake preflight, require `.bloomery/config.toml` before command
+handling for `check`, its nested commands, `review`, and `sync`. Parser help and
+the future `init` command are exempt. If the file is absent, stop before
+command-specific work and emit a nonzero `ConfigurationError` naming the missing
+path. With `--json`, emit one structured error with the same information. The
+specs and scanner tables are then loaded as described in
+[PARSER/CONFIGURATION](../../CONFIGURATION/design/config-file.md).
+
 The `check`, `review`, and `sync` commands operate on the validated root. Sync
 maintains lockfiles without loading specifications or scanning evidence.
 Command semantics are specified by [CHECK](../../CHECK/README.md),

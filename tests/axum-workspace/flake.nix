@@ -11,22 +11,18 @@
     bloomery,
     ...
   }:
-    import ../workspace-flake.nix {
+    bloomery.mkFlake {
       inherit nixpkgs;
-      workspace = system:
-        bloomery.lib.${system}.mkWorkspace {
-          root = ./.;
-          profile = {
-            optLevel = 3;
-            codegenUnits = 16;
-          };
-          toolchain = {
-            linker = "lld";
-          };
-          flags = {
-            rustc = ["-Copt-level=3"];
-          };
-        };
-      extraChecks = import ./checks.nix {inherit nixpkgs;};
+      root = ./.;
+      extraOutputs = {
+        eachSystem,
+        perSystemWorkspace,
+      }: {
+        checks = eachSystem (
+          system:
+            perSystemWorkspace.${system}.checks
+            // ((import ./checks.nix {inherit nixpkgs;}) system perSystemWorkspace.${system})
+        );
+      };
     };
 }

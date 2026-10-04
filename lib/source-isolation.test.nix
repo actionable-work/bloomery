@@ -83,8 +83,6 @@
       nixpkgs = mockNixpkgs;
       systems = [pkgs.system];
       root = fixtures + "/${name}";
-      createLibPackages = true;
-      createDevPackages = true;
     };
   in {
     packages = outputs.packages.${pkgs.system};
@@ -140,7 +138,7 @@
       mkWorkspace {
         root = ../tests + "/${name}";
       }
-  ) ["basic-workspace" "overrides-workspace" "mklib-workspace" "flake-parts-workspace"];
+  ) ["basic-workspace" "overrides-workspace" "flake-parts-workspace"];
 
   singleCrateBase = mkWorkspace {
     root = ../tests/single-crate-workspace;

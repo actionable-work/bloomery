@@ -42,7 +42,7 @@ pub async fn sidebar(active_path: &str) -> Result<impl View> {
                             "Strongly-Typed Profiles"
                         </a>
                         <a href="/api" class=(if active_path == "/api" || active_path == "/docs/api" { "sidebar-link active" } else { "sidebar-link" })>
-                            "mkWorkspace Options API"
+                            "mkFlake Config API"
                         </a>
                         <a href="/overrides" class=(if active_path == "/overrides" || active_path == "/docs/overrides" { "sidebar-link active" } else { "sidebar-link" })>
                             "Colocated overrides.nix"
@@ -109,17 +109,9 @@ pub async fn toc_sidebar(active_path: &str) -> Result<impl View> {
             ),
         ],
         "/api" | "/docs/api" => &[
-            (
-                "#mkflake-top-level-constructor",
-                "mkFlake Constructor",
-                false,
-            ),
-            (
-                "#mkworkspace-complete-options-schema",
-                "mkWorkspace Options Schema",
-                false,
-            ),
-            ("#flakemodules-default-schema", "flake-parts Module", false),
+            ("#mkflake-constructor", "mkFlake Constructor", false),
+            ("#configuration-tables", "Configuration Tables", false),
+            ("#overrides-argument", "overrides Argument", false),
             ("#workspace-return-value", "Workspace Return Value", false),
         ],
         "/overrides" | "/docs/overrides" => &[

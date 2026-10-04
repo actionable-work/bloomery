@@ -7,7 +7,7 @@ below the repository's top-level `.bloomery/` directory:
 
 ```text
 .bloomery/
-├── config.toml                       # optional
+├── config.toml                       # required
 └── specs/
     └── <AREA>/
         ├── README.md
@@ -19,9 +19,12 @@ below the repository's top-level `.bloomery/` directory:
                 └── <GROUP>.toml       # at least one group file
 ```
 
-The `config.toml` file is optional. When it is absent, Bloomery uses the
-validated defaults described in the
-[configuration file design](../../CONFIGURATION/design/config-file.md).
+The `config.toml` file is required for every repository command except parser
+help and the future `init` command. When it is present, omitted tables and keys
+use the validated defaults described in the
+[configuration file design](../../CONFIGURATION/design/config-file.md). The file
+also carries the build tables consumed by the flake interface, described in
+[NIXLIB/FLAKE](../../../NIXLIB/FLAKE/design/configuration.md).
 
 Every feature contains a `requirements/` directory with at least one grouped
 TOML file. The checker rejects a feature whose requirements directory is absent

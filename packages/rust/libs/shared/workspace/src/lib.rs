@@ -58,18 +58,14 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("PARSER-CONFIGURATION-OPTIONAL-004")]
-    fn loads_a_valid_workspace_without_a_configuration_file() {
+    #[bloomery("PARSER-CONFIGURATION-REQUIRED-001")]
+    fn missing_configuration_prevents_workspace_loading() {
         let root = fixture();
         fs::remove_file(root.join(".bloomery/config.toml")).expect("remove config");
 
-        let context = load(&root).expect("workspace should load without configuration");
-        assert_eq!(context.areas.len(), 1);
-        assert_eq!(context.requirements().count(), 1);
-        assert_eq!(context.config.specs.dir, "specs");
-        assert!(!context.config.scanners.rust.enabled);
-        assert!(!context.config.scanners.playwright.enabled);
-        assert!(!context.config.scanners.nix.enabled);
+        let diagnostics = load(&root).expect_err("workspace should require configuration");
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, "ConfigurationError");
         let _ = fs::remove_dir_all(root);
     }
 

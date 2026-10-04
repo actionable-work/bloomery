@@ -38,34 +38,10 @@
       }:
         import ./lib {inherit pkgs lib;};
     };
-
-    flakeModules = {
-      default = args:
-        import ./lib/modules/flake-module.nix args;
-    };
-    flakeModule = flakeModules.default;
-
-    eachSystem = lib.genAttrs systems;
-    mkLib =
-      {
-        __functor = _self: pkgs:
-          import ./lib {
-            inherit pkgs;
-            inherit (pkgs) lib;
-          };
-      }
-      // (eachSystem bloomeryFor);
   in
     (mkFlake {
       inherit nixpkgs systems;
       root = ./.;
-      createLibPackages = false;
-      createDevPackages = true;
-      profile = {
-        optLevel = "3";
-        lto = "fat";
-        codegenUnits = 1;
-      };
       extraOutputs = {
         eachSystem,
         perSystemWorkspace,
@@ -103,13 +79,6 @@
       };
     })
     // {
-      inherit mkFlake flakeModules flakeModule mkLib;
-
-      lib =
-        (eachSystem bloomeryFor)
-        // {
-          inherit mkFlake flakeModules flakeModule;
-          parseLock = import ./lib/workspace/parse-lock.nix {inherit lib;};
-        };
+      inherit mkFlake;
     };
 }

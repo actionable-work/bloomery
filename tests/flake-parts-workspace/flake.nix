@@ -12,13 +12,12 @@
 
   outputs = inputs @ {
     flake-parts,
-    bloomery,
     nixpkgs,
     ...
   }:
     flake-parts.lib.mkFlake {inherit inputs;} {
       imports = [
-        bloomery.flakeModules.default
+        (import ../../lib/modules/flake-module.nix)
       ];
       systems = import ../../nix/systems.nix;
       perSystem = {

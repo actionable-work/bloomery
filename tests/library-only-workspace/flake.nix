@@ -14,8 +14,6 @@
     bloomery.mkFlake {
       inherit nixpkgs;
       root = ./.;
-      createLibPackages = true;
-      createDevPackages = true;
       extraOutputs = import ./checks.nix {inherit nixpkgs;};
     };
 }

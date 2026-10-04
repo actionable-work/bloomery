@@ -90,11 +90,11 @@ pub async fn page_layout(
                                     <div class="result-desc">"Pure Nix Rust engine, zero Cargo overhead, and core principles"</div>
                                 </div>
                             </a>
-                            <a href="/quickstart" class="search-result-item" data-keywords="quickstart flake mkflake mkworkspace flake-parts lock shell">
+                            <a href="/quickstart" class="search-result-item" data-keywords="quickstart flake mkflake config toml lock shell">
                                 <span class="material-symbols-outlined result-icon">"rocket_launch"</span>
                                 <div>
-                                    <div class="result-title">"Quickstart & Integration Styles"</div>
-                                    <div class="result-desc">"Zero-boilerplate flake.nix, flake-parts modules, and lock commands"</div>
+                                    <div class="result-title">"Quickstart & Configuration"</div>
+                                    <div class="result-desc">"Config-driven flake.nix, .bloomery/config.toml, and lock commands"</div>
                                 </div>
                             </a>
                             <a href="/architecture" class="search-result-item" data-keywords="architecture dag zero-ifd build.rs assets rlib dependencies">
@@ -108,14 +108,14 @@ pub async fn page_layout(
                                 <span class="material-symbols-outlined result-icon">"tune"</span>
                                 <div>
                                     <div class="result-title">"Strongly-Typed Profiles"</div>
-                                    <div class="result-desc">"LTO, codegen units, panic strategies, and profileDev settings"</div>
+                                    <div class="result-desc">"LTO, codegen units, panic strategies, and profile.dev settings"</div>
                                 </div>
                             </a>
-                            <a href="/api" class="search-result-item" data-keywords="api schema options mkworkspace mkflake toolchain source flags">
+                            <a href="/api" class="search-result-item" data-keywords="api schema config toml mkflake toolchain source flags checks">
                                 <span class="material-symbols-outlined result-icon">"menu_book"</span>
                                 <div>
-                                    <div class="result-title">"mkWorkspace Options API"</div>
-                                    <div class="result-desc">"Categorized options reference for sources, toolchain, flags"</div>
+                                    <div class="result-title">"mkFlake Config API"</div>
+                                    <div class="result-desc">"Categorized config.toml reference for sources, toolchain, flags"</div>
                                 </div>
                             </a>
                             <a href="/overrides" class="search-result-item" data-keywords="overrides fileset assets assetdirs openssl sys-crates env">

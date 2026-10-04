@@ -5,6 +5,7 @@
   profile = import ./profile {inherit lib;};
   workspace = import ./workspace {inherit pkgs lib;};
   mkFlakeTests = import ./mk-flake.test.nix {inherit pkgs lib;};
+  buildConfigTests = import ./build-config.test.nix {inherit pkgs lib;};
   mkWorkspaceTests = import ./mk-workspace.test.nix {inherit pkgs lib;};
   flakeModuleTests = import ./modules/flake-module.test.nix {inherit pkgs lib;};
   builderTests = import ./builders/builders.test.nix {inherit pkgs lib;};
@@ -17,6 +18,7 @@
     profile.tests
     // workspace.tests
     // mkFlakeTests
+    // buildConfigTests
     // mkWorkspaceTests
     // flakeModuleTests
     // builderTests
@@ -60,6 +62,22 @@ in {
           "NIXLIB-FLAKE-ENTRYPOINTS-012"
           "NIXLIB-FLAKE-ENTRYPOINTS-013"
           "NIXLIB-FLAKE-ENTRYPOINTS-014"
+          "NIXLIB-FLAKE-CONFIGURATION-001"
+          "NIXLIB-FLAKE-CONFIGURATION-002"
+          "NIXLIB-FLAKE-CONFIGURATION-003"
+          "NIXLIB-FLAKE-CONFIGURATION-004"
+          "NIXLIB-FLAKE-CONFIGURATION-005"
+          "NIXLIB-FLAKE-CONFIGURATION-006"
+          "NIXLIB-FLAKE-CONFIGURATION-007"
+          "NIXLIB-FLAKE-CONFIGURATION-008"
+          "NIXLIB-FLAKE-CONFIGURATION-009"
+          "NIXLIB-FLAKE-CONFIGURATION-010"
+          "NIXLIB-FLAKE-CONFIGURATION-011"
+          "NIXLIB-FLAKE-CONFIGURATION-012"
+          "NIXLIB-FLAKE-CONFIGURATION-013"
+          "NIXLIB-FLAKE-CONFIGURATION-014"
+          "NIXLIB-FLAKE-CONFIGURATION-015"
+          "NIXLIB-FLAKE-CONFIGURATION-016"
           "NIXLIB-FLAKE-OPTIONS-001"
           "NIXLIB-FLAKE-OPTIONS-002"
           "NIXLIB-FLAKE-OPTIONS-003"

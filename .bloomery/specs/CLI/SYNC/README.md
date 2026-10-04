@@ -26,7 +26,7 @@ requirements define the CLI behavior.
 - Offer explicit dependency updates through `--update[=nix,rust]`.
 - Generate a compatible `bloomery.lock` from the final Cargo resolution.
 - Report missing recommended keys using the raw configuration, not defaults.
-- Warn non-fatally when `.bloomery/config.toml` is absent.
+- Require `.bloomery/config.toml` and report a ConfigurationError when it is absent.
 - Replace Nix lock-app exposure and lock-repair guidance with the CLI workflow.
 
 ## Boundaries and dependencies

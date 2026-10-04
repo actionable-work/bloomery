@@ -1,0 +1,13 @@
+[build]
+libPackages = true
+devPackages = true
+
+[flags]
+rustc = ["-Copt-level=3"]
+
+[profile.release]
+optLevel = 3
+codegenUnits = 16
+
+[toolchain]
+linker = "lld"

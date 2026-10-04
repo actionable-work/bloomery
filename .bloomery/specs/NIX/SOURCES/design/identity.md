@@ -42,7 +42,7 @@ unselected contents. Compare selected source store paths and generated
 `.drvPath` values under the same system, toolchain, and configuration. Cover
 root packages, nested members, symlinked entrypoints, custom filesets, explicit
 local paths, auxiliary inputs, workspace assets, and the repository
-cli-app/sync support overrides across `mkWorkspace`, `mkFlake`, and flake-parts.
+cli-app/sync support overrides across the `mkFlake` workspace integration.
 
 Negative controls change README and specification content without changing any
 Rust derivation identity. Positive controls change Rust source, embedded

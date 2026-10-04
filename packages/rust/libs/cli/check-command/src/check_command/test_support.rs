@@ -228,6 +228,12 @@ pub(super) fn fixture(with_flake: bool) -> (PathBuf, PathBuf) {
     if with_flake {
         fs::write(root.join("flake.nix"), "{}\n").expect("flake marker");
     }
+    fs::create_dir_all(root.join(".bloomery")).expect("configuration directory");
+    fs::write(
+        root.join(".bloomery/config.toml"),
+        "[specs]\ndir = \"specs\"\n",
+    )
+    .expect("configuration");
     let feature = root.join(".bloomery/specs/CLI/CHECK");
     fs::create_dir_all(feature.join("design")).expect("design directory");
     fs::create_dir_all(feature.join("requirements")).expect("requirements directory");
@@ -259,6 +265,29 @@ pub(super) fn nix_is_available() -> bool {
         .args(["store", "ping", "--json"])
         .output()
         .is_ok_and(|output| output.status.success())
+}
+
+/// Repository root, used to reference the checked-in `flake.lock` when locking
+/// real-Nix fixture flakes offline.
+pub(super) fn repository_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../../..")
+}
+
+/// Generate a `flake.lock` for a real-Nix fixture flake using the repository's
+/// locked nixpkgs, so `nix fmt` can build the fixture formatter offline.
+pub(super) fn lock_fixture_flake(root: &Path) {
+    let reference = repository_root().join("flake.lock");
+    let status = Command::new("nix")
+        .args(["flake", "lock", "--reference-lock-file"])
+        .arg(&reference)
+        .current_dir(root)
+        .status()
+        .expect("run nix flake lock");
+    assert!(
+        status.success(),
+        "nix flake lock failed for {}",
+        root.display()
+    );
 }
 
 pub(super) fn invoke(

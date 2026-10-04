@@ -23,7 +23,7 @@
     };
   };
 in {
-  testMkFlakeDefaults = {
+  testMkFlakeBasicWorkspace = {
     expr = let
       flakeOutputs = mkFlake {
         nixpkgs = mockNixpkgs;
@@ -31,23 +31,9 @@ in {
         root = ../tests/basic-workspace;
       };
     in {
-      hasPackages = builtins.hasAttr pkgs.system flakeOutputs.packages;
       hasBinCalcPackage = builtins.hasAttr "bin-calc" flakeOutputs.packages.${pkgs.system};
-      hasBinCalcDevColonPackage = builtins.hasAttr "bin-calc:dev" flakeOutputs.packages.${pkgs.system};
-      hasBinCalcDevDashPackage = builtins.hasAttr "bin-calc-dev" flakeOutputs.packages.${pkgs.system};
-      hasLibCalcPackage = builtins.hasAttr "lib-calc" flakeOutputs.packages.${pkgs.system};
       hasLibCalcLibPackage = builtins.hasAttr "lib-calc:lib" flakeOutputs.packages.${pkgs.system};
-      hasLibCalcDevColonPackage = builtins.hasAttr "lib-calc:dev" flakeOutputs.packages.${pkgs.system};
-      hasLibCalcLibDevColonPackage = builtins.hasAttr "lib-calc:lib:dev" flakeOutputs.packages.${pkgs.system};
-      hasLibCalcCheck = builtins.hasAttr "lib-calc:lib" flakeOutputs.checks.${pkgs.system};
-      hasApps = builtins.hasAttr pkgs.system flakeOutputs.apps;
-      hasBinCalcDevColonApp = builtins.hasAttr "bin-calc:dev" flakeOutputs.apps.${pkgs.system};
-      hasBinCalcDevDashApp = builtins.hasAttr "bin-calc-dev" flakeOutputs.apps.${pkgs.system};
-      hasLibCalcDocApp = builtins.hasAttr "lib-calc:doc" flakeOutputs.apps.${pkgs.system};
-      hasLibCalcDashDocApp = builtins.hasAttr "lib-calc-doc" flakeOutputs.apps.${pkgs.system};
-      hasLockApp = builtins.hasAttr "lock" flakeOutputs.apps.${pkgs.system};
-      hasSyncApp = builtins.hasAttr "sync" flakeOutputs.apps.${pkgs.system};
-      hasBinCalcApp = builtins.hasAttr "bin-calc" flakeOutputs.apps.${pkgs.system};
+      hasBinCalcDevApp = builtins.hasAttr "bin-calc:dev" flakeOutputs.apps.${pkgs.system};
       hasDefaultApp = builtins.hasAttr "default" flakeOutputs.apps.${pkgs.system};
       hasDefaultPackage = builtins.hasAttr "default" flakeOutputs.packages.${pkgs.system};
       hasDevShell = builtins.hasAttr "default" flakeOutputs.devShells.${pkgs.system};
@@ -55,28 +41,37 @@ in {
       hasBloomeryCheck = builtins.hasAttr "bloomery:check" flakeOutputs.checks.${pkgs.system};
     };
     expected = {
-      hasPackages = true;
       hasBinCalcPackage = true;
-      hasBinCalcDevColonPackage = false;
-      hasBinCalcDevDashPackage = false;
-      hasLibCalcPackage = false;
-      hasLibCalcLibPackage = false;
-      hasLibCalcDevColonPackage = false;
-      hasLibCalcLibDevColonPackage = false;
-      hasLibCalcCheck = true;
-      hasApps = true;
-      hasBinCalcDevColonApp = false;
-      hasBinCalcDevDashApp = false;
-      hasLibCalcDocApp = true;
-      hasLibCalcDashDocApp = false;
-      hasLockApp = false;
-      hasSyncApp = false;
-      hasBinCalcApp = true;
+      hasLibCalcLibPackage = true;
+      hasBinCalcDevApp = true;
       hasDefaultApp = true;
       hasDefaultPackage = true;
       hasDevShell = true;
       hasChecks = true;
       hasBloomeryCheck = false;
+    };
+  };
+
+  testMkFlakeZeroVisibilityDefaults = {
+    expr = let
+      flakeOutputs = mkFlake {
+        nixpkgs = mockNixpkgs;
+        systems = [pkgs.system];
+        root = ../tests/single-crate-workspace;
+      };
+      packages = flakeOutputs.packages.${pkgs.system};
+      apps = flakeOutputs.apps.${pkgs.system};
+    in {
+      hasMainPackage = builtins.hasAttr "single-crate-app" packages;
+      hasLibPackage = builtins.hasAttr "single-crate-app:lib" packages;
+      hasDevApp = builtins.hasAttr "single-crate-app:dev" apps;
+      hasDevShell = builtins.hasAttr "default" flakeOutputs.devShells.${pkgs.system};
+    };
+    expected = {
+      hasMainPackage = true;
+      hasLibPackage = false;
+      hasDevApp = false;
+      hasDevShell = true;
     };
   };
 
@@ -86,7 +81,6 @@ in {
         nixpkgs = mockNixpkgs;
         systems = [pkgs.system];
         root = ../.;
-        createLibPackages = false;
       };
       packages = flakeOutputs.packages.${pkgs.system};
     in {
@@ -98,72 +92,6 @@ in {
       hasExplicitBinary = true;
       hasDuplicateImplicitBinary = false;
       hasBloomeryCheck = false;
-    };
-  };
-
-  testMkFlakeOptionalPackages = {
-    expr = let
-      flakeOutputs = mkFlake {
-        nixpkgs = mockNixpkgs;
-        systems = [pkgs.system];
-        root = ../tests/basic-workspace;
-        createLibPackages = true;
-        createDevPackages = true;
-      };
-      packages = flakeOutputs.packages.${pkgs.system};
-      apps = flakeOutputs.apps.${pkgs.system};
-    in {
-      hasBinCalcPackage = builtins.hasAttr "bin-calc" packages;
-      hasBinCalcDevPackage = builtins.hasAttr "bin-calc:dev" packages;
-      hasLibCalcPackage = builtins.hasAttr "lib-calc" packages;
-      hasLibCalcLibPackage = builtins.hasAttr "lib-calc:lib" packages;
-      hasLibCalcDevPackage = builtins.hasAttr "lib-calc:dev" packages;
-      hasLibCalcLibDevPackage = builtins.hasAttr "lib-calc:lib:dev" packages;
-      hasBinCalcDevApp = builtins.hasAttr "bin-calc:dev" apps;
-      hasLibCalcDocApp = builtins.hasAttr "lib-calc:doc" apps;
-      hasLibCalcDashDocApp = builtins.hasAttr "lib-calc-doc" apps;
-    };
-    expected = {
-      hasBinCalcPackage = true;
-      hasBinCalcDevPackage = false;
-      hasLibCalcPackage = false;
-      hasLibCalcLibPackage = true;
-      hasLibCalcDevPackage = false;
-      hasLibCalcLibDevPackage = false;
-      hasBinCalcDevApp = true;
-      hasLibCalcDocApp = true;
-      hasLibCalcDashDocApp = false;
-    };
-  };
-
-  testMkFlakeDisableDevPackages = {
-    expr = let
-      flakeOutputs = mkFlake {
-        nixpkgs = mockNixpkgs;
-        systems = [pkgs.system];
-        root = ../tests/basic-workspace;
-        createLibPackages = true;
-        createDevPackages = false;
-      };
-    in {
-      hasBinCalcPackage = builtins.hasAttr "bin-calc" flakeOutputs.packages.${pkgs.system};
-      hasBinCalcDevPackage = builtins.hasAttr "bin-calc:dev" flakeOutputs.packages.${pkgs.system};
-      hasBinCalcDevApp = builtins.hasAttr "bin-calc:dev" flakeOutputs.apps.${pkgs.system};
-      hasLibCalcPackage = builtins.hasAttr "lib-calc" flakeOutputs.packages.${pkgs.system};
-      hasLibCalcLibPackage = builtins.hasAttr "lib-calc:lib" flakeOutputs.packages.${pkgs.system};
-      hasLibCalcDevPackage = builtins.hasAttr "lib-calc:dev" flakeOutputs.packages.${pkgs.system};
-      hasDefaultApp = builtins.hasAttr "default" flakeOutputs.apps.${pkgs.system};
-      hasDefaultPackage = builtins.hasAttr "default" flakeOutputs.packages.${pkgs.system};
-    };
-    expected = {
-      hasBinCalcPackage = true;
-      hasBinCalcDevPackage = false;
-      hasBinCalcDevApp = false;
-      hasLibCalcPackage = false;
-      hasLibCalcLibPackage = true;
-      hasLibCalcDevPackage = false;
-      hasDefaultApp = true;
-      hasDefaultPackage = true;
     };
   };
 
@@ -217,18 +145,15 @@ in {
       flakeOutputs = mkFlake {
         nixpkgs = mockNixpkgs;
         systems = [pkgs.system];
-        root = ../tests/basic-workspace;
-        devShell.enable = false;
+        root = ../tests/default-bin;
       };
     in {
       hasDefaultShell = builtins.hasAttr "default" flakeOutputs.devShells.${pkgs.system};
-      keepsPackages = builtins.hasAttr "bin-calc" flakeOutputs.packages.${pkgs.system};
-      keepsChecks = builtins.hasAttr "bin-calc:test" flakeOutputs.checks.${pkgs.system};
+      keepsPackages = builtins.hasAttr "default" flakeOutputs.packages.${pkgs.system};
     };
     expected = {
       hasDefaultShell = false;
       keepsPackages = true;
-      keepsChecks = true;
     };
   };
 
@@ -274,30 +199,34 @@ in {
     expected = {"override-marker" = "kept";};
   };
 
-  testMkFlakeForwardsWorkspaceOptions = {
+  testMkFlakeOverridesArgument = {
     expr = let
       flakeOutputs = mkFlake {
         nixpkgs = mockNixpkgs;
         systems = [pkgs.system];
         root = ../tests/basic-workspace;
-        toolchain.linker = "mold";
-        profile.optLevel = 2;
-        flags.test = ["--nocapture"];
-        overrides.bin-calc.env.FLAKE_OPTION_PASSTHROUGH = "yes";
+        overrides.bin-calc.env.FLAKE_OVERRIDE = "yes";
       };
-      packages = flakeOutputs.packages.${pkgs.system};
-      checks = flakeOutputs.checks.${pkgs.system};
-    in {
-      profileApplied = lib.hasInfix "-Copt-level=2" packages."bin-calc".buildPhase;
-      linkerApplied = lib.hasInfix "-fuse-ld=mold" packages."bin-calc".buildPhase;
-      testFlagsApplied = lib.hasInfix "--nocapture" checks."bin-calc:test".buildPhase;
-      envApplied = packages."bin-calc".FLAKE_OPTION_PASSTHROUGH == "yes";
-    };
-    expected = {
-      profileApplied = true;
-      linkerApplied = true;
-      testFlagsApplied = true;
-      envApplied = true;
-    };
+    in
+      flakeOutputs.packages.${pkgs.system}."bin-calc".FLAKE_OVERRIDE;
+    expected = "yes";
+  };
+
+  testMkFlakeRequiresConfiguration = {
+    expr =
+      !(builtins.tryEval (
+        builtins.deepSeq (mkFlake {
+          nixpkgs = mockNixpkgs;
+          systems = [pkgs.system];
+          root = ../nix;
+        })
+        true
+      )).success;
+    expected = true;
+  };
+
+  testMkFlakeArgumentSurface = {
+    expr = builtins.attrNames (builtins.functionArgs mkFlake);
+    expected = ["extraOutputs" "nixpkgs" "overrides" "root" "systems"];
   };
 }

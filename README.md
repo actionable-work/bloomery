@@ -16,13 +16,10 @@ Inspired by `oxalica/nocargo`, this flake:
 
 ---
 
-## Consumer APIs
+## Consumer API
 
-Bloomery supports three consumption workflows:
-
-### 1. Zero-Boilerplate (`bloomery.mkFlake`)
-
-The fastest way to package a Rust workspace:
+Bloomery exposes a single constructor, `bloomery.mkFlake`. It reads every build
+setting from a required `.bloomery/config.toml` at the workspace root.
 
 ```nix
 {
@@ -39,196 +36,85 @@ The fastest way to package a Rust workspace:
 }
 ```
 
-This automatically generates `packages`, `apps`, `checks`, and `devShells` across standard systems (`x86_64-linux`, `aarch64-linux`, `aarch64-darwin`).
-Synchronize locks from a workspace with the Bloomery CLI package, for example `nix run github:actionable-work/bloomery#bloomery -- sync`. `bloomery sync` reconciles `Cargo.lock` and writes `bloomery.lock`; use `--update=rust`, `--update=nix`, or bare `--update` to request ecosystem updates. The `check`, `review`, and `sync` commands share `--json` for machine-readable output; human terminal output is colorized automatically and honors `NO_COLOR`.
+`mkFlake` accepts `nixpkgs`, `root`, an optional `systems` list, an optional
+`overrides` set, an optional `extraOutputs` callback, and an optional `self`.
+It does not accept workspace options as arguments.
 
-### 2. Standard Flake (`bloomery.lib.${system}.mkWorkspace`)
+```toml
+# .bloomery/config.toml (required)
+[build]
+libPackages = false
+devPackages = true
+profileName = "release"
 
-When you want manual control over system outputs:
+[toolchain]
+linker = "lld"
 
-```nix
-{
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    bloomery.url = "github:actionable-work/bloomery";
-  };
+[profile.release]
+optLevel = 3
+lto = "thin"
+codegenUnits = 1
 
-  outputs = { nixpkgs, bloomery, ... }:
-    let
-      systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
-      eachSystem = nixpkgs.lib.genAttrs systems;
-    in {
-      packages = eachSystem (system:
-        (bloomery.lib.${system}.mkWorkspace {
-          root = ./.;
-        }).packages
-      );
+[flags]
+doc = ["-Dwarnings"]
 
-      apps = eachSystem (system:
-        (bloomery.lib.${system}.mkWorkspace {
-          root = ./.;
-        }).apps
-      );
+[devShell]
+enable = true
 
-      checks = eachSystem (system:
-        (bloomery.lib.${system}.mkWorkspace {
-          root = ./.;
-        }).checks
-      );
+[checks]
+enable = true
+includePackageChecks = true
 
-      devShells = eachSystem (system: {
-        default = (bloomery.lib.${system}.mkWorkspace {
-          root = ./.;
-        }).devShell;
-      });
-    };
-}
+[features]
+unify = true
 ```
 
-*Tip*: If you have custom `pkgs` with overlays, construct the library directly with `bloomery.mkLib pkgs`.
+Package-valued settings are nixpkgs attribute paths; path-valued settings are
+relative to the workspace root. The full table reference is in the
+[API documentation](./packages/rust/libs/docs/content/src/docs/api.md).
 
-### 3. Flake-Parts Module (`bloomery.flakeModules.default`)
+`mkFlake` generates `packages`, `apps`, `checks`, and `devShells` across the
+selected systems (`x86_64-linux`, `aarch64-linux`, and `aarch64-darwin` by
+default).
 
-Integrate into a `flake-parts` project with strongly-typed module options:
+Synchronize locks from a workspace with the Bloomery CLI package, for example
+`nix run github:actionable-work/bloomery#bloomery -- sync`. `bloomery sync`
+reconciles `Cargo.lock` and writes `bloomery.lock`; use `--update=rust`,
+`--update=nix`, or bare `--update` to request ecosystem updates. Sync requires
+`.bloomery/config.toml` and does not create or edit it. The `check`, `review`,
+and `sync` commands share `--json` for machine-readable output; human terminal
+output is colorized automatically and honors `NO_COLOR`.
 
-```nix
-{
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-parts.url = "github:hercules-ci/flake-parts";
-    bloomery.url = "github:actionable-work/bloomery";
-  };
+### Per-Crate Overrides
 
-  outputs = inputs@{ flake-parts, bloomery, ... }:
-    flake-parts.lib.mkFlake { inherit inputs; } {
-      imports = [ bloomery.flakeModules.default ];
-      systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
-      perSystem = { ... }: {
-        bloomery.workspace = {
-          root = ./.;
-          profile = {
-            optLevel = 3;
-            lto = "thin";
-          };
-        };
-      };
-    };
-}
-```
-
----
-
-## Categorized `mkWorkspace` Options
-
-Workspace configuration is strongly typed and organized into clear categories:
+Overrides carry arbitrary Nix values, so they stay in Nix. Pass them through the
+`overrides` argument or place an `overrides.nix` file next to any workspace
+member's `Cargo.toml`:
 
 ```nix
-bloomery.lib.${system}.mkWorkspace {
-  # Top-level required setting
+bloomery.mkFlake {
+  inherit nixpkgs;
   root = ./.;
-
-  # ── Public Package Outputs ────────────────────────────────────────────────
-  createLibPackages = false;             # expose <crate>:lib outputs
-  createDevPackages = false;             # expose <name>:dev apps
-
-  # ── Source & Files ────────────────────────────────────────────────────────
-  source = {
-    cargoToml = ./Cargo.toml;           # defaults to root + "/Cargo.toml"
-    cargoLock = ./Cargo.lock;           # defaults to root + "/Cargo.lock"
-    bloomeryLock = null;                # auto-detected at root + "/bloomery.lock" if present
-    members = null;                     # subset of crate names (null = build all)
-  };
-
-  # ── Toolchain & Linker ────────────────────────────────────────────────────
-  toolchain = {
-    rustc = pkgs.rustc;
-    clippy = pkgs.clippy;
-    cargo = pkgs.cargo;
-    linker = "lld";                     # "lld" (default on Linux), "mold", or null (system)
-  };
-
-  # ── Compilation Profile ───────────────────────────────────────────────────
-  profile = {
-    optLevel = 3;                       # 0, 1, 2, 3, "s", "z"
-    lto = "thin";                       # "fat", "thin", "off", or bool
-    codegenUnits = 1;                   # positive int
-    panic = "abort";                    # "unwind", "abort"
-    strip = true;                       # true, false, "debuginfo", "symbols"
-    targetCpu = null;                   # e.g. "x86-64-v3"
-  };
-
-  # ── Custom Compiler & Runner Flags ────────────────────────────────────────
-  flags = {
-    rustc = [ "-Copt-level=3" ];        # base flags for binary & library builds
-    test = [];                          # extra flags for test runners
-    clippy = [];                        # extra flags for clippy-driver
-    doc = [ "-Dwarnings" ];             # extra flags for rustdoc
-    doctest = [];                       # extra flags for doctest runner
-  };
-
-  # ── Crate Overrides (Native Dependencies) ─────────────────────────────────
-  overrides = {
-    openssl-sys = {
-      nativeBuildInputs = [ pkgs.pkg-config ];
-      buildInputs = [ pkgs.openssl ];
-      rustcFlags = [];
-      env = {};
-      features = null;
-    };
+  overrides.openssl-sys = {
+    nativeBuildInputs = [ pkgs.pkg-config ];
+    buildInputs = [ pkgs.openssl ];
+    rustcFlags = [ "-Ctarget-cpu=native" ];
+    env = { CUSTOM_ASSETS = "./assets"; };
   };
 }
 ```
-
-### Colocated Package Overrides (`overrides.nix`)
-
-In addition to top-level `overrides`, Bloomery automatically discovers and loads an `overrides.nix` file placed next to any workspace member's `Cargo.toml`. This allows individual packages to define custom filesets, compilation flags, environment variables, or native dependencies:
 
 ```nix
 # crates/my-app/overrides.nix
 { pkgs, lib, ... }: {
-  # Custom fileset (automatically converted to a clean derivation source)
   fileset = lib.fileset.unions [
     ./src
     ./Cargo.toml
     ./templates
     ./assets
   ];
-
-  # Package-specific rustc compiler flags
-  rustcFlags = [
-    "-Ctarget-cpu=native"
-  ];
-
-  # Additional build-time tools and runtime C libraries
   nativeBuildInputs = [ pkgs.pkg-config ];
   buildInputs = [ pkgs.openssl ];
-
-  # Environment variables for compilation
-  env = {
-    CUSTOM_ASSETS = "./assets";
-  };
-}
-```
-
-  # ── Development Shell (Direnv / nix develop) ──────────────────────────────
-  devShell = {
-    enable = true;                      # automatically generated devShell
-    packages = [ pkgs.rust-analyzer ];  # extra shell packages
-    shellHook = "";                     # bash setup script
-  };
-
-  # ── Checks & CI ───────────────────────────────────────────────────────────
-  checks = {
-    enable = true;                      # generate crate checks, package checks, and lock validation
-    includePackageChecks = true;        # include binary and library package builds in checks
-    throwOnOutOfDate = false;           # fail evaluation immediately if lockfile is stale
-  };
-
-  # ── Feature Resolution ────────────────────────────────────────────────────
-  features = {
-    unify = true;                       # match Cargo's workspace feature unification
-    cratesIoIndex = null;               # custom crates.io index directory
-  };
 }
 ```
 
@@ -236,12 +122,12 @@ In addition to top-level `overrides`, Bloomery automatically discovers and loads
 
 ## Workspace Outputs
 
-Calling `mkWorkspace` returns an attribute set with:
+`mkFlake` returns, per selected system:
 
-- `packages`: Derivations for workspace member binaries, plus optional library and dev outputs.
-- `apps`: Runnable app specifications for binaries, optional dev binaries, and documentation.
+- `packages`: Derivations for workspace member binaries, plus optional library and dev outputs, and `default` when a binary exists.
+- `apps`: Runnable app specifications for binaries, optional dev binaries, documentation, and `default` when a binary exists.
 - `checks`: Independent CI derivations (`crate:test`, `crate:clippy`, `crate:doc`, `crate:doctest`, `crate:bin`, `crate:lib`, and `workspace:lock`). They do not include a recursive `bloomery:check` output; invoke `bloomery check` directly for static validation and orchestration.
-- `devShell`: Preconfigured development shell with rustc, clippy, cargo, nix-fast-build, and lld.
+- `devShell`: Preconfigured development shell with rustc, clippy, cargo, nix-fast-build, and lld (null when disabled).
 - `crates`: DAG attribute set of all built `.rlib` crates.
 - `lock`: Parsed lockfile representation.
 - `config`: Evaluated and type-checked options.
@@ -250,14 +136,13 @@ Calling `mkWorkspace` returns an attribute set with:
 
 ## Test Workspaces (Setup Styles)
 
-Every supported flake setup style is verified by an isolated sub-flake in CI:
+Every supported setup style is verified by an isolated sub-flake in CI:
 
 | Workspace | Setup Style | Description |
 |---|---|---|
-| [`tests/basic-workspace`](./tests/basic-workspace) | Zero-Boilerplate (`bloomery.mkFlake`) | Common five-member workspace layout with `build.rs`, unit tests, doctests, and crates.io dependencies |
-| [`tests/axum-workspace`](./tests/axum-workspace) | Standard (`bloomery.lib.${system}.mkWorkspace`) | Axum webserver and CLI, including server asset packaging |
-| [`tests/edge-cases-workspace`](./tests/edge-cases-workspace) | Zero-Boilerplate (`bloomery.mkFlake`) | Root package, glob members, excluded crates, build cfgs, integration tests, and multiple binary layouts |
-| [`tests/mklib-workspace`](./tests/mklib-workspace) | Constructor (`bloomery.mkLib pkgs`) | Common workspace layout through a custom `pkgs` instance and compiler profile |
-| [`tests/flake-parts-workspace`](./tests/flake-parts-workspace) | Flake-Parts Module (`bloomery.flakeModules.default`) | Common workspace layout through declarative `perSystem.bloomery.workspace` configuration |
+| [`tests/basic-workspace`](./tests/basic-workspace) | Config-driven `mkFlake` | Common five-member workspace layout with `build.rs`, unit tests, doctests, and crates.io dependencies |
+| [`tests/axum-workspace`](./tests/axum-workspace) | Config-driven `mkFlake` | Axum webserver and CLI, including server asset packaging |
+| [`tests/single-crate-workspace`](./tests/single-crate-workspace) | Nix `overrides` argument | Single-crate workspace exercising the `overrides` argument |
+| [`tests/flake-parts-workspace`](./tests/flake-parts-workspace) | Internal flake-parts module | Exercises the internal flake-parts module directly; the public API is `mkFlake` |
+| [`tests/edge-cases-workspace`](./tests/edge-cases-workspace) | Config-driven `mkFlake` | Root package, glob members, excluded crates, build cfgs, integration tests, and multiple binary layouts |
 | [`tests/overrides-workspace`](./tests/overrides-workspace) | Multi-Crate Overrides | Validates colocated member overrides and flake-level overrides merging in a multi-crate workspace |
-| [`tests/single-crate-workspace`](./tests/single-crate-workspace) | Single-Crate Overrides | Validates root-package discovery and both colocated and flake-level overrides in a single-crate workspace |

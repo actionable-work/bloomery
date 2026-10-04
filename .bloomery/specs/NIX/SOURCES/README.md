@@ -6,7 +6,7 @@ description: |
   Source selection gives each Rust derivation a stable, filtered input tree.
   Compilation, checks, assets, and repository test support depend on selected
   content rather than the identity of the enclosing flake snapshot. The same
-  contract applies to direct workspace construction and both flake integrations.
+  contract applies to the config-driven mkFlake workspace construction.
 ---
 
 # Source Isolation

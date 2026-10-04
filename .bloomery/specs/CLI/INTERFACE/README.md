@@ -27,6 +27,8 @@ and how the target repository root is selected.
 - Resolve the repository root from the process's current working directory.
 - Require a root `flake.nix` before every command except the workspace-bootstrap
   `init` command.
+- Require `.bloomery/config.toml` for repository commands while exempting parser
+  help and `init`.
 - Specify shared `--json`, check selection/execution/retrieval options, and
   command-specific `sync --update` values.
 - Define human-readable terminal coloring and stable JSON output contracts.

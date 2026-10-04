@@ -30,8 +30,10 @@ See the [output contract](output.md).
 Bloomery does not expose a command-specific repository-root flag; check and
 review use the current working directory, as does sync. Every recognized command
 request, including help and nested check retrieval, requires the shared root
-`flake.nix` preflight; the workspace-bootstrap `init` command is exempt. The CLI
-parser also supplies the `help` subcommand for displaying command help.
+`flake.nix` preflight; the workspace-bootstrap `init` command is exempt. Check,
+review, and sync additionally require `.bloomery/config.toml`; parser help and
+`init` are exempt from the configuration requirement. The CLI parser also
+supplies the `help` subcommand for displaying command help.
 
 Check selectors form a union and must each match. `*` and `?` are the supported
 case-sensitive anchored glob operators. Offsets are zero-based; limits remain

@@ -1,3 +1,12 @@
+[build]
+libPackages = false
+devPackages = true
+
+[profile.release]
+optLevel = 3
+lto = "fat"
+codegenUnits = 1
+
 [scanners.nix]
 enabled = true
 paths = ["*.nix", "lib/**/*.nix", "nix/**/*.nix", "tests/**/*.nix"]

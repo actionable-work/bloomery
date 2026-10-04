@@ -441,6 +441,7 @@ struct InitialTask {
     result: InitialTaskResult,
 }
 
+#[allow(clippy::large_enum_variant)]
 enum InitialTaskResult {
     Structure(Result<Option<bloomery_model::Context>, Vec<Diagnostic>>),
     Traceability(Result<(), Vec<Diagnostic>>),
