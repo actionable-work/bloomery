@@ -1,0 +1,159 @@
+group = "ENTRYPOINTS"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-001"
+title = "Flake exports every library entry point"
+manual = false
+design = "design/entry-points.md#exported-flake-attributes"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery flake"
+action = "export mkFlake, mkLib, flakeModules.default with a flakeModule alias, and lib"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-002"
+title = "lib exposes per-system builders and shared helpers"
+manual = false
+design = "design/entry-points.md#exported-flake-attributes"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery lib output"
+action = "expose a complete builder interface for each supported system alongside mkFlake, flakeModules, flakeModule, and parseLock"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-003"
+title = "mkFlake accepts flake parameters and workspace options"
+manual = false
+design = "design/entry-points.md#mkflake"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the mkFlake constructor"
+action = "accept nixpkgs, an optional systems list, an optional extraOutputs callback, and every workspace option"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-004"
+title = "mkFlake instantiates each system with matching packages"
+manual = false
+design = "design/entry-points.md#mkflake"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the mkFlake constructor"
+action = "evaluate one workspace per selected system using that system's nixpkgs.legacyPackages"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-005"
+title = "mkFlake defaults to the supported systems"
+manual = false
+design = "design/entry-points.md#systems-and-output-mapping"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the mkFlake constructor"
+action = "select x86_64-linux, aarch64-linux, and aarch64-darwin when no systems list is provided"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-006"
+title = "mkFlake maps workspace outputs to flake attributes"
+manual = false
+design = "design/entry-points.md#systems-and-output-mapping"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the mkFlake constructor"
+action = "expose per-system packages, apps, checks, and devShells.default from the evaluated workspaces"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-007"
+title = "Disabled development shells omit the default shell"
+manual = false
+design = "design/entry-points.md#systems-and-output-mapping"
+
+[requirements.ears]
+type = "event"
+trigger = "the workspace disables its development shell"
+system = "the mkFlake constructor"
+action = "omit devShells.<system>.default while retaining packages, apps, and checks for that system"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-008"
+title = "extraOutputs receives system and workspace helpers"
+manual = false
+design = "design/entry-points.md#extraoutputs"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the mkFlake constructor"
+action = "call extraOutputs with eachSystem and perSystemWorkspace"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-009"
+title = "extraOutputs can add or replace flake outputs"
+manual = false
+design = "design/entry-points.md#extraoutputs"
+
+[requirements.ears]
+type = "event"
+trigger = "extraOutputs returns an attribute set"
+system = "the mkFlake constructor"
+action = "merge the returned attributes after the generated flake attributes so they can add or override outputs"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-010"
+title = "mkLib accepts a custom package set"
+manual = false
+design = "design/entry-points.md#mklib"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the mkLib constructor"
+action = "return the full builder interface when applied to a package set"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-011"
+title = "mkLib exposes per-system interfaces"
+manual = false
+design = "design/entry-points.md#mklib"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the mkLib constructor"
+action = "expose a builder interface attribute for each supported system"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-012"
+title = "Flake-parts module exposes workspace and outputs options"
+manual = false
+design = "design/entry-points.md#flake-parts-module"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the flake-parts module"
+action = "provide perSystem.bloomery.workspace defaulting to null and the internal perSystem.bloomery.outputs attribute"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-013"
+title = "Flake-parts module maps outputs as defaults"
+manual = false
+design = "design/entry-points.md#flake-parts-module"
+
+[requirements.ears]
+type = "event"
+trigger = "a per-system workspace is configured"
+system = "the flake-parts module"
+action = "set packages and apps as module defaults, checks when checks are enabled, and devShells.default when the development shell is enabled"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-014"
+title = "Flake-parts consumers override generated outputs"
+manual = false
+design = "design/entry-points.md#flake-parts-module"
+
+[requirements.ears]
+type = "event"
+trigger = "a flake-parts consumer defines the same output attribute"
+system = "the flake-parts module"
+action = "let the consumer definition win over the generated default"

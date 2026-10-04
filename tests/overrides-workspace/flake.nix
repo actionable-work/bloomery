@@ -21,6 +21,7 @@
             bin-calc = {
               env = {
                 TOP_LEVEL_OVERRIDE_VAR = "injected_from_flake_nix";
+                SHARED_OVERRIDE_VAR = "flake";
               };
               rustcFlags = [
                 "--cfg=bloomery_toplevel_override"

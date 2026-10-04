@@ -1,0 +1,12 @@
+[[bin]]
+name = "default"
+path = "src/default_bin.rs"
+
+[[bin]]
+name = "host-app"
+path = "src/main.rs"
+
+[package]
+name = "host-app"
+version = "0.1.0"
+edition = "2021"

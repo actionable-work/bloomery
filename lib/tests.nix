@@ -10,6 +10,7 @@
   builderTests = import ./builders/builders.test.nix {inherit pkgs lib;};
   repositoryLayoutTests = import ./repository-layout.test.nix {inherit lib;};
   sourceIsolationTests = import ./source-isolation.test.nix {inherit pkgs lib;};
+  graphTests = import ./graph.test.nix {inherit pkgs lib;};
 
   # Aggregate all colocated unit tests
   testCases =
@@ -20,7 +21,8 @@
     // flakeModuleTests
     // builderTests
     // repositoryLayoutTests
-    // sourceIsolationTests;
+    // sourceIsolationTests
+    // graphTests;
 
   failedTests = lib.runTests testCases;
 in {
@@ -48,6 +50,74 @@ in {
           "NIX-SOURCES-IDENTITY-008"
           "NIX-SOURCES-IDENTITY-009"
           "NIX-SOURCES-IDENTITY-010"
+          "NIXLIB-FLAKE-ENTRYPOINTS-003"
+          "NIXLIB-FLAKE-ENTRYPOINTS-004"
+          "NIXLIB-FLAKE-ENTRYPOINTS-005"
+          "NIXLIB-FLAKE-ENTRYPOINTS-006"
+          "NIXLIB-FLAKE-ENTRYPOINTS-007"
+          "NIXLIB-FLAKE-ENTRYPOINTS-008"
+          "NIXLIB-FLAKE-ENTRYPOINTS-009"
+          "NIXLIB-FLAKE-ENTRYPOINTS-012"
+          "NIXLIB-FLAKE-ENTRYPOINTS-013"
+          "NIXLIB-FLAKE-ENTRYPOINTS-014"
+          "NIXLIB-FLAKE-OPTIONS-001"
+          "NIXLIB-FLAKE-OPTIONS-002"
+          "NIXLIB-FLAKE-OPTIONS-003"
+          "NIXLIB-FLAKE-OPTIONS-004"
+          "NIXLIB-FLAKE-OPTIONS-005"
+          "NIXLIB-FLAKE-OPTIONS-006"
+          "NIXLIB-FLAKE-OPTIONS-007"
+          "NIXLIB-FLAKE-OPTIONS-008"
+          "NIXLIB-FLAKE-OPTIONS-009"
+          "NIXLIB-FLAKE-OPTIONS-010"
+          "NIXLIB-FLAKE-OPTIONS-011"
+          "NIXLIB-FLAKE-OPTIONS-012"
+          "NIXLIB-FLAKE-OPTIONS-013"
+          "NIXLIB-FLAKE-OPTIONS-014"
+          "NIXLIB-FLAKE-OPTIONS-015"
+          "NIXLIB-FLAKE-OPTIONS-016"
+          "NIXLIB-FLAKE-OUTPUTS-003"
+          "NIXLIB-FLAKE-OUTPUTS-009"
+          "NIXLIB-FLAKE-OUTPUTS-011"
+          "NIXLIB-FLAKE-OUTPUTS-013"
+          "NIXLIB-FLAKE-OUTPUTS-014"
+          "NIXLIB-FLAKE-OUTPUTS-015"
+          "NIXLIB-FLAKE-OUTPUTS-016"
+          "NIXLIB-GRAPH-RESOLUTION-001"
+          "NIXLIB-GRAPH-RESOLUTION-002"
+          "NIXLIB-GRAPH-RESOLUTION-003"
+          "NIXLIB-GRAPH-RESOLUTION-004"
+          "NIXLIB-GRAPH-RESOLUTION-005"
+          "NIXLIB-GRAPH-RESOLUTION-006"
+          "NIXLIB-GRAPH-RESOLUTION-007"
+          "NIXLIB-GRAPH-RESOLUTION-008"
+          "NIXLIB-GRAPH-RESOLUTION-009"
+          "NIXLIB-GRAPH-RESOLUTION-010"
+          "NIXLIB-GRAPH-RESOLUTION-011"
+          "NIXLIB-GRAPH-RESOLUTION-012"
+          "NIXLIB-GRAPH-RESOLUTION-014"
+          "NIXLIB-GRAPH-RESOLUTION-015"
+          "NIXLIB-GRAPH-RESOLUTION-016"
+          "NIXLIB-GRAPH-RESOLUTION-017"
+          "NIXLIB-GRAPH-RESOLUTION-018"
+          "NIXLIB-GRAPH-RESOLUTION-019"
+          "NIXLIB-GRAPH-RESOLUTION-020"
+          "NIXLIB-GRAPH-DERIVATIONS-001"
+          "NIXLIB-GRAPH-DERIVATIONS-003"
+          "NIXLIB-GRAPH-DERIVATIONS-004"
+          "NIXLIB-GRAPH-DERIVATIONS-005"
+          "NIXLIB-GRAPH-DERIVATIONS-006"
+          "NIXLIB-GRAPH-DERIVATIONS-007"
+          "NIXLIB-GRAPH-DERIVATIONS-008"
+          "NIXLIB-GRAPH-DERIVATIONS-010"
+          "NIXLIB-GRAPH-DERIVATIONS-011"
+          "NIXLIB-GRAPH-DERIVATIONS-014"
+          "NIXLIB-GRAPH-DERIVATIONS-016"
+          "NIXLIB-GRAPH-DERIVATIONS-017"
+          "NIXLIB-GRAPH-DERIVATIONS-018"
+          "NIXLIB-GRAPH-DERIVATIONS-019"
+          "NIXLIB-GRAPH-DERIVATIONS-020"
+          "NIXLIB-GRAPH-DERIVATIONS-021"
         ];
       };
     } ''

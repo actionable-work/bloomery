@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/links-sys", "crates/link-user", "crates/types-lib"]
+resolver = "2"

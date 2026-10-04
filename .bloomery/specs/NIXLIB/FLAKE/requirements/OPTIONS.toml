@@ -1,0 +1,182 @@
+group = "OPTIONS"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-001"
+title = "Source paths default below the workspace root"
+manual = false
+design = "design/workspace-options.md#source-and-files"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace option module"
+action = "default source.cargoToml and source.cargoLock to paths below root and auto-detect source.bloomeryLock when it exists"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-002"
+title = "source.members restricts built members"
+manual = false
+design = "design/workspace-options.md#source-and-files"
+
+[requirements.ears]
+type = "event"
+trigger = "source.members lists crate names"
+system = "the workspace builder"
+action = "restrict generated crate derivations to those workspace members"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-003"
+title = "Toolchain options are configurable"
+manual = false
+design = "design/workspace-options.md#toolchain-and-linker"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace option module"
+action = "accept rustc, clippy, cargo, lld, mold, stdenv, and linker settings"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-004"
+title = "Default linker follows the platform"
+manual = false
+design = "design/workspace-options.md#toolchain-and-linker"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "use lld by default on Linux and the system linker elsewhere unless a linker is selected explicitly"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-005"
+title = "Profile options are type-checked"
+manual = false
+design = "design/workspace-options.md#compilation-profiles"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace option module"
+action = "type-check profile and profileDev settings for optimization, LTO, codegen units, panic strategy, stripping, debug info, target CPU, overflow checks, linker, and link arguments"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-006"
+title = "Profiles lower to rustc flags"
+manual = false
+design = "design/workspace-options.md#compilation-profiles"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "lower the effective release and dev profile settings into rustc flags for their respective derivations"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-007"
+title = "Manifest profiles provide the option base"
+manual = false
+design = "design/workspace-options.md#compilation-profiles"
+
+[requirements.ears]
+type = "event"
+trigger = "Cargo.toml declares profile settings"
+system = "the workspace builder"
+action = "use those settings as the base profile while explicit options override them"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-008"
+title = "Package visibility toggles and aliases are exposed"
+manual = false
+design = "design/workspace-options.md#package-visibility"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace option module"
+action = "expose createLibPackages and createDevPackages with libPackages, packages.createLib, devPackages, and packages.createDev aliases"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-009"
+title = "Library visibility aliases take precedence"
+manual = false
+design = "design/workspace-options.md#package-visibility"
+
+[requirements.ears]
+type = "event"
+trigger = "libPackages and createLibPackages are both set"
+system = "the workspace option module"
+action = "use libPackages and otherwise fall back to packages.createLib and then createLibPackages"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-010"
+title = "Dev visibility aliases take precedence"
+manual = false
+design = "design/workspace-options.md#package-visibility"
+
+[requirements.ears]
+type = "event"
+trigger = "devPackages and createDevPackages are both set"
+system = "the workspace option module"
+action = "use devPackages and otherwise fall back to packages.createDev and then createDevPackages"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-011"
+title = "Per-phase flag lists are configurable"
+manual = false
+design = "design/workspace-options.md#flags"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace option module"
+action = "accept extra rustc, test, clippy, doc, and doctest flags"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-012"
+title = "Overrides expose per-crate settings"
+manual = false
+design = "design/workspace-options.md#overrides"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace option module"
+action = "accept per-crate native build inputs, build inputs, rustc and rustdoc flags, environment, features, fileset, src, release and dev profile fragments, assets, asset directories, and additive test settings"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-013"
+title = "Overrides merge with explicit values winning"
+manual = false
+design = "design/workspace-options.md#overrides"
+
+[requirements.ears]
+type = "event"
+trigger = "a crate has built-in, colocated, and explicit overrides"
+system = "the workspace builder"
+action = "merge them in that order and let explicit values win"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-014"
+title = "Development shell options are configurable"
+manual = false
+design = "design/workspace-options.md#development-shell-checks-and-features"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace option module"
+action = "accept development shell enablement, extra packages, and a shell hook"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-015"
+title = "Check options are configurable"
+manual = false
+design = "design/workspace-options.md#development-shell-checks-and-features"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace option module"
+action = "accept checks.enable, checks.includePackageChecks, and checks.throwOnOutOfDate"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-016"
+title = "Feature resolution options are configurable"
+manual = false
+design = "design/workspace-options.md#development-shell-checks-and-features"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace option module"
+action = "accept features.unify and features.cratesIoIndex"

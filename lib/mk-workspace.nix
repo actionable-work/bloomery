@@ -27,7 +27,10 @@ in
     cargo = cfg.toolchain.cargo;
     mold = cfg.toolchain.mold;
     lld = cfg.toolchain.lld;
-    defaultLinker = cfg.toolchain.linker;
+    defaultLinker =
+      if cfg.toolchain.linker == "system"
+      then null
+      else cfg.toolchain.linker;
     stdenv = cfg.toolchain.stdenv;
 
     defaultRustcFlags = cfg.flags.rustc;
@@ -52,14 +55,27 @@ in
       then cfg.packages.createDev
       else cfg.createDevPackages;
     unifyFeatures = cfg.features.unify;
+    featureIndex =
+      if cfg.features.cratesIoIndex != null
+      then cfg.features.cratesIoIndex
+      else cratesIoIndex;
     throwOnOutOfDate = cfg.checks.throwOnOutOfDate;
     includePackageChecks = cfg.checks.includePackageChecks;
 
-    # Discover workspace members from Cargo.toml or explicit option
-    rawDiscoveredMembers =
+    # Discover every workspace member. source.members selects which members
+    # generate outputs; unselected members remain available as dependency
+    # sources for selected members. Unknown member names are evaluation errors
+    # so a partial build cannot silently drop a requested member.
+    discoveredWorkspaceMembers = workspace.discoverWorkspaceCrates {inherit root cargoTomlPath;};
+    selectedWorkspaceMembers =
       if workspaceMembers != null
-      then workspaceMembers
-      else workspace.discoverWorkspaceCrates {inherit root cargoTomlPath;};
+      then let
+        missingMembers = builtins.filter (name: !(discoveredWorkspaceMembers ? ${name})) workspaceMembers;
+      in
+        if missingMembers != []
+        then throw "bloomery: source.members lists unknown workspace members: ${lib.concatStringsSep ", " missingMembers}"
+        else lib.filterAttrs (name: _: builtins.elem name workspaceMembers) discoveredWorkspaceMembers
+      else discoveredWorkspaceMembers;
 
     # Support colocated overrides.nix files next to member Cargo.toml files
     loadColocatedOverride = crateDir: let
@@ -82,7 +98,7 @@ in
         else imported
       else {};
 
-    colocatedOverrides = lib.mapAttrs (_cname: crateDir: loadColocatedOverride crateDir) rawDiscoveredMembers;
+    colocatedOverrides = lib.mapAttrs (_cname: crateDir: loadColocatedOverride crateDir) discoveredWorkspaceMembers;
 
     mergeTestOverrides = a: b: {
       nativeBuildInputs = (a.nativeBuildInputs or []) ++ (b.nativeBuildInputs or []);
@@ -146,11 +162,9 @@ in
     getOverride = nameOrId: let
       hyphenName = lib.replaceStrings ["_"] ["-"] nameOrId;
       underscoreName = lib.replaceStrings ["-"] ["_"] nameOrId;
+      variants = lib.filter (key: (effectiveOverrides.${key} or {}) != {}) (lib.unique [nameOrId hyphenName underscoreName]);
     in
-      effectiveOverrides.${nameOrId}
-      or effectiveOverrides.${hyphenName}
-      or effectiveOverrides.${underscoreName}
-      or {};
+      lib.foldl' (acc: key: mergeOverrides acc effectiveOverrides.${key}) {} variants;
 
     getCrateOverride = id: name: let
       byId = getOverride id;
@@ -176,7 +190,7 @@ in
       workspace.sources.resolve {
         inherit crateDir;
         override = getOverride cname;
-        excludeDirs = workspace.sources.nestedMemberPaths crateDir rawDiscoveredMembers;
+        excludeDirs = workspace.sources.nestedMemberPaths crateDir discoveredWorkspaceMembers;
       };
 
     resolveTestMemberSource = cname: crateDir:
@@ -185,7 +199,7 @@ in
         override = getOverride cname;
         includeTests = true;
         testFileset = getTestFileset cname;
-        excludeDirs = workspace.sources.nestedMemberPaths crateDir rawDiscoveredMembers;
+        excludeDirs = workspace.sources.nestedMemberPaths crateDir discoveredWorkspaceMembers;
       };
 
     # Resolved source plus library availability for every member. Library
@@ -193,8 +207,8 @@ in
     # custom filesets, explicit local paths, and accepted path strings reflect
     # the entrypoints that will compile. An opaque source derivation falls back
     # to the raw member manifest.
-    memberSourceInfo = lib.mapAttrs resolveMemberSource rawDiscoveredMembers;
-    testMemberSourceInfo = lib.mapAttrs resolveTestMemberSource rawDiscoveredMembers;
+    memberSourceInfo = lib.mapAttrs resolveMemberSource discoveredWorkspaceMembers;
+    testMemberSourceInfo = lib.mapAttrs resolveTestMemberSource discoveredWorkspaceMembers;
     discoveredMembers = lib.mapAttrs (_: info: info.evalSrc) memberSourceInfo;
     # `src` is the build source; it may materialize symlinked entrypoint
     # targets, so evaluation keeps using `discovered*` (the `evalSrc` trees).
@@ -214,6 +228,10 @@ in
     mkCheckName = crateName: checkType: "${crateName}:${checkType}";
 
     parsed = workspace.parseLock {lockFile = cargoLock;};
+
+    # Workspace members whose outputs are generated. Unselected members stay in
+    # the crate graph as dependency sources only.
+    selectedWorkspacePackages = builtins.filter (pkg: selectedWorkspaceMembers ? ${pkg.name}) parsed.workspacePackages;
 
     # Load and validate bloomery.lock if available
     lockName =
@@ -266,10 +284,11 @@ in
         // {
           __activeDeps = depMap;
         }
-      else if cratesIoIndex != null
+      else if featureIndex != null
       then
         workspace.resolveFeatures {
-          inherit root cargoTomlPath discoveredMembers unifyFeatures cratesIoIndex;
+          inherit root cargoTomlPath discoveredMembers unifyFeatures;
+          cratesIoIndex = featureIndex;
           lockPackages = parsed.packages;
         }
       else throw "bloomery: Lock manifest '${toString (root + "/bloomery.lock")}' not found. Please run 'bloomery sync' to generate it.";
@@ -285,7 +304,10 @@ in
       else if rootToml ? profile && rootToml.profile ? release
       then rootToml.profile.release
       else {};
-    effectiveBinaryProfile = profileMod.evalProfile (tomlProfile // profile);
+    effectiveBinaryProfile = profileMod.evalProfile (
+      (filterNullAttrs (profileMod.normalizeProfileAttrs tomlProfile))
+      // (filterNullAttrs (profileMod.normalizeProfileAttrs profile))
+    );
 
     # Resolve dev compilation profile (defaults to opt-level=0, lto=off, codegen-units=256, debuginfo=2)
     tomlDevProfile =
@@ -611,7 +633,7 @@ in
         in
           manifestBins ++ mainBin ++ extraBins ++ extraDirBins
       )
-      parsed.workspacePackages;
+      selectedWorkspacePackages;
 
     # Binary package outputs (release only; dev variants are apps).
     binPackages =
@@ -640,7 +662,7 @@ in
             }
           else acc
       ) {}
-      parsed.workspacePackages;
+      selectedWorkspacePackages;
     libPackages = lib.optionalAttrs createLibPackages libraryPackages;
 
     # Test checks for all workspace crates
@@ -673,7 +695,7 @@ in
           };
         }
       )
-      parsed.workspacePackages
+      selectedWorkspacePackages
     );
 
     # Clippy checks for all workspace crates
@@ -701,7 +723,7 @@ in
           };
         }
       )
-      parsed.workspacePackages
+      selectedWorkspacePackages
     );
 
     # Documentation for workspace crates
@@ -729,7 +751,7 @@ in
           };
         }
       )
-      parsed.workspacePackages
+      selectedWorkspacePackages
     );
 
     # Doctests for workspace library crates
@@ -763,7 +785,7 @@ in
             }
             else null
         )
-        parsed.workspacePackages
+        selectedWorkspacePackages
       )
     );
 

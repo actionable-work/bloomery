@@ -1,0 +1,232 @@
+group = "DERIVATIONS"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-001"
+title = "Crate derivations invoke rustc directly"
+manual = false
+design = "design/derivations.md#crate-compilation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "invoke rustc directly to compile a crate without running Cargo"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-002"
+title = "Crate type follows library and proc-macro metadata"
+manual = false
+design = "design/derivations.md#crate-compilation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "emit an rlib for libraries, a dynamic library for proc macros, and manifest-declared cdylib or staticlib crate types"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-003"
+title = "External crates compile with capped lints"
+manual = false
+design = "design/derivations.md#crate-compilation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "cap lints when compiling non-workspace crates"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-004"
+title = "Direct dependencies are wired with extern flags"
+manual = false
+design = "design/derivations.md#dependency-wiring-and-metadata"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "expose each direct dependency with an --extern flag from its propagated metadata, including package-rename aliases"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-005"
+title = "Crate metadata propagates to dependents"
+manual = false
+design = "design/derivations.md#dependency-wiring-and-metadata"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "record the crate name, library path, proc-macro flag, link flags, assets, and sys-crate metadata for dependents"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-006"
+title = "Dependency closures are published"
+manual = false
+design = "design/derivations.md#dependency-wiring-and-metadata"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "publish a deps-closure of transitive libraries for downstream compilation"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-007"
+title = "Build scripts receive Cargo-like environment"
+manual = false
+design = "design/derivations.md#build-scripts"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate and binary builders"
+action = "compile and run build scripts with the OUT_DIR, TARGET, HOST, NUM_JOBS, OPT_LEVEL, PROFILE, CARGO_CFG_*, and CARGO_FEATURE_* environment"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-008"
+title = "Build script directives are applied"
+manual = false
+design = "design/derivations.md#build-scripts"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate and binary builders"
+action = "parse legacy cargo: and modern cargo:: directives and apply cfg, link-lib, link-search, rustc-env, and rustc-flags to the target compilation"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-009"
+title = "Links metadata reaches dependent build scripts"
+manual = false
+design = "design/derivations.md#build-scripts"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "publish links metadata as DEP_<LINKS>_<KEY> variables for dependent build scripts"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-010"
+title = "Active features become cfg flags"
+manual = false
+design = "design/derivations.md#feature-compilation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "pass each active feature to rustc as a feature cfg flag"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-011"
+title = "Implied features are expanded at compile time"
+manual = false
+design = "design/derivations.md#feature-compilation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "expand features implied through the features table and skip features that only reference absent optional dependencies"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-012"
+title = "Binary entrypoints are discovered conventionally"
+manual = false
+design = "design/derivations.md#binary-derivations"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the binary builder"
+action = "discover binaries from manifest bin entries, implicit src/main.rs, src/bin/*.rs, and src/bin/*/main.rs with manifest entries winning duplicates"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-013"
+title = "Binaries link their crate and dependencies"
+manual = false
+design = "design/derivations.md#binary-derivations"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the binary builder"
+action = "link the member's library crate when present and the dependency closure into the binary"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-014"
+title = "Release and dev binaries use their profile flags"
+manual = false
+design = "design/derivations.md#binary-derivations"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the binary builder"
+action = "build release and dev binaries from the same discovery with their respective profile flags and crate variants"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-015"
+title = "Assets flow into crate and binary outputs"
+manual = false
+design = "design/derivations.md#assets"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate and binary builders"
+action = "install crate-local and configured assets in crate outputs and bundle dependency, workspace, crate-local, and explicit assets under $out/bin and $out/share with crate-local assets taking precedence"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-016"
+title = "Test checks run unit and integration tests"
+manual = false
+design = "design/derivations.md#checks"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the test builder"
+action = "compile and run unit tests and integration tests with rustc --test using test overrides"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-017"
+title = "Clippy checks use the clippy driver"
+manual = false
+design = "design/derivations.md#checks"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the clippy builder"
+action = "run clippy-driver with warnings denied by default"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-018"
+title = "Documentation checks build rustdoc output"
+manual = false
+design = "design/derivations.md#checks"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the documentation builder"
+action = "build rustdoc output for the crate"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-019"
+title = "Doctest checks run rustdoc tests"
+manual = false
+design = "design/derivations.md#checks"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the doctest builder"
+action = "run rustdoc tests against the library entrypoint"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-020"
+title = "Package checks reuse release derivations"
+manual = false
+design = "design/derivations.md#checks"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "reuse the release crate and binary derivations as package checks"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-021"
+title = "Lock checks validate without writing"
+manual = false
+design = "design/derivations.md#checks"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace:lock check"
+action = "validate Cargo.lock and bloomery.lock consistency, member presence, versions, and dependency completeness read-only and report bloomery sync as the repair"

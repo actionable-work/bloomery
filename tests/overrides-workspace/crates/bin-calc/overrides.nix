@@ -8,5 +8,6 @@
   ];
   env = {
     COLOCATED_OVERRIDE_VAR = "injected_from_member_override";
+    SHARED_OVERRIDE_VAR = "colocated";
   };
 }

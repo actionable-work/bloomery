@@ -3,7 +3,11 @@
     pkgs = nixpkgs.legacyPackages.${system};
     server = workspace.packages.server;
   in
-    pkgs.runCommand "validate-axum-assets" {} ''
+    pkgs.runCommand "validate-axum-assets" {
+      passthru.bloomery = [
+        "NIXLIB-GRAPH-DERIVATIONS-015"
+      ];
+    } ''
       echo "Validating server assets in ${server}..."
       test -d "${server}/bin/assets" || { echo "Missing bin/assets"; exit 1; }
       test -f "${server}/bin/assets/index.html" || { echo "Missing bin/assets/index.html"; exit 1; }

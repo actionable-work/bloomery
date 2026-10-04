@@ -15,6 +15,13 @@
       ${pkgs.system} = pkgs;
     };
   };
+  mockNixpkgsTwoSystems = {
+    inherit lib;
+    legacyPackages = {
+      aarch64-linux = pkgs;
+      x86_64-linux = pkgs;
+    };
+  };
 in {
   testMkFlakeDefaults = {
     expr = let
@@ -173,5 +180,124 @@ in {
     in
       flakeOutputs.customAttr.${pkgs.system};
     expected = "hello-${pkgs.system}";
+  };
+
+  testMkFlakeDefaultsSystems = {
+    expr = let
+      flakeOutputs = mkFlake {
+        nixpkgs = mockNixpkgs;
+        root = ../tests/basic-workspace;
+      };
+    in
+      builtins.attrNames flakeOutputs.packages;
+    expected = ["aarch64-darwin" "aarch64-linux" "x86_64-linux"];
+  };
+
+  testMkFlakeEvaluatesSelectedSystems = {
+    expr = let
+      flakeOutputs = mkFlake {
+        nixpkgs = mockNixpkgsTwoSystems;
+        systems = ["x86_64-linux" "aarch64-linux"];
+        root = ../tests/basic-workspace;
+      };
+      packages = flakeOutputs.packages;
+    in {
+      hasBothSystems = builtins.attrNames packages == ["aarch64-linux" "x86_64-linux"];
+      evaluatesEachSystem =
+        builtins.all (system: builtins.isString packages.${system}.default.drvPath) ["aarch64-linux" "x86_64-linux"];
+    };
+    expected = {
+      hasBothSystems = true;
+      evaluatesEachSystem = true;
+    };
+  };
+
+  testMkFlakeDisabledDevShell = {
+    expr = let
+      flakeOutputs = mkFlake {
+        nixpkgs = mockNixpkgs;
+        systems = [pkgs.system];
+        root = ../tests/basic-workspace;
+        devShell.enable = false;
+      };
+    in {
+      hasDefaultShell = builtins.hasAttr "default" flakeOutputs.devShells.${pkgs.system};
+      keepsPackages = builtins.hasAttr "bin-calc" flakeOutputs.packages.${pkgs.system};
+      keepsChecks = builtins.hasAttr "bin-calc:test" flakeOutputs.checks.${pkgs.system};
+    };
+    expected = {
+      hasDefaultShell = false;
+      keepsPackages = true;
+      keepsChecks = true;
+    };
+  };
+
+  testMkFlakeExtraOutputsWorkspaceContext = {
+    expr = let
+      flakeOutputs = mkFlake {
+        nixpkgs = mockNixpkgs;
+        systems = [pkgs.system];
+        root = ../tests/basic-workspace;
+        extraOutputs = {
+          eachSystem,
+          perSystemWorkspace,
+        }: {
+          eachSystemProbe = eachSystem (system: "probe-${system}");
+          workspaceCrateIds = builtins.attrNames perSystemWorkspace.${pkgs.system}.crates;
+          workspaceLockVersion = perSystemWorkspace.${pkgs.system}.lock.version;
+        };
+      };
+    in {
+      probe = flakeOutputs.eachSystemProbe.${pkgs.system};
+      hasLocalCrate = builtins.elem "bin-calc-0.1.0" flakeOutputs.workspaceCrateIds;
+      lockVersion = flakeOutputs.workspaceLockVersion;
+    };
+    expected = {
+      probe = "probe-${pkgs.system}";
+      hasLocalCrate = true;
+      lockVersion = 4;
+    };
+  };
+
+  testMkFlakeExtraOutputsOverride = {
+    expr = let
+      flakeOutputs = mkFlake {
+        nixpkgs = mockNixpkgs;
+        systems = [pkgs.system];
+        root = ../tests/basic-workspace;
+        extraOutputs = _: {
+          packages = {"override-marker" = "kept";};
+        };
+      };
+    in
+      flakeOutputs.packages;
+    expected = {"override-marker" = "kept";};
+  };
+
+  testMkFlakeForwardsWorkspaceOptions = {
+    expr = let
+      flakeOutputs = mkFlake {
+        nixpkgs = mockNixpkgs;
+        systems = [pkgs.system];
+        root = ../tests/basic-workspace;
+        toolchain.linker = "mold";
+        profile.optLevel = 2;
+        flags.test = ["--nocapture"];
+        overrides.bin-calc.env.FLAKE_OPTION_PASSTHROUGH = "yes";
+      };
+      packages = flakeOutputs.packages.${pkgs.system};
+      checks = flakeOutputs.checks.${pkgs.system};
+    in {
+      profileApplied = lib.hasInfix "-Copt-level=2" packages."bin-calc".buildPhase;
+      linkerApplied = lib.hasInfix "-fuse-ld=mold" packages."bin-calc".buildPhase;
+      testFlagsApplied = lib.hasInfix "--nocapture" checks."bin-calc:test".buildPhase;
+      envApplied = packages."bin-calc".FLAKE_OPTION_PASSTHROUGH == "yes";
+    };
+    expected = {
+      profileApplied = true;
+      linkerApplied = true;
+      testFlagsApplied = true;
+      envApplied = true;
+    };
   };
 }

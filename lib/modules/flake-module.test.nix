@@ -56,6 +56,20 @@
       }
     ];
   };
+  evalOverrideResult = lib.evalModules {
+    modules = [
+      mockFlakeParts
+      flakeModule
+      {
+        perSystem = {
+          bloomery.workspace = {
+            root = ../../tests/basic-workspace;
+          };
+          packages."bin-calc" = "consumer-wins";
+        };
+      }
+    ];
+  };
 in {
   testFlakeModuleOutputs = {
     expr = {
@@ -84,6 +98,26 @@ in {
     };
     expected = {
       workspaceIsNull = true;
+    };
+  };
+
+  testFlakeModuleExposesWorkspaceOutputs = {
+    expr = {
+      hasPackage = builtins.hasAttr "bin-calc" (evalResult.config.perSystem.bloomery.outputs.packages or {});
+      hasCrate = builtins.hasAttr "bin-calc-0.1.0" (evalResult.config.perSystem.bloomery.outputs.crates or {});
+    };
+    expected = {
+      hasPackage = true;
+      hasCrate = true;
+    };
+  };
+
+  testFlakeModuleConsumerOverridesGeneratedDefaults = {
+    expr = {
+      consumerPackage = evalOverrideResult.config.perSystem.packages."bin-calc";
+    };
+    expected = {
+      consumerPackage = "consumer-wins";
     };
   };
 }

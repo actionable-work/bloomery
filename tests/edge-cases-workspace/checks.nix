@@ -18,7 +18,12 @@
         assert builtins.hasAttr "manifest-bin" workspace.packages;
         assert builtins.hasAttr "dir_bin" workspace.packages;
         assert !(builtins.hasAttr "ignored-crate" workspace.packages);
-          pkgs.runCommand "validate-edge-cases-workspace" {} ''
+          pkgs.runCommand "validate-edge-cases-workspace" {
+            passthru.bloomery = [
+              "NIXLIB-GRAPH-DERIVATIONS-008"
+              "NIXLIB-GRAPH-DERIVATIONS-012"
+            ];
+          } ''
             echo "Validating edge-case workspace rendering..."
             test -x "${workspace.packages.edge-cases-root}/bin/edge-cases-root" || { echo "Missing root binary"; exit 1; }
             test -x "${workspace.packages."manifest-bin"}/bin/manifest-bin" || { echo "Missing manifest binary"; exit 1; }

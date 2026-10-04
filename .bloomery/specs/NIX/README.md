@@ -12,7 +12,9 @@ description: |
 # NIX Area
 
 The [Sources](SOURCES/README.md) feature defines fileset selection and source
-identity for Rust builds, checks, assets, and auxiliary inputs.
+identity for Rust builds, checks, assets, and auxiliary inputs. The exported
+constructors that consume these sources and the crate derivation graph are
+specified by [NIXLIB](../NIXLIB/README.md).
 
 This area does not own [CLI check orchestration](../CLI/CHECK/README.md),
 [repository layout](../REPOSITORY/LAYOUT/README.md), or documentation rendering.

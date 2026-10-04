@@ -1,0 +1,230 @@
+group = "RESOLUTION"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-001"
+title = "Workspace members are discovered from the manifest"
+manual = false
+design = "design/resolution.md#workspace-discovery"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "Bloomery workspace discovery"
+action = "collect the root package, explicit path dependencies, and glob-expanded workspace members minus excluded paths"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-002"
+title = "Explicit members replace discovery"
+manual = false
+design = "design/resolution.md#workspace-discovery"
+
+[requirements.ears]
+type = "event"
+trigger = "source.members lists crate names"
+system = "the workspace builder"
+action = "build exactly those members instead of discovering the manifest workspace"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-003"
+title = "Locked packages become identified nodes"
+manual = false
+design = "design/resolution.md#cargo-lock-model"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Cargo.lock parser"
+action = "model every package as a node identified by <name>-<version> with its source kind, checksum, and resolved dependency IDs"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-004"
+title = "Unresolvable dependency references fail evaluation"
+manual = false
+design = "design/resolution.md#cargo-lock-model"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a locked dependency reference is missing or ambiguous"
+system = "the Cargo.lock parser"
+action = "fail evaluation with an error naming the offending dependency"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-005"
+title = "Bloomery lock supplies active graph data"
+manual = false
+design = "design/resolution.md#bloomery-lock"
+
+[requirements.ears]
+type = "event"
+trigger = "bloomery.lock is present"
+system = "the workspace builder"
+action = "take each package's active features and dependency edges plus proc-macro and edition metadata from that lock"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-006"
+title = "Lock validation reports stale bloomery locks"
+manual = false
+design = "design/resolution.md#bloomery-lock"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "the recorded Cargo.lock digest does not match the current Cargo.lock"
+system = "the workspace:lock check"
+action = "fail and report the mismatch"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-007"
+title = "throwOnOutOfDate fails evaluation on stale locks"
+manual = false
+design = "design/resolution.md#bloomery-lock"
+
+[requirements.ears]
+type = "event"
+trigger = "checks.throwOnOutOfDate is enabled and the recorded digest differs from Cargo.lock"
+system = "the workspace builder"
+action = "fail evaluation before any derivation is realized"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-008"
+title = "Index fallback resolves features without a bloomery lock"
+manual = false
+design = "design/resolution.md#index-fallback"
+
+[requirements.ears]
+type = "event"
+trigger = "bloomery.lock is absent and features.cratesIoIndex is configured"
+system = "the workspace builder"
+action = "resolve active features and dependency edges from local manifests and index entries to a fixed point"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-009"
+title = "Missing lock inputs fail with sync guidance"
+manual = false
+design = "design/resolution.md#index-fallback"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "bloomery.lock is absent and no crates.io index is configured"
+system = "the workspace builder"
+action = "fail evaluation with guidance to run bloomery sync"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-010"
+title = "Every locked package becomes a crate node"
+manual = false
+design = "design/resolution.md#crate-nodes-and-edges"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "expose a release crate node keyed by <name>-<version> for every package in Cargo.lock"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-011"
+title = "Dev nodes cover workspace crates only"
+manual = false
+design = "design/resolution.md#crate-nodes-and-edges"
+
+[requirements.ears]
+type = "event"
+trigger = "dev packages are enabled"
+system = "the workspace builder"
+action = "expose dev-profile crate nodes for workspace members while sharing non-workspace release nodes"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-012"
+title = "Graph edges follow active dependencies"
+manual = false
+design = "design/resolution.md#crate-nodes-and-edges"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "wire each crate node to the nodes of its active resolved dependencies, falling back to all resolved Cargo.lock dependencies when no active edge set exists"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-013"
+title = "Transitive crates are available to consumers"
+manual = false
+design = "design/resolution.md#crate-nodes-and-edges"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "propagate a dependency closure so downstream compilation can resolve transitive crates and proc-macro helpers"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-014"
+title = "Registry nodes use locked checksums"
+manual = false
+design = "design/resolution.md#sources"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "fetch registry crate sources from static.crates.io using the checksum recorded in Cargo.lock"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-015"
+title = "Git nodes use pinned revisions"
+manual = false
+design = "design/resolution.md#sources"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "fetch git crate sources at the revision recorded in the package source"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-016"
+title = "Unsupported crate sources fail evaluation"
+manual = false
+design = "design/resolution.md#sources"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a locked package has a source kind other than workspace, registry, or git"
+system = "the workspace builder"
+action = "fail evaluation with an unsupported-source error"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-017"
+title = "Override keys normalize name spellings"
+manual = false
+design = "design/resolution.md#override-and-feature-precedence"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "match overrides by package ID, hyphenated name, or underscored name"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-018"
+title = "Feature selection follows override precedence"
+manual = false
+design = "design/resolution.md#override-and-feature-precedence"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "select a package's features from its per-crate override, then the lock manifest, then resolved features, then the default set"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-019"
+title = "Crate identity reflects effective inputs"
+manual = false
+design = "design/resolution.md#crate-identity"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "derive crate identity from the package ID, active features, selected sources, toolchain, native inputs, flags, and profile"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-020"
+title = "Resolution performs no builds or fetches"
+manual = false
+design = "design/resolution.md#evaluation-boundary"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "Bloomery graph resolution"
+action = "read manifests, Cargo.lock, and bloomery.lock only, without running Cargo, importing from a derivation, or fetching sources during evaluation"

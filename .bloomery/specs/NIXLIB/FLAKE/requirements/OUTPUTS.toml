@@ -1,0 +1,186 @@
+group = "OUTPUTS"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-001"
+title = "Packages expose binary derivations"
+manual = false
+design = "design/output-contract.md#packages"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "expose one release package derivation named after each discovered workspace binary"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-002"
+title = "Library packages are gated by visibility"
+manual = false
+design = "design/output-contract.md#packages"
+
+[requirements.ears]
+type = "event"
+trigger = "library package visibility is enabled"
+system = "the workspace builder"
+action = "expose a <crate>:lib package for each workspace crate with a library entrypoint"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-003"
+title = "Default package prefers the default binary"
+manual = false
+design = "design/output-contract.md#packages"
+
+[requirements.ears]
+type = "event"
+trigger = "a workspace has at least one binary"
+system = "the workspace builder"
+action = "expose packages.default as the binary named default when present or the first discovered binary otherwise"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-004"
+title = "Dev profile derivations are not packages"
+manual = false
+design = "design/output-contract.md#packages"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "keep dev-profile derivations out of the packages output"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-005"
+title = "Apps expose binaries, dev binaries, and documentation"
+manual = false
+design = "design/output-contract.md#apps"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "expose <bin> apps for release binaries, <bin>:dev apps when dev packages are enabled, and <crate>:doc apps for documentation servers"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-006"
+title = "Apps include a default entry"
+manual = false
+design = "design/output-contract.md#apps"
+
+[requirements.ears]
+type = "event"
+trigger = "a workspace has at least one binary"
+system = "the workspace builder"
+action = "expose apps.default for the preferred binary"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-007"
+title = "Checks cover each workspace crate"
+manual = false
+design = "design/output-contract.md#checks"
+
+[requirements.ears]
+type = "event"
+trigger = "checks are enabled"
+system = "the workspace builder"
+action = "expose <crate>:test, <crate>:clippy, and <crate>:doc checks for every workspace crate"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-008"
+title = "Doctest checks require a library entrypoint"
+manual = false
+design = "design/output-contract.md#checks"
+
+[requirements.ears]
+type = "event"
+trigger = "checks are enabled"
+system = "the workspace builder"
+action = "expose a <crate>:doctest check only for workspace crates with a library entrypoint"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-009"
+title = "Package checks are gated independently"
+manual = false
+design = "design/output-contract.md#checks"
+
+[requirements.ears]
+type = "event"
+trigger = "checks.includePackageChecks is disabled"
+system = "the workspace builder"
+action = "omit <bin>:bin and <crate>:lib checks while retaining the remaining checks"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-010"
+title = "Lock validation is part of the check set"
+manual = false
+design = "design/output-contract.md#checks"
+
+[requirements.ears]
+type = "event"
+trigger = "checks are enabled"
+system = "the workspace builder"
+action = "expose a workspace:lock validation check"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-011"
+title = "No recursive check output is generated"
+manual = false
+design = "design/output-contract.md#checks"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "generate no recursive bloomery:check output"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-012"
+title = "Crate derivations are exposed as outputs"
+manual = false
+design = "design/output-contract.md#derivation-and-metadata-outputs"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "expose release crate derivations as crates and dev workspace crate derivations as cratesDev"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-013"
+title = "Lock and configuration models are exposed"
+manual = false
+design = "design/output-contract.md#derivation-and-metadata-outputs"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "expose the parsed lock model as lock and the evaluated options as config"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-014"
+title = "Enabled development shell contains the toolchain"
+manual = false
+design = "design/output-contract.md#development-shell"
+
+[requirements.ears]
+type = "event"
+trigger = "the development shell is enabled"
+system = "the workspace builder"
+action = "return a shell containing rustc, clippy, cargo, nix-fast-build, the selected linker, and user packages with the configured shell hook"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-015"
+title = "Disabled development shell is null"
+manual = false
+design = "design/output-contract.md#development-shell"
+
+[requirements.ears]
+type = "event"
+trigger = "the development shell is disabled"
+system = "the workspace builder"
+action = "return a null devShell output"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-016"
+title = "App entries declare an app program"
+manual = false
+design = "design/output-contract.md#apps"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "shape every app entry as an attribute set with type = \"app\" and a program path"

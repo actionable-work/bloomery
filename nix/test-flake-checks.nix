@@ -44,3 +44,24 @@ in
           echo "passed" > "$out/success"
         ''))
   testFlakes
+  // {
+    "interface:exports" = assert bloomery ? mkFlake;
+    assert bloomery ? mkLib;
+    assert bloomery ? flakeModules;
+    assert bloomery.flakeModules ? default;
+    assert bloomery ? flakeModule;
+    assert bloomery.lib ? parseLock;
+    assert bloomery.lib.${system} ? mkWorkspace;
+    assert bloomery.mkLib.${system} ? mkWorkspace;
+      pkgs.runCommand "bloomery-interface-exports" {
+        passthru.bloomery = [
+          "NIXLIB-FLAKE-ENTRYPOINTS-001"
+          "NIXLIB-FLAKE-ENTRYPOINTS-002"
+          "NIXLIB-FLAKE-ENTRYPOINTS-011"
+        ];
+      } ''
+        echo "Bloomery flake exports are present."
+        mkdir "$out"
+        echo "passed" > "$out/success"
+      '';
+  }

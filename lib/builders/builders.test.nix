@@ -87,6 +87,30 @@
       invoke = procMacroWorkspace.checks."bloomery-test-macros:doctest".checkPhase;
     };
   };
+  crateDrv = (builderExports.buildCrateWith {defaultLinker = null;}) {
+    pkg = {
+      name = "crate-fixture";
+      version = "0.1.0";
+      crateName = "crate_fixture";
+      id = "crate-fixture-0.1.0";
+      isWorkspace = false;
+    };
+    src = source;
+    features = ["alpha" "beta"];
+    edition = "2021";
+    isProcMacro = false;
+  };
+  binDrv = (builderExports.buildBinWith {defaultLinker = null;}) {
+    binName = "bin-fixture";
+    pkg = {
+      name = "bin-fixture";
+      version = "0.1.0";
+      crateName = "bin_fixture";
+    };
+    src = source;
+    entry = "src/main.rs";
+    defaultRustcFlags = [];
+  };
 in {
   testProcMacroBuildersHandleMissingMetadata = {
     expr = let
@@ -127,5 +151,92 @@ in {
       && allPhasesContain workspaceProcMacroPhases "configure" procMacroFlag
       && allPhasesContain workspaceProcMacroPhases "invoke" passedProcMacroFlags;
     expected = true;
+  };
+
+  testCrateBuilderTypesAndLintCapping = {
+    expr = {
+      invokesRustc = lib.hasInfix "$RUSTC" crateDrv.buildPhase;
+      detectsCrateTypes = lib.hasInfix "crate-type" crateDrv.configurePhase;
+      emitsExtraCrateTypes = lib.hasInfix "cdylib" crateDrv.configurePhase && lib.hasInfix "staticlib" crateDrv.configurePhase;
+      capsExternalLints = lib.hasInfix "--cap-lints=allow" crateDrv.buildPhase;
+    };
+    expected = {
+      invokesRustc = true;
+      detectsCrateTypes = true;
+      emitsExtraCrateTypes = true;
+      capsExternalLints = true;
+    };
+  };
+
+  testCrateBuilderDependencyWiringAndMetadata = {
+    expr = {
+      wiresExterns = lib.hasInfix "--extern" crateDrv.configurePhase;
+      handlesRenamedDependencies = lib.hasInfix "package" crateDrv.configurePhase;
+      writesMeta = lib.hasInfix "nix-support/meta.sh" crateDrv.installPhase;
+      propagatesLibraryPath = lib.hasInfix "DEP_LIB_PATH" crateDrv.installPhase;
+      propagatesLinkFlags = lib.hasInfix "DEP_RUSTC_LINK_FLAGS" crateDrv.installPhase;
+      publishesClosure = lib.hasInfix "deps-closure" crateDrv.installPhase;
+    };
+    expected = {
+      wiresExterns = true;
+      handlesRenamedDependencies = true;
+      writesMeta = true;
+      propagatesLibraryPath = true;
+      propagatesLinkFlags = true;
+      publishesClosure = true;
+    };
+  };
+
+  testCrateBuilderBuildScriptHandling = {
+    expr = {
+      setsOutDir = lib.hasInfix "OUT_DIR" crateDrv.buildPhase;
+      setsTarget = lib.hasInfix "TARGET" crateDrv.buildPhase;
+      setsNumJobs = lib.hasInfix "NUM_JOBS" crateDrv.buildPhase;
+      setsCargoCfg = lib.hasInfix "CARGO_CFG_" crateDrv.buildPhase;
+      setsCargoFeature = lib.hasInfix "CARGO_FEATURE_" crateDrv.buildPhase;
+      parsesLegacyDirectives = lib.hasInfix "cargo:rustc-cfg=" crateDrv.buildPhase;
+      parsesModernDirectives = lib.hasInfix "cargo::rustc-cfg=" crateDrv.buildPhase;
+      propagatesLinksMetadata = lib.hasInfix "DEP_" crateDrv.buildPhase;
+    };
+    expected = {
+      setsOutDir = true;
+      setsTarget = true;
+      setsNumJobs = true;
+      setsCargoCfg = true;
+      setsCargoFeature = true;
+      parsesLegacyDirectives = true;
+      parsesModernDirectives = true;
+      propagatesLinksMetadata = true;
+    };
+  };
+
+  testCrateBuilderFeatureFlags = {
+    expr = {
+      emitsFeatureCfgs = lib.hasInfix "--cfg=feature=" crateDrv.configurePhase;
+      listsActiveFeatures = lib.hasInfix "alpha" crateDrv.configurePhase && lib.hasInfix "beta" crateDrv.configurePhase;
+      expandsImpliedFeatures = lib.hasInfix "for pass in 1 2 3" crateDrv.configurePhase;
+      skipsMissingOptionalDeps = lib.hasInfix "is_missing_optional_dep" crateDrv.configurePhase;
+    };
+    expected = {
+      emitsFeatureCfgs = true;
+      listsActiveFeatures = true;
+      expandsImpliedFeatures = true;
+      skipsMissingOptionalDeps = true;
+    };
+  };
+
+  testBinaryBuilderBuildScriptAndEntrypoint = {
+    expr = {
+      setsOutDir = lib.hasInfix "OUT_DIR" binDrv.buildPhase;
+      parsesDirectives = lib.hasInfix "cargo::rustc-cfg=" binDrv.buildPhase;
+      invokesRustc = lib.hasInfix "$RUSTC" binDrv.buildPhase;
+      setsCrateName = lib.hasInfix "--crate-name" binDrv.buildPhase;
+    };
+    expected = {
+      setsOutDir = true;
+      parsesDirectives = true;
+      invokesRustc = true;
+      setsCrateName = true;
+    };
   };
 }
