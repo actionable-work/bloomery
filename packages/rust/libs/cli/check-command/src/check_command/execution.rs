@@ -17,6 +17,9 @@ use std::process::ExitCode;
 use std::sync::mpsc;
 use std::time::Duration;
 
+/// Implicit, non-selectable outcome for the mandatory formatter gate.
+pub(super) const FORMAT_WORKSPACE_ID: &str = "format:workspace";
+
 pub(super) fn validate_execution_selection(selected: &[String]) -> Result<(), CheckError> {
     if selected.is_empty() {
         Err(CheckError::usage("execution selection contains no checks"))
@@ -89,14 +92,13 @@ pub(super) fn run_checks(
             );
         }
     };
-    let source = store::source_metadata(store.root());
     let started_at = store::timestamp_millis();
     let jobs = args.jobs.unwrap_or_else(default_jobs).max(1);
 
     let has_nix_checks = selected.iter().any(|id| id.starts_with("nix:"));
     let eligible = context.terminal.progress_eligible(json_mode);
     let mut progress = ProgressReporter::new(
-        ProgressReducer::new(selected.len(), has_nix_checks),
+        ProgressReducer::new(selected.len() + 1, has_nix_checks),
         &mut *stderr,
         eligible,
         context.terminal.width(),
@@ -105,16 +107,56 @@ pub(super) fn run_checks(
     // Render the initialized snapshot before workers start; the reducer is the
     // single source of displayed metrics, so later writes stay change-only.
     progress.start();
-    let execution = execute_selected(
-        root,
-        &selected,
-        &allocation,
-        backend,
-        interrupt.clone(),
-        jobs,
-        args.fail_fast,
-        &mut progress,
-    );
+    // The formatter gate is serial and mandatory. It runs before any selected
+    // check is admitted and short-circuits the run when it fails.
+    let FormatGate {
+        outcome: format_outcome,
+        failure: format_failure,
+        operational_error: format_operational_error,
+        log: format_log,
+    } = run_format_gate(root, backend, &allocation, &interrupt, &mut progress);
+    // Source metadata is sampled after formatting so it describes the workspace
+    // state the selected checks run against, including any formatter edits.
+    let source = store::source_metadata(store.root());
+    let execution = if format_outcome == Outcome::Passed {
+        execute_selected(
+            root,
+            &selected,
+            &allocation,
+            backend,
+            interrupt.clone(),
+            jobs,
+            args.fail_fast,
+            &mut progress,
+        )
+    } else {
+        // The gate stopped check work. Publish every selected check's final
+        // not_run outcome so the progress denominator still completes.
+        for id in &selected {
+            progress.apply(ProgressEvent::CheckFinalized {
+                id: id.clone(),
+                outcome: Outcome::NotRun,
+            });
+        }
+        Ok(ExecutionResults {
+            outcomes: selected
+                .iter()
+                .map(|id| {
+                    (
+                        id.clone(),
+                        CheckRecord {
+                            id: id.clone(),
+                            outcome: Outcome::NotRun,
+                            blocked_by: None,
+                            logs: Vec::new(),
+                        },
+                    )
+                })
+                .collect(),
+            failures: format_failure.into_iter().collect(),
+            operational_error: format_operational_error,
+        })
+    };
     // Snapshot the last applied tuple before cleanup so the completion summary
     // can repeat it. Metrics are only collected when live progress was eligible.
     let final_metrics = eligible.then(|| progress.final_metrics());
@@ -125,6 +167,15 @@ pub(super) fn run_checks(
     let completed_at = store::timestamp_millis();
     let (record, operational_error) = match execution {
         Ok(mut execution) => {
+            execution.outcomes.insert(
+                FORMAT_WORKSPACE_ID.to_owned(),
+                CheckRecord {
+                    id: FORMAT_WORKSPACE_ID.to_owned(),
+                    outcome: format_outcome,
+                    blocked_by: None,
+                    logs: format_log.clone().into_iter().collect(),
+                },
+            );
             let operational_error = execution.operational_error.take();
             let status = if interrupt.is_set() {
                 RunStatus::Interrupted
@@ -175,6 +226,12 @@ pub(super) fn run_checks(
                     logs: Vec::new(),
                 })
                 .collect::<Vec<_>>();
+            outcomes.push(CheckRecord {
+                id: FORMAT_WORKSPACE_ID.to_owned(),
+                outcome: format_outcome,
+                blocked_by: None,
+                logs: format_log.into_iter().collect(),
+            });
             outcomes.sort_by(|left, right| left.id.cmp(&right.id));
             let record = RunRecord {
                 id: allocation.id.clone(),
@@ -251,6 +308,94 @@ pub(super) fn run_checks(
         Err(error) => {
             let _ = writeln!(stderr, "bloomery: unable to write check result: {error}");
             ExitCode::from(2)
+        }
+    }
+}
+
+struct FormatGate {
+    outcome: Outcome,
+    failure: Option<FailureDraft>,
+    operational_error: Option<String>,
+    log: Option<String>,
+}
+
+/// Run the mandatory `nix fmt` preflight exactly once. The gate shares the
+/// run's interruption flag but not the check scheduler's admission or
+/// fail-fast behavior: a nonzero formatter exit always stops check work.
+fn run_format_gate<W: Write>(
+    root: &Path,
+    backend: &dyn NixBackend,
+    allocation: &store::RunAllocation,
+    interrupt: &InterruptFlag,
+    progress: &mut ProgressReporter<W>,
+) -> FormatGate {
+    let log_name = "format-workspace.log";
+    let log_reference = format!("logs/{log_name}");
+    let finalize = |progress: &mut ProgressReporter<W>, outcome: Outcome| {
+        progress.apply(ProgressEvent::CheckFinalized {
+            id: FORMAT_WORKSPACE_ID.to_owned(),
+            outcome,
+        });
+    };
+    let log_path = match allocation.prepare_log(log_name) {
+        Ok(path) => path,
+        Err(message) => {
+            finalize(progress, Outcome::NotRun);
+            return FormatGate {
+                outcome: Outcome::NotRun,
+                failure: None,
+                operational_error: Some(message),
+                log: None,
+            };
+        }
+    };
+    match backend.format_workspace(root, &log_path, CancellationToken::new(interrupt.clone())) {
+        NixTaskResult::Succeeded(()) => {
+            finalize(progress, Outcome::Passed);
+            FormatGate {
+                outcome: Outcome::Passed,
+                failure: None,
+                operational_error: None,
+                log: Some(log_reference),
+            }
+        }
+        NixTaskResult::Failed { code, message } => {
+            finalize(progress, Outcome::Failed);
+            FormatGate {
+                outcome: Outcome::Failed,
+                failure: Some(FailureDraft {
+                    check: FORMAT_WORKSPACE_ID.to_owned(),
+                    code,
+                    subject: None,
+                    location: None,
+                    message,
+                    notes: Vec::new(),
+                    log: Some(log_reference.clone()),
+                    nix_log: None,
+                    focus_tail: true,
+                    occurrence: 0,
+                }),
+                operational_error: None,
+                log: Some(log_reference),
+            }
+        }
+        NixTaskResult::Canceled => {
+            finalize(progress, Outcome::Canceled);
+            FormatGate {
+                outcome: Outcome::Canceled,
+                failure: None,
+                operational_error: None,
+                log: Some(log_reference),
+            }
+        }
+        NixTaskResult::OperationalError(message) => {
+            finalize(progress, Outcome::NotRun);
+            FormatGate {
+                outcome: Outcome::NotRun,
+                failure: None,
+                operational_error: Some(message),
+                log: Some(log_reference),
+            }
         }
     }
 }

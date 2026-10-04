@@ -4,8 +4,8 @@ name: Bloomery CLI Interface
 tagline: Define the user-visible command syntax and options for the bloomery executable.
 description: |
   The interface feature specifies the command tree, invocation root, shared
-  and command-specific flags, and output modes exposed by `bloomery`. Command behavior
-  is specified separately by the CHECK, REVIEW, and SYNC features.
+  flake-presence preflight, flags, and output modes exposed by `bloomery`.
+  Command behavior is specified separately by the CHECK, REVIEW, and SYNC features.
 ---
 
 # CLI Interface
@@ -25,6 +25,8 @@ and how the target repository root is selected.
 - Expose `check`, its `list`/`failures`/`details` commands, `review`, `sync`, and
   parser-generated help.
 - Resolve the repository root from the process's current working directory.
+- Require a root `flake.nix` before every command except the workspace-bootstrap
+  `init` command.
 - Specify shared `--json`, check selection/execution/retrieval options, and
   command-specific `sync --update` values.
 - Define human-readable terminal coloring and stable JSON output contracts.

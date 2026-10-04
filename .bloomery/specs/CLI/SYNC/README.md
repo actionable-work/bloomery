@@ -11,9 +11,10 @@ description: |
 
 # `bloomery sync`
 
-Sync is the workspace maintenance command, not a traceability check. It replaces
-Bloomery's Nix `lock` app with a CLI command; there is no replacement Nix `sync`
-app. Its design and requirements define the implemented CLI behavior.
+Sync is the workspace maintenance command, not a traceability check. It requires
+the shared root `flake.nix` preflight, then replaces Bloomery's Nix `lock` app
+with a CLI command; there is no replacement Nix `sync` app. Its design and
+requirements define the CLI behavior.
 
 ## Design documents
 
@@ -31,10 +32,11 @@ app. Its design and requirements define the implemented CLI behavior.
 ## Boundaries and dependencies
 
 Sync uses Cargo for dependency resolution and Nix only for selected flake-input
-updates. It shares configuration syntax and validation with
-[PARSER/CONFIGURATION](../../PARSER/CONFIGURATION/README.md), but does not load
-specifications, scan evidence, execute checks, or require a `.bloomery/specs`
-tree. Command syntax belongs to [INTERFACE](../INTERFACE/README.md).
+updates after the shared `flake.nix` preflight. It shares configuration syntax
+and validation with [PARSER/CONFIGURATION](../../PARSER/CONFIGURATION/README.md),
+but does not load specifications, scan evidence, execute checks, or require a
+`.bloomery/specs` tree. Command syntax belongs to
+[INTERFACE](../INTERFACE/README.md).
 
 Recommendations are advisory. Sync neither enables features nor writes config,
 manifests, specifications, or source code. The recommendation catalog is built
@@ -42,6 +44,6 @@ into Bloomery and can grow over time without storing notification history.
 
 ## Verification
 
-All requirements in this feature are automated (`manual = false`) and covered
-by unit tests using temporary workspaces and injectable tool runners. The sync
-command is also exercised directly against the repository during development.
+All requirements in this feature are automated (`manual = false`). Use
+temporary workspaces and injectable tool runners to verify lock reconciliation,
+update selection, missing-flake preflight, and failure handling.

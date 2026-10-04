@@ -93,27 +93,27 @@ action = "select Rust dependency updates"
 
 [[requirements]]
 id = "CLI-SYNC-INTERFACE-009"
-title = "Bare update selects an existing Nix flake"
+title = "Bare update selects Nix input updates"
 manual = false
 design = "design/sync.md#invocation-and-update-selection"
 
 [requirements.ears]
 type = "event"
-trigger = "--update is supplied without a list and flake.nix exists"
+trigger = "--update is supplied without a list"
 system = "bloomery sync"
 action = "select Nix input updates"
 
 [[requirements]]
 id = "CLI-SYNC-INTERFACE-010"
-title = "Bare update skips absent Nix flakes"
+title = "Bare update requires a root flake"
 manual = false
 design = "design/sync.md#invocation-and-update-selection"
 
 [requirements.ears]
-type = "event"
-trigger = "--update is supplied without a list and flake.nix is absent"
+type = "unwanted_behavior"
+trigger = "bare --update is requested and the workspace root lacks flake.nix"
 system = "bloomery sync"
-action = "skip Nix updates"
+action = "return the shared flake setup error before update planning or mutation"
 
 [[requirements]]
 id = "CLI-SYNC-INTERFACE-011"
@@ -182,9 +182,9 @@ design = "design/sync.md#invocation-and-update-selection"
 
 [requirements.ears]
 type = "unwanted_behavior"
-trigger = "Nix updates are explicitly selected but flake.nix is absent"
+trigger = "Nix updates are selected and the workspace root lacks flake.nix"
 system = "bloomery sync"
-action = "report an error before mutation"
+action = "return the shared flake setup error before mutation"
 
 [[requirements]]
 id = "CLI-SYNC-INTERFACE-017"

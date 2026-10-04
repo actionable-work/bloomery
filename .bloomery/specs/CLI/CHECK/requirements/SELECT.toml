@@ -139,15 +139,15 @@ action = "identify the selected scope rather than claim a default full-suite res
 
 [[requirements]]
 id = "CLI-CHECK-SELECT-013"
-title = "Default execution supports workspaces without flakes"
+title = "Default check execution requires a flake"
 manual = false
 design = "design/execution.md#check-catalog"
 
 [requirements.ears]
-type = "event"
-trigger = "the workspace has no flake.nix and no selectors are supplied"
+type = "unwanted_behavior"
+trigger = "no check selectors are supplied and the workspace root lacks flake.nix"
 system = "bloomery check"
-action = "select only the static checks"
+action = "return the shared flake setup error before running static checks"
 
 [[requirements]]
 id = "CLI-CHECK-SELECT-014"
@@ -169,9 +169,9 @@ design = "design/execution.md#check-catalog"
 
 [requirements.ears]
 type = "unwanted_behavior"
-trigger = "Nix checks are explicitly selected in a workspace without flake.nix"
+trigger = "Nix checks are explicitly selected and the workspace root lacks flake.nix"
 system = "bloomery check"
-action = "report an error rather than skip the requested checks"
+action = "return the shared flake setup error before discovering Nix checks"
 
 [[requirements]]
 id = "CLI-CHECK-SELECT-016"

@@ -2,14 +2,14 @@ group = "OUTPUT"
 
 [[requirements]]
 id = "CLI-CHECK-OUTPUT-001"
-title = "Summary reports outcome counts"
+title = "Summary reports run outcome counts"
 manual = false
 design = "design/diagnostics.md#bounded-summary"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "bloomery check"
-action = "report aggregate check outcome counts separately from failure-record totals"
+action = "report aggregate selected-check and format:workspace outcome counts separately from failure-record totals"
 
 [[requirements]]
 id = "CLI-CHECK-OUTPUT-002"
@@ -114,14 +114,14 @@ action = "represent equivalent outcomes and continuation data in human and JSON 
 
 [[requirements]]
 id = "CLI-CHECK-OUTPUT-011"
-title = "Success requires all selected checks to pass"
+title = "Success requires formatting and selected checks to pass"
 manual = false
 design = "design/execution.md#exit-and-setup-failures"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "bloomery check"
-action = "return exit code zero only when every selected check passes"
+action = "return exit code zero only when format:workspace and every selected check pass"
 
 [[requirements]]
 id = "CLI-CHECK-OUTPUT-012"

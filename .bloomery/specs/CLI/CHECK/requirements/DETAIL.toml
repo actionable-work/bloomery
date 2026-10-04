@@ -258,7 +258,7 @@ design = "design/details.md#storage-and-identity"
 
 [requirements.ears]
 type = "event"
-trigger = "Git provides working-tree status for the workspace"
+trigger = "Git provides working-tree status after the formatter gate completes or fails"
 system = "bloomery check"
 action = "record whether the workspace has tracked or untracked changes in the retained run"
 

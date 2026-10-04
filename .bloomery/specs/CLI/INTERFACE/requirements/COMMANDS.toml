@@ -87,3 +87,15 @@ design = "design/commands.md"
 type = "ubiquitous"
 system = "bloomery check"
 action = "expose the details subcommand"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-009"
+title = "Commands require a Bloomery flake"
+manual = false
+design = "design/commands.md#flake-presence-preflight"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a command other than init, including parser help, is requested from a current directory without flake.nix"
+system = "the bloomery CLI"
+action = "stop before command handling with a nonzero error instructing the user to set up a Bloomery flake.nix"

@@ -13,15 +13,16 @@ use std::sync::atomic::Ordering;
 #[bloomery("CLI-CHECK-SELECT-001")]
 #[bloomery("CLI-CHECK-SELECT-010")]
 #[bloomery("CLI-CHECK-SELECT-012")]
-#[bloomery("CLI-CHECK-SELECT-013")]
 fn default_and_explicit_selection_choose_static_and_requested_system_catalogs() {
-    let (root, cache) = fixture(false);
+    let (root, cache) = fixture(true);
     let static_backend = FakeNix::default();
     let (status, stdout, _) = invoke(request(), &root, &cache, &static_backend, true);
     assert_eq!(status, std::process::ExitCode::SUCCESS);
     let result: Value = serde_json::from_slice(&stdout).expect("summary JSON");
-    assert_eq!(result["counts"]["passed"], 2);
+    // Two static checks plus the implicit format:workspace gate.
+    assert_eq!(result["counts"]["passed"], 3);
     assert_eq!(static_backend.evaluations.load(Ordering::SeqCst), 0);
+    assert_eq!(static_backend.formatter_runs.load(Ordering::SeqCst), 1);
 
     let (root, cache2) = fixture(true);
     let backend = FakeNix {
@@ -47,6 +48,27 @@ fn default_and_explicit_selection_choose_static_and_requested_system_catalogs() 
 }
 
 #[test]
+#[bloomery("CLI-CHECK-SELECT-013")]
+fn default_check_execution_without_a_flake_returns_the_shared_setup_error() {
+    let (root, cache) = fixture(false);
+    let backend = FakeNix::default();
+    let (status, stdout, _) = invoke(request(), &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::from(2));
+    let error: Value = serde_json::from_slice(&stdout).expect("setup error");
+    assert_eq!(error["error"]["code"], "MissingFlake");
+    assert!(
+        error["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("flake.nix")
+    );
+    assert_eq!(backend.formatter_runs.load(Ordering::SeqCst), 0);
+    assert_eq!(backend.evaluations.load(Ordering::SeqCst), 0);
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
 #[bloomery("CLI-CHECK-SELECT-014")]
 fn execution_selection_rejects_an_empty_catalog() {
     assert_eq!(
@@ -64,8 +86,9 @@ fn explicit_nix_selection_without_a_flake_is_an_error() {
     let backend = FakeNix::default();
     let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::from(2));
-    let error: Value = serde_json::from_slice(&stdout).expect("usage error");
-    assert_eq!(error["error"]["code"], "UsageError");
+    let error: Value = serde_json::from_slice(&stdout).expect("setup error");
+    assert_eq!(error["error"]["code"], "MissingFlake");
+    assert_eq!(backend.formatter_runs.load(Ordering::SeqCst), 0);
     assert_eq!(backend.evaluations.load(Ordering::SeqCst), 0);
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
@@ -109,7 +132,7 @@ fn explicitly_selected_system_with_empty_checks_is_a_valid_static_only_run() {
     );
     assert_eq!(backend.evaluations.load(Ordering::SeqCst), 0);
     let result: Value = serde_json::from_slice(&stdout).expect("summary JSON");
-    assert_eq!(result["counts"]["passed"], 2);
+    assert_eq!(result["counts"]["passed"], 3);
     assert_eq!(result["scope"]["systems"][0], "aarch64-linux");
 
     let _ = fs::remove_dir_all(root);
@@ -146,7 +169,7 @@ fn real_nix_distinguishes_missing_system_outputs_from_empty_check_sets() {
     let (status, stdout, _) = invoke(empty, &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::SUCCESS);
     let result: Value = serde_json::from_slice(&stdout).expect("empty-system summary");
-    assert_eq!(result["counts"]["passed"], 2);
+    assert_eq!(result["counts"]["passed"], 3);
     assert_eq!(result["scope"]["systems"][0], "aarch64-linux");
 
     let _ = fs::remove_dir_all(root);
@@ -189,7 +212,7 @@ fn unmatched_selectors_bad_scopes_and_execution_options_are_usage_errors() {
 #[test]
 #[bloomery("CLI-INTERFACE-FLAGS-009")]
 fn zero_limits_return_a_usage_error_from_the_command_entrypoint() {
-    let (root, cache) = fixture(false);
+    let (root, cache) = fixture(true);
     let mut args = request();
     args.operation = Some(CheckOperation::List(ListArgs {
         selectors: Vec::new(),
@@ -201,6 +224,52 @@ fn zero_limits_return_a_usage_error_from_the_command_entrypoint() {
     assert_eq!(status, std::process::ExitCode::from(2));
     let error: Value = serde_json::from_slice(&stdout).expect("usage error");
     assert_eq!(error["error"]["code"], "UsageError");
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[bloomery("CLI-CHECK-CONTRACT-001")]
+fn check_fails_when_workspace_structure_is_invalid() {
+    let (root, cache) = fixture(true);
+    fs::remove_file(root.join(".bloomery/specs/CLI/CHECK/README.md"))
+        .expect("remove feature README");
+    let mut args = request();
+    args.selectors = vec!["static:*".to_owned()];
+    let backend = FakeNix::default();
+    let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::FAILURE);
+    assert!(
+        String::from_utf8(stdout)
+            .expect("summary")
+            .contains("MissingDocument")
+    );
+    assert_eq!(backend.formatter_runs.load(Ordering::SeqCst), 1);
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[bloomery("CLI-CHECK-CONTRACT-002")]
+fn check_fails_when_automated_traceability_is_invalid() {
+    let (root, cache) = fixture(true);
+    let requirement = root.join(".bloomery/specs/CLI/CHECK/requirements/CONTRACT.toml");
+    let contents = fs::read_to_string(&requirement).expect("fixture requirement");
+    fs::write(
+        &requirement,
+        contents.replace("manual = true", "manual = false"),
+    )
+    .expect("automated requirement without evidence");
+    let mut args = request();
+    args.selectors = vec!["static:*".to_owned()];
+    let backend = FakeNix::default();
+    let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::FAILURE);
+    assert!(
+        String::from_utf8(stdout)
+            .expect("summary")
+            .contains("MissingAutomatedTest")
+    );
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
 }

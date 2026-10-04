@@ -12,7 +12,8 @@ description: |
 # `bloomery review`
 
 Review is a read-only projection of the requirement model for human auditing
-and downstream workflow systems.
+and downstream workflow systems. It requires the shared root `flake.nix`
+preflight like every command, but does not run the check formatter.
 
 ## Design documents
 

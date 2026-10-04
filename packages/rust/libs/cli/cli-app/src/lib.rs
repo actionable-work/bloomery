@@ -4,33 +4,114 @@ use bloomery_cli_parser::{ParseError, ParseErrorKind, parse_from};
 use bloomery_cli_types::{CliCommand, CliInvocation};
 use bloomery_model::{render_diagnostics, sort_diagnostics};
 use serde_json::{Value, json};
+use std::ffi::OsString;
 use std::io::{self, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
 /// Parse and execute the CLI request using the current process environment.
 pub fn run() -> ExitCode {
-    match parse_from(std::env::args_os()) {
-        Ok(invocation) => run_invocation(invocation),
-        Err(error) => report_parse_error(error),
+    let mut stdout = io::stdout().lock();
+    let mut stderr = io::stderr().lock();
+    let root = match std::env::current_dir() {
+        Ok(root) => root,
+        Err(error) => {
+            return report_runtime_error(
+                "bloomery",
+                &error.to_string(),
+                false,
+                &mut stdout,
+                &mut stderr,
+            );
+        }
+    };
+    run_args_at(std::env::args_os(), &root, &mut stdout, &mut stderr)
+}
+
+/// Root-injected entry point shared by the process entry point and tests.
+fn run_args_at<I, T>(
+    arguments: I,
+    root: &Path,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode
+where
+    I: IntoIterator<Item = T>,
+    T: Into<OsString> + Clone,
+{
+    match parse_from(arguments) {
+        Ok(invocation) => run_invocation_at(invocation, root, stdout, stderr),
+        Err(error) => report_parse_error_at(error, root, stdout, stderr),
     }
 }
 
-fn run_invocation(invocation: CliInvocation) -> ExitCode {
+fn run_invocation_at(
+    invocation: CliInvocation,
+    root: &Path,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
     match invocation.command {
-        CliCommand::Check(args) => check_command::run(args, invocation.json_mode),
-        CliCommand::Sync { update } => run_sync(update.as_deref(), invocation.json_mode),
-        command => run_workspace_command(command, invocation.json_mode),
+        CliCommand::Sync { update } => run_sync_at(
+            root,
+            update.as_deref(),
+            invocation.json_mode,
+            stdout,
+            stderr,
+        ),
+        command => run_workspace_command_at(command, invocation.json_mode, root, stdout, stderr),
     }
 }
 
-fn report_parse_error(error: ParseError) -> ExitCode {
+fn flake_present(root: &Path) -> bool {
+    root.join("flake.nix").is_file()
+}
+
+fn command_name(command: &CliCommand) -> Option<&'static str> {
+    match command {
+        CliCommand::Check(_) => Some("check"),
+        CliCommand::Review => Some("review"),
+        CliCommand::Sync { .. } => Some("sync"),
+    }
+}
+
+fn report_missing_flake(
+    command: Option<&str>,
+    json_mode: bool,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
+    if json_mode {
+        if write_json(stdout, &output::flake_setup_error_json(command)).is_err() {
+            let _ = writeln!(stderr, "bloomery: unable to render JSON setup error");
+            return ExitCode::from(1);
+        }
+    } else {
+        let message = format!("error: {}", output::MISSING_FLAKE_MESSAGE);
+        let rendered = output::colorize_error(
+            &message,
+            output::color_enabled(output::Stream::Stderr, false),
+        );
+        let _ = writeln!(stderr, "{rendered}");
+    }
+    ExitCode::from(2)
+}
+
+fn report_parse_error_at(
+    error: ParseError,
+    root: &Path,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
     let exit_code = error.exit_code();
     if matches!(
         error.kind(),
         ParseErrorKind::DisplayHelp | ParseErrorKind::DisplayVersion
     ) {
-        let _ = io::stdout().write_all(error.message().as_bytes());
+        if !flake_present(root) {
+            return report_missing_flake(error.command(), error.json_mode(), stdout, stderr);
+        }
+        let _ = stdout.write_all(error.message().as_bytes());
         return ExitCode::from(exit_code);
     }
 
@@ -38,49 +119,50 @@ fn report_parse_error(error: ParseError) -> ExitCode {
         if error.command() == Some("check") {
             let document =
                 check_command::check_output::error_document("UsageError", error.message());
-            if print_json(&document).is_err() {
-                eprintln!("bloomery: unable to render JSON usage error");
+            if write_json(stdout, &document).is_err() {
+                let _ = writeln!(stderr, "bloomery: unable to render JSON usage error");
                 return ExitCode::from(1);
             }
         } else {
             let document = output::usage_error_json(error.command(), error.message());
-            if print_json(&document).is_err() {
-                eprintln!("bloomery: unable to render JSON usage error");
+            if write_json(stdout, &document).is_err() {
+                let _ = writeln!(stderr, "bloomery: unable to render JSON usage error");
                 return ExitCode::from(1);
             }
         }
     } else {
-        let _ = io::stderr().write_all(error.message().as_bytes());
+        let _ = stderr.write_all(error.message().as_bytes());
     }
     ExitCode::from(exit_code)
 }
 
-fn run_sync(update: Option<&str>, json_mode: bool) -> ExitCode {
+fn run_sync_at(
+    root: &Path,
+    update: Option<&str>,
+    json_mode: bool,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
+    if !flake_present(root) {
+        return report_missing_flake(Some("sync"), json_mode, stdout, stderr);
+    }
     let selection = match bloomery_sync::parse_cli_update(update) {
         Ok(selection) => selection,
         Err(error) => {
             if json_mode {
                 let document = output::usage_error_json(Some("sync"), &error.to_string());
-                if print_json(&document).is_err() {
-                    eprintln!("bloomery: unable to render JSON usage error");
+                if write_json(stdout, &document).is_err() {
+                    let _ = writeln!(stderr, "bloomery: unable to render JSON usage error");
                     return ExitCode::from(1);
                 }
             } else {
-                eprintln!(
-                    "{}",
-                    output::colorize_error(
-                        &format!("error: {error}\nUsage: bloomery sync [--update[=nix,rust]]"),
-                        output::color_enabled(output::Stream::Stderr, false)
-                    )
+                let rendered = output::colorize_error(
+                    &format!("error: {error}\nUsage: bloomery sync [--update[=nix,rust]]"),
+                    output::color_enabled(output::Stream::Stderr, false),
                 );
+                let _ = writeln!(stderr, "{rendered}");
             }
             return ExitCode::from(error.exit_code());
-        }
-    };
-    let root = match std::env::current_dir() {
-        Ok(root) => root,
-        Err(error) => {
-            return report_runtime_error("sync", &error.to_string(), json_mode);
         }
     };
 
@@ -89,15 +171,15 @@ fn run_sync(update: Option<&str>, json_mode: bool) -> ExitCode {
         let mut progress = Vec::new();
         let mut diagnostics = Vec::new();
         return match bloomery_sync::run(
-            &root,
+            root,
             &selection,
             &mut runner,
             &mut progress,
             &mut diagnostics,
         ) {
             Ok(report) => {
-                if print_json(&output::sync_success_json(&report)).is_err() {
-                    eprintln!("bloomery: unable to render JSON sync result");
+                if write_json(stdout, &output::sync_success_json(&report)).is_err() {
+                    let _ = writeln!(stderr, "bloomery: unable to render JSON sync result");
                     ExitCode::from(1)
                 } else {
                     ExitCode::SUCCESS
@@ -112,8 +194,8 @@ fn run_sync(update: Option<&str>, json_mode: bool) -> ExitCode {
                     error.may_be_partially_synchronized(),
                     &String::from_utf8_lossy(&diagnostics),
                 );
-                if print_json(&document).is_err() {
-                    eprintln!("bloomery: unable to render JSON sync error");
+                if write_json(stdout, &document).is_err() {
+                    let _ = writeln!(stderr, "bloomery: unable to render JSON sync error");
                     ExitCode::from(1)
                 } else {
                     ExitCode::from(exit_code)
@@ -122,23 +204,31 @@ fn run_sync(update: Option<&str>, json_mode: bool) -> ExitCode {
         };
     }
 
-    let mut stdout = output::ColorWriter::stdout(
-        io::stdout().lock(),
-        output::color_enabled(output::Stream::Stdout, false),
-    );
-    let mut stderr = output::ColorWriter::stderr(
-        io::stderr().lock(),
-        output::color_enabled(output::Stream::Stderr, false),
-    );
-    let result = bloomery_sync::run(&root, &selection, &mut runner, &mut stdout, &mut stderr);
-    let _ = stdout.flush();
-    let _ = stderr.flush();
-    drop(stdout);
-    drop(stderr);
+    let result = {
+        let mut stdout_writer = output::ColorWriter::stdout(
+            &mut *stdout,
+            output::color_enabled(output::Stream::Stdout, false),
+        );
+        let mut stderr_writer = output::ColorWriter::stderr(
+            &mut *stderr,
+            output::color_enabled(output::Stream::Stderr, false),
+        );
+        let result = bloomery_sync::run(
+            root,
+            &selection,
+            &mut runner,
+            &mut stdout_writer,
+            &mut stderr_writer,
+        );
+        let _ = stdout_writer.flush();
+        let _ = stderr_writer.flush();
+        result
+    };
     match result {
         Ok(_) => ExitCode::SUCCESS,
         Err(error) => {
-            eprintln!(
+            let _ = writeln!(
+                stderr,
                 "{}",
                 output::colorize_error(
                     &format!("error: {error}"),
@@ -150,30 +240,6 @@ fn run_sync(update: Option<&str>, json_mode: bool) -> ExitCode {
     }
 }
 
-fn run_workspace_command(command: CliCommand, json_mode: bool) -> ExitCode {
-    let mut stdout = io::stdout().lock();
-    let mut stderr = io::stderr().lock();
-    run_workspace_command_from_current_dir(command, json_mode, &mut stdout, &mut stderr)
-}
-
-fn run_workspace_command_from_current_dir(
-    command: CliCommand,
-    json_mode: bool,
-    stdout: &mut impl Write,
-    stderr: &mut impl Write,
-) -> ExitCode {
-    let name = match &command {
-        CliCommand::Check(_) => "check",
-        CliCommand::Review => "review",
-        CliCommand::Sync { .. } => unreachable!("sync is dispatched before workspace loading"),
-    };
-    let root = match std::env::current_dir() {
-        Ok(root) => root,
-        Err(error) => return report_runtime_error(name, &error.to_string(), json_mode),
-    };
-    run_workspace_command_at(command, json_mode, &root, stdout, stderr)
-}
-
 fn run_workspace_command_at(
     command: CliCommand,
     json_mode: bool,
@@ -181,20 +247,45 @@ fn run_workspace_command_at(
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> ExitCode {
-    let command = match command {
-        CliCommand::Check(args) => {
-            return check_command::run_at(args, json_mode, root, stdout, stderr);
-        }
-        CliCommand::Review => CliCommand::Review,
+    if !flake_present(root) {
+        return report_missing_flake(command_name(&command), json_mode, stdout, stderr);
+    }
+    match command {
+        CliCommand::Check(args) => check_command::run_at(args, json_mode, root, stdout, stderr),
+        CliCommand::Review => run_review_at(root, json_mode, stdout, stderr),
         CliCommand::Sync { .. } => unreachable!("sync is dispatched before workspace loading"),
+    }
+}
+
+#[cfg(test)]
+fn run_workspace_command_from_current_dir(
+    command: CliCommand,
+    json_mode: bool,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
+    let name = command_name(&command).unwrap_or("bloomery");
+    let root = match std::env::current_dir() {
+        Ok(root) => root,
+        Err(error) => {
+            return report_runtime_error(name, &error.to_string(), json_mode, stdout, stderr);
+        }
     };
-    let name = "review";
+    run_workspace_command_at(command, json_mode, &root, stdout, stderr)
+}
+
+fn run_review_at(
+    root: &Path,
+    json_mode: bool,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
     let context = match bloomery_workspace::load(root) {
         Ok(context) => context,
         Err(mut diagnostics) => {
             sort_diagnostics(&mut diagnostics);
             if json_mode {
-                let document = output::diagnostics_json(name, "failed", root, &diagnostics);
+                let document = output::diagnostics_json("review", "failed", root, &diagnostics);
                 if write_json(stdout, &document).is_err() {
                     let _ = writeln!(stderr, "bloomery: unable to render JSON diagnostics");
                     return ExitCode::from(1);
@@ -211,56 +302,31 @@ fn run_workspace_command_at(
         }
     };
 
-    match command {
-        CliCommand::Review => {
-            let items = bloomery_review::items(&context);
-            if json_mode {
-                match serde_json::to_value(&items) {
-                    Ok(document) => {
-                        if write_json(stdout, &document).is_err() {
-                            let _ =
-                                writeln!(stderr, "bloomery: unable to render JSON review catalog");
-                            ExitCode::from(1)
-                        } else {
-                            ExitCode::SUCCESS
-                        }
-                    }
-                    Err(error) => {
-                        let document = output::usage_error_json(Some("review"), &error.to_string());
-                        let _ = write_json(stdout, &document);
-                        ExitCode::from(1)
-                    }
+    let items = bloomery_review::items(&context);
+    if json_mode {
+        match serde_json::to_value(&items) {
+            Ok(document) => {
+                if write_json(stdout, &document).is_err() {
+                    let _ = writeln!(stderr, "bloomery: unable to render JSON review catalog");
+                    ExitCode::from(1)
+                } else {
+                    ExitCode::SUCCESS
                 }
-            } else {
-                let rendered = bloomery_review::render_text(&items);
-                let rendered = output::colorize_review(
-                    &rendered,
-                    output::color_enabled(output::Stream::Stdout, false),
-                );
-                let _ = stdout.write_all(rendered.as_bytes());
-                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                let document = output::usage_error_json(Some("review"), &error.to_string());
+                let _ = write_json(stdout, &document);
+                ExitCode::from(1)
             }
         }
-        CliCommand::Check(_) | CliCommand::Sync { .. } => {
-            unreachable!("non-review command was dispatched before workspace loading")
-        }
-    }
-}
-
-#[cfg(test)]
-fn run_workspace_command_at_with_check_cache(
-    command: CliCommand,
-    json_mode: bool,
-    root: &Path,
-    cache_base: &Path,
-    stdout: &mut impl Write,
-    stderr: &mut impl Write,
-) -> ExitCode {
-    match command {
-        CliCommand::Check(args) => {
-            check_command::run_at_with_cache(args, json_mode, root, cache_base, stdout, stderr)
-        }
-        command => run_workspace_command_at(command, json_mode, root, stdout, stderr),
+    } else {
+        let rendered = bloomery_review::render_text(&items);
+        let rendered = output::colorize_review(
+            &rendered,
+            output::color_enabled(output::Stream::Stdout, false),
+        );
+        let _ = stdout.write_all(rendered.as_bytes());
+        ExitCode::SUCCESS
     }
 }
 
@@ -269,19 +335,26 @@ fn write_json(writer: &mut impl Write, value: &Value) -> io::Result<()> {
     writer.write_all(b"\n")
 }
 
-fn report_runtime_error(command: &str, message: &str, json_mode: bool) -> ExitCode {
+fn report_runtime_error(
+    command: &str,
+    message: &str,
+    json_mode: bool,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
     if json_mode {
         let document = json!({
             "command": command,
             "status": "failed",
             "error": { "kind": "runtime", "message": message },
         });
-        if print_json(&document).is_err() {
-            eprintln!("bloomery: unable to render JSON error");
+        if write_json(stdout, &document).is_err() {
+            let _ = writeln!(stderr, "bloomery: unable to render JSON error");
             return ExitCode::from(1);
         }
     } else {
-        eprintln!(
+        let _ = writeln!(
+            stderr,
             "{}",
             output::colorize_error(
                 &format!("error: bloomery: {message}"),
@@ -292,17 +365,9 @@ fn report_runtime_error(command: &str, message: &str, json_mode: bool) -> ExitCo
     ExitCode::from(1)
 }
 
-fn print_json(value: &Value) -> Result<(), serde_json::Error> {
-    println!("{}", serde_json::to_string_pretty(value)?);
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{
-        check_command, run_workspace_command_at, run_workspace_command_at_with_check_cache,
-        run_workspace_command_from_current_dir,
-    };
+    use super::{run_args_at, run_workspace_command_at, run_workspace_command_from_current_dir};
     use bloomery_cli_parser::{ParseError, ParseErrorKind as ErrorKind, parse_from};
     use bloomery_cli_types::CliCommand as Command;
     use bloomery_test_macros::bloomery;
@@ -423,6 +488,7 @@ mod tests {
         let feature = area.join("CHECK");
         fs::create_dir_all(feature.join("design")).expect("design directory");
         fs::create_dir_all(feature.join("requirements")).expect("requirements directory");
+        fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
         fs::write(
             area.join("README.md"),
             "---\nid: CLI\nname: CLI\ntagline: CLI\ndescription: Area\n---\n# CLI\n",
@@ -539,6 +605,7 @@ mod tests {
         let _lock = CURRENT_DIR_LOCK.lock().expect("working-directory lock");
         let root = fixture_root("cwd");
         fs::create_dir_all(&root).expect("workspace root");
+        fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
         let previous = std::env::current_dir().expect("original working directory");
         std::env::set_current_dir(&root).expect("set working directory");
         let mut stdout = Vec::new();
@@ -557,6 +624,99 @@ mod tests {
                 .expect("diagnostics")
                 .contains("MissingSpecsDirectory")
         );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[bloomery("CLI-INTERFACE-COMMANDS-009")]
+    fn every_command_and_help_requires_a_root_flake_before_working() {
+        let command_argvs: &[&[&str]] = &[
+            &["bloomery", "check"],
+            &["bloomery", "check", "list"],
+            &["bloomery", "check", "failures"],
+            &["bloomery", "check", "details", "f1"],
+            &["bloomery", "review"],
+            &["bloomery", "sync"],
+            &["bloomery", "help"],
+            &["bloomery", "help", "check"],
+            &["bloomery", "--help"],
+        ];
+        for arguments in command_argvs {
+            let root = fixture_root("preflight");
+            fs::create_dir_all(&root).expect("workspace root");
+            let mut stdout = Vec::new();
+            let mut stderr = Vec::new();
+            let status = run_args_at(arguments.iter().copied(), &root, &mut stdout, &mut stderr);
+            assert_eq!(status, ExitCode::from(2), "arguments: {arguments:?}");
+            let text = String::from_utf8_lossy(&stderr);
+            assert!(
+                text.contains("flake.nix"),
+                "arguments: {arguments:?}, stderr: {text:?}"
+            );
+            assert!(stdout.is_empty(), "arguments: {arguments:?}");
+            // The shared preflight stops before any cache, spec, or lock side effect.
+            assert!(!root.join(".bloomery").exists());
+            assert!(!root.join("Cargo.lock").exists());
+            assert!(!root.join("bloomery.lock").exists());
+            let _ = fs::remove_dir_all(root);
+        }
+    }
+
+    #[test]
+    #[bloomery("CLI-INTERFACE-OUTPUT-008")]
+    fn missing_flake_errors_honor_json_mode() {
+        let commands: &[&[&str]] = &[
+            &["bloomery", "check", "--json"],
+            &["bloomery", "check", "list", "--json"],
+            &["bloomery", "review", "--json"],
+            &["bloomery", "sync", "--json"],
+            &["bloomery", "--help", "--json"],
+        ];
+        for arguments in commands {
+            let root = fixture_root("preflight-json");
+            fs::create_dir_all(&root).expect("workspace root");
+            let mut stdout = Vec::new();
+            let mut stderr = Vec::new();
+            let status = run_args_at(arguments.iter().copied(), &root, &mut stdout, &mut stderr);
+            assert_eq!(status, ExitCode::from(2), "arguments: {arguments:?}");
+            assert!(stderr.is_empty(), "arguments: {arguments:?}");
+            let document: Value = serde_json::from_slice(&stdout).expect("JSON setup error");
+            assert_eq!(document["status"], "error");
+            assert_eq!(document["error"]["code"], "MissingFlake");
+            assert!(
+                document["error"]["message"]
+                    .as_str()
+                    .unwrap()
+                    .contains("flake.nix")
+            );
+            let _ = fs::remove_dir_all(root);
+        }
+    }
+
+    #[test]
+    #[bloomery("CLI-INTERFACE-COMMANDS-009")]
+    fn a_present_root_flake_allows_command_dispatch() {
+        let root = fixture_root("present-flake");
+        fs::create_dir_all(&root).expect("workspace root");
+        fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
+
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_args_at(["bloomery", "--help"], &root, &mut stdout, &mut stderr);
+        assert_eq!(status, ExitCode::SUCCESS);
+        assert!(String::from_utf8_lossy(&stdout).contains("Usage: bloomery"));
+
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_args_at(["bloomery", "review"], &root, &mut stdout, &mut stderr);
+        assert_eq!(status, ExitCode::FAILURE);
+        assert!(String::from_utf8_lossy(&stderr).contains("MissingSpecsDirectory"));
+
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_args_at(["bloomery", "sync"], &root, &mut stdout, &mut stderr);
+        assert_eq!(status, ExitCode::from(1));
+        assert!(String::from_utf8_lossy(&stderr).contains("Cargo.toml"));
         let _ = fs::remove_dir_all(root);
     }
 
@@ -674,62 +834,6 @@ mod tests {
                 assert_eq!(error.exit_code(), 0);
             }
         }
-    }
-
-    #[test]
-    #[bloomery("CLI-CHECK-CONTRACT-001")]
-    fn check_fails_when_workspace_structure_is_invalid() {
-        let root = fixture_workspace("CLI-CHECK-CONTRACT-001", true);
-        let cache = fixture_root("cache");
-        fs::create_dir_all(&cache).expect("cache base");
-        fs::remove_file(root.join(".bloomery/specs/CLI/CHECK/README.md"))
-            .expect("remove feature README");
-        let mut stdout = Vec::new();
-        let mut stderr = Vec::new();
-        let status = run_workspace_command_at_with_check_cache(
-            Command::Check(check_command::CheckArgs::default()),
-            false,
-            &root,
-            &cache,
-            &mut stdout,
-            &mut stderr,
-        );
-
-        assert_eq!(status, ExitCode::FAILURE);
-        assert!(
-            String::from_utf8(stdout)
-                .expect("summary")
-                .contains("MissingDocument")
-        );
-        let _ = fs::remove_dir_all(root);
-        let _ = fs::remove_dir_all(cache);
-    }
-
-    #[test]
-    #[bloomery("CLI-CHECK-CONTRACT-002")]
-    fn check_fails_when_automated_traceability_is_invalid() {
-        let root = fixture_workspace("CLI-CHECK-CONTRACT-002", false);
-        let cache = fixture_root("cache");
-        fs::create_dir_all(&cache).expect("cache base");
-        let mut stdout = Vec::new();
-        let mut stderr = Vec::new();
-        let status = run_workspace_command_at_with_check_cache(
-            Command::Check(check_command::CheckArgs::default()),
-            false,
-            &root,
-            &cache,
-            &mut stdout,
-            &mut stderr,
-        );
-
-        assert_eq!(status, ExitCode::FAILURE);
-        assert!(
-            String::from_utf8(stdout)
-                .expect("summary")
-                .contains("MissingAutomatedTest")
-        );
-        let _ = fs::remove_dir_all(root);
-        let _ = fs::remove_dir_all(cache);
     }
 
     #[test]

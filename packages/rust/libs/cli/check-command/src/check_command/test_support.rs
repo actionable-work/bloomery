@@ -35,6 +35,20 @@ pub(super) struct FakeNix {
     /// Derivation events emitted for every realization request. Tests use this
     /// to exercise progress wiring without a real Nix daemon.
     pub(super) scripted_events: Mutex<Vec<DerivationEvent>>,
+    /// Ordered record of formatter and realization activity so tests can assert
+    /// that the formatter gate precedes every selected check.
+    pub(super) events: Mutex<Vec<String>>,
+    /// Number of times the formatter gate ran.
+    pub(super) formatter_runs: AtomicUsize,
+    /// Optional formatter result; defaults to success.
+    pub(super) formatter_result: Option<NixTaskResult<()>>,
+    /// Optional formatter log contents.
+    pub(super) formatter_log_contents: Option<Vec<u8>>,
+    /// Files the fake formatter writes relative to the workspace root. Applied
+    /// regardless of the result so partial edits can be tested.
+    pub(super) formatter_edits: Vec<(String, Vec<u8>)>,
+    /// Files the fake formatter removes relative to the workspace root.
+    pub(super) formatter_removals: Vec<String>,
     /// Events emitted only when the realized attribute matches the key.
     pub(super) events_by_attribute: Mutex<BTreeMap<String, Vec<DerivationEvent>>>,
     /// When set, realize_check blocks until the test releases this barrier so a
@@ -61,6 +75,33 @@ impl NixBackend for FakeNix {
         Ok(self.names.clone())
     }
 
+    fn format_workspace(
+        &self,
+        root: &Path,
+        log_path: &Path,
+        _cancellation: CancellationToken,
+    ) -> NixTaskResult<()> {
+        self.formatter_runs.fetch_add(1, Ordering::SeqCst);
+        self.events
+            .lock()
+            .expect("event lock")
+            .push("format".to_owned());
+        let contents = self
+            .formatter_log_contents
+            .clone()
+            .unwrap_or_else(|| b"formatter output\n".to_vec());
+        fs::write(log_path, contents).expect("formatter log");
+        for (path, contents) in &self.formatter_edits {
+            fs::write(root.join(path), contents).expect("formatter edit");
+        }
+        for path in &self.formatter_removals {
+            let _ = fs::remove_file(root.join(path));
+        }
+        self.formatter_result
+            .clone()
+            .unwrap_or(NixTaskResult::Succeeded(()))
+    }
+
     fn realize_check(
         &self,
         _root: &Path,
@@ -72,6 +113,10 @@ impl NixBackend for FakeNix {
     ) -> NixTaskResult<()> {
         self.evaluations.fetch_add(1, Ordering::SeqCst);
         self.build_commands.fetch_add(1, Ordering::SeqCst);
+        self.events
+            .lock()
+            .expect("event lock")
+            .push(format!("realize:{attribute}"));
         if cancellation.is_canceled() {
             return NixTaskResult::Canceled;
         }

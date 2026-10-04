@@ -18,9 +18,11 @@ Preserve the existing diagnostic semantics and repository-relative locations:
 | `ParseError` | Configuration, Markdown, TOML, source, or Nix input is invalid. |
 
 Runner failures retain captured Nix check invocation output and the referenced
-store path as seekable task details. `check details` resolves a retained Nix
-store path on demand and includes the derivation log in its detail stream.
-Setup/discovery errors are operational failures, not fabricated test cases.
+store path as seekable task details. A formatter failure is recorded under
+`format:workspace` with its captured `nix fmt` output. The
+`check details` command resolves a retained Nix store path on demand and includes
+the derivation log in its detail stream. Setup/discovery errors are operational
+failures, not fabricated test cases.
 Diagnostics do not cause automatic repairs. Preserve complete structured
 messages, locations, and notes in the run store; default output is a summary,
 not the complete compiler-style rendering.
@@ -51,9 +53,10 @@ run r42 · details: bloomery check details f2 --run r42
 built 12 · cached 4 · total 18
 ```
 
-Report check outcome counts separately from the total number of failure records:
-one static check may produce many diagnostics. Omitted failures have a count
-and continuation offset; `check failures` retrieves subsequent pages. Notices
+Report run outcome counts, including the implicit `format:workspace` outcome,
+separately from the total number of failure records: one static check
+may produce many diagnostics. Omitted failures have a count and continuation
+offset; `check failures` retrieves subsequent pages. Notices
 (such as legacy integration exclusions) are bounded too and cannot silently
 consume the failure page. Details are described in [retained runs](details.md).
 

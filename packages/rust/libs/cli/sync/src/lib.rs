@@ -23,6 +23,11 @@ use std::fmt;
 use std::io::Write;
 use std::path::Path;
 
+/// Shared message for the root-flake preflight required by every command. Kept
+/// in sync with the CLI output layer so direct library callers see the same
+/// guidance as the CLI boundary.
+pub const MISSING_FLAKE_MESSAGE: &str = "A Bloomery flake.nix is required; set up a Bloomery flake.nix in the current directory before running this command.";
+
 #[derive(Debug)]
 pub struct SyncError {
     stage: String,
@@ -292,11 +297,7 @@ pub fn run(
             .into_iter()
             .map(str::to_owned)
             .collect(),
-        skipped_updates: if plan.skip_nix {
-            vec!["nix".to_owned()]
-        } else {
-            Vec::new()
-        },
+        skipped_updates: Vec::new(),
         completed_stages: state.completed.clone(),
         warnings: advisories.warnings,
         recommendations: advisories.recommendations,
@@ -321,6 +322,9 @@ fn preflight(
             ),
         ));
     }
+    if !root.join("flake.nix").is_file() {
+        return Err(SyncError::new("preflight", MISSING_FLAKE_MESSAGE));
+    }
 
     let loaded_config = load_with_raw(root).map_err(|diagnostic| {
         SyncError::new(
@@ -328,9 +332,7 @@ fn preflight(
             format_diagnostic(root, &diagnostic),
         )
     })?;
-    let has_flake = root.join("flake.nix").is_file();
-    let plan = UpdatePlan::new(selection, has_flake)
-        .map_err(|error| SyncError::new("preflight", error.to_string()))?;
+    let plan = UpdatePlan::new(selection);
 
     if !runner.is_available("cargo") {
         return Err(SyncError::new(
@@ -492,13 +494,6 @@ fn write_completion(
         "Successfully synchronized {lock_summary}; updated ecosystems: {updates}."
     )
     .map_err(|error| state.failure("completion output", error.to_string()))?;
-    if plan.skip_nix {
-        writeln!(
-            stdout,
-            "Skipped Nix input updates because flake.nix is absent."
-        )
-        .map_err(|error| state.failure("completion output", error.to_string()))?;
-    }
     Ok(())
 }
 
@@ -535,6 +530,7 @@ mod tests {
                 "[package]\nname = \"sync-fixture\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
             )
             .expect("manifest");
+            fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
             Self { root }
         }
 
@@ -896,6 +892,7 @@ mod tests {
     #[bloomery("CLI-SYNC-INTERFACE-016")]
     fn explicit_nix_selection_without_a_flake_fails_before_any_command() {
         let fixture = Fixture::new();
+        fs::remove_file(fixture.root.join("flake.nix")).expect("remove flake");
         let selection = parse_update_list("nix").expect("Nix selection");
         let mut runner = FakeRunner::default();
 
@@ -903,9 +900,27 @@ mod tests {
             .0
             .expect_err("missing flake should be rejected");
         assert_eq!(error.stage(), "preflight");
-        assert!(error.to_string().contains("flake.nix is absent"));
+        assert!(error.to_string().contains("flake.nix"));
         assert!(runner.calls.is_empty());
         assert!(!fixture.root.join("Cargo.lock").exists());
+    }
+
+    #[test]
+    #[bloomery("CLI-SYNC-LOCKS-040")]
+    #[bloomery("CLI-SYNC-INTERFACE-010")]
+    fn missing_root_flake_blocks_sync_before_lock_operations() {
+        let fixture = Fixture::new();
+        fs::remove_file(fixture.root.join("flake.nix")).expect("remove flake");
+        let mut runner = FakeRunner::default();
+
+        let (result, stdout, _stderr) = run_fixture(&fixture, &UpdateSelection::All, &mut runner);
+        let error = result.expect_err("missing flake should fail");
+        assert_eq!(error.stage(), "preflight");
+        assert!(error.to_string().contains("flake.nix"));
+        assert!(runner.calls.is_empty());
+        assert!(!fixture.root.join("Cargo.lock").exists());
+        assert!(!fixture.root.join("bloomery.lock").exists());
+        assert!(!stdout.contains("Successfully synchronized"));
     }
 
     #[test]
@@ -1039,8 +1054,8 @@ mod tests {
     #[test]
     #[bloomery("CLI-SYNC-LOCKS-038")]
     #[bloomery("CLI-SYNC-LOCKS-039")]
-    #[bloomery("CLI-SYNC-LOCKS-040")]
-    fn successful_summary_reports_reconciled_locks_selected_updates_and_nix_skips() {
+    #[bloomery("CLI-SYNC-INTERFACE-009")]
+    fn successful_summary_reports_reconciled_locks_and_selected_updates() {
         let fixture = Fixture::new();
         fixture.write_config(
             "[scanners.rust]\nenabled = false\n\
@@ -1049,11 +1064,13 @@ mod tests {
         );
         let mut runner = FakeRunner::default();
         let (result, stdout, _stderr) = run_fixture(&fixture, &UpdateSelection::All, &mut runner);
-        result.expect("bare update should work without a flake");
-        assert!(stdout.contains("Cargo.lock and bloomery.lock"));
-        assert!(stdout.contains("updated ecosystems: rust"));
-        assert!(stdout.contains("Skipped Nix input updates because flake.nix is absent"));
-        assert_eq!(runner.calls[0].arguments[0], "update");
+        result.expect("bare update should select both ecosystems");
+        assert!(stdout.contains("Cargo.lock, bloomery.lock, and flake.lock"));
+        assert!(stdout.contains("updated ecosystems: nix, rust"));
+        assert!(!stdout.contains("Skipped"));
+        assert_eq!(runner.calls[0].executable, "nix");
+        assert_eq!(runner.calls[0].arguments, ["flake", "update"]);
+        assert!(fixture.root.join("flake.lock").exists());
     }
 
     #[test]

@@ -32,7 +32,7 @@ design = "design/sync.md#execution-pipeline"
 
 [requirements.ears]
 type = "event"
-trigger = "Nix updates are selected and flake.nix exists"
+trigger = "Nix updates are selected"
 system = "bloomery sync"
 action = "invoke nix flake update in the workspace root"
 
@@ -455,15 +455,15 @@ action = "summarize selected update ecosystems on stdout"
 
 [[requirements]]
 id = "CLI-SYNC-LOCKS-040"
-title = "Completion reports absent-flake skips"
+title = "Missing flake blocks sync completion"
 manual = false
-design = "design/sync.md#failures-and-output"
+design = "design/sync.md#execution-pipeline"
 
 [requirements.ears]
-type = "event"
-trigger = "bare --update succeeds without flake.nix"
+type = "unwanted_behavior"
+trigger = "bloomery sync is requested without root flake.nix"
 system = "bloomery sync"
-action = "report the skipped Nix update on stdout"
+action = "stop before lock operations and omit the completion summary"
 
 [[requirements]]
 id = "CLI-SYNC-LOCKS-041"

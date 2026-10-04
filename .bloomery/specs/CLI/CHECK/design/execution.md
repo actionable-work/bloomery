@@ -10,15 +10,42 @@
 
 Preserve the existing static validations; these IDs group the existing passes,
 not new independent validation semantics. Static structure is a prerequisite
-of traceability. Nix discovery and execution do not depend on specification
-validity. Failures in either pipeline do not suppress the other in default mode.
+of traceability. The shared CLI preflight requires a root `flake.nix` before any
+check operation. Nix catalog discovery is setup and does not depend on
+specification validity. The formatter gate runs before selected check tasks; a
+failure prevents static validation and Nix check realization. After it passes,
+failures in either pipeline do not suppress the other in default mode.
 
 With no selectors, run both static checks and every check attribute for the
 host Nix system. Include generated Rust tests, clippy, documentation, doctests,
 package builds, lock validation, formatter checks, and integration-flake checks
 when present in that output. Do not implicitly build packages outside checks
-or select other architectures. A workspace without `flake.nix` defaults to
-static checks only; explicit Nix selection in that workspace is an error.
+or select other architectures. Every check command requires the shared flake
+preflight, including static-only and read-only selections.
+
+## Formatting gate
+
+For each valid `bloomery check` execution, run `nix fmt` once from the workspace
+root after selection validation and run-store allocation, but before admitting
+any selected check. The gate runs for full and partial selections, including
+selections containing only static checks. It is not a catalog entry and cannot
+be selected; `check list`, `check failures`, and `check details` require the
+shared flake preflight but do not run the formatter.
+
+Record the gate as the implicit `format:workspace` outcome. Capture its output
+in the run store without streaming it to normal output. A successful formatter
+outcome is passed, and selected checks run against the resulting workspace.
+Keep formatter edits in the working tree, including edits made before a
+formatting failure; do not roll them back.
+
+A non-zero `nix fmt` exit is a formatter check failure, not an operational
+failure. Record `format:workspace` as failed with a `NixFormatFailed` failure
+record, mark every selected check `not_run`, and finalize the run as failed with
+exit code 1. Publish those final outcomes to progress. This is unconditional
+fail-fast: no selected check starts, regardless of `--fail-fast`. Failure to
+start Nix or retain the formatter log is an operational error with exit code 2;
+leave the formatter and selected checks not_run and retain the partial run.
+User interruption retains the usual interrupted status and exit code.
 
 ## Selection
 
@@ -46,19 +73,20 @@ with valid empty check sets are distinct from missing system outputs.
 
 ## Scheduler
 
-Run independent static and Nix tasks concurrently. Admit traceability as soon
-as structure passes and a task slot is available, ahead of queued independent
-work; do not wait for Nix completion. All tasks share admission and cancellation.
-`--jobs N` is a positive
-integer, defaulting to the available logical CPU count, with a minimum of one.
-The limit applies to Bloomery-owned active check tasks, not discovery processes
-or all builders and dependencies inside the Nix daemon. Do not override users'
-Nix builder configuration to imply a global process bound.
+After the formatter gate passes, run independent static and Nix tasks
+concurrently. Admit traceability as soon as structure passes and a task slot is
+available, ahead of queued independent work; do not wait for Nix completion.
+All tasks share admission and cancellation. `--jobs N` is positive, defaults to
+the available logical CPU count, and has a minimum of one. The limit applies to
+Bloomery-owned active check tasks, not the serial formatter preflight, discovery
+processes, or all builders and dependencies inside the Nix daemon. Do not override
+users' Nix builder configuration to imply a global process bound.
 
-Track each selected check as passed, failed, blocked, canceled, or not_run.
-Queued/running are intermediate states. Publish final-outcome transitions during
-execution to the [progress aggregator](progress.md#check-metrics); provisional
-not_run records do not mark queued work complete. Default execution attempts every
+Track each selected check and `format:workspace` as passed, failed, blocked,
+canceled, or not_run. Queued/running are intermediate states.
+Publish final-outcome transitions during execution to the
+[progress aggregator](progress.md#check-metrics); provisional not_run records do
+not mark queued work complete. Default execution attempts every
 selected check whose prerequisites permit execution; independent work continues
 after validation, evaluation, or build failures. A failed prerequisite leaves
 its dependents blocked with a link to the causal failure, not extra duplicate
@@ -76,8 +104,8 @@ must not depend on completion order.
 
 | Code | Meaning |
 | --- | --- |
-| `0` | Every selected check passed |
-| `1` | Selected check failed, or failure prevented completion |
+| `0` | The formatter gate and every selected check passed |
+| `1` | The formatter gate or a selected check failed, or failure prevented completion |
 | `2` | Invalid invocation, unavailable required tool, discovery/setup or cache failure |
 | `130` | User interruption |
 
@@ -92,4 +120,5 @@ execution begins. See [Nix orchestration](workspace-check.md) and
 
 The default full run is the readiness gate. Label any filtered or explicitly
 system-selected run with its selection; successful subsets must not claim that
-the default workspace suite passed.
+the default workspace suite passed. A run succeeds only when its formatter gate
+and every selected check pass.

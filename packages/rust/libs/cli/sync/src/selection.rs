@@ -99,35 +99,23 @@ pub fn parse_update_list(list: &str) -> Result<UpdateSelection, UsageError> {
 pub struct UpdatePlan {
     pub update_nix: bool,
     pub update_rust: bool,
-    pub skip_nix: bool,
 }
 
 impl UpdatePlan {
-    pub fn new(selection: &UpdateSelection, has_flake: bool) -> Result<Self, UsageError> {
+    pub fn new(selection: &UpdateSelection) -> Self {
         match selection {
-            UpdateSelection::None => Ok(Self {
+            UpdateSelection::None => Self {
                 update_nix: false,
                 update_rust: false,
-                skip_nix: false,
-            }),
-            UpdateSelection::All => Ok(Self {
-                update_nix: has_flake,
+            },
+            UpdateSelection::All => Self {
+                update_nix: true,
                 update_rust: true,
-                skip_nix: !has_flake,
-            }),
-            UpdateSelection::Only(ecosystems) => {
-                let update_nix = ecosystems.contains(&Ecosystem::Nix);
-                if update_nix && !has_flake {
-                    return Err(UsageError::new(
-                        "Nix updates were selected, but flake.nix is absent from the workspace root",
-                    ));
-                }
-                Ok(Self {
-                    update_nix,
-                    update_rust: ecosystems.contains(&Ecosystem::Rust),
-                    skip_nix: false,
-                })
-            }
+            },
+            UpdateSelection::Only(ecosystems) => Self {
+                update_nix: ecosystems.contains(&Ecosystem::Nix),
+                update_rust: ecosystems.contains(&Ecosystem::Rust),
+            },
         }
     }
 
@@ -178,12 +166,7 @@ mod tests {
         let forward = parse_update_list("rust,nix,rust").expect("forward list");
         let reverse = parse_update_list("nix,rust").expect("reverse list");
         assert_eq!(forward, reverse);
-        assert_eq!(
-            UpdatePlan::new(&forward, true)
-                .expect("flake-backed selection")
-                .selected_names(),
-            ["nix", "rust"]
-        );
+        assert_eq!(UpdatePlan::new(&forward).selected_names(), ["nix", "rust"]);
     }
 
     #[test]
@@ -191,24 +174,17 @@ mod tests {
     #[bloomery("CLI-SYNC-INTERFACE-007")]
     #[bloomery("CLI-SYNC-INTERFACE-008")]
     #[bloomery("CLI-SYNC-INTERFACE-009")]
-    #[bloomery("CLI-SYNC-INTERFACE-010")]
     fn update_plans_restrict_explicit_updates_and_expand_bare_updates() {
-        let reconcile = UpdatePlan::new(&UpdateSelection::None, true).expect("reconcile");
+        let reconcile = UpdatePlan::new(&UpdateSelection::None);
         assert!(!reconcile.update_nix && !reconcile.update_rust);
 
-        let bare_with_flake = UpdatePlan::new(&UpdateSelection::All, true).expect("bare + flake");
-        assert!(bare_with_flake.update_nix && bare_with_flake.update_rust);
-        assert!(!bare_with_flake.skip_nix);
-
-        let bare_without_flake =
-            UpdatePlan::new(&UpdateSelection::All, false).expect("bare without flake");
-        assert!(!bare_without_flake.update_nix && bare_without_flake.update_rust);
-        assert!(bare_without_flake.skip_nix);
+        let bare = UpdatePlan::new(&UpdateSelection::All);
+        assert!(bare.update_nix && bare.update_rust);
+        assert_eq!(bare.selected_names(), ["nix", "rust"]);
 
         let rust_only = parse_update_list("rust").expect("rust-only list");
-        let rust_plan = UpdatePlan::new(&rust_only, false).expect("rust-only plan");
+        let rust_plan = UpdatePlan::new(&rust_only);
         assert!(!rust_plan.update_nix && rust_plan.update_rust);
-        assert!(!rust_plan.skip_nix);
     }
 
     #[test]
@@ -220,13 +196,5 @@ mod tests {
             let error = parse_update_list(invalid).expect_err("invalid update list");
             assert_eq!(error.exit_code(), 2);
         }
-    }
-
-    #[test]
-    #[bloomery("CLI-SYNC-INTERFACE-016")]
-    fn explicit_nix_update_requires_a_flake() {
-        let nix_only = parse_update_list("nix").expect("nix list");
-        let error = UpdatePlan::new(&nix_only, false).expect_err("flake is required");
-        assert!(error.to_string().contains("flake.nix"));
     }
 }

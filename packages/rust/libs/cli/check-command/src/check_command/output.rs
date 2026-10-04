@@ -979,6 +979,34 @@ mod tests {
     }
 
     #[test]
+    #[bloomery("CLI-CHECK-OUTPUT-001")]
+    #[bloomery("CLI-CHECK-OUTPUT-011")]
+    fn summary_counts_include_the_implicit_formatter_outcome() {
+        let mut passed = record(0);
+        passed.outcomes.push(CheckRecord {
+            id: "format:workspace".to_owned(),
+            outcome: Outcome::Passed,
+            blocked_by: None,
+            logs: Vec::new(),
+        });
+        let summary = run_summary_json(&passed);
+        assert_eq!(summary.value["counts"]["passed"], 2);
+        assert_eq!(summary.value["total"], 0);
+
+        let mut failed = record(0);
+        failed.status = RunStatus::Failed;
+        failed.outcomes = vec![CheckRecord {
+            id: "format:workspace".to_owned(),
+            outcome: Outcome::Failed,
+            blocked_by: None,
+            logs: Vec::new(),
+        }];
+        let summary = run_summary_json(&failed);
+        assert_eq!(summary.value["counts"]["failed"], 1);
+        assert_eq!(summary.value["counts"].get("passed"), None);
+    }
+
+    #[test]
     #[bloomery("CLI-CHECK-OUTPUT-010")]
     fn optional_failure_location_fields_are_omitted_when_unavailable() {
         let mut failure = record(1).failures.remove(0);

@@ -1,5 +1,7 @@
 use crate::check_command::catalog::{NixBackend, NixCli, NixTaskResult};
-use crate::check_command::command::{CheckContext, run_at_with};
+use crate::check_command::command::{
+    CheckContext, CheckOperation, DetailsArgs, FailureArgs, ListArgs, run_at_with,
+};
 use crate::check_command::execution::{FailureDraft, assign_failure_ids, default_jobs};
 use crate::check_command::interrupt::InterruptFlag;
 use crate::check_command::model::{Outcome, RunStatus};
@@ -10,6 +12,7 @@ use crate::check_command::test_support::{
 use bloomery_test_macros::bloomery;
 use serde_json::Value;
 use std::fs;
+use std::path::Path;
 use std::process::Command;
 use std::sync::atomic::Ordering;
 
@@ -104,7 +107,7 @@ fn aliased_check_build_requests_rely_on_native_store_deduplication() {
     assert_eq!(backend.build_commands.load(Ordering::SeqCst), 2);
     assert_eq!(backend.realizations.load(Ordering::SeqCst), 1);
     let result: Value = serde_json::from_slice(&stdout).expect("summary");
-    assert_eq!(result["counts"]["passed"], 2);
+    assert_eq!(result["counts"]["passed"], 3);
     assert_eq!(result["total"], 0);
     let store =
         crate::check_command::store::RunStore::open(&root, Some(&cache)).expect("retained store");
@@ -232,27 +235,34 @@ fn default_execution_attempts_other_independent_checks_after_a_build_failure() {
 #[bloomery("CLI-CHECK-RUN-004")]
 #[bloomery("CLI-CHECK-RUN-011")]
 #[bloomery("CLI-CHECK-RUN-017")]
-fn default_jobs_are_positive_task_output_isolated_and_source_is_unchanged() {
+#[bloomery("CLI-CHECK-FORMAT-004")]
+fn default_jobs_are_positive_task_output_isolated_and_locks_are_unchanged() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
         names: vec!["one".to_owned(), "two".to_owned()],
+        formatter_edits: vec![("formatted-source.rs".to_owned(), b"// formatted\n".to_vec())],
         ..FakeNix::default()
     };
     assert!(default_jobs() >= 1);
-    let source_files = ["flake.nix", "Cargo.lock", "bloomery.lock", "flake.lock"]
+    let lock_files = ["Cargo.lock", "bloomery.lock", "flake.lock"]
         .into_iter()
         .map(|name| {
             let path = root.join(name);
-            fs::write(&path, format!("unchanged {name}\n")).expect("source fixture");
-            let contents = fs::read(&path).expect("source before run");
+            fs::write(&path, format!("unchanged {name}\n")).expect("lock fixture");
+            let contents = fs::read(&path).expect("lock before run");
             (path, contents)
         })
         .collect::<Vec<_>>();
     let (status, stdout, _) = invoke(request(), &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::SUCCESS);
     assert_eq!(backend.evaluations.load(Ordering::SeqCst), 2);
-    for (path, before) in source_files {
-        assert_eq!(fs::read(&path).expect("source after run"), before);
+    // Formatter edits persist, while repository lockfiles are untouched.
+    assert_eq!(
+        fs::read(root.join("formatted-source.rs")).expect("formatter edit"),
+        b"// formatted\n"
+    );
+    for (path, before) in lock_files {
+        assert_eq!(fs::read(&path).expect("lock after run"), before);
     }
     let output = String::from_utf8(stdout).expect("JSON summary");
     assert!(!output.contains("build log output"));
@@ -299,7 +309,7 @@ fn evaluation_failures_are_check_failures_and_store_failures_are_operational() {
     let result: Value = serde_json::from_slice(&stdout).expect("evaluation failure");
     assert_eq!(result["failures"][0]["code"], "EvaluationFailed");
 
-    let (root2, cache2) = fixture(false);
+    let (root2, cache2) = fixture(true);
     let blocked_cache = root2.join("not-a-directory");
     fs::write(&blocked_cache, "file").expect("cache collision");
     let mut stdout = Vec::new();
@@ -489,7 +499,7 @@ fn prerequisite_failures_block_dependents_without_suppressing_nix_checks() {
     let result: Value = serde_json::from_slice(&stdout).expect("summary JSON");
     assert_eq!(result["counts"]["failed"], 1);
     assert_eq!(result["counts"]["blocked"], 1);
-    assert_eq!(result["counts"]["passed"], 1);
+    assert_eq!(result["counts"]["passed"], 2);
     assert_eq!(backend.realizations.load(Ordering::SeqCst), 1);
     assert_eq!(
         backend.systems.lock().unwrap().as_slice(),
@@ -513,7 +523,7 @@ fn prerequisite_failures_block_dependents_without_suppressing_nix_checks() {
 #[bloomery("CLI-CHECK-RUN-015")]
 #[bloomery("CLI-CHECK-OUTPUT-011")]
 fn successful_exit_requires_every_selected_check_to_pass() {
-    let (root, cache) = fixture(false);
+    let (root, cache) = fixture(true);
     let backend = FakeNix::default();
     let (status, _, _) = invoke(request(), &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::SUCCESS);
@@ -555,6 +565,228 @@ fn summaries_agree_between_human_and_json_and_do_not_stream_logs() {
     assert!(!text.contains("build log output"));
     assert_eq!(json["counts"]["failed"], 1);
     assert!(json["failures"][0].get("message").is_none());
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[bloomery("CLI-CHECK-FORMAT-001")]
+fn every_execution_shape_formats_once_before_any_check() {
+    for selectors in [
+        Vec::new(),
+        vec!["nix:*".to_owned()],
+        vec!["static:*".to_owned()],
+    ] {
+        let (root, cache) = fixture(true);
+        let backend = FakeNix {
+            names: vec!["one".to_owned(), "two".to_owned()],
+            ..FakeNix::default()
+        };
+        let mut args = request();
+        args.selectors = selectors;
+        let (status, _, _) = invoke(args, &root, &cache, &backend, true);
+        assert_eq!(status, std::process::ExitCode::SUCCESS);
+        assert_eq!(backend.formatter_runs.load(Ordering::SeqCst), 1);
+        let events = backend.events.lock().unwrap().clone();
+        assert_eq!(events.first().map(String::as_str), Some("format"));
+        assert!(
+            events[1..]
+                .iter()
+                .all(|event| event.starts_with("realize:"))
+        );
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_dir_all(cache);
+    }
+}
+
+#[test]
+#[bloomery("CLI-CHECK-FORMAT-002")]
+#[bloomery("CLI-CHECK-FORMAT-006")]
+fn formatter_failure_stops_all_check_work_regardless_of_fail_fast() {
+    for fail_fast in [false, true] {
+        let (root, cache) = fixture(true);
+        let backend = FakeNix {
+            names: vec!["one".to_owned(), "two".to_owned()],
+            unique_derivations: true,
+            formatter_result: Some(NixTaskResult::Failed {
+                code: "NixFormatFailed".to_owned(),
+                message: "nix fmt failed with exit code 1".to_owned(),
+            }),
+            ..FakeNix::default()
+        };
+        let mut args = request();
+        args.fail_fast = fail_fast;
+        args.jobs = Some(1);
+        let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
+        assert_eq!(status, std::process::ExitCode::FAILURE);
+        assert_eq!(backend.formatter_runs.load(Ordering::SeqCst), 1);
+        assert_eq!(backend.realizations.load(Ordering::SeqCst), 0);
+        let result: Value = serde_json::from_slice(&stdout).expect("summary");
+        assert_eq!(result["counts"]["failed"], 1);
+        assert!(result["counts"]["not_run"].as_u64().unwrap_or(0) >= 2);
+        assert_eq!(result["failures"][0]["check"], "format:workspace");
+        assert_eq!(result["failures"][0]["code"], "NixFormatFailed");
+        let store = RunStore::open(&root, Some(&cache)).expect("retained store");
+        let record = store.latest().expect("retained run").0;
+        assert!(record.outcomes.iter().any(|outcome| {
+            outcome.id == "format:workspace" && outcome.outcome == Outcome::Failed
+        }));
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_dir_all(cache);
+    }
+}
+
+#[test]
+#[bloomery("CLI-CHECK-FORMAT-003")]
+fn selected_checks_run_against_the_formatted_workspace() {
+    let (root, cache) = fixture(true);
+    let backend = FakeNix {
+        formatter_removals: vec![".bloomery/specs/CLI/CHECK/README.md".to_owned()],
+        ..FakeNix::default()
+    };
+    let mut args = request();
+    args.selectors = vec!["static:*".to_owned()];
+    let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::FAILURE);
+    let result: Value = serde_json::from_slice(&stdout).expect("summary");
+    assert_eq!(result["failures"][0]["code"], "MissingDocument");
+    assert!(!root.join(".bloomery/specs/CLI/CHECK/README.md").exists());
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[bloomery("CLI-CHECK-FORMAT-004")]
+fn partial_formatter_edits_persist_after_failure() {
+    let (root, cache) = fixture(true);
+    let backend = FakeNix {
+        formatter_edits: vec![("partial-format.txt".to_owned(), b"partial".to_vec())],
+        formatter_result: Some(NixTaskResult::Failed {
+            code: "NixFormatFailed".to_owned(),
+            message: "nix fmt failed".to_owned(),
+        }),
+        ..FakeNix::default()
+    };
+    let (status, _, _) = invoke(request(), &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::FAILURE);
+    assert_eq!(
+        fs::read(root.join("partial-format.txt")).expect("partial formatter edit"),
+        b"partial"
+    );
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[bloomery("CLI-CHECK-FORMAT-005")]
+fn read_only_check_operations_do_not_format() {
+    let (root, cache) = fixture(true);
+    let backend = FakeNix {
+        names: vec!["one".to_owned()],
+        ..FakeNix::default()
+    };
+    let operations = [
+        CheckOperation::List(ListArgs::default()),
+        CheckOperation::Failures(FailureArgs {
+            run: None,
+            offset: 0,
+            limit: 20,
+        }),
+        CheckOperation::Details(DetailsArgs {
+            failure: "f1".to_owned(),
+            run: None,
+            offset: None,
+            limit: 20,
+        }),
+    ];
+    for operation in operations {
+        let mut args = request();
+        args.operation = Some(operation);
+        let _ = invoke(args, &root, &cache, &backend, true);
+        assert_eq!(backend.formatter_runs.load(Ordering::SeqCst), 0);
+    }
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[bloomery("CLI-CHECK-FORMAT-007")]
+fn formatter_output_is_captured_in_a_run_local_log_and_not_streamed() {
+    let (root, cache) = fixture(true);
+    let secret = "formatter secret output line";
+    let backend = FakeNix {
+        names: vec!["one".to_owned()],
+        formatter_log_contents: Some(format!("{secret}\n").into_bytes()),
+        ..FakeNix::default()
+    };
+    let (status, stdout, stderr) = invoke(request(), &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::SUCCESS);
+    assert!(!String::from_utf8_lossy(&stdout).contains(secret));
+    assert!(!String::from_utf8_lossy(&stderr).contains(secret));
+    let store = RunStore::open(&root, Some(&cache)).expect("retained store");
+    let (record, directory) = store.latest().expect("retained run");
+    let format = record
+        .outcomes
+        .iter()
+        .find(|outcome| outcome.id == "format:workspace")
+        .expect("retained format outcome");
+    assert_eq!(format.logs.len(), 1);
+    let path = crate::check_command::store::resolve_log_path(&directory, &format.logs[0])
+        .expect("formatter log path");
+    assert!(fs::read_to_string(path).unwrap().contains(secret));
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+fn git_is_available() -> bool {
+    Command::new("git")
+        .arg("--version")
+        .output()
+        .is_ok_and(|output| output.status.success())
+}
+
+fn run_git(root: &Path, arguments: &[&str]) {
+    let status = Command::new("git")
+        .args(arguments)
+        .current_dir(root)
+        .status()
+        .expect("start git");
+    assert!(status.success(), "git {arguments:?} failed");
+}
+
+#[test]
+#[bloomery("CLI-CHECK-DETAIL-023")]
+fn git_dirty_state_is_sampled_after_formatter_edits() {
+    if !git_is_available() {
+        eprintln!("skipping post-format git-state test: git is unavailable");
+        return;
+    }
+    let (root, cache) = fixture(true);
+    run_git(&root, &["init", "-q"]);
+    run_git(&root, &["add", "-A"]);
+    run_git(
+        &root,
+        &[
+            "-c",
+            "user.email=bloomery@example.invalid",
+            "-c",
+            "user.name=Bloomery",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+    );
+    let backend = FakeNix {
+        names: vec!["one".to_owned()],
+        formatter_edits: vec![("formatted-source.rs".to_owned(), b"// formatted\n".to_vec())],
+        ..FakeNix::default()
+    };
+    let (status, _, _) = invoke(request(), &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::SUCCESS);
+    let store = RunStore::open(&root, Some(&cache)).expect("retained store");
+    let record = store.latest().expect("retained run").0;
+    assert_eq!(record.source_dirty, Some(true));
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
 }

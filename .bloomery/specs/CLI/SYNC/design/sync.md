@@ -3,18 +3,18 @@
 ## Intent
 
 `bloomery sync` is the single maintenance entry point for `Cargo.lock`,
-`bloomery.lock`, and optional `flake.lock` updates. It replaces the existing
-Nix lock generator while leaving Nix's pure lock parsing and validation intact.
+`bloomery.lock`, and optional `flake.lock` updates. Every sync invocation also
+requires the shared CLI `flake.nix` preflight. It replaces the existing Nix lock
+generator while leaving Nix's pure lock parsing and validation intact.
 The Rust CLI orchestrates tools and owns Bloomery lock generation; running sync
 must not depend on evaluating or building the workspace's Nix outputs.
-
-This design is implemented by the Rust CLI and its automated tests.
 
 ## Invocation and update selection
 
 Run from the workspace root (the current working directory). There is no root
-argument or upward workspace search. The root must contain `Cargo.toml`;
-`Cargo.lock`, `bloomery.lock`, the configuration, and the spec tree may be absent.
+argument or upward workspace search. The root must contain `Cargo.toml` and
+`flake.nix`; `Cargo.lock`, `bloomery.lock`, the configuration, and the spec tree
+may be absent.
 
 ```text
 bloomery sync
@@ -34,24 +34,24 @@ Repeated `--update` flags are rejected to avoid ambiguous merging.
 | Invocation | Rust dependency policy | Nix input policy |
 | --- | --- | --- |
 | no flag | Reconcile manifests, preserve locked versions where possible | Leave `flake.lock` untouched |
-| bare `--update` | Update all dependencies within Cargo manifest constraints | Update all inputs if `flake.nix` exists; otherwise skip |
+| bare `--update` | Update all dependencies within Cargo manifest constraints | Update all Nix inputs |
 | `--update=rust` | Update all dependencies within Cargo manifest constraints | Leave `flake.lock` untouched |
-| `--update=nix` | Reconcile manifests, preserve locked versions where possible | Require `flake.nix` and update all inputs |
-| `--update=nix,rust` | Update all dependencies within Cargo manifest constraints | Require `flake.nix` and update all inputs |
+| `--update=nix` | Reconcile manifests, preserve locked versions where possible | Update all Nix inputs |
+| `--update=nix,rust` | Update all dependencies within Cargo manifest constraints | Update all Nix inputs |
 
-Bare `--update` means all applicable ecosystems. An explicit `nix` selection
-without `flake.nix` is an error, not a silent skip. Every successful invocation
-reconciles `Cargo.lock` and regenerates `bloomery.lock`, even when only Nix was
-selected. `bloomery.lock` is a derived resolution artifact, not a separately
-selectable update ecosystem. No package-specific or input-specific update
+Bare `--update` selects both Rust and Nix updates. The shared CLI preflight
+rejects every command when the root lacks `flake.nix`. Every successful
+invocation reconciles `Cargo.lock` and regenerates `bloomery.lock`, even when
+only Nix was selected. `bloomery.lock` is a derived resolution artifact, not a
+separately selectable update ecosystem. No package-specific or input-specific update
 selection is included in this design.
 
 ## Execution pipeline
 
 1. Parse CLI arguments and determine the root.
-2. Preflight: require `Cargo.toml`, load/validate configuration if present,
-   inspect `flake.nix`, and verify required executables. Cargo is always required;
-   Nix is required only when an actual Nix update will run. A present malformed,
+2. Preflight: require `Cargo.toml` and `flake.nix`, load/validate configuration
+   if present, and verify required executables. Cargo is always required; Nix is
+   required only when an actual Nix update will run. A present malformed,
    unreadable, or invalid config remains an error under the shared configuration
    contract. Preflight failures occur before invoking mutating tools.
 3. Emit the missing-config warning or the recommendation notices described
@@ -178,9 +178,9 @@ for CLI usage errors. Identify the failing stage, retain useful subprocess
 stderr, and do not report completion or run later stages after a failure.
 
 Use stdout for stage progress and completion, stderr for warnings,
-recommendations, and failures. A successful summary identifies reconciled locks,
-selected update ecosystems, and skipped Nix updates when bare `--update` runs
-without a flake. `sync --json` emits the structured success or failure contract
+recommendations, and failures. A successful summary identifies reconciled
+locks and selected update ecosystems. `sync --json` emits the structured success
+or failure contract
 specified by [CLI output design](../../INTERFACE/design/output.md). No
 interactive confirmation is introduced. Invoke subprocesses with structured
 arguments rather than interpolated shell commands.
@@ -207,17 +207,17 @@ evaluation.
 
 ## Verification plan
 
-Use temporary workspace fixtures and injectable subprocess runners for update
-selection, preflight ordering, tool failures, and partial-success reporting.
-Exercise real Cargo fixtures for missing and stale locks, version preservation,
-explicit updates, and compatible metadata generation. Test byte-level lock
-stability, escaping, collision rejection, CRLF hash agreement with the Nix
-consumer, and safe publication under injected write failures.
+Use temporary workspace fixtures and injectable subprocess runners for the
+shared flake preflight, update selection, tool failures, and partial-success
+reporting. Exercise real Cargo fixtures for missing and stale locks, version
+preservation, explicit updates, and compatible metadata generation. Test
+byte-level lock stability, escaping, collision rejection, CRLF hash agreement
+with the Nix consumer, and safe publication under injected write failures.
 
 Use config fixtures for absent files, empty files, missing parents/leaves,
 explicit false/true, dotted keys, inline tables, malformed files, and future
 catalog entries. Assert stable notices and no config mutation. Verify sync works
-without specs and with uncovered specs. Nix integration tests should assert
-lock-app exports are absent across consumption styles while normal workspace
-apps and lock validation remain available. Add real static evidence only with
-the implementation; the requirements intentionally lack it today.
+with missing or uncovered specs when a root flake is present, and rejects a
+missing root flake before invoking tools or mutating locks. Nix integration tests
+assert lock-app exports are absent across consumption styles while normal
+workspace apps and lock validation remain available.

@@ -82,3 +82,15 @@ type = "unwanted_behavior"
 trigger = "an application command is invoked with --json"
 system = "the bloomery CLI"
 action = "refrain from writing human-formatted progress, banners, or diagnostics to stdout"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-008"
+title = "Missing-flake errors honor JSON mode"
+manual = false
+design = "design/output.md"
+
+[requirements.ears]
+type = "event"
+trigger = "a non-init command or parser help is requested without flake.nix and --json is selected"
+system = "the bloomery CLI"
+action = "emit one JSON error with guidance to set up a Bloomery flake.nix"

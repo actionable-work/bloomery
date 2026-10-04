@@ -94,24 +94,24 @@ action = "orchestrate Nix directly without requiring or invoking nix-fast-build"
 id = "CLI-CHECK-NIX-012"
 title = "Missing Nix is explicit"
 manual = false
-design = "design/workspace-check.md#internal-wrapper"
+design = "design/workspace-check.md#formatter-preflight"
 
 [requirements.ears]
 type = "unwanted_behavior"
-trigger = "Nix execution is selected but the Nix CLI is unavailable"
+trigger = "a check execution requires nix fmt or selected Nix checks but the Nix CLI is unavailable"
 system = "bloomery check"
-action = "report an operational error rather than silently skip Nix checks"
+action = "report an operational error rather than silently skip the formatter or selected Nix checks"
 
 [[requirements]]
 id = "CLI-CHECK-NIX-013"
 title = "Check does not update flake locks"
 manual = false
-design = "design/workspace-check.md#internal-wrapper"
+design = "design/workspace-check.md#formatter-preflight"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "bloomery check"
-action = "disable lockfile writes and updates in its Nix operations"
+action = "disable lockfile writes and updates in every Nix operation, including nix fmt"
 
 [[requirements]]
 id = "CLI-CHECK-NIX-014"

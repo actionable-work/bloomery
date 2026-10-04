@@ -28,8 +28,10 @@ non-empty `NO_COLOR`, redirected streams, and JSON mode suppress ANSI styling.
 See the [output contract](output.md).
 
 Bloomery does not expose a command-specific repository-root flag; check and
-review use the current working directory, as does sync. The CLI parser also
-supplies the `help` subcommand for displaying command help.
+review use the current working directory, as does sync. Every recognized command
+request, including help and nested check retrieval, requires the shared root
+`flake.nix` preflight; the workspace-bootstrap `init` command is exempt. The CLI
+parser also supplies the `help` subcommand for displaying command help.
 
 Check selectors form a union and must each match. `*` and `?` are the supported
 case-sensitive anchored glob operators. Offsets are zero-based; limits remain
@@ -38,9 +40,10 @@ Execution-only flags are not accepted on retrieval commands. See
 [selection](../../CHECK/design/execution.md) and
 [seeking](../../CHECK/design/details.md).
 
-For sync, bare `--update` updates Rust dependencies and any existing Nix flake.
-An explicit list updates only those ecosystems; explicit `nix` requires
-`flake.nix`. Both `--update=nix,rust` and `--update nix,rust` are accepted.
+For sync, bare `--update` updates both Rust dependencies and Nix flake inputs.
+The shared command preflight always requires `flake.nix`; an explicit list
+updates only those ecosystems. Both `--update=nix,rust` and `--update nix,rust`
+are accepted.
 Unknown values, empty elements, an explicit empty list, and repeated flags are
 usage errors; duplicate names are deduplicated. Every successful sync still
 reconciles Cargo.lock and regenerates bloomery.lock. See the

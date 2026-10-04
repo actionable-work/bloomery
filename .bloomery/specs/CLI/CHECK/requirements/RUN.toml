@@ -189,14 +189,14 @@ action = "report an operational failure rather than exit successfully"
 
 [[requirements]]
 id = "CLI-CHECK-RUN-017"
-title = "Check leaves repository source unchanged"
+title = "Check leaves repository lockfiles unchanged"
 manual = false
-design = "README.md#boundaries"
+design = "design/workspace-check.md#formatter-preflight"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "bloomery check"
-action = "leave repository source files and lockfiles unchanged"
+action = "leave repository lockfiles unchanged during formatting and check execution"
 
 [[requirements]]
 id = "CLI-CHECK-RUN-018"

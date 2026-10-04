@@ -1,0 +1,85 @@
+group = "FORMAT"
+
+[[requirements]]
+id = "CLI-CHECK-FORMAT-001"
+title = "Check executions format before selected checks"
+manual = false
+design = "design/execution.md#formatting-gate"
+
+[requirements.ears]
+type = "event"
+trigger = "a valid bloomery check execution is requested"
+system = "bloomery check"
+action = "run nix fmt once before admitting any selected check, regardless of selected checks or systems"
+
+[[requirements]]
+id = "CLI-CHECK-FORMAT-002"
+title = "Formatting failure always stops check work"
+manual = false
+design = "design/execution.md#formatting-gate"
+
+[requirements.ears]
+type = "event"
+trigger = "nix fmt exits unsuccessfully"
+system = "bloomery check"
+action = "record format:workspace as failed with a NixFormatFailed record, mark all selected checks not_run, and fail without starting check work regardless of --fail-fast"
+
+[[requirements]]
+id = "CLI-CHECK-FORMAT-003"
+title = "Checks use the formatted workspace"
+manual = false
+design = "design/workspace-check.md#formatter-preflight"
+
+[requirements.ears]
+type = "event"
+trigger = "nix fmt exits successfully"
+system = "bloomery check"
+action = "run selected checks against the workspace state produced by formatting"
+
+[[requirements]]
+id = "CLI-CHECK-FORMAT-004"
+title = "Formatter edits are not rolled back"
+manual = false
+design = "design/workspace-check.md#formatter-preflight"
+
+[requirements.ears]
+type = "event"
+trigger = "nix fmt modifies workspace files"
+system = "bloomery check"
+action = "leave formatter edits in the workspace, including edits made before a formatting failure"
+
+[[requirements]]
+id = "CLI-CHECK-FORMAT-005"
+title = "Read-only check operations do not format"
+manual = false
+design = "design/execution.md#formatting-gate"
+
+[requirements.ears]
+type = "state"
+state = "check list, check failures, or check details is selected"
+system = "bloomery check"
+action = "do not invoke nix fmt"
+
+[[requirements]]
+id = "CLI-CHECK-FORMAT-006"
+title = "Formatter outcomes are retained"
+manual = false
+design = "design/details.md#storage-and-identity"
+
+[requirements.ears]
+type = "event"
+trigger = "the formatter gate completes"
+system = "bloomery check"
+action = "retain its format:workspace outcome in the run record"
+
+[[requirements]]
+id = "CLI-CHECK-FORMAT-007"
+title = "Formatter output is captured"
+manual = false
+design = "design/workspace-check.md#formatter-preflight"
+
+[requirements.ears]
+type = "event"
+trigger = "the formatter gate runs"
+system = "bloomery check"
+action = "capture nix fmt output in a run-local log without streaming it to normal output"

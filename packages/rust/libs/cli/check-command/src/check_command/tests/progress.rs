@@ -77,9 +77,9 @@ fn eligible_execution_writes_changing_metrics_to_stderr_and_final_metrics_to_std
     let stderr = stdio_text(&stderr);
     let stdout = stdio_text(&stdout);
 
-    // Two alias checks complete as separate units while the shared derivation
-    // contributes a single work unit.
-    assert!(stderr.contains("checks 2/2 complete"), "stderr: {stderr:?}");
+    // Two alias checks and the format:workspace gate complete as separate
+    // units while the shared derivation contributes a single work unit.
+    assert!(stderr.contains("checks 3/3 complete"), "stderr: {stderr:?}");
     assert!(stderr.contains("built 1"), "stderr: {stderr:?}");
     assert!(stderr.contains("known total 1"), "stderr: {stderr:?}");
     // Live progress is stderr-only. The completion summary closes with the
@@ -93,7 +93,7 @@ fn eligible_execution_writes_changing_metrics_to_stderr_and_final_metrics_to_std
     // The initialized snapshot is the first progress write, before any worker
     // event changes a metric.
     assert!(
-        stderr.starts_with("\r\u{1b}[K\u{1b}[1mchecks 0/2"),
+        stderr.starts_with("\r\u{1b}[K\u{1b}[1mchecks 0/3"),
         "stderr: {stderr:?}"
     );
     // The transient line is explicitly cleared before final reporting.
@@ -371,7 +371,7 @@ fn all_store_hits_report_known_zero_work() {
 #[test]
 #[bloomery("CLI-CHECK-PROGRESS-021")]
 fn static_only_runs_report_zero_derivation_work() {
-    let (root, cache) = fixture(false);
+    let (root, cache) = fixture(true);
     let backend = FakeNix::default();
     let (status, _, stderr) = invoke_with_terminal(
         request(),
@@ -453,12 +453,13 @@ fn blocked_dependents_finalize_before_a_slow_worker_joins() {
         )
     });
 
-    // Structure failure blocks traceability immediately, so both checks are
-    // complete while the held Nix worker is still active.
+    // Structure failure blocks traceability immediately, so structure,
+    // traceability, and the formatter gate are all complete while the held Nix
+    // worker is still active.
     let deadline = Instant::now() + Duration::from_secs(5);
     let mut blocked_published = false;
     while Instant::now() < deadline {
-        if stdio_text(&observed.lock().expect("shared writer")).contains("checks 2/3") {
+        if stdio_text(&observed.lock().expect("shared writer")).contains("checks 3/4") {
             blocked_published = true;
             break;
         }
@@ -545,4 +546,35 @@ fn finalization_is_published_while_another_worker_is_still_running() {
     release_sender.send(()).expect("release slow worker");
     worker.join().expect("scheduler thread");
     assert!(published.load(Ordering::SeqCst));
+}
+
+#[test]
+#[bloomery("CLI-CHECK-PROGRESS-009")]
+fn formatter_failure_finalizes_every_selected_check() {
+    let (root, cache) = fixture(true);
+    let backend = FakeNix {
+        formatter_result: Some(crate::check_command::catalog::NixTaskResult::Failed {
+            code: "NixFormatFailed".to_owned(),
+            message: "nix fmt failed".to_owned(),
+        }),
+        ..FakeNix::default()
+    };
+    let (status, stdout, stderr) = invoke_with_terminal(
+        request(),
+        &root,
+        &cache,
+        &backend,
+        false,
+        InterruptFlag::for_test(),
+        tty(),
+    );
+    assert_eq!(status, std::process::ExitCode::FAILURE);
+    let stderr = stdio_text(&stderr);
+    // The formatter gate plus both selected static checks reach a final
+    // outcome, so the fixed denominator completes even though no check ran.
+    assert!(stderr.contains("checks 1/3"), "stderr: {stderr:?}");
+    assert!(stderr.contains("checks 3/3 complete"), "stderr: {stderr:?}");
+    assert!(stdio_text(&stdout).contains("failed"));
+    let _ = std::fs::remove_dir_all(root);
+    let _ = std::fs::remove_dir_all(cache);
 }

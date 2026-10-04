@@ -120,7 +120,7 @@ fn concurrent_alias_retrieval_freezes_one_shared_derivation_log_snapshot() {
 #[bloomery("CLI-CHECK-DETAIL-012")]
 #[bloomery("CLI-CHECK-DETAIL-018")]
 fn diagnostics_keep_full_messages_and_default_details_start_at_the_failure() {
-    let (root, cache) = fixture(false);
+    let (root, cache) = fixture(true);
     let requirement = root.join(".bloomery/specs/CLI/CHECK/requirements/CONTRACT.toml");
     let contents = fs::read_to_string(&requirement).expect("fixture requirement");
     fs::write(
@@ -377,7 +377,7 @@ fn an_unavailable_nix_log_preserves_captured_failure_details() {
 #[bloomery("CLI-CHECK-DETAIL-016")]
 #[bloomery("CLI-CHECK-DETAIL-020")]
 fn retrieval_rejects_missing_runs_and_preserves_only_safe_display_records() {
-    let (root, cache) = fixture(false);
+    let (root, cache) = fixture(true);
     let mut args = request();
     args.operation = Some(CheckOperation::Details(DetailsArgs {
         failure: "f1".to_owned(),

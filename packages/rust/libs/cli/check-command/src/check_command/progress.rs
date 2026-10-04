@@ -446,6 +446,30 @@ mod tests {
     }
 
     #[test]
+    #[bloomery("CLI-CHECK-PROGRESS-008")]
+    #[bloomery("CLI-CHECK-PROGRESS-009")]
+    #[bloomery("CLI-CHECK-PROGRESS-010")]
+    fn the_formatter_gate_is_a_fixed_completion_unit() {
+        // The caller includes format:workspace in the fixed denominator.
+        let mut reducer = ProgressReducer::new(3, false);
+        assert_eq!(reducer.snapshot().checks_total, 3);
+        assert_eq!(reducer.snapshot().checks_complete, 0);
+        check(&mut reducer, "format:workspace", Outcome::Passed);
+        assert_eq!(reducer.snapshot().checks_complete, 1);
+        check(&mut reducer, "static:structure", Outcome::Passed);
+        check(&mut reducer, "static:traceability", Outcome::Passed);
+        assert_eq!(reducer.snapshot().checks_complete, 3);
+        assert_eq!(
+            reducer.final_outcome("format:workspace"),
+            Some(Outcome::Passed)
+        );
+        // Re-finalizing the formatter gate never double counts.
+        check(&mut reducer, "format:workspace", Outcome::Failed);
+        assert_eq!(reducer.snapshot().checks_complete, 3);
+        assert_eq!(reducer.snapshot().checks_total, 3);
+    }
+
+    #[test]
     #[bloomery("CLI-CHECK-PROGRESS-011")]
     fn alias_checks_retain_separate_completion_units() {
         let mut reducer = reducer(2);

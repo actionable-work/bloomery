@@ -2,12 +2,16 @@
 
 ## Integration direction
 
-`bloomery check` owns static verification and test/build orchestration:
+The shared CLI preflight requires a root `flake.nix` before every command. See
+[CLI command and workspace requirements](../../INTERFACE/design/commands.md#flake-presence-preflight).
+After that gate, `bloomery check` owns workspace formatting, static verification,
+and test/build orchestration:
 
 ```text
 bloomery check
-├── static:structure → static:traceability
-└── checks.<system>.* → Nix derivation realization
+├── execution: catalog/selection setup → format:workspace (`nix fmt`)
+│   └── after formatting succeeds: static checks + Nix derivations
+└── list/failures/details: shared flake gate only; no formatting
 ```
 
 `mkWorkspace`, `mkFlake`, and flake-module integration do not generate a
@@ -23,19 +27,36 @@ For externally supplied flakes, exclude an exact legacy `bloomery:check`
 attribute with an explicit compact compatibility notice, preventing the known
 recursive integration; custom derivations must not invoke the runner themselves.
 
+## Formatter preflight
+
+For each valid `bloomery check` execution, invoke `nix fmt` once from the
+workspace root, using the flake's default formatter. Run it regardless of check
+selectors or selected systems, after catalog/selection setup and before any
+selected check task. It is an implicit `format:workspace` outcome, not a
+`checks.<system>.*` attribute or a selectable catalog ID. Read-only check
+subcommands do not invoke the formatter, but still require the shared flake gate.
+
+Capture formatter output in a run-local log without forwarding it to normal
+output. A non-zero exit is the `NixFormatFailed` check failure described in
+[selection and execution](execution.md#formatting-gate); failure to start Nix or
+retain the log is operational and leaves the formatter and selected checks
+not_run. Leave source edits in place, including partial edits from a failed
+formatter. Disable lockfile writes and updates for this Nix operation.
+
 ## Internal wrapper
 
 Use Nix's CLI directly. Do not require or invoke `nix-fast-build`, and do not
 add a small orchestration dependency solely for scheduling.
 
-1. Discover names under each selected `checks.<system>` output.
-2. Invoke one argument-safe `nix build --no-link` for each selected check
+After catalog discovery and the formatter preflight:
+
+1. Invoke one argument-safe `nix build --no-link` for each selected check
    installable; Nix evaluates that attribute as part of the build request.
-3. Schedule bounded concurrent build requests and capture output separately
+2. Schedule bounded concurrent build requests and capture output separately
    for each selected check. Consume structured Nix activity for run-scoped
    [derivation metrics](progress.md#derivation-metrics), preserving retained
    diagnostic and builder logs without forwarding activity to terminal output.
-4. Map outcomes to their check IDs. Nix store locking deduplicates realization
+3. Map outcomes to their check IDs. Nix store locking deduplicates realization
    when aliases resolve to one derivation.
 
 A catalog-wide discovery failure is an operational error; an individual
@@ -50,7 +71,8 @@ Use argument-safe subprocess invocation, not shell interpolation of attribute
 names. Keep every Nix evaluation pure; never pass `--impure`. Disable lockfile
 writes/updates and result-link creation during all Nix operations. Honor users'
 Nix configuration for stores, substitution, builders, and build parallelism.
-Report unavailable Nix when Nix checks are selected.
+Report unavailable Nix when a check execution requires formatting or selected
+Nix checks.
 
 Nix owns the dependency graph and deduplicates shared derivations through its
 store locks; Bloomery schedules top-level build requests only. Submit each

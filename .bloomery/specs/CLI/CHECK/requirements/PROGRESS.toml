@@ -86,14 +86,14 @@ action = "emit no live progress updates"
 
 [[requirements]]
 id = "CLI-CHECK-PROGRESS-008"
-title = "Check totals include selected prerequisites"
+title = "Check totals include implicit execution stages"
 manual = false
 design = "design/progress.md#check-metrics"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "the check progress aggregator"
-action = "use the deduplicated selected check count including implicit prerequisites as its fixed completion denominator"
+action = "use the deduplicated selected check count, prerequisites, and format:workspace as its fixed completion denominator"
 
 [[requirements]]
 id = "CLI-CHECK-PROGRESS-009"
@@ -103,21 +103,21 @@ design = "design/progress.md#check-metrics"
 
 [requirements.ears]
 type = "event"
-trigger = "a selected check acquires a final passed, failed, blocked, canceled, or not_run outcome"
+trigger = "a selected check or formatter gate acquires a final passed, failed, blocked, canceled, or not_run outcome"
 system = "the check progress aggregator"
 action = "increment completion exactly once at finalization without waiting for all active checks to finish"
 
 [[requirements]]
 id = "CLI-CHECK-PROGRESS-010"
-title = "Queued checks remain incomplete"
+title = "Queued checks and formatting remain incomplete"
 manual = false
 design = "design/progress.md#check-metrics"
 
 [requirements.ears]
 type = "state"
-state = "a selected check is queued or running without a final outcome"
+state = "a selected check or formatter gate is queued or running without a final outcome"
 system = "the check progress aggregator"
-action = "exclude that check from its completion count"
+action = "exclude that work from its completion count"
 
 [[requirements]]
 id = "CLI-CHECK-PROGRESS-011"

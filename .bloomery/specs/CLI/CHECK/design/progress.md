@@ -19,15 +19,17 @@ live progress.
 
 After selection validation and run allocation, initialize `checks complete` to
 zero and `checks total` to the deduplicated selected check count, including
-implicitly selected prerequisites. The denominator stays fixed throughout the
-run. Static checks and each selected Nix attribute count independently; aliases
+implicitly selected prerequisites, plus the `format:workspace` gate. The
+denominator stays fixed throughout the run. The formatter gate, static checks,
+and each selected Nix attribute count independently; aliases
 retain separate check identities.
 
-A check becomes complete once it has a final outcome: passed, failed, blocked,
-canceled, or not_run. Queued work is not complete merely because its provisional
-outcome is not_run. Update completion when outcomes become final during execution,
-not only after all workers join. Count each check once. Finalizing skipped or
-canceled work can bring the counter to the denominator without implying success;
+A check or formatter gate becomes complete once it has a final outcome: passed,
+failed, blocked, canceled, or not_run. Queued work is not complete merely because
+its provisional outcome is not_run. Update completion when outcomes become final
+during execution, not only after all workers join. Count each outcome once.
+Finalizing skipped or canceled work can bring the counter to the denominator
+without implying success;
 the final summary owns the pass/fail result.
 
 ## Derivation metrics
@@ -72,8 +74,9 @@ structured Nix metadata; store-path download counts are not derivation counts.
 Do not scrape localized human diagnostics, forward raw Nix events to the
 terminal, or sum per-client aggregate totals that can overlap.
 
-The check scheduler supplies final-outcome events to the same aggregator. One
-serialized renderer owns terminal writes; workers do not render independently.
+Execution supplies final-outcome events for selected checks and the formatter
+gate to the same aggregator. One serialized renderer owns terminal writes;
+workers do not render independently.
 Collect progress without changing check selection, admission, Nix configuration,
 realization ownership, or cancellation behavior. Nix remains the dependency
 scheduler. Drain subprocess output continuously and retain diagnostic and builder

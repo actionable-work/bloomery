@@ -5,7 +5,10 @@ Every application command (`check`, `review`, and `sync`) accepts the same globa
 flag or format selector. It emits one JSON document on stdout, with no ANSI
 escapes, progress text, or human-formatted banners mixed into the document.
 Usage and operational failures requested with `--json` are also represented as
-JSON while retaining their normal exit codes. Parser help remains human-readable.
+JSON while retaining their normal exit codes. Parser help remains
+human-readable when the flake preflight passes. If the root lacks `flake.nix`,
+the shared setup error takes precedence and says to set up a Bloomery
+`flake.nix`; `--json` emits one structured setup-error document.
 
 ## Human-readable output
 

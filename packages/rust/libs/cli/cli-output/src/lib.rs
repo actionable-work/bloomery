@@ -172,6 +172,26 @@ pub fn usage_error_json(command: Option<&str>, message: &str) -> Value {
     })
 }
 
+/// Shared message for the root `flake.nix` preflight required by every command.
+pub const MISSING_FLAKE_MESSAGE: &str = "A Bloomery flake.nix is required; set up a Bloomery flake.nix in the current directory before running this command.";
+
+/// Stable error code shared by the CLI preflight and each command's own
+/// missing-flake boundary check.
+pub const MISSING_FLAKE_CODE: &str = "MissingFlake";
+
+/// One structured setup error for a missing root flake, reused by every
+/// command so human and JSON modes carry the same guidance.
+pub fn flake_setup_error_json(command: Option<&str>) -> Value {
+    json!({
+        "command": command,
+        "status": "error",
+        "error": {
+            "code": MISSING_FLAKE_CODE,
+            "message": MISSING_FLAKE_MESSAGE,
+        },
+    })
+}
+
 fn categorize_stderr(contents: &str) -> (Vec<String>, Vec<String>, Vec<String>) {
     let mut warnings = Vec::new();
     let mut recommendations = Vec::new();

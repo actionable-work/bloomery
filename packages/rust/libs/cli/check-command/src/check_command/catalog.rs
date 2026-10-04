@@ -25,6 +25,14 @@ pub enum NixTaskResult<T> {
 pub trait NixBackend: Send + Sync {
     fn host_system(&self, root: &Path) -> Result<String, String>;
     fn discover(&self, root: &Path, system: &str) -> Result<Vec<String>, String>;
+    /// Run the flake's default formatter once from the workspace root. The
+    /// caller supplies a run-local log path that receives all command output.
+    fn format_workspace(
+        &self,
+        root: &Path,
+        log_path: &Path,
+        cancellation: CancellationToken,
+    ) -> NixTaskResult<()>;
     fn realize_check(
         &self,
         root: &Path,
@@ -304,6 +312,30 @@ impl NixBackend for NixCli {
         NixCli::read_derivation_log(self, root, store_path)
     }
 
+    fn format_workspace(
+        &self,
+        root: &Path,
+        log_path: &Path,
+        cancellation: CancellationToken,
+    ) -> NixTaskResult<()> {
+        let args = format_args();
+        match self.run_logged_command(LoggedCommand {
+            root,
+            args: &args,
+            log_path,
+            cancellation,
+            capture_stdout: false,
+            failure_code: Some("NixFormatFailed"),
+            failure_description: "nix fmt failed",
+            progress: None,
+        }) {
+            NixTaskResult::Succeeded(_) => NixTaskResult::Succeeded(()),
+            NixTaskResult::Failed { code, message } => NixTaskResult::Failed { code, message },
+            NixTaskResult::Canceled => NixTaskResult::Canceled,
+            NixTaskResult::OperationalError(message) => NixTaskResult::OperationalError(message),
+        }
+    }
+
     fn realize_check(
         &self,
         root: &Path,
@@ -543,6 +575,13 @@ fn build_args(system: &str, attribute: &str) -> Vec<OsString> {
     ]
 }
 
+fn format_args() -> Vec<OsString> {
+    ["fmt", "--no-write-lock-file", "--no-update-lock-file"]
+        .into_iter()
+        .map(OsString::from)
+        .collect()
+}
+
 fn host_nix_system() -> Result<String, String> {
     if let Some(configured) = configured_nix_system() {
         if valid_system_name(&configured) {
@@ -762,8 +801,8 @@ fn bounded_process_error(bytes: &[u8]) -> String {
 mod tests {
     use super::{
         NixBackend, NixCli, NixTaskResult, build_args, discover_args, discover_catalog,
-        drain_progress_stderr, host_nix_system, nix_log_store_path, nix_string_literal,
-        parse_nix_id, target_nix_system,
+        drain_progress_stderr, format_args, host_nix_system, nix_log_store_path,
+        nix_string_literal, parse_nix_id, target_nix_system,
     };
     use crate::check_command::interrupt::{CancellationToken, InterruptFlag};
     use crate::check_command::model::valid_system_name;
@@ -787,6 +826,15 @@ mod tests {
 
         fn discover(&self, _root: &Path, _system: &str) -> Result<Vec<String>, String> {
             Ok(self.names.clone())
+        }
+
+        fn format_workspace(
+            &self,
+            _root: &Path,
+            _log_path: &Path,
+            _cancellation: CancellationToken,
+        ) -> NixTaskResult<()> {
+            unreachable!("catalog test does not format the workspace")
         }
 
         fn realize_check(
@@ -850,7 +898,8 @@ mod tests {
         let malicious = "bad\"; builtins.abort \"injected ${value}";
         let discovery = strings(&discover_args("x86_64-linux"));
         let build = strings(&build_args("x86_64-linux", malicious));
-        for args in [&discovery, &build] {
+        let format = strings(&format_args());
+        for args in [&discovery, &build, &format] {
             assert!(args.iter().any(|arg| arg == "--no-write-lock-file"));
             assert!(args.iter().any(|arg| arg == "--no-update-lock-file"));
             assert!(args.iter().all(|argument| {
@@ -867,6 +916,8 @@ mod tests {
             assert!(!args.iter().any(|arg| arg.contains("nix-fast-build")));
         }
         assert!(build.iter().any(|arg| arg == "--no-link"));
+        assert!(!format.iter().any(|arg| arg == "--no-link"));
+        assert_eq!(format.first().map(String::as_str), Some("fmt"));
         let installable = build.last().expect("quoted Nix installable");
         assert!(installable.contains("x86_64-linux."));
         assert!(!installable.contains(malicious));
@@ -953,6 +1004,20 @@ mod tests {
             .discover(Path::new("."), "x86_64-linux")
             .expect_err("missing executable");
         assert!(error.contains("nix"));
+    }
+
+    #[test]
+    #[bloomery("CLI-CHECK-NIX-012")]
+    fn an_unavailable_nix_cli_fails_the_formatter_instead_of_skipping_it() {
+        let missing = NixCli::with_executable("/missing/bloomery-nix-cli");
+        let log = std::env::temp_dir().join("bloomery-missing-nix-format.log");
+        let result = missing.format_workspace(
+            Path::new("."),
+            &log,
+            CancellationToken::new(InterruptFlag::for_test()),
+        );
+        assert!(matches!(result, NixTaskResult::OperationalError(_)));
+        let _ = fs::remove_file(log);
     }
 
     #[test]

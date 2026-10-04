@@ -137,6 +137,20 @@ pub(super) fn run_at_with(
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> ExitCode {
+    // Mirror the shared CLI preflight at the feature boundary so no direct
+    // caller can execute or retrieve checks without a root flake.
+    if !context.root.join("flake.nix").is_file() {
+        return report_error(
+            context.json_mode,
+            &CheckError {
+                code: crate::output::MISSING_FLAKE_CODE,
+                message: crate::output::MISSING_FLAKE_MESSAGE.to_owned(),
+            },
+            None,
+            stdout,
+            stderr,
+        );
+    }
     if let Err(error) = validate_args(&args) {
         return report_error(context.json_mode, &error, None, stdout, stderr);
     }
@@ -290,28 +304,10 @@ pub(super) fn discover_for_selection(
     requested_systems: &[String],
     backend: &dyn NixBackend,
 ) -> Result<Catalog, CheckError> {
-    let has_flake = root.join("flake.nix").is_file();
-    if !has_flake {
-        if !requested_systems.is_empty() {
-            return Err(CheckError::usage(
-                "--system requires a workspace containing flake.nix",
-            ));
-        }
-        if selectors
-            .iter()
-            .any(|selector| selector.starts_with("nix:"))
-        {
-            return Err(CheckError::usage(
-                "Nix checks cannot be selected because the workspace has no flake.nix",
-            ));
-        }
-        return Ok(Catalog {
-            ids: vec![
-                "static:structure".to_owned(),
-                "static:traceability".to_owned(),
-            ],
-            systems: Vec::new(),
-            notices: Vec::new(),
+    if !root.join("flake.nix").is_file() {
+        return Err(CheckError {
+            code: crate::output::MISSING_FLAKE_CODE,
+            message: crate::output::MISSING_FLAKE_MESSAGE.to_owned(),
         });
     }
 
