@@ -1,4 +1,7 @@
-{bloomeryLib ? null}: let
+{
+  bloomeryLib ? null,
+  bloomeryCli ? null,
+}: let
   defaultSystems = [
     "x86_64-linux"
     "aarch64-linux"
@@ -23,8 +26,16 @@ in
           then bloomeryLib {inherit pkgs lib;}
           else import ./. {inherit pkgs lib;};
         config = import ./build-config.nix {inherit pkgs lib;};
+        raw = config.load {inherit root overrides;};
+        cli =
+          if bloomeryCli != null
+          then bloomeryCli {inherit pkgs lib;}
+          else null;
       in
-        bl.mkWorkspace (config.load {inherit root overrides;})
+        bl.mkWorkspace (raw
+          // {
+            devShell = raw.devShell // lib.optionalAttrs (cli != null) {bloomeryCli = cli;};
+          })
     );
 
     baseOutputs = {

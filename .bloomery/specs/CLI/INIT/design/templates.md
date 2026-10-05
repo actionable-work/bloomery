@@ -25,6 +25,8 @@ Every template provides the same bootstrap files:
 
 - `flake.nix` wires `bloomery.mkFlake` with a `nixpkgs` input and a `bloomery`
   input pointing at `github:actionable-work/bloomery`, passing `root = ./.`.
+  The generated workspace inherits the default development shell, including the
+  Bloomery CLI.
 - `Cargo.toml` declares a `[workspace]` with `resolver = "2"` and the
   template's member crates.
 - `.bloomery/config.toml` is present and relies on the documented default build

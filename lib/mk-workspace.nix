@@ -902,6 +902,7 @@ in
             ]
             ++ (lib.optional (defaultLinker == "lld") lld)
             ++ (lib.optional (defaultLinker == "mold") mold)
+            ++ (lib.optional (cfg.devShell.bloomeryCli != null) cfg.devShell.bloomeryCli)
             ++ cfg.devShell.packages;
           shellHook = cfg.devShell.shellHook;
         }

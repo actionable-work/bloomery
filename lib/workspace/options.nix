@@ -298,6 +298,12 @@
           default = "";
           description = "Additional bash shell hook to execute when entering the development shell.";
         };
+        bloomeryCli = lib.mkOption {
+          type = types.nullOr types.package;
+          default = null;
+          internal = true;
+          description = "Bloomery CLI package injected into the development shell by mkFlake.";
+        };
       };
 
       # ── Checks & CI ──────────────────────────────────────────────────────────

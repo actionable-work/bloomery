@@ -125,6 +125,6 @@ The evaluated workspace attribute set returned by `mkFlake` for each system expo
 - `packages`: Release derivations for binaries (`<name>`) and, when enabled, libraries (`<crate>:lib`), plus `default` when a binary exists.
 - `apps`: Runnable release/dev binaries, documentation apps (`<crate>:doc`), and `default` when a binary exists.
 - `checks`: Comprehensive Nix check suite (`name:test`, `name:clippy`, `name:doc`, `name:doctest`, and `workspace:lock`), with optional package build checks. It does not generate a recursive `bloomery:check`; run the Bloomery CLI directly for static validation and check orchestration.
-- `devShell`: Preconfigured `mkShell` environment with Rust toolchain and build utilities (null when disabled).
+- `devShell`: Preconfigured `mkShell` environment with the Rust toolchain, build utilities, and the Bloomery CLI (null when disabled).
 - `crates`: Map of all individual `.rlib` derivations in the dependency DAG.
 - `config`: Fully evaluated options configuration set.

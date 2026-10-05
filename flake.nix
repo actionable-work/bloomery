@@ -23,23 +23,36 @@
     inherit (nixpkgs) lib;
     systems = import ./nix/systems.nix;
 
-    bloomeryFor = system: let
-      pkgs = nixpkgs.legacyPackages.${system};
-    in
-      import ./lib {
-        inherit pkgs;
-        inherit (pkgs) lib;
-      };
+    bloomeryLib = {
+      pkgs,
+      lib ? pkgs.lib,
+    }:
+      import ./lib {inherit pkgs lib;};
 
+    bloomeryFor = system:
+      bloomeryLib {pkgs = nixpkgs.legacyPackages.${system};};
+
+    # The repository builds its own workspace without a pinned CLI so local
+    # iteration is never shadowed by a prebuilt binary.
+    mkSelfFlake = import ./lib/mk-flake.nix {
+      inherit bloomeryLib;
+    };
+
+    # Consumers always receive the Bloomery CLI in the default development
+    # shell, built from this flake's workspace with their nixpkgs.
     mkFlake = import ./lib/mk-flake.nix {
-      bloomeryLib = {
+      inherit bloomeryLib;
+      bloomeryCli = {
         pkgs,
-        lib ? pkgs.lib,
-      }:
-        import ./lib {inherit pkgs lib;};
+        lib,
+      }: let
+        bl = import ./lib {inherit pkgs lib;};
+        config = import ./lib/build-config.nix {inherit pkgs lib;};
+      in
+        (bl.mkWorkspace (config.load {root = ./.;})).packages.bloomery;
     };
   in
-    (mkFlake {
+    (mkSelfFlake {
       inherit nixpkgs systems;
       root = ./.;
       extraOutputs = {

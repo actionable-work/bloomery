@@ -96,6 +96,10 @@
     root = ../tests/basic-workspace;
     devShell.shellHook = "echo custom-hook";
   };
+  cliDevShellWorkspace = mkWorkspace {
+    root = ../tests/basic-workspace;
+    devShell.bloomeryCli = pkgs.hello;
+  };
   disabledDevShellWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
     devShell.enable = false;
@@ -350,6 +354,18 @@ in {
       hasNixFastBuild = true;
       disabledIsNull = true;
     };
+  };
+
+  testDevShellIncludesConfiguredCli = {
+    expr = lib.elem pkgs.hello cliDevShellWorkspace.devShell.nativeBuildInputs;
+    expected = true;
+  };
+
+  testDevShellOmitsUnconfiguredCli = {
+    expr =
+      lib.any (p: (p.pname or "") == "bloomery")
+      metadataWorkspace.devShell.nativeBuildInputs;
+    expected = false;
   };
 
   testPackageChecksReuseReleaseDerivations = {

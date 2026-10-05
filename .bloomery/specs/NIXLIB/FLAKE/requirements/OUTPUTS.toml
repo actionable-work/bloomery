@@ -184,3 +184,27 @@ design = "design/output-contract.md#apps"
 type = "ubiquitous"
 system = "the workspace builder"
 action = "shape every app entry as an attribute set with type = \"app\" and a program path"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-017"
+title = "Default development shell includes the Bloomery CLI"
+manual = false
+design = "design/output-contract.md#development-shell"
+
+[requirements.ears]
+type = "event"
+trigger = "the development shell is enabled"
+system = "the workspace builder"
+action = "add the Bloomery CLI derivation to the default development shell package set"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-018"
+title = "Workspaces without a CLI derivation omit it"
+manual = false
+design = "design/output-contract.md#development-shell"
+
+[requirements.ears]
+type = "event"
+trigger = "the workspace builder receives no Bloomery CLI derivation"
+system = "the workspace builder"
+action = "generate the default development shell without the Bloomery CLI while retaining the toolchain and user packages"

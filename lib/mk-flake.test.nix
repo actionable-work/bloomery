@@ -9,6 +9,14 @@
     }:
       import ./. {inherit pkgs lib;};
   };
+  mkFlakeWithCli = import ./mk-flake.nix {
+    bloomeryLib = {
+      pkgs,
+      lib,
+    }:
+      import ./. {inherit pkgs lib;};
+    bloomeryCli = {pkgs, ...}: pkgs.hello;
+  };
   mockNixpkgs = {
     inherit lib;
     legacyPackages = {
@@ -155,6 +163,31 @@ in {
       hasDefaultShell = false;
       keepsPackages = true;
     };
+  };
+
+  testMkFlakeInjectsCliIntoDevShell = {
+    expr = let
+      flakeOutputs = mkFlakeWithCli {
+        nixpkgs = mockNixpkgs;
+        systems = [pkgs.system];
+        root = ../tests/basic-workspace;
+      };
+    in
+      lib.elem pkgs.hello flakeOutputs.devShells.${pkgs.system}.default.nativeBuildInputs;
+    expected = true;
+  };
+
+  testMkFlakeOmitsCliWithoutBuilder = {
+    expr = let
+      flakeOutputs = mkFlake {
+        nixpkgs = mockNixpkgs;
+        systems = [pkgs.system];
+        root = ../tests/basic-workspace;
+      };
+    in
+      lib.any (p: (p.pname or "") == "bloomery")
+      flakeOutputs.devShells.${pkgs.system}.default.nativeBuildInputs;
+    expected = false;
   };
 
   testMkFlakeExtraOutputsWorkspaceContext = {

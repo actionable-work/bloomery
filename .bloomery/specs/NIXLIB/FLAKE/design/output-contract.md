@@ -35,7 +35,7 @@ lock model and `config` exposes the evaluated options.
 
 ## Development shell
 
-When enabled, `devShell` is a shell containing `rustc`, `clippy`, `cargo`, and
-`nix-fast-build`, plus the selected linker and user packages, with the
-configured shell hook. When disabled, `devShell` is null and `mkFlake` omits
-the default shell.
+When enabled, `devShell` is a shell containing `rustc`, `clippy`, `cargo`,
+`nix-fast-build`, and the Bloomery CLI, plus the selected linker and user
+packages, with the configured shell hook. When disabled, `devShell` is null and
+`mkFlake` omits the default shell.

@@ -12,7 +12,7 @@ Inspired by `oxalica/nocargo`, this flake:
   - Automatically compiles and executes build scripts (`build.rs`), capturing generated environment variables, `cargo:rustc-cfg`, and native library link search paths.
   - Links rlib dependencies and workspace binaries using `rustc --crate-type bin` with default high-performance linkers (`lld` on Linux).
 - **Checks without cargo**: Generates independent CI checks for unit tests (`rustc --test`), clippy (`clippy-driver`), documentation (`rustdoc`), doctests (`rustdoc --test`), package builds, and lock validation. Run `bloomery check` separately to combine static specification validation with the selected Nix checks; generated checks never invoke the top-level runner recursively.
-- **Built-in DevShell & Apps**: Every workspace automatically generates a development shell (with `rustc`, `cargo`, `clippy`, `nix-fast-build`, direnv support) and runnable apps for its binaries and documentation.
+- **Built-in DevShell & Apps**: Every workspace automatically generates a development shell (with `rustc`, `cargo`, `clippy`, `nix-fast-build`, the Bloomery CLI, direnv support) and runnable apps for its binaries and documentation.
 
 ---
 
@@ -127,7 +127,7 @@ bloomery.mkFlake {
 - `packages`: Derivations for workspace member binaries, plus optional library and dev outputs, and `default` when a binary exists.
 - `apps`: Runnable app specifications for binaries, optional dev binaries, documentation, and `default` when a binary exists.
 - `checks`: Independent CI derivations (`crate:test`, `crate:clippy`, `crate:doc`, `crate:doctest`, `crate:bin`, `crate:lib`, and `workspace:lock`). They do not include a recursive `bloomery:check` output; invoke `bloomery check` directly for static validation and orchestration.
-- `devShell`: Preconfigured development shell with rustc, clippy, cargo, nix-fast-build, and lld (null when disabled).
+- `devShell`: Preconfigured development shell with rustc, clippy, cargo, nix-fast-build, the Bloomery CLI, and lld (null when disabled).
 - `crates`: DAG attribute set of all built `.rlib` crates.
 - `lock`: Parsed lockfile representation.
 - `config`: Evaluated and type-checked options.

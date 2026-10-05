@@ -64,4 +64,16 @@ in
         mkdir "$out"
         echo "passed" > "$out/success"
       '';
+
+    "interface:self-host-devshell" = assert !(lib.any (p: (p.pname or "") == "bloomery")
+      bloomery.devShells.${system}.default.nativeBuildInputs);
+      pkgs.runCommand "bloomery-self-host-devshell" {
+        passthru.bloomery = [
+          "NIXLIB-FLAKE-ENTRYPOINTS-017"
+        ];
+      } ''
+        echo "Bloomery's own development shell omits the prebuilt CLI."
+        mkdir "$out"
+        echo "passed" > "$out/success"
+      '';
   }

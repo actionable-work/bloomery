@@ -28,6 +28,20 @@ each system, `mkFlake` maps the evaluated workspace to `packages`, `apps`,
 `checks`, and `devShells.default`. The default development shell is omitted
 when the workspace disables it, and the remaining attributes stay present.
 
+## Bloomery CLI injection
+
+The exported `mkFlake` always adds the Bloomery CLI derivation to each generated
+default development shell. The derivation is the `bloomery` binary produced from
+the Bloomery flake's own workspace for the selected system. The constructor
+exposes no argument that enables or disables this injection.
+
+## Self-hosting
+
+The repository's root `flake.nix` evaluates its own workspace through an
+internal constructor binding created without CLI injection, so its development
+shell never pins a prebuilt CLI during local iteration. Only the exported
+`mkFlake` carries the CLI injection.
+
 ## extraOutputs
 
 `extraOutputs` receives `{eachSystem, perSystemWorkspace}`. `eachSystem` maps a

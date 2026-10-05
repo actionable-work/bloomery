@@ -156,3 +156,37 @@ type = "unwanted_behavior"
 trigger = "a build-table setting other than overrides is passed as a mkFlake argument"
 system = "the mkFlake constructor"
 action = "reject the argument instead of treating it as configuration"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-015"
+title = "Exported mkFlake injects the Bloomery CLI"
+manual = false
+design = "design/entry-points.md#bloomery-cli-injection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the exported mkFlake constructor"
+action = "add the bloomery binary built from the Bloomery flake's own workspace to every generated default development shell"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-016"
+title = "Exported mkFlake exposes no CLI opt-out"
+manual = false
+design = "design/entry-points.md#bloomery-cli-injection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the exported mkFlake constructor"
+action = "accept no argument that enables or disables Bloomery CLI injection"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-017"
+title = "Root flake evaluates without CLI injection"
+manual = false
+design = "design/entry-points.md#self-hosting"
+
+[requirements.ears]
+type = "event"
+trigger = "the Bloomery repository evaluates its own workspace"
+system = "the root flake.nix"
+action = "use an internal constructor binding created without Bloomery CLI injection"

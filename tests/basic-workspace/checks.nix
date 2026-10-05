@@ -5,6 +5,7 @@
   checks = eachSystem (
     system: let
       pkgs = nixpkgs.legacyPackages.${system};
+      lib = nixpkgs.lib;
       workspace = perSystemWorkspace.${system};
     in
       workspace.checks
@@ -40,8 +41,10 @@
         assert workspace.checks."lib-calc:lib".drvPath == workspace.packages."lib-calc:lib".drvPath;
         assert workspace.crates."itoa-1.0.18".src.name == "itoa-1.0.18.crate";
         assert workspace.crates."itoa-1.0.18".src.url == "https://static.crates.io/crates/itoa/itoa-1.0.18.crate";
+        assert lib.any (p: (p.pname or "") == "bloomery") workspace.devShell.nativeBuildInputs;
           pkgs.runCommand "validate-basic-workspace" {
             passthru.bloomery = [
+              "NIXLIB-FLAKE-ENTRYPOINTS-015"
               "NIXLIB-FLAKE-OUTPUTS-001"
               "NIXLIB-FLAKE-OUTPUTS-002"
               "NIXLIB-FLAKE-OUTPUTS-004"
@@ -51,6 +54,7 @@
               "NIXLIB-FLAKE-OUTPUTS-008"
               "NIXLIB-FLAKE-OUTPUTS-010"
               "NIXLIB-FLAKE-OUTPUTS-012"
+              "NIXLIB-FLAKE-OUTPUTS-017"
               "NIXLIB-GRAPH-RESOLUTION-013"
               "NIXLIB-GRAPH-DERIVATIONS-013"
               "NIXLIB-GRAPH-DERIVATIONS-016"
