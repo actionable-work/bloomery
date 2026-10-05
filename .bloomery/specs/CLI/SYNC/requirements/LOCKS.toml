@@ -196,7 +196,7 @@ design = "design/sync.md#bloomery-lock-format-and-publication"
 [requirements.ears]
 type = "ubiquitous"
 system = "bloomery sync"
-action = "derive resolved package records from final Cargo metadata obtained with --locked"
+action = "derive the global view and per-member context records from final Cargo metadata obtained with --locked"
 
 [[requirements]]
 id = "CLI-SYNC-LOCKS-018"
@@ -487,3 +487,36 @@ type = "unwanted_behavior"
 trigger = "a stage fails after earlier lock mutations"
 system = "bloomery sync"
 action = "warn that locks may be partially synchronized"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-043"
+title = "Lock records only activated dependency edges"
+manual = false
+design = "design/sync.md#bloomery-lock-format-and-publication"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery lock generator"
+action = "record only dependency edges that Cargo activates for a global or context record, omitting optional, weak, and target-specific edges that are not built"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-044"
+title = "Lock records per-member resolution contexts"
+manual = false
+design = "design/sync.md#bloomery-lock-format-and-publication"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery lock generator"
+action = "record the global package view and one fully-unified context per workspace member"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-045"
+title = "Lock is independent of feature unification"
+manual = false
+design = "design/sync.md#bloomery-lock-format-and-publication"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery lock generator"
+action = "produce records that do not encode build.unify so toggling that setting leaves the lock valid and byte-identical"

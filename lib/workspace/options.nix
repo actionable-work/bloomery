@@ -143,6 +143,15 @@
         };
       };
 
+      # ── Build Model ─────────────────────────────────────────────────────────
+      build = {
+        unify = lib.mkOption {
+          type = types.bool;
+          default = true;
+          description = "Unify resolved features across the whole workspace; disable to unify per workspace member instead.";
+        };
+      };
+
       # ── Toolchain & Linker ───────────────────────────────────────────────────
       toolchain = {
         rustc = lib.mkOption {
@@ -337,11 +346,6 @@
 
       # ── Feature Resolution ───────────────────────────────────────────────────
       features = {
-        unify = lib.mkOption {
-          type = types.bool;
-          default = true;
-          description = "Unify features across workspace crates matching Cargo's workspace behavior.";
-        };
         cratesIoIndex = lib.mkOption {
           type = types.nullOr types.path;
           default = null;

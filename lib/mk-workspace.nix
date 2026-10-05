@@ -57,7 +57,7 @@ in
       else if cfg.packages.createDev != null
       then cfg.packages.createDev
       else cfg.createDevPackages;
-    unifyFeatures = cfg.features.unify;
+    unifyFeatures = cfg.build.unify;
     featureIndex =
       if cfg.features.cratesIoIndex != null
       then cfg.features.cratesIoIndex
@@ -350,11 +350,11 @@ in
       ++ lib.optional (effectiveDevBinaryProfile.debuginfo != null) "-Cdebuginfo=${toString effectiveDevBinaryProfile.debuginfo}"
       ++ devRustcFlags;
 
-    # Helper to resolve active dependencies for a package (only dependencies activated by features)
+    # Active dependencies for the global unified package view.
     getDepIds = id: defaultDepIds:
       if resolvedFeatures ? __activeDeps && resolvedFeatures.__activeDeps ? ${id}
       then lib.filter (depId: builtins.elem depId defaultDepIds) resolvedFeatures.__activeDeps.${id}
-      else defaultDepIds;
+      else [];
 
     fetchGitCrate = {
       url,
@@ -395,107 +395,177 @@ in
       then builtins.head matches
       else repo;
 
-    # Attribute set of all crate derivations, keyed by package ID ("name-version")
-    crates =
-      lib.mapAttrs (
-        id: pkg: let
-          src =
-            if pkg.isWorkspace
-            then buildMembers.${pkg.name} or (throw "Workspace crate '${pkg.name}' path not found in workspace")
-            else if pkg.isRegistry
-            then
-              pkgs.fetchurl {
-                name = "${pkg.name}-${pkg.version}.crate";
-                url = "https://static.crates.io/crates/${pkg.name}/${pkg.name}-${pkg.version}.crate";
-                sha256 = pkg.checksum;
-              }
-            else if pkg.isGit
-            then let
-              gitInfo = workspace.sources.parseGitSource pkg.source;
-            in
-              fetchGitCrate {
-                inherit (gitInfo) url rev;
-                name = pkg.name;
-              }
-            else throw "Unsupported source for package ${pkg.name}: ${builtins.toString pkg.source}";
+    # Select the source for a locked package.
+    resolveCrateSrc = pkg:
+      if pkg.isWorkspace
+      then buildMembers.${pkg.name} or (throw "Workspace crate '${pkg.name}' path not found in workspace")
+      else if pkg.isRegistry
+      then
+        pkgs.fetchurl {
+          name = "${pkg.name}-${pkg.version}.crate";
+          url = "https://static.crates.io/crates/${pkg.name}/${pkg.name}-${pkg.version}.crate";
+          sha256 = pkg.checksum;
+        }
+      else if pkg.isGit
+      then let
+        gitInfo = workspace.sources.parseGitSource pkg.source;
+      in
+        fetchGitCrate {
+          inherit (gitInfo) url rev;
+          name = pkg.name;
+        }
+      else throw "Unsupported source for package ${pkg.name}: ${builtins.toString pkg.source}";
 
-          depDrvs = map (depId: crates.${depId}) (getDepIds id pkg.depIds);
-          cOverride = getCrateOverride id pkg.name;
-          pkgLock =
-            if lockManifest != null
-            then (lockManifest.packages.${id} or lockManifest.packages.${pkg.name} or {})
-            else {};
-          pkgFeatures =
-            if cOverride ? features
-            then cOverride.features
-            else if pkgLock ? features
-            then pkgLock.features
-            else if resolvedFeatures ? ${id}
-            then resolvedFeatures.${id}
-            else if resolvedFeatures ? ${pkg.name}
-            then resolvedFeatures.${pkg.name}
-            else if resolvedFeatures ? ${pkg.crateName}
-            then resolvedFeatures.${pkg.crateName}
-            else ["default"];
-        in
-          builderCrate {
-            inherit pkg src;
-            dependencies = depDrvs;
-            override = cOverride;
-            features = pkgFeatures;
-            inherit defaultRustcFlags;
-            isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or null;
-            edition = pkgLock.edition or null;
-          }
-      )
-      parsed.byId;
+    # Build one crate node from a resolved entry.
+    mkCrateNode = {
+      key,
+      package,
+      features ? null,
+      dependencies ? null,
+      rustFlags,
+      resolveDep,
+      variantName ? null,
+    }: let
+      pkg = parsed.byId.${package} or (throw "Bloomery build node '${key}' references unknown package '${package}'");
+      pkgLock =
+        if lockManifest != null
+        then (lockManifest.packages.${package} or {})
+        else {};
+      cOverride = getCrateOverride package pkg.name;
+      pkgFeatures =
+        if cOverride ? features
+        then cOverride.features
+        else if features != null
+        then features
+        else if pkgLock ? features
+        then pkgLock.features
+        else if resolvedFeatures ? ${package}
+        then resolvedFeatures.${package}
+        else if resolvedFeatures ? ${pkg.name}
+        then resolvedFeatures.${pkg.name}
+        else if resolvedFeatures ? ${pkg.crateName}
+        then resolvedFeatures.${pkg.crateName}
+        else ["default"];
+      depIds =
+        if dependencies != null
+        then dependencies
+        else getDepIds key pkg.depIds;
+      depDrvs = map resolveDep depIds;
+    in
+      builderCrate {
+        inherit pkg;
+        src = resolveCrateSrc pkg;
+        dependencies = depDrvs;
+        override = cOverride;
+        features = pkgFeatures;
+        defaultRustcFlags = rustFlags;
+        inherit variantName;
+        isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or null;
+        edition = pkgLock.edition or null;
+      };
 
-    # Attribute set of dev workspace crate derivations (workspace crates compiled with dev flags)
-    devCrates =
+    # Global unified view: one cargo-like node per package.
+    globalCrates = lib.mapAttrs (pkgKey: _:
+      mkCrateNode {
+        key = pkgKey;
+        package = pkgKey;
+        rustFlags = defaultRustcFlags;
+        resolveDep = dep: globalCrates.${dep};
+      })
+    parsed.byId;
+
+    globalDevCrates =
       if createDevPackages
       then
-        lib.mapAttrs (
-          id: pkg:
-            if !pkg.isWorkspace
-            then crates.${id}
-            else let
-              src = buildMembers.${pkg.name} or (throw "Workspace crate '${pkg.name}' path not found in workspace");
-              depDrvs = map (depId: devCrates.${depId}) (getDepIds id pkg.depIds);
-              cOverride = getCrateOverride id pkg.name;
-              pkgLock =
-                if lockManifest != null
-                then (lockManifest.packages.${id} or lockManifest.packages.${pkg.name} or {})
-                else {};
-              pkgFeatures =
-                if cOverride ? features
-                then cOverride.features
-                else if pkgLock ? features
-                then pkgLock.features
-                else if resolvedFeatures ? ${id}
-                then resolvedFeatures.${id}
-                else if resolvedFeatures ? ${pkg.name}
-                then resolvedFeatures.${pkg.name}
-                else if resolvedFeatures ? ${pkg.crateName}
-                then resolvedFeatures.${pkg.crateName}
-                else ["default"];
-            in
-              builderCrate {
-                inherit pkg src;
-                dependencies = depDrvs;
-                override = cOverride;
-                features = pkgFeatures;
-                defaultRustcFlags = devCrateRustcFlags;
-                isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or null;
-                edition = pkgLock.edition or null;
-              }
-        )
+        lib.mapAttrs (pkgKey: _: let
+          pkg = parsed.byId.${pkgKey};
+        in
+          if !pkg.isWorkspace
+          then globalCrates.${pkgKey}
+          else
+            mkCrateNode {
+              key = pkgKey;
+              package = pkgKey;
+              rustFlags = devCrateRustcFlags;
+              resolveDep = dep: globalDevCrates.${dep};
+            })
         parsed.byId
       else {};
+
+    # Per-member resolution contexts: each is a fully-unified closure.
+    lockContexts =
+      if lockManifest != null && (lockManifest ? contexts) && lockManifest.contexts != {}
+      then lockManifest.contexts
+      else
+        lib.genAttrs (map (member: member.id) parsed.workspacePackages) (_:
+          lib.mapAttrs (pkgKey: _: {
+            features = resolvedFeatures.${pkgKey} or ["default"];
+            dependencies = resolvedFeatures.__activeDeps.${pkgKey} or [];
+          })
+          parsed.byId);
+
+    contextCrates = lib.mapAttrs (root: context:
+      lib.mapAttrs (pkgKey: entry:
+        mkCrateNode {
+          key = pkgKey;
+          package = pkgKey;
+          inherit (entry) features dependencies;
+          rustFlags = defaultRustcFlags;
+          resolveDep = dep: contextCrates.${root}.${dep};
+          variantName = root;
+        })
+      context)
+    lockContexts;
+
+    contextDevCrates =
+      if createDevPackages
+      then
+        lib.mapAttrs (root: context:
+          lib.mapAttrs (pkgKey: _: let
+            pkg = parsed.byId.${pkgKey};
+            entry = context.${pkgKey};
+          in
+            if !pkg.isWorkspace
+            then contextCrates.${root}.${pkgKey}
+            else
+              mkCrateNode {
+                key = pkgKey;
+                package = pkgKey;
+                inherit (entry) features dependencies;
+                rustFlags = devCrateRustcFlags;
+                resolveDep = dep: contextDevCrates.${root}.${dep};
+                variantName = root;
+              })
+          context)
+        lockContexts
+      else {};
+
+    # The active graph for a workspace member: global when unifying, otherwise
+    # the member's own context.
+    cratesFor = root:
+      if unifyFeatures || !(lockContexts ? ${root})
+      then globalCrates
+      else contextCrates.${root};
+    devCratesFor = root:
+      if unifyFeatures || !(lockContexts ? ${root})
+      then globalDevCrates
+      else contextDevCrates.${root};
+    getDepIdsFor = root: id: defaultDepIds:
+      if unifyFeatures || !(lockContexts ? ${root})
+      then getDepIds id defaultDepIds
+      else lockContexts.${root}.${id}.dependencies or [];
+
+    # Public crates expose the global unified view.
+    crates = globalCrates;
+    devCrates = globalDevCrates;
 
     # Find and build binaries for workspace crates (both release and dev profiles)
     workspaceBinaries =
       lib.concatMap (
         wpkg: let
+          crates = cratesFor wpkg.id;
+          devCrates = devCratesFor wpkg.id;
+          getDepIds = getDepIdsFor wpkg.id;
           cratePath = discoveredMembers.${wpkg.name} or null;
           buildPath = buildMembers.${wpkg.name} or null;
           depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
@@ -668,6 +738,7 @@ in
       lib.foldl' (
         acc: wpkg: let
           hasLib = memberHasLib wpkg.name;
+          crates = cratesFor wpkg.id;
         in
           if hasLib
           then
@@ -684,6 +755,8 @@ in
     workspaceTests = lib.listToAttrs (
       map (
         wpkg: let
+          crates = cratesFor wpkg.id;
+          getDepIds = getDepIdsFor wpkg.id;
           cratePath = buildTestMembers.${wpkg.name};
           depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
           cOverride = testOverridesFor wpkg.name;
@@ -717,6 +790,8 @@ in
     workspaceClippy = lib.listToAttrs (
       map (
         wpkg: let
+          crates = cratesFor wpkg.id;
+          getDepIds = getDepIdsFor wpkg.id;
           cratePath = buildMembers.${wpkg.name};
           depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
           cOverride = getOverride wpkg.name;
@@ -745,6 +820,8 @@ in
     workspaceDocs = lib.listToAttrs (
       map (
         wpkg: let
+          crates = cratesFor wpkg.id;
+          getDepIds = getDepIdsFor wpkg.id;
           cratePath = buildMembers.${wpkg.name};
           depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
           cOverride = getOverride wpkg.name;
@@ -774,6 +851,8 @@ in
       builtins.filter (x: x != null) (
         map (
           wpkg: let
+            crates = cratesFor wpkg.id;
+            getDepIds = getDepIdsFor wpkg.id;
             cratePath = buildMembers.${wpkg.name};
             hasLib = memberHasLib wpkg.name;
             depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
@@ -962,6 +1041,9 @@ in
     # All compiled rlibs (DAG) - release and dev variants
     inherit crates devCrates;
     cratesDev = devCrates;
+
+    # Per-member resolution contexts and their crate graphs
+    inherit lockContexts contextCrates contextDevCrates globalCrates globalDevCrates cratesFor devCratesFor;
 
     # Expose both binaries and libraries
     packages =

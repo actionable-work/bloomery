@@ -4,6 +4,7 @@ cargoToml = "Cargo.toml" # Repository-relative path to the Cargo workspace manif
 devPackages = true       # Generate dev-profile apps for workspace binaries.
 libPackages = false      # Expose <crate>:lib packages for workspace libraries.
 profileName = "release"  # Active Cargo profile name for release builds.
+unify = false            # Unify workspace features like Cargo's resolver.
 
 [checks]
 enable = true                # Generate workspace checks.
@@ -16,9 +17,6 @@ workspaceDependencies = true # Validate workspace dependency declarations.
 enable = true  # Generate the default development shell.
 packages = []  # Additional nixpkgs packages in the development shell.
 shellHook = "" # Shell hook run when entering the development shell.
-
-[features]
-unify = true # Unify workspace features like Cargo's resolver.
 
 [flags]
 clippy = []               # Extra rustc flags for clippy runs.

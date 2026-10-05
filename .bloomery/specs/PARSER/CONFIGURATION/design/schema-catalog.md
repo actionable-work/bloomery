@@ -53,6 +53,7 @@ editing and validation.
 | `build.profileName` | string | `"release"` |
 | `build.libPackages` | boolean | `false` |
 | `build.devPackages` | boolean | `false` |
+| `build.unify` | boolean | `true` |
 
 ### `[toolchain]`
 
@@ -116,7 +117,6 @@ default because omission delegates to `Cargo.toml` and rustc defaults.
 
 | Key | Type | Recommended default |
 | --- | --- | --- |
-| `features.unify` | boolean | `true` |
 | `features.cratesIoIndex` | repository-relative path, absent means none | none |
 
 ### `[formatters]`

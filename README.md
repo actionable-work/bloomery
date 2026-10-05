@@ -47,6 +47,7 @@ arguments.
 libPackages = false
 devPackages = true
 profileName = "release"
+unify = true
 
 [toolchain]
 linker = "lld"
@@ -65,9 +66,6 @@ enable = true
 [checks]
 enable = true
 includePackageChecks = true
-
-[features]
-unify = true
 ```
 
 Package-valued settings are nixpkgs attribute paths; path-valued settings are

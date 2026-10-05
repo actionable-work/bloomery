@@ -15,6 +15,7 @@
       "profileName"
       "libPackages"
       "devPackages"
+      "unify"
     ];
     toolchain = ["rustc" "clippy" "cargo" "lld" "mold" "stdenv" "linker"];
     profile = ["release" "dev"];
@@ -33,7 +34,7 @@
     flags = ["rustc" "test" "clippy" "doc" "doctest"];
     devShell = ["enable" "packages" "shellHook"];
     checks = ["enable" "includePackageChecks" "throwOnOutOfDate" "workspaceDependencies" "noDefaultFeatures"];
-    features = ["unify" "cratesIoIndex"];
+    features = ["cratesIoIndex"];
   };
 
   checkTable = name: keys: value:
@@ -134,11 +135,12 @@
       // (lib.optionalAttrs (devShell ? packages) {packages = resolvePackages devShell.packages;})
       // (lib.optionalAttrs (devShell ? shellHook) {shellHook = devShell.shellHook;});
 
-    featuresArgs =
-      (lib.optionalAttrs (features ? unify) {unify = features.unify;})
-      // (lib.optionalAttrs (features ? cratesIoIndex) {
-        cratesIoIndex = resolvePath root features.cratesIoIndex;
-      });
+    featuresArgs = lib.optionalAttrs (features ? cratesIoIndex) {
+      cratesIoIndex = resolvePath root features.cratesIoIndex;
+    };
+
+    buildArgs =
+      lib.optionalAttrs (build ? unify) {unify = build.unify;};
   in
     {
       inherit root overrides;
@@ -149,6 +151,7 @@
       flags = flags;
       devShell = devShellArgs;
       checks = checks;
+      build = buildArgs;
       features = featuresArgs;
       formatters = formatters;
     }

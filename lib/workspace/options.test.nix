@@ -15,7 +15,7 @@ in {
       hasCargoLock = cfg.source.cargoLock == ./. + "/Cargo.lock";
       devShellEnabled = cfg.devShell.enable;
       checksEnabled = cfg.checks.enable;
-      unifyFeatures = cfg.features.unify;
+      unifyFeatures = cfg.build.unify;
       linker = cfg.toolchain.linker;
       libPackages = cfg.createLibPackages;
       devPackages = cfg.createDevPackages;
@@ -70,6 +70,7 @@ in {
         };
         devShell.packages = [pkgs.hello];
         checks.throwOnOutOfDate = true;
+        build.unify = false;
       };
     in {
       linker = cfg.toolchain.linker;
@@ -79,6 +80,7 @@ in {
       profileStrip = cfg.profile.strip;
       devShellPackagesCount = builtins.length cfg.devShell.packages;
       throwOnOutOfDate = cfg.checks.throwOnOutOfDate;
+      unify = cfg.build.unify;
     };
     expected = {
       linker = "mold";
@@ -88,6 +90,7 @@ in {
       profileStrip = true;
       devShellPackagesCount = 1;
       throwOnOutOfDate = true;
+      unify = false;
     };
   };
 

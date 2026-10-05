@@ -241,3 +241,27 @@ design = "design/derivations.md#crate-compilation"
 type = "ubiquitous"
 system = "the crate builder test suite"
 action = "compile a proc-macro fixture crate and assert its derived crate type"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-023"
+title = "Context variants compile independently"
+manual = false
+design = "design/derivations.md#feature-compilation"
+
+[requirements.ears]
+type = "event"
+trigger = "a package is reachable from more than one resolution context"
+system = "the crate builder"
+action = "emit a separate crate derivation for each context"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-024"
+title = "Context variants have distinct identifiers"
+manual = false
+design = "design/derivations.md#feature-compilation"
+
+[requirements.ears]
+type = "event"
+trigger = "a package is reachable from more than one resolution context"
+system = "the crate builder"
+action = "give each context variant a distinct deterministic identifier derived from the context and the package ID"

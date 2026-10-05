@@ -461,7 +461,7 @@ pub const CATALOG: &[CatalogEntry] = &[
         documentation: "Require default features to be disabled on workspace dependencies.",
     },
     CatalogEntry {
-        path: &["features", "unify"],
+        path: &["build", "unify"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(true)),
         documentation: "Unify workspace features like Cargo's resolver.",
@@ -833,7 +833,7 @@ pub fn effective_value(raw: Option<&Value>, path: &[&str]) -> Option<Value> {
 #[cfg(test)]
 mod tests {
     use super::{
-        BUILTIN_FORMATTERS, CATALOG, CATALOG_VERSION, ValueType, effective_default,
+        BUILTIN_FORMATTERS, CATALOG, CATALOG_VERSION, DefaultValue, ValueType, effective_default,
         effective_value, lookup, recommended_entries, resolve, validate_raw,
     };
     use toml::Value;
@@ -860,7 +860,7 @@ mod tests {
             "flags.rustc",
             "devShell.shellHook",
             "checks.enable",
-            "features.unify",
+            "build.unify",
             "formatters.toml-sort.before",
         ] {
             assert!(
@@ -1024,6 +1024,15 @@ mod tests {
         assert!(extra.recommended.is_none());
         assert!(resolve(&["formatters", "prettier", "command"]).is_none());
         assert!(resolve(&["formatters", "prettier"]).is_none());
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-011"))]
+    fn feature_unification_is_catalogued_under_build() {
+        let entry = resolve(&["build", "unify"]).expect("build.unify catalog entry");
+        assert_eq!(entry.value_type, ValueType::Bool);
+        assert_eq!(entry.recommended, Some(DefaultValue::Bool(true)));
+        assert!(resolve(&["features", "unify"]).is_none());
     }
 
     #[test]

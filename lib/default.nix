@@ -46,7 +46,6 @@
     (workspace)
     discoverWorkspaceCrates
     extractFeaturesFromToml
-    unifyWorkspaceFeatures
     resolveFeatures
     parseLock
     ;

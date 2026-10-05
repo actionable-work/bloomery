@@ -42,6 +42,7 @@ members = ["my-crate"]          # omit to discover all workspace members
 profileName = "release"         # active profile name
 libPackages = false             # expose <crate>:lib packages
 devPackages = true              # generate dev-profile apps (<bin>:dev)
+unify = true                    # Cargo-style feature unification
 
 [toolchain]
 rustc = "rustc"                 # nixpkgs attribute path
@@ -88,7 +89,6 @@ includePackageChecks = true     # build final packages as CI checks
 throwOnOutOfDate = false        # error evaluation if bloomery.lock is out of date
 
 [features]
-unify = true                    # Cargo-style feature unification
 cratesIoIndex = "crates-io-index"
 
 [formatters.toml-sort]          # enable/disable and order built-in formatters

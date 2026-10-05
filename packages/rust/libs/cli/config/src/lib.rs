@@ -537,7 +537,7 @@ mod tests {
         match report.outcome {
             ConfigOutcome::List { keys } => {
                 assert!(keys.iter().any(|key| key.key == "specs.dir"));
-                assert!(keys.iter().any(|key| key.key == "features.unify"));
+                assert!(keys.iter().any(|key| key.key == "build.unify"));
                 assert!(
                     keys.iter()
                         .all(|key| key.configured == (key.key == "checks.enable"))
@@ -965,8 +965,8 @@ mod tests {
                 assert_eq!(enable.recommended, Some(toml::Value::Boolean(true)));
                 let absent = differences
                     .iter()
-                    .find(|record| record.key == "features.unify")
-                    .expect("features.unify diff");
+                    .find(|record| record.key == "build.unify")
+                    .expect("build.unify diff");
                 assert_eq!(absent.status, DiffStatus::Absent);
                 let optional = differences
                     .iter()

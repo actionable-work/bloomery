@@ -152,7 +152,7 @@ action = "merge them in that order and let explicit values win"
 id = "NIXLIB-FLAKE-OPTIONS-014"
 title = "Development shell options are configurable"
 manual = false
-design = "design/workspace-options.md#development-shell-checks-and-features"
+design = "design/workspace-options.md#development-shell-and-checks"
 
 [requirements.ears]
 type = "ubiquitous"
@@ -163,7 +163,7 @@ action = "accept development shell enablement, extra packages, and a shell hook"
 id = "NIXLIB-FLAKE-OPTIONS-015"
 title = "Check options are configurable"
 manual = false
-design = "design/workspace-options.md#development-shell-checks-and-features"
+design = "design/workspace-options.md#development-shell-and-checks"
 
 [requirements.ears]
 type = "ubiquitous"
@@ -174,18 +174,18 @@ action = "accept checks.enable, checks.includePackageChecks, and checks.throwOnO
 id = "NIXLIB-FLAKE-OPTIONS-016"
 title = "Feature resolution options are configurable"
 manual = false
-design = "design/workspace-options.md#development-shell-checks-and-features"
+design = "design/workspace-options.md#feature-resolution"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "the workspace option module"
-action = "accept features.unify and features.cratesIoIndex"
+action = "accept build.unify and features.cratesIoIndex"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-OPTIONS-017"
 title = "Workspace dependency check defaults to on"
 manual = false
-design = "design/workspace-options.md#development-shell-checks-and-features"
+design = "design/workspace-options.md#development-shell-and-checks"
 
 [requirements.ears]
 type = "ubiquitous"
@@ -196,7 +196,7 @@ action = "default checks.workspaceDependencies to true"
 id = "NIXLIB-FLAKE-OPTIONS-018"
 title = "Default features check defaults to on"
 manual = false
-design = "design/workspace-options.md#development-shell-checks-and-features"
+design = "design/workspace-options.md#development-shell-and-checks"
 
 [requirements.ears]
 type = "ubiquitous"

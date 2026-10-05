@@ -35,6 +35,7 @@
   defaultRustcFlags ? ["-Copt-level=3"],
   isProcMacro ? null,
   edition ? null,
+  variantName ? null,
 }: let
   pname = pkg.name;
   version = pkg.version;
@@ -70,7 +71,7 @@
 in
   stdenv.mkDerivation (_finalAttrs:
     {
-      name = "rust-crate-${pname}-${version}";
+      name = "rust-crate-${pname}-${version}${lib.optionalString (variantName != null) "-${variantName}"}";
       inherit pname version src;
 
       nativeBuildInputs = nativeBuildInputs;

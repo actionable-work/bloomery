@@ -14,6 +14,8 @@ pub(crate) struct BloomeryLock {
     #[serde(rename = "cargo-lock-hash")]
     pub cargo_lock_hash: String,
     pub packages: BTreeMap<String, BloomeryPackage>,
+    #[serde(default)]
+    pub contexts: BTreeMap<String, BTreeMap<String, BloomeryContextPackage>>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -23,6 +25,13 @@ pub(crate) struct BloomeryPackage {
     #[serde(rename = "proc-macro")]
     pub proc_macro: bool,
     pub edition: String,
+}
+
+/// A package resolved within one workspace member's fully-unified closure.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub(crate) struct BloomeryContextPackage {
+    pub features: Vec<String>,
+    pub dependencies: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -84,6 +93,36 @@ fn validate_lock(lock: &BloomeryLock) -> Result<(), String> {
                 return Err(format!(
                     "package '{key}' references unresolved Bloomery lock dependency '{dependency}'"
                 ));
+            }
+        }
+    }
+
+    for (member, context) in &lock.contexts {
+        if member.is_empty() {
+            return Err("Bloomery lock context keys must not be empty".to_owned());
+        }
+        for (key, package) in context {
+            if !lock.packages.contains_key(key) {
+                return Err(format!(
+                    "context '{member}' references unknown package '{key}'"
+                ));
+            }
+            if !is_strictly_sorted(&package.features) {
+                return Err(format!(
+                    "context '{member}' package '{key}' features must be sorted and deduplicated"
+                ));
+            }
+            if !is_strictly_sorted(&package.dependencies) {
+                return Err(format!(
+                    "context '{member}' package '{key}' dependencies must be sorted and deduplicated"
+                ));
+            }
+            for dependency in &package.dependencies {
+                if !context.contains_key(dependency) {
+                    return Err(format!(
+                        "context '{member}' package '{key}' references unresolved package '{dependency}'"
+                    ));
+                }
             }
         }
     }
@@ -210,8 +249,8 @@ impl Drop for TempFileGuard {
 #[cfg(test)]
 mod tests {
     use super::{
-        BloomeryLock, BloomeryPackage, PublicationOutcome, publish_candidate,
-        publish_candidate_with, serialize_candidate,
+        BloomeryContextPackage, BloomeryLock, BloomeryPackage, PublicationOutcome,
+        publish_candidate, publish_candidate_with, serialize_candidate,
     };
     use std::collections::BTreeMap;
     use std::fs;
@@ -271,6 +310,25 @@ mod tests {
                     },
                 ),
             ]),
+            contexts: BTreeMap::from([(
+                "crate-a-1.0.0".to_owned(),
+                BTreeMap::from([
+                    (
+                        "crate-a-1.0.0".to_owned(),
+                        BloomeryContextPackage {
+                            features: vec!["alpha".to_owned(), "zeta".to_owned()],
+                            dependencies: vec!["crate-b-2.0.0".to_owned()],
+                        },
+                    ),
+                    (
+                        "crate-b-2.0.0".to_owned(),
+                        BloomeryContextPackage {
+                            features: Vec::new(),
+                            dependencies: Vec::new(),
+                        },
+                    ),
+                ]),
+            )]),
         }
     }
 
@@ -325,6 +383,7 @@ mod tests {
     fn toml_writer_escapes_package_keys_and_string_values() {
         let mut lock = sample_lock();
         lock.packages.clear();
+        lock.contexts.clear();
         let unusual_key = "crate.\\\"name-1.0.0".to_owned();
         let unusual_feature = "quote: \" slash: \\".to_owned();
         lock.packages.insert(

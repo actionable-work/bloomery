@@ -21,7 +21,7 @@
     else {};
 in {
   inherit (discover) discoverWorkspaceCrates;
-  inherit (features) extractFeaturesFromToml unifyWorkspaceFeatures resolveFeatures;
+  inherit (features) extractFeaturesFromToml resolveFeatures;
   inherit (parseLock) parseDepString parseLock;
   inherit manifestPolicy;
   inherit sources;

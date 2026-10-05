@@ -685,8 +685,4 @@
       });
   in
     expandedResult;
-
-  # Compute unified features across workspace root and all member Cargo.toml files
-  unifyWorkspaceFeatures = args:
-    resolveFeatures (args // {unifyFeatures = true;});
 }

@@ -48,7 +48,7 @@ action = "fail evaluation with an error naming the offending dependency"
 
 [[requirements]]
 id = "NIXLIB-GRAPH-RESOLUTION-005"
-title = "Bloomery lock supplies active graph data"
+title = "Bloomery lock supplies the global and per-member resolutions"
 manual = false
 design = "design/resolution.md#bloomery-lock"
 
@@ -56,7 +56,7 @@ design = "design/resolution.md#bloomery-lock"
 type = "event"
 trigger = "bloomery.lock is present"
 system = "the workspace builder"
-action = "take each package's active features and dependency edges plus proc-macro and edition metadata from that lock"
+action = "take the global package view and one unified context per workspace member, each recording active features and activated dependencies, plus proc-macro and edition metadata and the Cargo.lock digest"
 
 [[requirements]]
 id = "NIXLIB-GRAPH-RESOLUTION-006"
@@ -84,7 +84,7 @@ action = "fail evaluation before any derivation is realized"
 
 [[requirements]]
 id = "NIXLIB-GRAPH-RESOLUTION-008"
-title = "Index fallback resolves features without a bloomery lock"
+title = "Index fallback resolves global and per-member contexts"
 manual = false
 design = "design/resolution.md#index-fallback"
 
@@ -92,7 +92,7 @@ design = "design/resolution.md#index-fallback"
 type = "event"
 trigger = "bloomery.lock is absent and features.cratesIoIndex is configured"
 system = "the workspace builder"
-action = "resolve active features and dependency edges from local manifests and index entries to a fixed point"
+action = "resolve the global view and one unified context per workspace member from local manifests and index entries to a fixed point with accurate activated edges"
 
 [[requirements]]
 id = "NIXLIB-GRAPH-RESOLUTION-009"
@@ -108,14 +108,15 @@ action = "fail evaluation with guidance to run bloomery sync"
 
 [[requirements]]
 id = "NIXLIB-GRAPH-RESOLUTION-010"
-title = "Every locked package becomes a crate node"
+title = "Unified resolution uses the global package view"
 manual = false
-design = "design/resolution.md#crate-nodes-and-edges"
+design = "design/resolution.md#feature-unification-modes"
 
 [requirements.ears]
-type = "ubiquitous"
+type = "event"
+trigger = "build.unify is enabled"
 system = "the workspace builder"
-action = "expose a release crate node keyed by <name>-<version> for every package in Cargo.lock"
+action = "expose one release crate node per package from the global workspace-wide resolution"
 
 [[requirements]]
 id = "NIXLIB-GRAPH-RESOLUTION-011"
@@ -131,14 +132,14 @@ action = "expose dev-profile crate nodes for workspace members while sharing non
 
 [[requirements]]
 id = "NIXLIB-GRAPH-RESOLUTION-012"
-title = "Graph edges follow active dependencies"
+title = "Graph edges follow activated dependencies"
 manual = false
 design = "design/resolution.md#crate-nodes-and-edges"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "the workspace builder"
-action = "wire each crate node to the nodes of its active resolved dependencies, falling back to all resolved Cargo.lock dependencies when no active edge set exists"
+action = "wire each crate node only to the nodes of its activated dependencies, never to unactivated locked packages"
 
 [[requirements]]
 id = "NIXLIB-GRAPH-RESOLUTION-013"
@@ -205,7 +206,7 @@ design = "design/resolution.md#override-and-feature-precedence"
 [requirements.ears]
 type = "ubiquitous"
 system = "the workspace builder"
-action = "select a package's features from its per-crate override, then the lock manifest, then resolved features, then the default set"
+action = "select a package's features from its per-crate override, then the resolved context or global view, then resolved features, then the default set"
 
 [[requirements]]
 id = "NIXLIB-GRAPH-RESOLUTION-019"
@@ -228,3 +229,37 @@ design = "design/resolution.md#evaluation-boundary"
 type = "ubiquitous"
 system = "Bloomery graph resolution"
 action = "read manifests, Cargo.lock, and bloomery.lock only, without running Cargo, importing from a derivation, or fetching sources during evaluation"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-021"
+title = "Non-unified resolution uses per-member contexts"
+manual = false
+design = "design/resolution.md#feature-unification-modes"
+
+[requirements.ears]
+type = "event"
+trigger = "build.unify is disabled"
+system = "the workspace builder"
+action = "build every artifact of a workspace member from that member's unified context so a package reachable from several members has a distinct derivation per context"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-023"
+title = "Each artifact resolves against one context"
+manual = false
+design = "design/resolution.md#feature-unification-modes"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "resolve every artifact against a single fully-unified context so crate instances from different contexts never mix"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-022"
+title = "Unify setting does not affect lock validity"
+manual = false
+design = "design/resolution.md#bloomery-lock"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "treat one bloomery.lock as valid for both build.unify settings and keep its bytes unchanged when only that setting changes"

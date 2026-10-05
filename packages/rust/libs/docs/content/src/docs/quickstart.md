@@ -59,13 +59,13 @@ All build settings are read from `.bloomery/config.toml`:
 
 | Table | Purpose |
 | --- | --- |
-| `[build]` | Source paths, member selection, `profileName`, `libPackages`, `devPackages` |
+| `[build]` | Source paths, member selection, `profileName`, `libPackages`, `devPackages`, `unify` |
 | `[toolchain]` | `rustc`, `clippy`, `cargo`, `lld`, `mold`, `stdenv`, and `linker` |
 | `[profile.release]`, `[profile.dev]` | Optimization, LTO, codegen units, panic, strip, debug info, CPU target |
 | `[flags]` | Extra `rustc`, `test`, `clippy`, `doc`, and `doctest` flags |
 | `[devShell]` | `enable`, extra `packages`, and `shellHook` |
 | `[checks]` | `enable`, `includePackageChecks`, `throwOnOutOfDate` |
-| `[features]` | `unify` and `cratesIoIndex` |
+| `[features]` | `cratesIoIndex` |
 
 Package-valued settings are written as nixpkgs attribute paths (for example
 `linker = "mold"` or `packages = ["rust-analyzer"]`); path-valued settings are

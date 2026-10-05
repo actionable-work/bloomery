@@ -32,7 +32,12 @@ to the target compilation. A `links` crate publishes its metadata keys as
 
 Active features become `--cfg feature="..."` flags. Features implied through a
 crate's `[features]` table are expanded, and features that only reference
-optional dependencies absent from the graph are skipped.
+optional dependencies absent from the graph are skipped. With non-unified
+resolution a package reachable from more than one context produces one crate
+derivation per context. Each context variant carries a distinct deterministic
+identifier derived from the context and the package ID; that identifier
+qualifies its graph node key and derivation name. A package resolved by a single
+context keeps its package-based identifier.
 
 ## Binary derivations
 

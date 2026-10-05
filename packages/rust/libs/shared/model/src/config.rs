@@ -360,14 +360,14 @@ mod tests {
 
         fs::write(
             &config_path,
-            "[build]\ncargoToml = \"Cargo.toml\"\nlibPackages = true\n\
+            "[build]\ncargoToml = \"Cargo.toml\"\nlibPackages = true\nunify = true\n\
              [toolchain]\nlinker = \"lld\"\n\
              [profile.release]\noptLevel = 3\n\
              [profile.dev]\noptLevel = 0\n\
              [flags]\ndoc = [\"-Dwarnings\"]\n\
              [devShell]\nenable = false\n\
              [checks]\nenable = true\n\
-             [features]\nunify = true\n",
+             [features]\ncratesIoIndex = \"crates-io-index\"\n",
         )
         .expect("build tables");
         let config = load(&root).expect("build tables should be accepted");

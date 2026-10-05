@@ -38,7 +38,7 @@ configuration and the current effective configuration. For every catalogued key
 that has a recommended default it reports the recommended value and the current
 value, marking each as equal, differing, or absent and would-be-added. Keys
 without a recommendation are reported as unset. The diff includes enabled-state
-differences such as `checks.enable`, `devShell.enable`, `features.unify`, and
+differences such as `checks.enable`, `devShell.enable`, `build.unify`, and
 scanner `enabled` flags.
 
 `--diff` writes nothing and is mutually exclusive with `--dry-run`; supplying

@@ -25,7 +25,7 @@ build.
 ## Scope
 
 This feature covers graph inputs, workspace discovery, feature and dependency
-resolution, crate sourcing, crate identity, binary discovery, build scripts,
-propagation metadata, asset flow, and the workspace check derivations. Fileset
-selection mechanics are owned by
+resolution, feature unification modes, crate sourcing, crate identity, binary
+discovery, build scripts, propagation metadata, asset flow, and the workspace
+check derivations. Fileset selection mechanics are owned by
 [NIX/SOURCES](../../NIX/SOURCES/README.md).

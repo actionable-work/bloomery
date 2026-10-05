@@ -40,9 +40,10 @@ TOML values map to the workspace option module as follows:
 ## Build table
 
 `[build]` carries `cargoToml`, `cargoLock`, `bloomeryLock`, `members`,
-`profileName`, `libPackages`, and `devPackages`. Omitted source path keys default
-below the root; an omitted `bloomeryLock` key auto-detects the lock file. The
-`libPackages` and `devPackages` booleans are the visibility toggles.
+`profileName`, `libPackages`, `devPackages`, and `unify`. Omitted source path
+keys default below the root; an omitted `bloomeryLock` key auto-detects the lock
+file. The `libPackages` and `devPackages` booleans are the visibility toggles,
+and `unify` selects workspace-wide or per-member unification.
 
 ```toml
 [build]
@@ -53,6 +54,7 @@ members = ["bloomery-cli"]       # omit to build every member
 profileName = "release"
 libPackages = false
 devPackages = true
+unify = true
 ```
 
 ## Toolchain
@@ -129,11 +131,10 @@ noDefaultFeatures = true
 
 ## Features
 
-`[features]` carries `unify` and `cratesIoIndex`.
+`[features]` carries `cratesIoIndex`.
 
 ```toml
 [features]
-unify = true
 cratesIoIndex = "crates-io-index"
 ```
 

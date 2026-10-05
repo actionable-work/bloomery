@@ -109,3 +109,14 @@ design = "design/schema-catalog.md#formatters"
 type = "ubiquitous"
 system = "the schema catalog"
 action = "include the enable, before, and after keys for any formatter name under the formatters table"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-011"
+title = "Feature unification is catalogued under build"
+manual = false
+design = "design/schema-catalog.md#build-tables"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "catalogue the feature unification toggle as build.unify with a recommended default of true"

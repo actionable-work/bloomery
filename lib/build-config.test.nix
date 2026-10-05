@@ -23,7 +23,7 @@ in {
       devPackages = cfg.createDevPackages;
       devShellEnabled = cfg.devShell.enable;
       checksEnabled = cfg.checks.enable;
-      unify = cfg.features.unify;
+      unify = cfg.build.unify;
       profileOptLevel = cfg.profile.optLevel;
     };
     expected = {
@@ -150,8 +150,10 @@ in {
           workspaceDependencies = false;
           noDefaultFeatures = false;
         };
-        features = {
+        build = {
           unify = false;
+        };
+        features = {
           cratesIoIndex = "crates-io-index";
         };
       };
@@ -164,7 +166,7 @@ in {
       throwOnOutOfDate = cfg.checks.throwOnOutOfDate;
       workspaceDependencies = cfg.checks.workspaceDependencies;
       noDefaultFeatures = cfg.checks.noDefaultFeatures;
-      unify = cfg.features.unify;
+      unify = cfg.build.unify;
       cratesIoIndex = cfg.features.cratesIoIndex;
     };
     expected = {

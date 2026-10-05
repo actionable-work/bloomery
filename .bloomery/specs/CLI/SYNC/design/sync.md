@@ -70,11 +70,12 @@ selection is included in this design.
    `Cargo.lock` hash.
 7. Publish the generated lock safely and report completion.
 
-Cargo's normal workspace resolution and feature behavior are retained; sync
-adds no target or feature selection flags. Normal reconciliation may change
-versions when manifest changes require it and may access the network. It is
-not an offline mode and does not promise that Cargo.lock will be unchanged.
-Neither sync nor update modifies dependency constraints in Cargo.toml.
+Cargo remains the feature-resolution authority. Sync derives the dependency-edge
+unit graph from the final locked resolution and adds no target or feature
+selection flags of its own. Normal reconciliation may change versions when
+manifest changes require it and may access the network. It is not an offline
+mode and does not promise that Cargo.lock will be unchanged. Neither sync nor
+update modifies dependency constraints in Cargo.toml.
 
 Sync dispatch must happen before specification loading in the CLI. Missing or
 invalid specs and uncovered requirements cannot prevent lock repair. This is
@@ -82,22 +83,31 @@ separate from rejecting an invalid configuration file.
 
 ## Bloomery lock format and publication
 
-Preserve the existing version-1 TOML contract consumed by the Nix builders:
+Emit the version-1 TOML contract consumed by the Nix builders:
 
 - Generated-file header and `version = 1`.
 - `cargo-lock-hash`: SHA-256 of final `Cargo.lock`, normalizing CRLF to LF,
   matching the Nix lock validator.
 - A `packages` table keyed by `name-version`, covering resolved packages with
-  feature names, dependency package identifiers, `proc-macro`, and edition.
-- Derive package records from Cargo metadata's resolved graph. Retain the
-  current lock generator's field semantics and edition fallback (`2021`).
+  their workspace-wide active features, activated dependencies, `proc-macro`,
+  and edition metadata.
+- A `contexts` table keyed by workspace member. Each context maps every package
+  in that member's fully-unified closure to its active features and activated
+  dependencies.
 
-Canonical output sorts package keys, feature names, and deduplicated dependency
-identifiers and correctly escapes TOML strings. Identical metadata and Cargo
-lock bytes produce identical Bloomery lock bytes. If multiple distinct Cargo
-package identities collide on a `name-version` key, fail with an actionable
-unsupported-resolution error instead of silently overwriting a record. A future
-lock format change to represent that case is out of scope.
+Global and context records capture only dependencies that Cargo activates, so the
+lock never carries optional, weak, or target-specific edges that Cargo would not
+build. Contexts do not depend on `build.unify`; toggling that setting leaves the
+lock valid and byte-identical on regeneration. Derive records from the final
+locked Cargo resolution using the existing Cargo invocation outputs, retaining
+the edition fallback (`2021`); no additional tool is required.
+
+Canonical output sorts package keys, context keys, feature names, and
+deduplicated dependency identifiers and correctly escapes TOML strings.
+Identical resolution inputs produce identical Bloomery lock bytes. If multiple
+distinct Cargo package identities collide on a `name-version` key, fail with an
+actionable unsupported-resolution error instead of silently overwriting a
+record. A future lock format change to represent that case is out of scope.
 
 Serialize and validate the entire candidate before writing. Write to a temporary
 file beside `bloomery.lock`, then atomically rename into place; clean up temporary

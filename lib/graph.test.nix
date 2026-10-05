@@ -26,6 +26,88 @@
       dependencies = [ ]
       proc-macro = false
       edition = "2018"
+
+      [contexts."bin-calc-0.1.0"."bin-calc-0.1.0"]
+      features = [ "custom-feature" ]
+      dependencies = [ ]
+    '';
+  };
+  multiContextWorkspace = mkWorkspace {
+    root = ../tests/basic-workspace;
+    source.bloomeryLock = builtins.toFile "multi-context-bloomery.lock" ''
+      version = 1
+
+      [packages."lib-calc-0.1.0"]
+      features = [ "alpha", "beta" ]
+      dependencies = [ "lib-core-0.1.0" ]
+      proc-macro = false
+      edition = "2021"
+
+      [packages."lib-core-0.1.0"]
+      features = [ ]
+      dependencies = [ ]
+      proc-macro = false
+      edition = "2021"
+
+      [contexts."lib-calc-0.1.0"."lib-calc-0.1.0"]
+      features = [ "alpha" ]
+      dependencies = [ "lib-core-0.1.0" ]
+
+      [contexts."lib-calc-0.1.0"."lib-core-0.1.0"]
+      features = [ ]
+      dependencies = [ ]
+
+      [contexts."bin-calc-0.1.0"."bin-calc-0.1.0"]
+      features = [ ]
+      dependencies = [ "lib-calc-0.1.0", "lib-core-0.1.0" ]
+
+      [contexts."bin-calc-0.1.0"."lib-calc-0.1.0"]
+      features = [ "beta" ]
+      dependencies = [ "lib-core-0.1.0" ]
+
+      [contexts."bin-calc-0.1.0"."lib-core-0.1.0"]
+      features = [ ]
+      dependencies = [ ]
+    '';
+  };
+  nonUnifiedWorkspace = mkWorkspace {
+    root = ../tests/basic-workspace;
+    build.unify = false;
+    createLibPackages = true;
+    source.bloomeryLock = builtins.toFile "non-unified-bloomery.lock" ''
+      version = 1
+
+      [packages."lib-calc-0.1.0"]
+      features = [ "alpha", "beta" ]
+      dependencies = [ "lib-core-0.1.0" ]
+      proc-macro = false
+      edition = "2021"
+
+      [packages."lib-core-0.1.0"]
+      features = [ ]
+      dependencies = [ ]
+      proc-macro = false
+      edition = "2021"
+
+      [contexts."lib-calc-0.1.0"."lib-calc-0.1.0"]
+      features = [ "alpha" ]
+      dependencies = [ "lib-core-0.1.0" ]
+
+      [contexts."lib-calc-0.1.0"."lib-core-0.1.0"]
+      features = [ ]
+      dependencies = [ ]
+
+      [contexts."bin-calc-0.1.0"."bin-calc-0.1.0"]
+      features = [ ]
+      dependencies = [ "lib-calc-0.1.0", "lib-core-0.1.0" ]
+
+      [contexts."bin-calc-0.1.0"."lib-calc-0.1.0"]
+      features = [ "beta" ]
+      dependencies = [ "lib-core-0.1.0" ]
+
+      [contexts."bin-calc-0.1.0"."lib-core-0.1.0"]
+      features = [ ]
+      dependencies = [ ]
     '';
   };
   fallbackWorkspace = mkWorkspace {
@@ -166,14 +248,93 @@ in {
 
   testGraphEdgesFollowActiveDependencies = {
     expr = {
-      fallbackKeepsLockedDeps =
-        builtins.length fallbackWorkspace.crates."bin-calc-0.1.0".dependencies
-        == builtins.length fallbackWorkspace.lock.byId."bin-calc-0.1.0".depIds;
-      keepsLockedEdge = builtins.length fallbackWorkspace.crates."lib-calc-0.1.0".dependencies == 1;
+      removesUnactivatedDeps =
+        builtins.length fallbackWorkspace.crates."bin-calc-0.1.0".dependencies == 0;
+      keepsActivatedEdge = builtins.length fallbackWorkspace.crates."lib-calc-0.1.0".dependencies == 1;
     };
     expected = {
-      fallbackKeepsLockedDeps = true;
-      keepsLockedEdge = true;
+      removesUnactivatedDeps = true;
+      keepsActivatedEdge = true;
+    };
+  };
+
+  testLockSuppliesPerMemberContexts = {
+    expr = {
+      hasContext = multiContextWorkspace.lockContexts ? "lib-calc-0.1.0";
+      hasContextCrate =
+        builtins.isString multiContextWorkspace.contextCrates."lib-calc-0.1.0"."lib-calc-0.1.0".drvPath;
+      contextFeature =
+        lib.hasInfix "alpha"
+        multiContextWorkspace.contextCrates."lib-calc-0.1.0"."lib-calc-0.1.0".configurePhase;
+    };
+    expected = {
+      hasContext = true;
+      hasContextCrate = true;
+      contextFeature = true;
+    };
+  };
+
+  testIndexFallbackBuildsContexts = {
+    expr = {
+      hasContexts = indexWorkspace.lockContexts != {};
+      hasGlobalCrate = builtins.isString indexWorkspace.crates."itoa-1.0.18".drvPath;
+    };
+    expected = {
+      hasContexts = true;
+      hasGlobalCrate = true;
+    };
+  };
+
+  testUnifiedUsesGlobalView = {
+    expr = let
+      phase = multiContextWorkspace.crates."lib-calc-0.1.0".configurePhase;
+    in {
+      hasAlpha = lib.hasInfix "alpha" phase;
+      hasBeta = lib.hasInfix "beta" phase;
+    };
+    expected = {
+      hasAlpha = true;
+      hasBeta = true;
+    };
+  };
+
+  testNonUnifiedUsesPerMemberContexts = {
+    expr = {
+      libUsesContext =
+        nonUnifiedWorkspace.packages."lib-calc:lib".drvPath
+        == nonUnifiedWorkspace.contextCrates."lib-calc-0.1.0"."lib-calc-0.1.0".drvPath;
+      differsFromGlobal =
+        nonUnifiedWorkspace.packages."lib-calc:lib".drvPath
+        != nonUnifiedWorkspace.crates."lib-calc-0.1.0".drvPath;
+    };
+    expected = {
+      libUsesContext = true;
+      differsFromGlobal = true;
+    };
+  };
+
+  testContextVariantsQualifyDerivations = {
+    expr = {
+      libName = nonUnifiedWorkspace.contextCrates."lib-calc-0.1.0"."lib-calc-0.1.0".name;
+      binName = nonUnifiedWorkspace.contextCrates."bin-calc-0.1.0"."lib-calc-0.1.0".name;
+    };
+    expected = {
+      libName = "rust-crate-lib-calc-0.1.0-lib-calc-0.1.0";
+      binName = "rust-crate-lib-calc-0.1.0-bin-calc-0.1.0";
+    };
+  };
+
+  testContextsAreSoundAcrossMembers = {
+    expr = {
+      hasBothContexts =
+        nonUnifiedWorkspace.lockContexts ? "lib-calc-0.1.0"
+        && nonUnifiedWorkspace.lockContexts ? "bin-calc-0.1.0";
+      sameLock =
+        multiContextWorkspace.lockContexts == nonUnifiedWorkspace.lockContexts;
+    };
+    expected = {
+      hasBothContexts = true;
+      sameLock = true;
     };
   };
 

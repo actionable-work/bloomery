@@ -46,14 +46,20 @@ colocated `overrides.nix` files, and the `overrides` constructor argument merge
 in that order with explicit values winning. Override keys match package IDs,
 hyphenated names, and underscored names.
 
-## Development shell, checks, and features
+## Feature resolution
+
+`build.unify` selects how resolved features lower into crate nodes. A value of
+`true` (the default) unifies each package across the whole workspace cargo-style
+into one derivation; `false` unifies each workspace member's closure separately,
+so a shared package may compile once per member. `features.cratesIoIndex`
+supplies a local crates.io index for the no-lock fallback.
+
+## Development shell and checks
 
 `devShell` controls shell generation, extra packages, and the shell hook.
 `checks` enables or disables generated checks, includes or omits package build
 checks, optionally fails evaluation on an out-of-date lock, and independently
 enables the workspace dependency and no default features manifest checks.
-`features.unify` selects workspace feature unification for index-based
-resolution; `features.cratesIoIndex` supplies a local crates.io index.
 
 ## Formatter ordering
 
