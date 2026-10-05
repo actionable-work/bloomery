@@ -121,11 +121,10 @@ pub fn diagnostic_detail_text(
 #[cfg(test)]
 mod tests {
     use super::{display_records, normalize_display_bytes, normalize_display_text};
-    use bloomery_test_macros::bloomery;
 
     #[test]
-    #[bloomery("CLI-CHECK-DETAIL-013")]
-    #[bloomery("CLI-CHECK-DETAIL-020")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-013"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-020"))]
     fn oversized_logical_lines_split_into_seekable_bounded_records() {
         let input = "é".repeat(600);
         let records = display_records(&input);
@@ -135,7 +134,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-DETAIL-015")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-015"))]
     fn display_text_replaces_invalid_utf8_and_removes_terminal_controls() {
         let records = normalize_display_bytes(
             b"first\r\n\x1b[31mred\x1b[0m\x1b]0;private-title\x07\x01bad\xff\n",

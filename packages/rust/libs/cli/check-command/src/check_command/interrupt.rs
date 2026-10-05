@@ -84,11 +84,10 @@ impl CancellationToken {
 #[cfg(test)]
 mod tests {
     use super::{CancellationToken, InterruptFlag};
-    use bloomery_test_macros::bloomery;
 
     #[test]
-    #[bloomery("CLI-CHECK-RUN-012")]
-    #[bloomery("CLI-CHECK-RUN-013")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-012"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-013"))]
     fn user_interruption_is_distinct_from_task_cancellation() {
         let interrupt = InterruptFlag::for_test();
         let token = CancellationToken::new(interrupt.clone());

@@ -32,3 +32,25 @@ design = "design/overview.md"
 type = "ubiquitous"
 system = "enabled scanners"
 action = "refrain from executing the referenced tests"
+
+[[requirements]]
+id = "PARSER-SCANNING-STATIC-004"
+title = "Rust evidence tags are inert at compile time"
+manual = false
+design = "design/rust.md#reference-syntax"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "Rust evidence tags"
+action = "nest the bloomery attribute inside cfg_attr(any(), ...) so tagged sources compile without a proc-macro dependency"
+
+[[requirements]]
+id = "PARSER-SCANNING-STATIC-005"
+title = "Rust scanner extracts nested evidence tags"
+manual = false
+design = "design/rust.md#reference-syntax"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Rust scanner"
+action = "extract requirement IDs from bloomery meta items nested in cfg_attr attributes on test functions"

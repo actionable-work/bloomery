@@ -1,0 +1,73 @@
+group = "OUTPUT"
+
+[[requirements]]
+id = "CLI-INIT-OUTPUT-001"
+title = "Init accepts JSON output"
+manual = false
+design = "design/init.md#output-and-failure"
+
+[requirements.ears]
+type = "event"
+trigger = "init is invoked with --json"
+system = "bloomery init"
+action = "emit one structured document with the command, status, target directory, template, created paths, and lockfile status"
+
+[[requirements]]
+id = "CLI-INIT-OUTPUT-002"
+title = "Init reports the target and template"
+manual = false
+design = "design/init.md#output-and-failure"
+
+[requirements.ears]
+type = "event"
+trigger = "init succeeds"
+system = "bloomery init"
+action = "report the target directory and selected template"
+
+[[requirements]]
+id = "CLI-INIT-OUTPUT-003"
+title = "Init reports created paths"
+manual = false
+design = "design/init.md#output-and-failure"
+
+[requirements.ears]
+type = "event"
+trigger = "init succeeds"
+system = "bloomery init"
+action = "list the created paths"
+
+[[requirements]]
+id = "CLI-INIT-OUTPUT-004"
+title = "Init suggests a next command"
+manual = false
+design = "design/init.md#output-and-failure"
+
+[requirements.ears]
+type = "event"
+trigger = "init succeeds"
+system = "bloomery init"
+action = "suggest nix develop as the next command"
+
+[[requirements]]
+id = "CLI-INIT-OUTPUT-005"
+title = "Init failures return a nonzero exit code"
+manual = false
+design = "design/init.md#output-and-failure"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "init rejects an argument, refuses a non-empty target, or fails to write or lock"
+system = "bloomery init"
+action = "return a nonzero exit code"
+
+[[requirements]]
+id = "CLI-INIT-OUTPUT-006"
+title = "Non-empty target refusal warns"
+manual = false
+design = "design/init.md#output-and-failure"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "init refuses a non-empty target without --force"
+system = "bloomery init"
+action = "print a warning naming the target before exiting nonzero"

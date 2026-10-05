@@ -7,7 +7,7 @@ design tree.
 ## Required file
 
 Every repository command requires `.bloomery/config.toml`. The only exemptions
-are parser-generated help and the future `init` command, which bootstraps the
+are parser-generated help and the `init` command, which bootstraps the
 repository before configuration exists. A missing file is a
 `ConfigurationError`; Bloomery does not substitute defaults.
 

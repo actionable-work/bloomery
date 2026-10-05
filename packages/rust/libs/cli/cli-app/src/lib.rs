@@ -52,6 +52,7 @@ fn run_invocation_at(
     stderr: &mut impl Write,
 ) -> ExitCode {
     match invocation.command {
+        CliCommand::Init(args) => run_init_at(args, invocation.json_mode, root, stdout, stderr),
         CliCommand::Sync { update } => run_sync_at(
             root,
             update.as_deref(),
@@ -77,6 +78,7 @@ fn configuration_exempt(command: &str) -> bool {
 
 fn command_name(command: &CliCommand) -> Option<&'static str> {
     match command {
+        CliCommand::Init(_) => Some("init"),
         CliCommand::Check(_) => Some("check"),
         CliCommand::Review => Some("review"),
         CliCommand::Sync { .. } => Some("sync"),
@@ -307,6 +309,85 @@ fn run_sync_at(
     }
 }
 
+fn run_init_at(
+    args: bloomery_cli_types::InitArgs,
+    json_mode: bool,
+    root: &Path,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
+    let directory = match args.directory {
+        Some(path) if path.is_absolute() => path,
+        Some(path) => root.join(path),
+        None => root.to_path_buf(),
+    };
+    let request = bloomery_init::InitRequest {
+        directory,
+        template: args.template,
+        force: args.force,
+    };
+    let mut stage = bloomery_init::SyncLockStage::system();
+    run_init_request(&request, &mut stage, json_mode, stdout, stderr)
+}
+
+fn run_init_request<L: bloomery_init::LockStage>(
+    request: &bloomery_init::InitRequest,
+    stage: &mut L,
+    json_mode: bool,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
+    let mut progress = Vec::new();
+    let mut progress_err = Vec::new();
+    match bloomery_init::run(request, stage, &mut progress, &mut progress_err) {
+        Ok(report) => {
+            if json_mode {
+                if write_json(stdout, &output::init_success_json(&report)).is_err() {
+                    let _ = writeln!(stderr, "bloomery: unable to render JSON init result");
+                    return ExitCode::from(1);
+                }
+            } else {
+                for path in &report.created {
+                    let _ = writeln!(stdout, "created {}", path.display());
+                }
+                let _ = writeln!(
+                    stdout,
+                    "Initialized '{}' from the '{}' template.",
+                    report.directory.display(),
+                    report.template
+                );
+                let _ = writeln!(
+                    stdout,
+                    "Generated lockfiles: {}.",
+                    report.lockfiles.join(", ")
+                );
+                let _ = writeln!(stdout, "Next: run `nix develop` in the project.");
+                let _ = stdout.flush();
+            }
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            if json_mode {
+                if write_json(stdout, &output::init_failure_json(&error)).is_err() {
+                    let _ = writeln!(stderr, "bloomery: unable to render JSON init error");
+                    return ExitCode::from(1);
+                }
+            } else {
+                let _ = stderr.write_all(&progress_err);
+                let _ = writeln!(
+                    stderr,
+                    "{}",
+                    output::colorize_error(
+                        &format!("error: {error}"),
+                        output::color_enabled(output::Stream::Stderr, false)
+                    )
+                );
+            }
+            ExitCode::from(error.exit_code())
+        }
+    }
+}
+
 fn run_workspace_command_at(
     command: CliCommand,
     json_mode: bool,
@@ -325,6 +406,7 @@ fn run_workspace_command_at(
     match command {
         CliCommand::Check(args) => check_command::run_at(args, json_mode, root, stdout, stderr),
         CliCommand::Review => run_review_at(root, json_mode, stdout, stderr),
+        CliCommand::Init(_) => unreachable!("init is dispatched before workspace loading"),
         CliCommand::Sync { .. } => unreachable!("sync is dispatched before workspace loading"),
     }
 }
@@ -442,11 +524,11 @@ mod tests {
     use super::{run_args_at, run_workspace_command_at, run_workspace_command_from_current_dir};
     use bloomery_cli_parser::{ParseError, ParseErrorKind as ErrorKind, parse_from};
     use bloomery_cli_types::CliCommand as Command;
-    use bloomery_test_macros::bloomery;
     use serde_json::Value;
     use std::ffi::OsString;
     use std::fs;
-    use std::path::PathBuf;
+    use std::io::Write;
+    use std::path::{Path, PathBuf};
     use std::process::ExitCode;
     use std::sync::Mutex;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -481,7 +563,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("REPOSITORY-LAYOUT-STRUCTURE-007")]
+    #[cfg_attr(any(), bloomery("REPOSITORY-LAYOUT-STRUCTURE-007"))]
     fn rust_binary_entrypoints_only_delegate_to_library_crates() {
         let repository_root = repository_root();
         for (path, expected) in [
@@ -501,7 +583,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("REPOSITORY-LAYOUT-STRUCTURE-008")]
+    #[cfg_attr(any(), bloomery("REPOSITORY-LAYOUT-STRUCTURE-008"))]
     fn rust_library_crates_are_grouped_under_the_three_ownership_categories() {
         let repository_root = repository_root();
         let manifest =
@@ -588,7 +670,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-INTERFACE-005")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-005"))]
     fn clap_accepts_equals_update_syntax() {
         assert_eq!(
             parse_update(&["bloomery", "sync", "--update=nix,rust"])
@@ -599,7 +681,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-INTERFACE-006")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-006"))]
     fn clap_accepts_a_separate_update_argument() {
         assert_eq!(
             parse_update(&["bloomery", "sync", "--update", "nix,rust"])
@@ -610,9 +692,9 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-INTERFACE-008")]
-    #[bloomery("CLI-SYNC-INTERFACE-009")]
-    #[bloomery("CLI-SYNC-INTERFACE-010")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-008"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-009"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-010"))]
     fn clap_distinguishes_bare_update_from_omitted_update() {
         assert_eq!(
             parse_update(&["bloomery", "sync"]).expect("omitted update"),
@@ -625,7 +707,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-INTERFACE-015")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-015"))]
     fn clap_rejects_repeated_update_flags_with_usage_exit_code() {
         let error = parse_update(&["bloomery", "sync", "--update=rust", "--update=nix"])
             .expect_err("duplicate update flags");
@@ -633,7 +715,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-INTERFACE-023")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-023"))]
     fn cli_does_not_expose_a_lock_subcommand() {
         let error =
             Cli::try_parse_from(["bloomery", "lock"]).expect_err("lock must not be a CLI command");
@@ -641,9 +723,9 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-INTERFACE-COMMANDS-001")]
-    #[bloomery("CLI-INTERFACE-COMMANDS-002")]
-    #[bloomery("CLI-INTERFACE-COMMANDS-003")]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-001"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-002"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-003"))]
     fn the_cli_exposes_check_review_and_sync() {
         assert!(matches!(
             Cli::try_parse_from(["bloomery", "check"])
@@ -666,7 +748,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-INTERFACE-COMMANDS-004")]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-004"))]
     fn clap_provides_its_help_subcommand() {
         for args in [vec!["bloomery", "help"], vec!["bloomery", "help", "check"]] {
             let error = Cli::try_parse_from(args).expect_err("help should be rendered by clap");
@@ -677,7 +759,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-INTERFACE-COMMANDS-005")]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-005"))]
     fn repository_commands_resolve_against_the_process_working_directory() {
         let _lock = CURRENT_DIR_LOCK.lock().expect("working-directory lock");
         let root = fixture_root("cwd");
@@ -710,7 +792,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-INTERFACE-COMMANDS-009")]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-009"))]
     fn every_command_and_help_requires_a_root_flake_before_working() {
         let command_argvs: &[&[&str]] = &[
             &["bloomery", "check"],
@@ -745,7 +827,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-INTERFACE-OUTPUT-008")]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-008"))]
     fn missing_flake_errors_honor_json_mode() {
         let commands: &[&[&str]] = &[
             &["bloomery", "check", "--json"],
@@ -776,7 +858,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-INTERFACE-COMMANDS-009")]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-009"))]
     fn a_present_root_flake_allows_command_dispatch() {
         let root = fixture_root("present-flake");
         fs::create_dir_all(root.join(".bloomery")).expect("workspace root");
@@ -808,7 +890,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-INTERFACE-COMMANDS-010")]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-010"))]
     fn repository_commands_require_configuration() {
         for arguments in [
             &["bloomery", "check"][..],
@@ -835,7 +917,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-INTERFACE-COMMANDS-010")]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-010"))]
     fn missing_configuration_errors_honor_json_mode() {
         let root = fixture_root("missing-config-json");
         fs::create_dir_all(&root).expect("workspace root");
@@ -857,7 +939,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-INTERFACE-COMMANDS-011")]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-011"))]
     fn parser_help_does_not_require_configuration() {
         let root = fixture_root("help-missing-config");
         fs::create_dir_all(&root).expect("workspace root");
@@ -871,7 +953,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-INTERFACE-COMMANDS-012")]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-012"))]
     fn init_is_exempt_from_the_configuration_requirement() {
         assert!(super::configuration_exempt("init"));
         assert!(super::configuration_exempt("help"));
@@ -879,7 +961,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-INTERFACE-FLAGS-001")]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-001"))]
     fn review_defaults_to_human_readable_output() {
         let root = fixture_workspace("CLI-CHECK-CONTRACT-001", true);
         let json_mode = parse_json(&["bloomery", "review"]).expect("default output mode");
@@ -903,7 +985,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-INTERFACE-FLAGS-002")]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-002"))]
     fn review_emits_json_when_requested() {
         let root = fixture_workspace("CLI-CHECK-CONTRACT-001", true);
         let mut stdout = Vec::new();
@@ -920,10 +1002,11 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-INTERFACE-FLAGS-003")]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-003"))]
     fn all_application_commands_accept_the_same_json_flag() {
         for command in [
             ["bloomery", "check", "--json"],
+            ["bloomery", "init", "--json"],
             ["bloomery", "review", "--json"],
             ["bloomery", "sync", "--json"],
         ] {
@@ -934,13 +1017,13 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-INTERFACE-COMMANDS-006")]
-    #[bloomery("CLI-INTERFACE-COMMANDS-007")]
-    #[bloomery("CLI-INTERFACE-COMMANDS-008")]
-    #[bloomery("CLI-INTERFACE-FLAGS-007")]
-    #[bloomery("CLI-CHECK-SELECT-010")]
-    #[bloomery("CLI-INTERFACE-FLAGS-008")]
-    #[bloomery("CLI-INTERFACE-FLAGS-009")]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-006"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-007"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-008"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-007"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-010"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-008"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-009"))]
     fn check_exposes_nested_retrieval_options_and_rejects_execution_flags_there() {
         for args in [
             &["bloomery", "check", "--check", "static:*", "--jobs", "2"][..],
@@ -982,9 +1065,9 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-INTERFACE-FLAGS-005")]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-005"))]
     fn every_application_command_accepts_short_and_long_help_flags() {
-        for command in ["check", "review", "sync"] {
+        for command in ["check", "init", "review", "sync"] {
             for flag in ["-h", "--help"] {
                 let error = Cli::try_parse_from(["bloomery", command, flag])
                     .expect_err("help flag should short-circuit parsing");
@@ -995,10 +1078,10 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-INTERFACE-OUTPUT-003")]
-    #[bloomery("CLI-INTERFACE-FLAGS-006")]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-003"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-006"))]
     fn every_application_command_accepts_the_shared_json_flag_before_or_after_its_name() {
-        for command in ["check", "review", "sync"] {
+        for command in ["check", "init", "review", "sync"] {
             assert!(parse_json(&["bloomery", command, "--json"]).expect("trailing --json"));
             assert!(parse_json(&["bloomery", "--json", command]).expect("leading --json"));
         }
@@ -1006,11 +1089,116 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-INTERFACE-COMMANDS-004")]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-004"))]
     fn top_level_help_is_generated_by_the_parser() {
         let error = Cli::try_parse_from(["bloomery", "--help"]).expect_err("help output");
         assert_eq!(error.kind(), ErrorKind::DisplayHelp);
         assert_eq!(error.exit_code(), 0);
         assert!(error.to_string().contains("Usage: bloomery"));
+    }
+
+    #[derive(Default)]
+    struct InitLock {
+        locked: bool,
+    }
+
+    impl bloomery_init::LockStage for InitLock {
+        fn missing_tools(&self) -> Vec<&'static str> {
+            Vec::new()
+        }
+
+        fn lock<O: Write, E: Write>(
+            &mut self,
+            _root: &Path,
+            _stdout: &mut O,
+            _stderr: &mut E,
+        ) -> Result<Vec<String>, bloomery_init::InitError> {
+            self.locked = true;
+            Ok(vec![
+                "Cargo.lock".to_owned(),
+                "bloomery.lock".to_owned(),
+                "flake.lock".to_owned(),
+            ])
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-013"))]
+    #[cfg_attr(any(), bloomery("CLI-INIT-COMMAND-001"))]
+    #[cfg_attr(any(), bloomery("CLI-INIT-COMMAND-002"))]
+    #[cfg_attr(any(), bloomery("CLI-INIT-COMMAND-003"))]
+    #[cfg_attr(any(), bloomery("CLI-INIT-COMMAND-008"))]
+    fn init_exposes_target_template_and_force_options() {
+        let parsed =
+            Cli::try_parse_from(["bloomery", "init", "app", "--template", "axum", "--force"])
+                .expect("init parses");
+        match parsed.command {
+            Command::Init(args) => {
+                assert_eq!(args.directory.as_deref(), Some(Path::new("app")));
+                assert_eq!(args.template.as_deref(), Some("axum"));
+                assert!(args.force);
+            }
+            other => panic!("expected init, got {other:?}"),
+        }
+        let default = Cli::try_parse_from(["bloomery", "init"]).expect("init defaults");
+        match default.command {
+            Command::Init(args) => {
+                assert!(args.directory.is_none());
+                assert!(args.template.is_none());
+                assert!(!args.force);
+            }
+            other => panic!("expected init, got {other:?}"),
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INIT-COMMAND-006"))]
+    #[cfg_attr(any(), bloomery("CLI-INIT-OUTPUT-002"))]
+    #[cfg_attr(any(), bloomery("CLI-INIT-OUTPUT-004"))]
+    fn init_runs_without_a_flake_or_configuration() {
+        let root = fixture_root("init-no-flake");
+        let request = bloomery_init::InitRequest {
+            directory: root.join("app"),
+            template: None,
+            force: false,
+        };
+        let mut stage = InitLock::default();
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = super::run_init_request(&request, &mut stage, false, &mut stdout, &mut stderr);
+        assert_eq!(status, ExitCode::SUCCESS);
+        assert!(stage.locked);
+        assert!(root.join("app/flake.nix").is_file());
+        assert!(!root.join("flake.nix").exists());
+        let text = String::from_utf8(stdout).expect("human output");
+        assert!(text.contains("basic"));
+        assert!(text.contains("nix develop"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INIT-OUTPUT-001"))]
+    fn init_json_reports_the_target_template_and_created_paths() {
+        let root = fixture_root("init-json");
+        let request = bloomery_init::InitRequest {
+            directory: root.join("app"),
+            template: Some("basic".to_owned()),
+            force: false,
+        };
+        let mut stage = InitLock::default();
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = super::run_init_request(&request, &mut stage, true, &mut stdout, &mut stderr);
+        assert_eq!(status, ExitCode::SUCCESS);
+        let document: Value = serde_json::from_slice(&stdout).expect("init JSON");
+        assert_eq!(document["command"], "init");
+        assert_eq!(document["status"], "succeeded");
+        assert_eq!(document["template"], "basic");
+        assert!(
+            document["created"]
+                .as_array()
+                .is_some_and(|paths| !paths.is_empty())
+        );
+        let _ = fs::remove_dir_all(root);
     }
 }

@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 pub const DEFAULT_PAGE_LIMIT: usize = 20;
 pub const DETAIL_PAGE_LIMIT: usize = 40;
 
@@ -9,9 +11,17 @@ pub struct CliInvocation {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CliCommand {
+    Init(InitArgs),
     Check(CheckArgs),
     Review,
     Sync { update: Option<String> },
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct InitArgs {
+    pub directory: Option<PathBuf>,
+    pub template: Option<String>,
+    pub force: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

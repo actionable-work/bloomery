@@ -113,7 +113,6 @@ fn is_executable(_path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{CommandOutput, CommandRunner, SystemCommandRunner};
-    use bloomery_test_macros::bloomery;
 
     #[test]
     fn command_output_checks_exit_status_and_keeps_streams() {
@@ -136,7 +135,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-031")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-031"))]
     fn system_runner_checks_tool_availability_without_running_it() {
         let runner = SystemCommandRunner;
         assert!(runner.is_available("sh"));

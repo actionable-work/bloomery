@@ -14,7 +14,7 @@ packages/rust/
     │   ├── workspace/          # filesystem, Markdown, and TOML loading
     │   ├── scanning/           # Rust, Playwright, and Nix evidence scanners
     │   ├── check/              # evidence and traceability validation
-    │   └── test-macros/         # test-only evidence annotations
+    │   └── test-macros/         # proc-macro build-graph fixture
     ├── cli/
     │   ├── cli-types/          # parsed command requests, independent of Clap
     │   ├── cli-parser/         # Clap syntax and request conversion

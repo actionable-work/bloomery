@@ -1,0 +1,7 @@
+[dependencies]
+app_server = { package = "{{project}}_server", path = "../{{project}}_server" }
+
+[package]
+name = "{{project}}"
+version = "0.1.0"
+edition = "2024"

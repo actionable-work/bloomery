@@ -9,7 +9,6 @@ use crate::check_command::store::RunStore;
 use crate::check_command::test_support::{
     FakeNix, fixture, invoke, invoke_with_interrupt, lock_fixture_flake, nix_is_available, request,
 };
-use bloomery_test_macros::bloomery;
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
@@ -17,10 +16,10 @@ use std::process::Command;
 use std::sync::atomic::Ordering;
 
 #[test]
-#[bloomery("CLI-CHECK-RUN-001")]
-#[bloomery("CLI-CHECK-RUN-007")]
-#[bloomery("CLI-CHECK-RUN-008")]
-#[bloomery("CLI-CHECK-RUN-018")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-001"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-007"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-008"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-018"))]
 fn traceability_failure_stops_nix_work_without_waiting_for_builds() {
     let (root, cache) = fixture(true);
     let requirement = root.join(".bloomery/specs/CLI/CHECK/requirements/CONTRACT.toml");
@@ -62,7 +61,7 @@ fn traceability_failure_stops_nix_work_without_waiting_for_builds() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-DETAIL-024")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-024"))]
 fn failed_nix_checks_retain_referenced_derivation_log_paths() {
     let (root, cache) = fixture(true);
     let store_path = "/nix/store/0123456789abcdfghijklmnpqrsvwxyz-failed-check.drv";
@@ -89,10 +88,10 @@ fn failed_nix_checks_retain_referenced_derivation_log_paths() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-NIX-007")]
-#[bloomery("CLI-CHECK-NIX-008")]
-#[bloomery("CLI-CHECK-NIX-009")]
-#[bloomery("CLI-CHECK-OUTPUT-011")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-007"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-008"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-009"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-011"))]
 fn aliased_check_build_requests_rely_on_native_store_deduplication() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -123,9 +122,9 @@ fn aliased_check_build_requests_rely_on_native_store_deduplication() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-NIX-007")]
-#[bloomery("CLI-CHECK-NIX-008")]
-#[bloomery("CLI-CHECK-NIX-009")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-007"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-008"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-009"))]
 fn real_nix_runner_builds_two_aliases_of_one_low_storage_derivation() {
     if !nix_is_available() {
         eprintln!("skipping real-Nix alias test: Nix store is unavailable");
@@ -216,7 +215,7 @@ fn real_nix_runner_builds_two_aliases_of_one_low_storage_derivation() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-RUN-005")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-005"))]
 fn default_execution_attempts_other_independent_checks_after_a_build_failure() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -241,10 +240,10 @@ fn default_execution_attempts_other_independent_checks_after_a_build_failure() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-RUN-004")]
-#[bloomery("CLI-CHECK-RUN-011")]
-#[bloomery("CLI-CHECK-RUN-017")]
-#[bloomery("CLI-CHECK-FORMAT-004")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-004"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-011"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-017"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-004"))]
 fn default_jobs_are_positive_task_output_isolated_and_locks_are_unchanged() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -301,8 +300,8 @@ fn default_jobs_are_positive_task_output_isolated_and_locks_are_unchanged() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-NIX-010")]
-#[bloomery("CLI-CHECK-RUN-014")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-010"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-014"))]
 fn evaluation_failures_are_check_failures_and_store_failures_are_operational() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -347,10 +346,10 @@ fn evaluation_failures_are_check_failures_and_store_failures_are_operational() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-RUN-005")]
-#[bloomery("CLI-CHECK-RUN-007")]
-#[bloomery("CLI-CHECK-RUN-008")]
-#[bloomery("CLI-CHECK-RUN-010")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-005"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-007"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-008"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-010"))]
 fn fail_fast_retains_started_results_and_does_not_admit_queued_work() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -375,7 +374,7 @@ fn fail_fast_retains_started_results_and_does_not_admit_queued_work() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-OUTPUT-007")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-007"))]
 fn failure_ids_are_stable_when_task_completion_order_changes() {
     let make_failures = || {
         vec![
@@ -413,7 +412,7 @@ fn failure_ids_are_stable_when_task_completion_order_changes() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-RUN-016")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-016"))]
 fn failure_to_finalize_a_run_never_returns_success() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -431,9 +430,9 @@ fn failure_to_finalize_a_run_never_returns_success() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-RUN-001")]
-#[bloomery("CLI-CHECK-RUN-002")]
-#[bloomery("CLI-CHECK-RUN-003")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-001"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-002"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-003"))]
 fn independent_nix_derivations_realize_concurrently_within_the_job_limit() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -453,8 +452,8 @@ fn independent_nix_derivations_realize_concurrently_within_the_job_limit() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-RUN-012")]
-#[bloomery("CLI-CHECK-RUN-013")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-012"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-013"))]
 fn interrupted_runs_retain_completed_outcomes_and_return_130() {
     let (root, cache) = fixture(true);
     let interrupt = InterruptFlag::for_test();
@@ -490,11 +489,11 @@ fn interrupted_runs_retain_completed_outcomes_and_return_130() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-SELECT-006")]
-#[bloomery("CLI-CHECK-SELECT-009")]
-#[bloomery("CLI-CHECK-RUN-005")]
-#[bloomery("CLI-CHECK-RUN-009")]
-#[bloomery("CLI-CHECK-RUN-006")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-006"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-009"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-005"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-009"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-006"))]
 fn prerequisite_failures_block_dependents_without_suppressing_nix_checks() {
     let (root, cache) = fixture(true);
     fs::remove_file(root.join(".bloomery/specs/CLI/CHECK/README.md"))
@@ -529,8 +528,8 @@ fn prerequisite_failures_block_dependents_without_suppressing_nix_checks() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-RUN-015")]
-#[bloomery("CLI-CHECK-OUTPUT-011")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-RUN-015"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-011"))]
 fn successful_exit_requires_every_selected_check_to_pass() {
     let (root, cache) = fixture(true);
     let backend = FakeNix::default();
@@ -541,17 +540,17 @@ fn successful_exit_requires_every_selected_check_to_pass() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-OUTPUT-001")]
-#[bloomery("CLI-CHECK-OUTPUT-002")]
-#[bloomery("CLI-CHECK-OUTPUT-003")]
-#[bloomery("CLI-CHECK-OUTPUT-004")]
-#[bloomery("CLI-CHECK-OUTPUT-005")]
-#[bloomery("CLI-CHECK-OUTPUT-006")]
-#[bloomery("CLI-CHECK-OUTPUT-007")]
-#[bloomery("CLI-CHECK-OUTPUT-008")]
-#[bloomery("CLI-CHECK-OUTPUT-009")]
-#[bloomery("CLI-CHECK-OUTPUT-010")]
-#[bloomery("CLI-CHECK-OUTPUT-011")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-001"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-002"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-003"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-004"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-005"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-006"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-007"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-008"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-009"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-010"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-011"))]
 fn summaries_agree_between_human_and_json_and_do_not_stream_logs() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -579,7 +578,7 @@ fn summaries_agree_between_human_and_json_and_do_not_stream_logs() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-FORMAT-001")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-001"))]
 fn every_execution_shape_formats_once_before_any_check() {
     for selectors in [
         Vec::new(),
@@ -609,8 +608,8 @@ fn every_execution_shape_formats_once_before_any_check() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-FORMAT-002")]
-#[bloomery("CLI-CHECK-FORMAT-006")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-002"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-006"))]
 fn formatter_failure_stops_all_check_work_regardless_of_fail_fast() {
     for fail_fast in [false, true] {
         let (root, cache) = fixture(true);
@@ -646,7 +645,7 @@ fn formatter_failure_stops_all_check_work_regardless_of_fail_fast() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-FORMAT-003")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-003"))]
 fn selected_checks_run_against_the_formatted_workspace() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -665,7 +664,7 @@ fn selected_checks_run_against_the_formatted_workspace() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-FORMAT-004")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-004"))]
 fn partial_formatter_edits_persist_after_failure() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -687,7 +686,7 @@ fn partial_formatter_edits_persist_after_failure() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-FORMAT-005")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-005"))]
 fn read_only_check_operations_do_not_format() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -719,7 +718,7 @@ fn read_only_check_operations_do_not_format() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-FORMAT-007")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-007"))]
 fn formatter_output_is_captured_in_a_run_local_log_and_not_streamed() {
     let (root, cache) = fixture(true);
     let secret = "formatter secret output line";
@@ -764,7 +763,7 @@ fn run_git(root: &Path, arguments: &[&str]) {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-DETAIL-023")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-023"))]
 fn git_dirty_state_is_sampled_after_formatter_edits() {
     if !git_is_available() {
         eprintln!("skipping post-format git-state test: git is unavailable");

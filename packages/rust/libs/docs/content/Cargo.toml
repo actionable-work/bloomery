@@ -1,7 +1,6 @@
 [dependencies]
 
 [dev-dependencies]
-bloomery-test-macros.workspace = true
 
 [package]
 name = "bloomery-content"

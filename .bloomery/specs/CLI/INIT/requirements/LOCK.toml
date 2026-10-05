@@ -1,0 +1,97 @@
+group = "LOCK"
+
+[[requirements]]
+id = "CLI-INIT-LOCK-001"
+title = "Init creates Cargo.lock"
+manual = false
+design = "design/init.md#locking"
+
+[requirements.ears]
+type = "event"
+trigger = "scaffolding succeeds"
+system = "bloomery init"
+action = "create Cargo.lock for the generated workspace"
+
+[[requirements]]
+id = "CLI-INIT-LOCK-002"
+title = "Init creates bloomery.lock"
+manual = false
+design = "design/init.md#locking"
+
+[requirements.ears]
+type = "event"
+trigger = "scaffolding succeeds"
+system = "bloomery init"
+action = "generate bloomery.lock from the resolved Cargo metadata"
+
+[[requirements]]
+id = "CLI-INIT-LOCK-003"
+title = "Init creates flake.lock"
+manual = false
+design = "design/init.md#locking"
+
+[requirements.ears]
+type = "event"
+trigger = "scaffolding succeeds"
+system = "bloomery init"
+action = "lock the generated flake inputs into flake.lock"
+
+[[requirements]]
+id = "CLI-INIT-LOCK-004"
+title = "Locking runs after scaffolding"
+manual = false
+design = "design/init.md#locking"
+
+[requirements.ears]
+type = "event"
+trigger = "init runs with a valid template and target"
+system = "bloomery init"
+action = "complete all template writes before starting lock creation"
+
+[[requirements]]
+id = "CLI-INIT-LOCK-005"
+title = "Missing lock tools fail before writing"
+manual = false
+design = "design/init.md#locking"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a required Cargo or Nix executable is unavailable"
+system = "bloomery init"
+action = "fail before writing any file"
+
+[[requirements]]
+id = "CLI-INIT-LOCK-006"
+title = "Lock failures preserve scaffolded files"
+manual = false
+design = "design/init.md#locking"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "the lock stage fails"
+system = "bloomery init"
+action = "leave the scaffolded files in place"
+
+[[requirements]]
+id = "CLI-INIT-LOCK-007"
+title = "Lock failures return nonzero with guidance"
+manual = false
+design = "design/init.md#locking"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "the lock stage fails"
+system = "bloomery init"
+action = "return a nonzero exit code and advise rerunning bloomery sync or init --force in the target"
+
+[[requirements]]
+id = "CLI-INIT-LOCK-008"
+title = "Init reports generated lockfiles"
+manual = false
+design = "design/init.md#output-and-failure"
+
+[requirements.ears]
+type = "event"
+trigger = "init succeeds"
+system = "bloomery init"
+action = "report the generated lockfiles in its output"

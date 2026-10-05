@@ -53,7 +53,7 @@ design = "design/flags.md#shared-purpose-options"
 [requirements.ears]
 type = "ubiquitous"
 system = "the bloomery CLI"
-action = "expose the same --json option for check, review, and sync"
+action = "expose the same --json option for init, check, review, and sync"
 
 [[requirements]]
 id = "CLI-INTERFACE-FLAGS-007"

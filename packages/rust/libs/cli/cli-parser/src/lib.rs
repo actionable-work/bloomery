@@ -1,10 +1,11 @@
 use bloomery_cli_types::{
     CheckArgs, CheckOperation, CliCommand, CliInvocation, DEFAULT_PAGE_LIMIT, DETAIL_PAGE_LIMIT,
-    DetailsArgs, FailureArgs, ListArgs,
+    DetailsArgs, FailureArgs, InitArgs, ListArgs,
 };
 use clap::{ArgAction, Args, Parser, Subcommand, error::ErrorKind};
 use std::ffi::OsString;
 use std::fmt;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParseErrorKind {
@@ -96,6 +97,7 @@ fn command_from_arguments(arguments: &[OsString]) -> Option<&'static str> {
             "check" => Some("check"),
             "review" => Some("review"),
             "sync" => Some("sync"),
+            "init" => Some("init"),
             _ => None,
         })
 }
@@ -115,6 +117,8 @@ struct RawCli {
 
 #[derive(Debug, Subcommand)]
 enum RawCommand {
+    /// Scaffold a new Bloomery flake and Rust workspace from a template.
+    Init(RawInitArgs),
     /// Run static validation and selected Nix checks, or retrieve retained results.
     Check(RawCheckArgs),
     /// Print requirements that require human review.
@@ -136,9 +140,32 @@ enum RawCommand {
 impl From<RawCommand> for CliCommand {
     fn from(command: RawCommand) -> Self {
         match command {
+            RawCommand::Init(args) => Self::Init(args.into()),
             RawCommand::Check(args) => Self::Check(args.into()),
             RawCommand::Review => Self::Review,
             RawCommand::Sync { update } => Self::Sync { update },
+        }
+    }
+}
+
+#[derive(Debug, Args)]
+struct RawInitArgs {
+    /// Target directory; defaults to the current working directory.
+    directory: Option<PathBuf>,
+    /// Template to scaffold; defaults to the basic workspace template.
+    #[arg(long, value_name = "NAME")]
+    template: Option<String>,
+    /// Overwrite files in a non-empty target directory.
+    #[arg(long)]
+    force: bool,
+}
+
+impl From<RawInitArgs> for InitArgs {
+    fn from(args: RawInitArgs) -> Self {
+        Self {
+            directory: args.directory,
+            template: args.template,
+            force: args.force,
         }
     }
 }

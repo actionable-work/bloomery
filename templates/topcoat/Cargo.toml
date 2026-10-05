@@ -1,0 +1,7 @@
+[workspace]
+members = [
+  "crates/{{project}}",
+  "crates/{{project}}_server",
+  "crates/{{project}}_ui",
+]
+resolver = "2"

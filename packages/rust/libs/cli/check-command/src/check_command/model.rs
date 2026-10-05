@@ -270,10 +270,9 @@ mod tests {
         glob_matches, page_window, select_ids, selector_may_match_prefix, truncate_utf8,
         valid_system_name,
     };
-    use bloomery_test_macros::bloomery;
 
     #[test]
-    #[bloomery("CLI-CHECK-SELECT-002")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-002"))]
     fn exact_selectors_match_one_complete_catalog_id() {
         assert!(glob_matches("static:structure", "static:structure"));
         assert!(!glob_matches("static:struct", "static:structure"));
@@ -281,7 +280,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-SELECT-003")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-003"))]
     fn globs_are_anchored_case_sensitive_and_support_only_star_and_question() {
         assert!(glob_matches(
             "nix:*:core:?est",
@@ -297,8 +296,8 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-SELECT-004")]
-    #[bloomery("CLI-CHECK-SELECT-005")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-004"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-005"))]
     fn selectors_form_a_deduplicated_union_and_reject_unmatched_patterns() {
         let catalog = vec![
             "nix:x86_64-linux:core:doc".to_owned(),
@@ -320,8 +319,8 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-SELECT-016")]
-    #[bloomery("CLI-CHECK-DETAIL-016")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-016"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-016"))]
     fn page_windows_clamp_end_offsets_and_advance() {
         assert_eq!(
             page_window(5, 2, 2),
@@ -342,7 +341,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-INTERFACE-FLAGS-009")]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-009"))]
     fn system_names_and_utf8_truncation_are_bounded() {
         assert!(valid_system_name("x86_64-linux"));
         assert!(!valid_system_name("../x86_64-linux"));

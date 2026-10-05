@@ -33,7 +33,7 @@ design = "design/output.md"
 [requirements.ears]
 type = "ubiquitous"
 system = "the bloomery CLI"
-action = "accept --json for check, review, and sync"
+action = "accept --json for init, check, review, and sync"
 
 [[requirements]]
 id = "CLI-INTERFACE-OUTPUT-004"

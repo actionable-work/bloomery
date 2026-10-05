@@ -20,7 +20,7 @@ below the repository's top-level `.bloomery/` directory:
 ```
 
 The `config.toml` file is required for every repository command except parser
-help and the future `init` command. When it is present, omitted tables and keys
+help and the `init` command. When it is present, omitted tables and keys
 use the validated defaults described in the
 [configuration file design](../../CONFIGURATION/design/config-file.md). The file
 also carries the build tables consumed by the flake interface, described in

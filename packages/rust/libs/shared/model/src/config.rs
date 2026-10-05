@@ -258,7 +258,6 @@ fn error_span_line(contents: &str, error: String) -> usize {
 #[cfg(test)]
 mod tests {
     use super::{NixScannerConfig, PlaywrightScannerConfig, RustScannerConfig, load};
-    use bloomery_test_macros::bloomery;
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -291,7 +290,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("PARSER-CONFIGURATION-REQUIRED-001")]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-REQUIRED-001"))]
     fn missing_configuration_is_an_error() {
         let root = root();
         assert_configuration_error(&root);
@@ -299,7 +298,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("PARSER-CONFIGURATION-REQUIRED-002")]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-REQUIRED-002"))]
     fn partial_configuration_uses_defaults_for_omitted_tables_and_keys() {
         let root = root();
         let config_path = root.join(".bloomery/config.toml");
@@ -341,8 +340,8 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("PARSER-CONFIGURATION-REQUIRED-003")]
-    #[bloomery("PARSER-CONFIGURATION-SECTIONS-001")]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-REQUIRED-003"))]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-SECTIONS-001"))]
     fn build_tables_are_accepted_as_valid_configuration() {
         let root = root();
         let config_path = root.join(".bloomery/config.toml");
@@ -378,7 +377,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("PARSER-CONFIGURATION-REQUIRED-004")]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-REQUIRED-004"))]
     fn present_malformed_unreadable_or_invalid_configuration_is_an_error() {
         let root = root();
         let config_path = root.join(".bloomery/config.toml");

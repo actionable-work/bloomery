@@ -730,7 +730,6 @@ mod tests {
         CheckRecord, FailureLocation, FailureRecord, OUTPUT_BYTE_LIMIT, Outcome, RunRecord,
         RunSelection, RunStatus,
     };
-    use bloomery_test_macros::bloomery;
 
     fn record(failure_count: usize) -> RunRecord {
         let failures = (0..failure_count)
@@ -785,12 +784,12 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-OUTPUT-001")]
-    #[bloomery("CLI-CHECK-OUTPUT-002")]
-    #[bloomery("CLI-CHECK-OUTPUT-008")]
-    #[bloomery("CLI-CHECK-OUTPUT-009")]
-    #[bloomery("CLI-CHECK-OUTPUT-010")]
-    #[bloomery("CLI-INTERFACE-OUTPUT-004")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-001"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-002"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-008"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-009"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-010"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-004"))]
     fn run_summary_is_compact_counts_only_and_omits_logs_and_success_records() {
         let passing = record(0);
         let summary = run_summary_json(&passing);
@@ -809,10 +808,10 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-OUTPUT-003")]
-    #[bloomery("CLI-CHECK-OUTPUT-004")]
-    #[bloomery("CLI-CHECK-OUTPUT-005")]
-    #[bloomery("CLI-CHECK-OUTPUT-006")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-003"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-004"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-005"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-006"))]
     fn initial_summary_page_is_bounded_and_failures_have_run_local_ids() {
         let large = record(80);
         let summary = run_summary_json(&large);
@@ -827,8 +826,8 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-030")]
-    #[bloomery("CLI-CHECK-OUTPUT-004")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-030"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-004"))]
     fn summary_includes_final_metrics_and_stays_within_its_ceiling() {
         let metrics = "built 8 · cached 16 · total 30";
         let with_metrics = run_summary_text(&record(80), Some(metrics));
@@ -846,9 +845,9 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-SELECT-017")]
-    #[bloomery("CLI-CHECK-SELECT-018")]
-    #[bloomery("CLI-CHECK-SELECT-019")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-017"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-018"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-019"))]
     fn catalog_pages_are_sorted_seekable_and_bounded() {
         let ids = (0..500)
             .map(|index| format!("nix:x86_64-linux:check-{index:03}"))
@@ -869,7 +868,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-SELECT-021")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-021"))]
     fn oversized_catalog_entries_are_explicit_errors_without_truncating_ids() {
         let ids = vec!["first".to_owned(), "x".repeat(9000)];
         let first = list_page(&ids, &[], &[], 0, 20).expect("preceding entry fits");
@@ -884,10 +883,10 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-DETAIL-010")]
-    #[bloomery("CLI-CHECK-DETAIL-011")]
-    #[bloomery("CLI-CHECK-DETAIL-016")]
-    #[bloomery("CLI-CHECK-DETAIL-020")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-010"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-011"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-016"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-020"))]
     fn detail_pages_are_bounded_seekable_and_make_progress_in_both_formats() {
         let run = record(1);
         let failure = &run.failures[0];
@@ -945,8 +944,8 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-DETAIL-006")]
-    #[bloomery("CLI-CHECK-DETAIL-011")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-006"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-011"))]
     fn failure_pages_report_the_actual_offset_and_continuation() {
         let run = record(50);
         let first = failure_page(&run, 10, 5);
@@ -962,8 +961,8 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-OUTPUT-011")]
-    #[bloomery("CLI-CHECK-OUTPUT-012")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-011"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-012"))]
     fn blocked_outcomes_count_without_duplicating_the_causal_failure() {
         let mut run = record(1);
         run.outcomes.push(CheckRecord {
@@ -979,8 +978,8 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-OUTPUT-001")]
-    #[bloomery("CLI-CHECK-OUTPUT-011")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-001"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-011"))]
     fn summary_counts_include_the_implicit_formatter_outcome() {
         let mut passed = record(0);
         passed.outcomes.push(CheckRecord {
@@ -1007,7 +1006,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-OUTPUT-010")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-010"))]
     fn optional_failure_location_fields_are_omitted_when_unavailable() {
         let mut failure = record(1).failures.remove(0);
         failure.location = Some(FailureLocation {

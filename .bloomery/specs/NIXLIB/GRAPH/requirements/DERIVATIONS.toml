@@ -230,3 +230,14 @@ design = "design/derivations.md#checks"
 type = "ubiquitous"
 system = "the workspace:lock check"
 action = "validate Cargo.lock and bloomery.lock consistency, member presence, versions, and dependency completeness read-only and report bloomery sync as the repair"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-022"
+title = "Proc-macro compilation is covered by builder tests"
+manual = false
+design = "design/derivations.md#crate-compilation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder test suite"
+action = "compile a proc-macro fixture crate and assert its derived crate type"

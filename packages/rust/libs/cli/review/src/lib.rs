@@ -100,7 +100,6 @@ mod tests {
         Area, Config, Context, DesignReference, EarsStatement, Feature, MarkdownFrontmatter,
         Requirement, RequirementEntry, RequirementGroup,
     };
-    use bloomery_test_macros::bloomery;
     use std::path::PathBuf;
 
     fn context(requirements: &[(&str, bool)]) -> Context {
@@ -190,7 +189,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-REVIEW-CATALOG-001")]
+    #[cfg_attr(any(), bloomery("CLI-REVIEW-CATALOG-001"))]
     fn catalogue_contains_all_and_only_manual_requirements() {
         let context = context(&[
             ("ALPHA-ONE-GRP-001", true),
@@ -209,7 +208,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-REVIEW-CATALOG-002")]
+    #[cfg_attr(any(), bloomery("CLI-REVIEW-CATALOG-002"))]
     fn catalogue_order_is_hierarchical_and_uses_numeric_sequences() {
         let context = context(&[
             ("ZETA-ALPHA-BETA-001", true),

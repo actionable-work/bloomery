@@ -9,7 +9,6 @@ use crate::check_command::progress::{
 use crate::check_command::scheduler::{Task, WorkerTracker, run_with_followups};
 use crate::check_command::test_support::{FakeNix, fixture, invoke_with_terminal, request};
 use crate::output::TerminalFacts;
-use bloomery_test_macros::bloomery;
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
@@ -45,11 +44,11 @@ impl Write for SharedWriter {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-PROGRESS-001")]
-#[bloomery("CLI-CHECK-PROGRESS-009")]
-#[bloomery("CLI-CHECK-PROGRESS-011")]
-#[bloomery("CLI-CHECK-PROGRESS-012")]
-#[bloomery("CLI-CHECK-PROGRESS-024")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-001"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-009"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-011"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-012"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-024"))]
 fn eligible_execution_writes_changing_metrics_to_stderr_and_final_metrics_to_stdout() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -107,7 +106,7 @@ fn eligible_execution_writes_changing_metrics_to_stderr_and_final_metrics_to_std
 }
 
 #[test]
-#[bloomery("CLI-CHECK-PROGRESS-030")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-030"))]
 fn eligible_completion_summary_repeats_the_final_metrics() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -139,7 +138,7 @@ fn eligible_completion_summary_repeats_the_final_metrics() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-PROGRESS-031")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-031"))]
 fn completion_output_omits_metrics_without_a_user_terminal() {
     // Redirected stderr in human mode.
     let (root, cache) = fixture(true);
@@ -185,7 +184,7 @@ fn completion_output_omits_metrics_without_a_user_terminal() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-PROGRESS-002")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-002"))]
 fn non_terminal_stderr_receives_no_progress_on_either_stream() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -210,7 +209,7 @@ fn non_terminal_stderr_receives_no_progress_on_either_stream() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-PROGRESS-003")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-003"))]
 fn ci_markers_suppress_progress_even_with_a_terminal() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -236,7 +235,7 @@ fn ci_markers_suppress_progress_even_with_a_terminal() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-PROGRESS-004")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-004"))]
 fn json_mode_suppresses_progress_on_both_streams() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -263,7 +262,7 @@ fn json_mode_suppresses_progress_on_both_streams() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-PROGRESS-005")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-005"))]
 fn dumb_terminals_suppress_progress() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -289,7 +288,7 @@ fn dumb_terminals_suppress_progress() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-PROGRESS-006")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-006"))]
 fn no_color_keeps_progress_without_styling() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -316,7 +315,7 @@ fn no_color_keeps_progress_without_styling() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-PROGRESS-007")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-007"))]
 fn catalog_and_retrieval_subcommands_never_start_progress() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -344,7 +343,7 @@ fn catalog_and_retrieval_subcommands_never_start_progress() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-PROGRESS-019")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-019"))]
 fn all_store_hits_report_known_zero_work() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -369,7 +368,7 @@ fn all_store_hits_report_known_zero_work() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-PROGRESS-021")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-021"))]
 fn static_only_runs_report_zero_derivation_work() {
     let (root, cache) = fixture(true);
     let backend = FakeNix::default();
@@ -391,7 +390,7 @@ fn static_only_runs_report_zero_derivation_work() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-PROGRESS-028")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-028"))]
 fn final_reporting_clears_the_transient_line_before_any_summary() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -419,8 +418,8 @@ fn final_reporting_clears_the_transient_line_before_any_summary() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-PROGRESS-009")]
-#[bloomery("CLI-CHECK-PROGRESS-028")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-009"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-028"))]
 fn blocked_dependents_finalize_before_a_slow_worker_joins() {
     let (root, cache) = fixture(true);
     std::fs::remove_file(root.join(".bloomery/specs/CLI/CHECK/README.md"))
@@ -475,8 +474,8 @@ fn blocked_dependents_finalize_before_a_slow_worker_joins() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-PROGRESS-009")]
-#[bloomery("CLI-CHECK-PROGRESS-027")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-009"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-027"))]
 fn finalization_is_published_while_another_worker_is_still_running() {
     let buffer = Arc::new(Mutex::new(Vec::new()));
     let (release_sender, release_receiver) = mpsc::channel::<()>();
@@ -549,7 +548,7 @@ fn finalization_is_published_while_another_worker_is_still_running() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-PROGRESS-009")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-009"))]
 fn formatter_failure_finalizes_every_selected_check() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {

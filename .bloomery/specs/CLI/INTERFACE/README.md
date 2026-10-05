@@ -22,14 +22,14 @@ and how the target repository root is selected.
 
 ## Responsibilities
 
-- Expose `check`, its `list`/`failures`/`details` commands, `review`, `sync`, and
-  parser-generated help.
+- Expose `init`, `check`, its `list`/`failures`/`details` commands, `review`,
+  `sync`, and parser-generated help.
 - Resolve the repository root from the process's current working directory.
 - Require a root `flake.nix` before every command except the workspace-bootstrap
   `init` command.
 - Require `.bloomery/config.toml` for repository commands while exempting parser
   help and `init`.
 - Specify shared `--json`, check selection/execution/retrieval options, and
-  command-specific `sync --update` values.
+  command-specific `sync --update` and `init --template`/`init --force` values.
 - Define human-readable terminal coloring and stable JSON output contracts.
-- Keep command syntax distinct from check, review, and sync semantics.
+- Keep command syntax distinct from init, check, review, and sync semantics.

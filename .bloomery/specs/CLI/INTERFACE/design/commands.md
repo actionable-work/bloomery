@@ -4,6 +4,7 @@ The `bloomery` executable exposes the application commands and the CLI parser's
 built-in help command:
 
 ```text
+bloomery init [DIRECTORY] [--template NAME] [--force] [--json]
 bloomery check [--check ID_OR_GLOB]... [--system SYSTEM]... [--jobs N] [--fail-fast] [--json]
 bloomery check list [--check ID_OR_GLOB]... [--system SYSTEM]... [--offset N] [--limit N] [--json]
 bloomery check failures [--run RUN] [--offset N] [--limit N] [--json]
@@ -22,7 +23,8 @@ and the application library dispatches those requests to command libraries.
 Before command handling or parser-generated help is returned, resolve the root
 from the process's current working directory and require a `flake.nix` file
 there. This applies to `check` and its nested commands, `review`, `sync`, and
-help requests. The sole exception is the workspace-bootstrap `init` command.
+help requests. The sole exception is the workspace-bootstrap `init` command,
+which creates the flake and may run in a directory without one.
 
 If `flake.nix` is absent, stop before command-specific work and emit a nonzero
 error with this message:
@@ -39,19 +41,21 @@ command's own behavior. No upward workspace search is performed.
 
 After the flake preflight, require `.bloomery/config.toml` before command
 handling for `check`, its nested commands, `review`, and `sync`. Parser help and
-the future `init` command are exempt. If the file is absent, stop before
+the `init` command are exempt. If the file is absent, stop before
 command-specific work and emit a nonzero `ConfigurationError` naming the missing
 path. With `--json`, emit one structured error with the same information. The
 specs and scanner tables are then loaded as described in
 [PARSER/CONFIGURATION](../../CONFIGURATION/design/config-file.md).
 
-The `check`, `review`, and `sync` commands operate on the validated root. Sync
-maintains lockfiles without loading specifications or scanning evidence.
-Command semantics are specified by [CHECK](../../CHECK/README.md),
+The `check`, `review`, and `sync` commands operate on the validated root. The
+`init` command operates on its target directory instead and requires no existing
+configuration. Sync maintains lockfiles without loading specifications or
+scanning evidence. Command semantics are specified by
+[INIT](../../INIT/README.md), [CHECK](../../CHECK/README.md),
 [REVIEW](../../REVIEW/README.md), and [SYNC](../../SYNC/README.md). Sync is a
 CLI-only replacement for the Nix lock app, not a new Nix app. The global
-`--json` flag is available after any of the three application subcommands and
-their nested commands; see the [output contract](output.md). Check without a
+`--json` flag is available after any application subcommand and their nested
+commands; see the [output contract](output.md). Check without a
 nested command executes the selected suite; list discovers checks, failures
 pages retained failures, and details seeks within retained failure output.
 Retrieval never executes tests or builds.

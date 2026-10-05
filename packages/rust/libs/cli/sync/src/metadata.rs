@@ -166,7 +166,6 @@ pub(crate) fn sha256_normalized_crlf(contents: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::{create_lock, sha256_normalized_crlf};
-    use bloomery_test_macros::bloomery;
 
     fn metadata(nodes: &str) -> Vec<u8> {
         format!(
@@ -179,10 +178,10 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-017")]
-    #[bloomery("CLI-SYNC-LOCKS-018")]
-    #[bloomery("CLI-SYNC-LOCKS-019")]
-    #[bloomery("CLI-SYNC-LOCKS-020")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-017"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-018"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-019"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-020"))]
     fn resolved_metadata_builds_canonical_lock_records_and_normalizes_crlf() {
         let metadata = metadata(
             r#"{"id":"crate-a 1.0.0 (registry+https://example.invalid)","features":["zeta","alpha","alpha"],"deps":[{"pkg":"crate-b 2.0.0 (registry+https://example.invalid)"},{"pkg":"crate-b 2.0.0 (registry+https://example.invalid)"}]},
@@ -211,7 +210,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-022")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-022"))]
     fn distinct_package_identities_with_a_colliding_key_are_rejected() {
         let mut json: serde_json::Value = serde_json::from_slice(&metadata(
             r#"{"id":"crate-a 1.0.0 (registry+https://example.invalid)","features":[],"deps":[]},
@@ -241,7 +240,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-018")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-018"))]
     fn lock_hash_normalizes_crlf_without_removing_other_carriage_returns() {
         assert_eq!(
             sha256_normalized_crlf(b"a\r\nb\rc\n"),

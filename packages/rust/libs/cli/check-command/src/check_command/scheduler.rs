@@ -269,7 +269,6 @@ where
 mod tests {
     use super::{ScheduledState, Task, run_bounded, run_with_followups};
     use crate::check_command::interrupt::{CancellationToken, InterruptFlag};
-    use bloomery_test_macros::bloomery;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Barrier};
     use std::time::Duration;
@@ -284,7 +283,7 @@ mod tests {
     type TestTask = Box<dyn FnOnce(CancellationToken) -> TaskResult + Send>;
 
     #[test]
-    #[bloomery("CLI-CHECK-RUN-018")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-018"))]
     fn ready_followups_cancel_running_work_and_leave_queued_work_unstarted() {
         let barrier = Arc::new(Barrier::new(2));
         let structure_barrier = barrier.clone();
@@ -358,9 +357,9 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-RUN-001")]
-    #[bloomery("CLI-CHECK-RUN-002")]
-    #[bloomery("CLI-CHECK-RUN-003")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-001"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-002"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-003"))]
     fn bounded_workers_run_independent_tasks_concurrently() {
         let active = Arc::new(AtomicUsize::new(0));
         let maximum = Arc::new(AtomicUsize::new(0));
@@ -390,7 +389,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-RUN-003")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-003"))]
     fn the_task_limit_bounds_active_work() {
         let active = Arc::new(AtomicUsize::new(0));
         let maximum = Arc::new(AtomicUsize::new(0));
@@ -422,9 +421,9 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-RUN-005")]
-    #[bloomery("CLI-CHECK-RUN-007")]
-    #[bloomery("CLI-CHECK-RUN-010")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-005"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-007"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-010"))]
     fn fail_fast_stops_admission_and_marks_queued_tasks_not_run() {
         let admitted = Arc::new(AtomicUsize::new(0));
         let tasks = ["first", "queued-1", "queued-2"]
@@ -449,7 +448,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-RUN-008")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-008"))]
     fn fail_fast_cancels_only_its_running_task_work() {
         let barrier = Arc::new(Barrier::new(2));
         let first_barrier = barrier.clone();
@@ -488,8 +487,8 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-RUN-012")]
-    #[bloomery("CLI-CHECK-RUN-013")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-012"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-013"))]
     fn interruption_requests_cancellation_and_preserves_finished_work() {
         let interrupt = InterruptFlag::for_test();
         let for_task = interrupt.clone();

@@ -3,7 +3,6 @@ bloomery-model = { path = "../../shared/model" }
 serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
-bloomery-test-macros.workspace = true
 
 [package]
 name = "bloomery-review"

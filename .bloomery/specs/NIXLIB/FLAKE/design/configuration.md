@@ -14,9 +14,9 @@ flake interface ignores them.
 ## Required configuration
 
 `.bloomery/config.toml` is required. All repository commands and `mkFlake` fail
-when it is absent; the only exemptions are parser help and the future `init`
-command. When the file is missing, `mkFlake` fails evaluation with a
-`bloomery:`-prefixed message naming the missing path.
+when it is absent; the only exemptions are parser help and the `init` command.
+When the file is missing, `mkFlake` fails evaluation with a `bloomery:`-prefixed
+message naming the missing path.
 
 ## Value encoding
 

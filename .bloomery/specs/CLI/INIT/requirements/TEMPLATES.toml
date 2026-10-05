@@ -1,0 +1,125 @@
+group = "TEMPLATES"
+
+[[requirements]]
+id = "CLI-INIT-TEMPLATES-001"
+title = "Init defaults to the basic template"
+manual = false
+design = "design/templates.md#catalog-layout"
+
+[requirements.ears]
+type = "event"
+trigger = "--template is omitted"
+system = "bloomery init"
+action = "scaffold the basic workspace template"
+
+[[requirements]]
+id = "CLI-INIT-TEMPLATES-002"
+title = "Init accepts a template selection"
+manual = false
+design = "design/templates.md#catalog-layout"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery init"
+action = "accept --template with a template name"
+
+[[requirements]]
+id = "CLI-INIT-TEMPLATES-003"
+title = "Templates resolve by exact catalog name"
+manual = false
+design = "design/templates.md#catalog-layout"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery init"
+action = "resolve --template by exact match against the bundled catalog directory names"
+
+[[requirements]]
+id = "CLI-INIT-TEMPLATES-004"
+title = "A basic workspace template is bundled"
+manual = false
+design = "design/templates.md#basic-workspace"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery template catalog"
+action = "provide the basic workspace template"
+
+[[requirements]]
+id = "CLI-INIT-TEMPLATES-005"
+title = "An Axum server template is bundled"
+manual = false
+design = "design/templates.md#axum-server"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery template catalog"
+action = "provide the axum server template"
+
+[[requirements]]
+id = "CLI-INIT-TEMPLATES-006"
+title = "A Topcoat website template is bundled"
+manual = false
+design = "design/templates.md#topcoat-website"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery template catalog"
+action = "provide the topcoat website template"
+
+[[requirements]]
+id = "CLI-INIT-TEMPLATES-007"
+title = "Unknown templates are usage errors"
+manual = false
+design = "design/templates.md#catalog-layout"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "--template names no catalog template"
+system = "bloomery init"
+action = "return a usage error before writing any file"
+
+[[requirements]]
+id = "CLI-INIT-TEMPLATES-008"
+title = "Template sources are excluded from scanning"
+manual = false
+design = "design/templates.md#catalog-layout"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery template catalog"
+action = "stay outside configured scanner targets"
+
+[[requirements]]
+id = "CLI-INIT-TEMPLATES-009"
+title = "Template placeholders are substituted"
+manual = false
+design = "design/templates.md#project-substitution"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery init"
+action = "replace every {{project}} placeholder with the derived project name"
+
+[[requirements]]
+id = "CLI-INIT-TEMPLATES-010"
+title = "The project name derives from the target directory"
+manual = false
+design = "design/templates.md#project-substitution"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery init"
+action = "derive the project name from the target directory's final path component normalized to lowercase snake_case"
+
+[[requirements]]
+id = "CLI-INIT-TEMPLATES-011"
+title = "Invalid project names fail before writing"
+manual = false
+design = "design/templates.md#project-substitution"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "the derived project name is not a valid Cargo package name"
+system = "bloomery init"
+action = "fail before writing any file"

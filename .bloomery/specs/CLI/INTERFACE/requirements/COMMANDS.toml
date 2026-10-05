@@ -135,3 +135,14 @@ type = "event"
 trigger = "init runs without .bloomery/config.toml"
 system = "the bloomery CLI"
 action = "run without a configuration error"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-013"
+title = "The CLI exposes init"
+manual = false
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery"
+action = "expose the init subcommand"

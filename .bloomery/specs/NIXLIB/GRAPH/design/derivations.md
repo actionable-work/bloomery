@@ -6,7 +6,9 @@ A crate derivation invokes `rustc` directly. It builds an `rlib` for libraries
 and a dynamic library for proc macros, and also emits manifest-declared
 `cdylib` and `staticlib` crate types. External crates compile with lints
 capped, and compiler metadata and extra filename hashes derive from the package
-ID and active features.
+ID and active features. The builder test suite compiles a proc-macro fixture
+crate and asserts its dynamic-library crate type, keeping proc-macro support
+covered independently of evidence annotations.
 
 ## Dependency wiring and metadata
 

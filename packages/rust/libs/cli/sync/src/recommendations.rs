@@ -84,7 +84,6 @@ mod tests {
     use super::{
         CATALOG, RECOMMENDATION_CATALOG_VERSION, missing_recommendations, write_recommendations,
     };
-    use bloomery_test_macros::bloomery;
 
     fn raw(contents: &str) -> toml::Value {
         toml::from_str(contents).expect("valid TOML")
@@ -98,12 +97,12 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-001")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-006")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-007")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-008")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-009")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-010")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-001"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-006"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-007"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-008"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-009"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-010"))]
     fn built_in_catalog_covers_each_recommended_scanner_with_guidance() {
         assert_eq!(RECOMMENDATION_CATALOG_VERSION, 1);
         assert_eq!(CATALOG.len(), 3);
@@ -127,9 +126,9 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-002")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-011")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-012")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-002"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-011"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-012"))]
     fn only_absent_raw_paths_are_recommended() {
         let absent_parent = raw("[scanners.rust]\n");
         assert_eq!(
@@ -149,8 +148,8 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-013")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-014")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-013"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-014"))]
     fn explicit_false_and_true_values_suppress_recommendations() {
         let explicit_values = raw("[scanners.rust]\nenabled = false\n\
              [scanners.playwright]\nenabled = false\n\
@@ -159,8 +158,8 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-015")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-016")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-015"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-016"))]
     fn dotted_keys_and_inline_tables_have_normal_toml_presence_semantics() {
         let dotted = raw("scanners.rust.enabled = false\n\
              scanners.playwright.enabled = false\n\
@@ -174,11 +173,11 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-003")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-017")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-018")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-019")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-020")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-003"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-017"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-018"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-019"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-020"))]
     fn notices_are_sorted_unique_and_repeat_without_persisted_history() {
         let empty = raw("");
         let first = missing_paths(&empty);

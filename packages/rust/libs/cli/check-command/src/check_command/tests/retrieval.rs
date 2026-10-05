@@ -1,7 +1,6 @@
 use crate::check_command::catalog::NixTaskResult;
 use crate::check_command::command::{CheckOperation, DetailsArgs, FailureArgs, ListArgs};
 use crate::check_command::test_support::{FakeNix, fixture, invoke, request};
-use bloomery_test_macros::bloomery;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::fs;
@@ -9,7 +8,7 @@ use std::sync::Mutex;
 use std::sync::atomic::Ordering;
 
 #[test]
-#[bloomery("CLI-CHECK-SELECT-021")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-021"))]
 fn oversized_catalog_ids_return_an_error_instead_of_a_stalled_page() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -39,9 +38,9 @@ fn oversized_catalog_ids_return_an_error_instead_of_a_stalled_page() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-DETAIL-027")]
-#[bloomery("CLI-CHECK-DETAIL-028")]
-#[bloomery("CLI-CHECK-DETAIL-008")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-027"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-028"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-008"))]
 fn concurrent_alias_retrieval_freezes_one_shared_derivation_log_snapshot() {
     let (root, cache) = fixture(true);
     let store_path = "/nix/store/0123456789abcdfghijklmnpqrsvwxyz-failed-check.drv";
@@ -114,11 +113,11 @@ fn concurrent_alias_retrieval_freezes_one_shared_derivation_log_snapshot() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-DETAIL-008")]
-#[bloomery("CLI-CHECK-DETAIL-009")]
-#[bloomery("CLI-CHECK-DETAIL-011")]
-#[bloomery("CLI-CHECK-DETAIL-012")]
-#[bloomery("CLI-CHECK-DETAIL-018")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-008"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-009"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-011"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-012"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-018"))]
 fn diagnostics_keep_full_messages_and_default_details_start_at_the_failure() {
     let (root, cache) = fixture(true);
     let requirement = root.join(".bloomery/specs/CLI/CHECK/requirements/CONTRACT.toml");
@@ -173,10 +172,10 @@ fn diagnostics_keep_full_messages_and_default_details_start_at_the_failure() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-SELECT-007")]
-#[bloomery("CLI-CHECK-SELECT-008")]
-#[bloomery("CLI-INTERFACE-COMMANDS-006")]
-#[bloomery("CLI-CHECK-DETAIL-007")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-007"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-008"))]
+#[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-006"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-007"))]
 fn listing_discovers_and_filters_ids_without_executing_builds() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -201,13 +200,13 @@ fn listing_discovers_and_filters_ids_without_executing_builds() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-DETAIL-004")]
-#[bloomery("CLI-CHECK-DETAIL-005")]
-#[bloomery("CLI-CHECK-DETAIL-006")]
-#[bloomery("CLI-CHECK-DETAIL-014")]
-#[bloomery("CLI-CHECK-DETAIL-017")]
-#[bloomery("CLI-CHECK-OUTPUT-010")]
-#[bloomery("CLI-INTERFACE-COMMANDS-007")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-004"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-005"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-006"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-014"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-017"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-010"))]
+#[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-007"))]
 fn retrieval_pages_failures_and_details_without_reexecuting_work() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -256,7 +255,7 @@ fn retrieval_pages_failures_and_details_without_reexecuting_work() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-DETAIL-025")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-025"))]
 fn detail_retrieval_loads_a_retained_nix_log_on_demand() {
     let (root, cache) = fixture(true);
     let store_path = "/nix/store/0123456789abcdfghijklmnpqrsvwxyz-failed-check.drv";
@@ -307,8 +306,8 @@ fn detail_retrieval_loads_a_retained_nix_log_on_demand() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-DETAIL-026")]
-#[bloomery("CLI-CHECK-DETAIL-027")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-026"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-027"))]
 fn an_unavailable_nix_log_preserves_captured_failure_details() {
     let (root, cache) = fixture(true);
     let store_path = "/nix/store/0123456789abcdfghijklmnpqrsvwxyz-failed-check.drv";
@@ -373,9 +372,9 @@ fn an_unavailable_nix_log_preserves_captured_failure_details() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-DETAIL-015")]
-#[bloomery("CLI-CHECK-DETAIL-016")]
-#[bloomery("CLI-CHECK-DETAIL-020")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-015"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-016"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-020"))]
 fn retrieval_rejects_missing_runs_and_preserves_only_safe_display_records() {
     let (root, cache) = fixture(true);
     let mut args = request();

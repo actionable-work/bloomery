@@ -8,6 +8,9 @@ commands:
 | Command | Option | Accepted values | Default |
 | --- | --- | --- | --- |
 | `check` and nested commands | `--json` | flag | human-readable text |
+| `init` | `--json` | flag | human-readable text |
+| `init` | `--template` | `basic`, `axum`, or `topcoat` | `basic` workspace template |
+| `init` | `--force` | flag | refuse a non-empty target |
 | `check`, `check list` | `--check` | repeatable exact ID or quoted glob | all available checks |
 | `check`, `check list` | `--system` | repeatable system name | host Nix system |
 | `check` | `--jobs` | positive integer | logical CPU count, minimum 1 |
@@ -21,18 +24,22 @@ commands:
 | all commands | `-h`, `--help` | — | — |
 
 `--json` is a shared global option, accepted before or after the subcommand. It
-selects machine-readable output for check, review, and sync; no command-specific
-`--format` or alternate JSON spelling is exposed. Human-readable output is the
-default. Terminal color behavior is automatic and consistent across commands;
-non-empty `NO_COLOR`, redirected streams, and JSON mode suppress ANSI styling.
+selects machine-readable output for check, review, sync, and init; no
+command-specific `--format` or alternate JSON spelling is exposed. Human-readable
+output is the default. Terminal color behavior is automatic and consistent
+across commands; non-empty `NO_COLOR`, redirected streams, and JSON mode
+suppress ANSI styling.
 See the [output contract](output.md).
 
-Bloomery does not expose a command-specific repository-root flag; check and
-review use the current working directory, as does sync. Every recognized command
-request, including help and nested check retrieval, requires the shared root
-`flake.nix` preflight; the workspace-bootstrap `init` command is exempt. Check,
-review, and sync additionally require `.bloomery/config.toml`; parser help and
-`init` are exempt from the configuration requirement. The CLI parser also
+Bloomery does not expose a command-specific repository-root flag. Check and
+review use the current working directory, as does sync. Init instead accepts an
+optional positional target directory that defaults to the current working
+directory, and its `--template` value names a bundled template. Init refuses a
+non-empty target unless `--force` is supplied. Every recognized
+command request, including help and nested check retrieval, requires the shared
+root `flake.nix` preflight; the workspace-bootstrap `init` command is exempt.
+Check, review, and sync additionally require `.bloomery/config.toml`; parser help
+and `init` are exempt from the configuration requirement. The CLI parser also
 supplies the `help` subcommand for displaying command help.
 
 Check selectors form a union and must each match. `*` and `?` are the supported

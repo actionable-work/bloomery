@@ -2,6 +2,7 @@ use crate::files::expand_globs;
 use bloomery_model::{Diagnostic, Evidence, SourceLocation};
 use std::fs;
 use std::path::Path;
+use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
 
 pub fn scan(root: &Path, patterns: &[String]) -> Result<Vec<Evidence>, Vec<Diagnostic>> {
@@ -74,36 +75,52 @@ impl<'ast> Visit<'ast> for Visitor<'_> {
         });
         if is_test {
             for attribute in &item.attrs {
-                if !attribute.path().is_ident("bloomery") {
+                if !attribute.path().is_ident("cfg_attr") {
                     continue;
                 }
-                match attribute.parse_args::<syn::LitStr>() {
-                    Ok(value) => {
-                        let needle = format!("bloomery(\"{}\"", value.value());
-                        let line = self
-                            .contents
-                            .find(&needle)
-                            .map(|offset| {
-                                self.contents[..offset]
-                                    .bytes()
-                                    .filter(|byte| *byte == b'\n')
-                                    .count()
-                                    + 1
-                            })
-                            .unwrap_or(1);
-                        self.evidence.push(Evidence {
-                            id: value.value(),
-                            location: SourceLocation::new(self.path, Some(line)),
-                            scanner: "rust",
-                        });
+                let nested = match attribute
+                    .parse_args_with(Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated)
+                {
+                    Ok(nested) => nested,
+                    Err(_) => continue,
+                };
+                for meta in nested {
+                    let syn::Meta::List(list) = meta else {
+                        continue;
+                    };
+                    if !list.path.is_ident("bloomery") {
+                        continue;
                     }
-                    Err(error) => self.diagnostics.push(
-                        Diagnostic::new(
-                            "RustReferenceError",
-                            format!("Bloomery attribute must contain one string ID: {error}"),
-                        )
-                        .at(self.path.to_path_buf(), Some(1)),
-                    ),
+                    match list.parse_args::<syn::LitStr>() {
+                        Ok(value) => {
+                            let needle = format!("bloomery(\"{}\"", value.value());
+                            let line = self
+                                .contents
+                                .find(&needle)
+                                .map(|offset| {
+                                    self.contents[..offset]
+                                        .bytes()
+                                        .filter(|byte| *byte == b'\n')
+                                        .count()
+                                        + 1
+                                })
+                                .unwrap_or(1);
+                            self.evidence.push(Evidence {
+                                id: value.value(),
+                                location: SourceLocation::new(self.path, Some(line)),
+                                scanner: "rust",
+                            });
+                        }
+                        Err(error) => self.diagnostics.push(
+                            Diagnostic::new(
+                                "RustReferenceError",
+                                format!(
+                                    "Bloomery evidence tag must contain one string ID: {error}"
+                                ),
+                            )
+                            .at(self.path.to_path_buf(), Some(1)),
+                        ),
+                    }
                 }
             }
         }

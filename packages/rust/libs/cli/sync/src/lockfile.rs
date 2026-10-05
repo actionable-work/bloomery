@@ -213,7 +213,6 @@ mod tests {
         BloomeryLock, BloomeryPackage, PublicationOutcome, publish_candidate,
         publish_candidate_with, serialize_candidate,
     };
-    use bloomery_test_macros::bloomery;
     use std::collections::BTreeMap;
     use std::fs;
     use std::io::{self, Write};
@@ -287,11 +286,11 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-004")]
-    #[bloomery("CLI-SYNC-LOCKS-005")]
-    #[bloomery("CLI-SYNC-LOCKS-006")]
-    #[bloomery("CLI-SYNC-LOCKS-019")]
-    #[bloomery("CLI-SYNC-LOCKS-020")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-004"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-005"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-006"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-019"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-020"))]
     fn candidate_is_a_valid_version_one_lock_with_sorted_tables_and_fields() {
         let candidate = serialize_candidate(&sample_lock()).expect("serialized candidate");
         let text = String::from_utf8(candidate.clone()).expect("UTF-8 TOML");
@@ -322,7 +321,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-021")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-021"))]
     fn toml_writer_escapes_package_keys_and_string_values() {
         let mut lock = sample_lock();
         lock.packages.clear();
@@ -344,7 +343,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-023")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-023"))]
     fn publication_writes_a_sibling_temporary_file_then_atomically_renames_it() {
         let fixture = Fixture::new();
         let target = fixture.lock();
@@ -359,7 +358,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-024")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-024"))]
     fn identical_lock_bytes_leave_the_existing_file_untouched() {
         let fixture = Fixture::new();
         let target = fixture.lock();
@@ -385,8 +384,8 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-025")]
-    #[bloomery("CLI-SYNC-LOCKS-026")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-025"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-026"))]
     fn failed_partial_write_preserves_the_old_lock_and_cleans_up_the_temp_file() {
         let fixture = Fixture::new();
         let target = fixture.lock();
@@ -410,8 +409,8 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-025")]
-    #[bloomery("CLI-SYNC-LOCKS-026")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-025"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-026"))]
     fn failed_atomic_rename_preserves_the_old_lock_and_cleans_up_the_temp_file() {
         let fixture = Fixture::new();
         let target = fixture.lock();
@@ -432,8 +431,8 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-025")]
-    #[bloomery("CLI-SYNC-LOCKS-026")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-025"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-026"))]
     fn failed_first_publication_leaves_no_lock_or_temporary_file() {
         let fixture = Fixture::new();
         let target = fixture.lock();

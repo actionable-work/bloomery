@@ -47,14 +47,15 @@ mod tests {
         NixScannerConfig, PlaywrightScannerConfig, RustScannerConfig, ScannersConfig, SpecsConfig,
     };
     use bloomery_model::{Config, Context};
-    use bloomery_test_macros::bloomery;
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
-    #[bloomery("PARSER-SCANNING-STATIC-001")]
-    #[bloomery("PARSER-SCANNING-STATIC-002")]
-    #[bloomery("PARSER-SCANNING-STATIC-003")]
+    #[cfg_attr(any(), bloomery("PARSER-SCANNING-STATIC-001"))]
+    #[cfg_attr(any(), bloomery("PARSER-SCANNING-STATIC-002"))]
+    #[cfg_attr(any(), bloomery("PARSER-SCANNING-STATIC-003"))]
+    #[cfg_attr(any(), bloomery("PARSER-SCANNING-STATIC-004"))]
+    #[cfg_attr(any(), bloomery("PARSER-SCANNING-STATIC-005"))]
     fn extracts_static_references_with_locations_without_running_tests() {
         let suffix = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -65,7 +66,7 @@ mod tests {
         fs::create_dir_all(root.join("e2e")).expect("e2e");
         fs::write(
             root.join("tests/example.rs"),
-            "#[bloomery(\"PARSER-SCANNING-TESTS-001\")]\n#[test]\nfn example() { panic!(\"scanner must not execute source tests\") }\n",
+            "#[cfg_attr(any(), bloomery(\"PARSER-SCANNING-TESTS-001\"))]\n#[test]\nfn example() { panic!(\"scanner must not execute source tests\") }\n",
         )
         .expect("Rust source");
         fs::write(

@@ -1,0 +1,25 @@
+group = "ROUTES"
+
+[[requirements]]
+id = "SERVER-HTTP-ROUTES-001"
+title = "The server serves an index page"
+manual = false
+design = "design/routes.md"
+
+[requirements.ears]
+type = "event"
+trigger = "the index route is requested"
+system = "the server"
+action = "return the embedded index document"
+
+[[requirements]]
+id = "SERVER-HTTP-ROUTES-002"
+title = "The server reports health"
+manual = false
+design = "design/routes.md"
+
+[requirements.ears]
+type = "event"
+trigger = "the health route is requested"
+system = "the server"
+action = "return a JSON status of ok"

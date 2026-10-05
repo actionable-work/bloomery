@@ -7,6 +7,7 @@ members = [
   "packages/rust/libs/cli/cli-output",
   "packages/rust/libs/cli/cli-parser",
   "packages/rust/libs/cli/cli-types",
+  "packages/rust/libs/cli/init",
   "packages/rust/libs/cli/check-command",
   "packages/rust/libs/cli/review",
   "packages/rust/libs/cli/sync",

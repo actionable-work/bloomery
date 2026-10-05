@@ -375,7 +375,6 @@ mod tests {
         ProgressSnapshot as Snapshot, format_progress_snapshot,
     };
     use crate::check_command::model::Outcome;
-    use bloomery_test_macros::bloomery;
     use std::sync::mpsc;
 
     fn reducer(checks: usize) -> ProgressReducer {
@@ -394,7 +393,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-008")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-008"))]
     fn the_denominator_is_fixed_and_includes_prerequisites() {
         let mut reducer = ProgressReducer::new(3, false);
         assert_eq!(reducer.snapshot().checks_total, 3);
@@ -409,7 +408,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-009")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-009"))]
     fn every_terminal_outcome_advances_completion_exactly_once() {
         let mut reducer = reducer(6);
         assert_eq!(reducer.snapshot().checks_complete, 0);
@@ -434,7 +433,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-010")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-010"))]
     fn queued_or_running_checks_remain_incomplete() {
         let reducer = reducer(4);
         assert_eq!(reducer.snapshot().checks_complete, 0);
@@ -446,9 +445,9 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-008")]
-    #[bloomery("CLI-CHECK-PROGRESS-009")]
-    #[bloomery("CLI-CHECK-PROGRESS-010")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-008"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-009"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-010"))]
     fn the_formatter_gate_is_a_fixed_completion_unit() {
         // The caller includes format:workspace in the fixed denominator.
         let mut reducer = ProgressReducer::new(3, false);
@@ -470,7 +469,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-011")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-011"))]
     fn alias_checks_retain_separate_completion_units() {
         let mut reducer = reducer(2);
         derivation(
@@ -487,7 +486,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-012")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-012"))]
     fn shared_dependencies_are_deduplicated_by_canonical_derivation_path() {
         let mut reducer = reducer(2);
         for drv in [
@@ -517,7 +516,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-013")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-013"))]
     fn built_counts_require_successful_completion() {
         let mut reducer = reducer(1);
         derivation(
@@ -553,7 +552,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-014")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-014"))]
     fn unfinished_builds_remain_outstanding() {
         let mut reducer = reducer(3);
         for drv in [
@@ -591,7 +590,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-015")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-015"))]
     fn cached_counts_require_every_required_output() {
         let mut reducer = reducer(1);
         derivation(
@@ -621,7 +620,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-016")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-016"))]
     fn outstanding_substitutions_remain_visible_once_per_derivation() {
         let mut reducer = reducer(1);
         for _ in 0..3 {
@@ -645,7 +644,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-017")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-017"))]
     fn substitution_fallback_reclassifies_without_duplicating() {
         let mut reducer = reducer(1);
         derivation(
@@ -674,7 +673,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-018")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-018"))]
     fn known_total_partitions_discovered_work_and_grows_incrementally() {
         let mut reducer = reducer(1);
         derivation(
@@ -722,7 +721,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-019")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-019"))]
     fn existing_store_reuse_is_excluded_from_work_counts() {
         let mut reducer = reducer(1);
         derivation(
@@ -745,7 +744,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-020")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-020"))]
     fn unavailable_metrics_stay_unknown_until_structured_information_arrives() {
         let mut reducer = ProgressReducer::new(1, true);
         let snapshot = reducer.snapshot();
@@ -768,7 +767,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-021")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-021"))]
     fn static_only_runs_report_known_zero_derivation_work() {
         let reducer = ProgressReducer::new(2, false);
         let snapshot = reducer.snapshot();
@@ -780,7 +779,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-020")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-020"))]
     fn incomplete_structured_information_latches_metrics_unknown() {
         let mut reducer = ProgressReducer::new(1, true);
         reducer.apply(ProgressEvent::DerivationMetadataAvailable);
@@ -799,7 +798,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-024")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-024"))]
     fn the_initial_snapshot_renders_once_and_unchanged_snapshots_do_not() {
         let mut output = Vec::new();
         {

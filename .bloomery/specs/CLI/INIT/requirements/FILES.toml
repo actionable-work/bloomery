@@ -1,0 +1,298 @@
+group = "FILES"
+
+[[requirements]]
+id = "CLI-INIT-FILES-001"
+title = "Every template writes a flake"
+manual = false
+design = "design/templates.md#common-files"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery template catalog"
+action = "provide a flake.nix in every template"
+
+[[requirements]]
+id = "CLI-INIT-FILES-002"
+title = "Generated flakes use the Bloomery constructor"
+manual = false
+design = "design/templates.md#common-files"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "a generated flake.nix"
+action = "call bloomery.mkFlake with the generated workspace root and nixpkgs"
+
+[[requirements]]
+id = "CLI-INIT-FILES-003"
+title = "Generated flakes declare the Bloomery input"
+manual = false
+design = "design/templates.md#common-files"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "a generated flake.nix"
+action = "declare a bloomery input pointing at github:actionable-work/bloomery"
+
+[[requirements]]
+id = "CLI-INIT-FILES-004"
+title = "Generated flakes declare a nixpkgs input"
+manual = false
+design = "design/templates.md#common-files"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "a generated flake.nix"
+action = "declare a nixpkgs input"
+
+[[requirements]]
+id = "CLI-INIT-FILES-005"
+title = "Every template writes a Cargo workspace"
+manual = false
+design = "design/templates.md#common-files"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery template catalog"
+action = "provide a Cargo.toml declaring a resolver-2 workspace in every template"
+
+[[requirements]]
+id = "CLI-INIT-FILES-006"
+title = "Every template writes Bloomery configuration"
+manual = false
+design = "design/templates.md#common-files"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery template catalog"
+action = "provide .bloomery/config.toml in every template"
+
+[[requirements]]
+id = "CLI-INIT-FILES-007"
+title = "Generated configuration uses Bloomery defaults"
+manual = false
+design = "design/templates.md#common-files"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "a generated .bloomery/config.toml"
+action = "rely on the documented default build settings"
+
+[[requirements]]
+id = "CLI-INIT-FILES-008"
+title = "Every template writes a gitignore"
+manual = false
+design = "design/templates.md#common-files"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery template catalog"
+action = "provide a .gitignore in every template"
+
+[[requirements]]
+id = "CLI-INIT-FILES-009"
+title = "Generated gitignore excludes build outputs and direnv"
+manual = false
+design = "design/templates.md#common-files"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "a generated .gitignore"
+action = "ignore target/, result, result-*, and .direnv/"
+
+[[requirements]]
+id = "CLI-INIT-FILES-010"
+title = "Every template writes a direnv environment"
+manual = false
+design = "design/templates.md#common-files"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery template catalog"
+action = "provide .envrc in every template"
+
+[[requirements]]
+id = "CLI-INIT-FILES-011"
+title = "Generated direnv uses the flake"
+manual = false
+design = "design/templates.md#common-files"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "a generated .envrc"
+action = "contain use flake"
+
+[[requirements]]
+id = "CLI-INIT-FILES-012"
+title = "Every template is a multi-crate workspace"
+manual = false
+design = "design/templates.md#common-files"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery template catalog"
+action = "declare at least one library crate and one binary crate in every template"
+
+[[requirements]]
+id = "CLI-INIT-FILES-013"
+title = "Template binaries are thin"
+manual = false
+design = "design/templates.md#common-files"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "every template binary crate"
+action = "delegate its behavior to a library crate"
+
+[[requirements]]
+id = "CLI-INIT-FILES-014"
+title = "The basic template writes a core library"
+manual = false
+design = "design/templates.md#basic-workspace"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the basic workspace template"
+action = "contain a library crate at crates/{{project}}_core"
+
+[[requirements]]
+id = "CLI-INIT-FILES-015"
+title = "The basic template writes a thin binary"
+manual = false
+design = "design/templates.md#basic-workspace"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the basic workspace template"
+action = "contain a thin binary crate at crates/{{project}} that calls the core library"
+
+[[requirements]]
+id = "CLI-INIT-FILES-016"
+title = "The Axum template writes a server library"
+manual = false
+design = "design/templates.md#axum-server"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the axum server template"
+action = "contain a library crate at crates/{{project}}_server providing the router and handlers"
+
+[[requirements]]
+id = "CLI-INIT-FILES-017"
+title = "The Axum template writes a thin binary"
+manual = false
+design = "design/templates.md#axum-server"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the axum server template"
+action = "contain a thin binary crate at crates/{{project}} that starts the server library"
+
+[[requirements]]
+id = "CLI-INIT-FILES-018"
+title = "The Topcoat template writes a UI library"
+manual = false
+design = "design/templates.md#topcoat-website"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the topcoat website template"
+action = "contain a library crate at crates/{{project}}_ui providing pages and assets"
+
+[[requirements]]
+id = "CLI-INIT-FILES-019"
+title = "The Topcoat template writes a server library"
+manual = false
+design = "design/templates.md#topcoat-website"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the topcoat website template"
+action = "contain a library crate at crates/{{project}}_server that registers UI pages and serves the site"
+
+[[requirements]]
+id = "CLI-INIT-FILES-020"
+title = "The Topcoat template writes a thin binary"
+manual = false
+design = "design/templates.md#topcoat-website"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the topcoat website template"
+action = "contain a thin binary crate at crates/{{project}} that starts the server library"
+
+[[requirements]]
+id = "CLI-INIT-FILES-021"
+title = "Every template seeds a specification skeleton"
+manual = false
+design = "design/templates.md#seeded-specifications"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery template catalog"
+action = "provide a .bloomery/specs skeleton with an area, feature, design document, and grouped requirements in every template"
+
+[[requirements]]
+id = "CLI-INIT-FILES-022"
+title = "Seeded requirements are automated"
+manual = false
+design = "design/templates.md#seeded-specifications"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "a seeded specification requirement"
+action = "be marked manual = false"
+
+[[requirements]]
+id = "CLI-INIT-FILES-023"
+title = "The basic template seeds an app feature"
+manual = false
+design = "design/templates.md#basic-workspace"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the basic workspace template"
+action = "seed an APP/CORE feature whose requirement describes the greeting behavior"
+
+[[requirements]]
+id = "CLI-INIT-FILES-024"
+title = "The Axum template seeds an HTTP feature"
+manual = false
+design = "design/templates.md#axum-server"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the axum server template"
+action = "seed a SERVER/HTTP feature whose requirements describe the index and health routes"
+
+[[requirements]]
+id = "CLI-INIT-FILES-025"
+title = "The Topcoat template seeds a UI feature"
+manual = false
+design = "design/templates.md#topcoat-website"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the topcoat website template"
+action = "seed a SITE/UI feature whose requirement describes page registration"
+
+[[requirements]]
+id = "CLI-INIT-FILES-026"
+title = "The Topcoat template seeds a server feature"
+manual = false
+design = "design/templates.md#topcoat-website"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the topcoat website template"
+action = "seed a SITE/SERVER feature whose requirement describes serving the site"
+
+[[requirements]]
+id = "CLI-INIT-FILES-027"
+title = "Seeded tests tag evidence inline"
+manual = false
+design = "design/templates.md#seeded-specifications"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "a seeded library unit test"
+action = "tag its requirement with a cfg_attr(any(), bloomery(\"ID\")) attribute"

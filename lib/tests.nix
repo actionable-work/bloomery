@@ -10,6 +10,7 @@
   flakeModuleTests = import ./modules/flake-module.test.nix {inherit pkgs lib;};
   builderTests = import ./builders/builders.test.nix {inherit pkgs lib;};
   repositoryLayoutTests = import ./repository-layout.test.nix {inherit lib;};
+  templatesSourceTests = import ./templates-source.test.nix {inherit pkgs lib;};
   sourceIsolationTests = import ./source-isolation.test.nix {inherit pkgs lib;};
   graphTests = import ./graph.test.nix {inherit pkgs lib;};
 
@@ -23,6 +24,7 @@
     // flakeModuleTests
     // builderTests
     // repositoryLayoutTests
+    // templatesSourceTests
     // sourceIsolationTests
     // graphTests;
 
@@ -136,6 +138,8 @@ in {
           "NIXLIB-GRAPH-DERIVATIONS-019"
           "NIXLIB-GRAPH-DERIVATIONS-020"
           "NIXLIB-GRAPH-DERIVATIONS-021"
+          "NIX-SOURCES-FILESETS-011"
+          "CLI-INIT-TEMPLATES-008"
         ];
       };
     } ''

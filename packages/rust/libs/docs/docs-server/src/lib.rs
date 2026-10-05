@@ -53,7 +53,6 @@ pub async fn run() {
 #[cfg(test)]
 mod tests {
     use super::{bind_address, bind_listener, configured_port, internal_serve, router_with_assets};
-    use bloomery_test_macros::bloomery;
     use std::fs;
     use std::io::{Read, Write};
     use std::net::Ipv4Addr;
@@ -132,14 +131,14 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("DOCS-SERVER-STARTUP-003")]
+    #[cfg_attr(any(), bloomery("DOCS-SERVER-STARTUP-003"))]
     fn valid_port_environment_values_select_the_requested_port() {
         assert_eq!(configured_port(Some("43127")), 43127);
         assert_eq!(bind_address(configured_port(Some("43127"))).port(), 43127);
     }
 
     #[test]
-    #[bloomery("DOCS-SERVER-STARTUP-004")]
+    #[cfg_attr(any(), bloomery("DOCS-SERVER-STARTUP-004"))]
     fn missing_or_invalid_port_values_use_the_default() {
         assert_eq!(configured_port(None), 8080);
         assert_eq!(configured_port(Some("not-a-port")), 8080);
@@ -148,7 +147,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("DOCS-SERVER-STARTUP-002")]
+    #[cfg_attr(any(), bloomery("DOCS-SERVER-STARTUP-002"))]
     fn listener_binds_to_ipv4_localhost() {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_io()
@@ -164,7 +163,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("DOCS-SERVER-STARTUP-001")]
+    #[cfg_attr(any(), bloomery("DOCS-SERVER-STARTUP-001"))]
     fn server_serves_registered_ui_pages_over_local_http() {
         let (bundle, directory) = test_bundle();
         let router = router_with_assets(Some(bundle));
@@ -202,7 +201,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("DOCS-SERVER-STARTUP-005")]
+    #[cfg_attr(any(), bloomery("DOCS-SERVER-STARTUP-005"))]
     fn an_available_native_asset_bundle_is_attached_to_the_router() {
         let (bundle, directory) = test_bundle();
         let router = router_with_assets(Some(bundle));

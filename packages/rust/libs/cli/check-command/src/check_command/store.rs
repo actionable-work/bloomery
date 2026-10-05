@@ -682,7 +682,6 @@ mod tests {
     use crate::check_command::model::{
         CheckRecord, FailureRecord, Outcome, RunRecord, RunSelection, RunStatus,
     };
-    use bloomery_test_macros::bloomery;
     use std::fs;
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -741,10 +740,10 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-DETAIL-001")]
-    #[bloomery("CLI-CHECK-DETAIL-002")]
-    #[bloomery("CLI-CHECK-DETAIL-003")]
-    #[bloomery("CLI-CHECK-DETAIL-021")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-001"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-002"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-003"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-021"))]
     fn cache_runs_are_isolated_unique_and_atomically_finalized() {
         let (root, cache) = paths();
         let store = RunStore::open(&root, Some(&cache)).expect("run store");
@@ -769,9 +768,9 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-DETAIL-004")]
-    #[bloomery("CLI-CHECK-DETAIL-005")]
-    #[bloomery("CLI-CHECK-DETAIL-014")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-004"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-005"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-014"))]
     fn retrieval_selects_explicit_or_latest_completed_runs_without_fallback() {
         let (root, cache) = paths();
         let store = RunStore::open(&root, Some(&cache)).expect("run store");
@@ -792,8 +791,8 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-DETAIL-022")]
-    #[bloomery("CLI-CHECK-DETAIL-023")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-022"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-023"))]
     fn available_git_revision_and_dirty_state_are_retained_in_runs() {
         #[cfg(unix)]
         {
@@ -872,7 +871,7 @@ fi
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-DETAIL-019")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-019"))]
     fn cache_directories_files_and_logs_use_private_permissions() {
         use std::os::unix::fs::PermissionsExt;
 

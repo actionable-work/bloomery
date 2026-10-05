@@ -809,7 +809,6 @@ mod tests {
     use crate::check_command::nix_progress::NixProgressCollector;
     use crate::check_command::progress::ProgressSink;
     use crate::check_command::test_support::{fixture, nix_is_available};
-    use bloomery_test_macros::bloomery;
     use std::ffi::OsString;
     use std::fs;
     use std::io::{self, Read, Write};
@@ -855,9 +854,9 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-NIX-006")]
-    #[bloomery("CLI-CHECK-NIX-015")]
-    #[bloomery("CLI-CHECK-SELECT-019")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-006"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-015"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-019"))]
     fn catalog_discovery_includes_every_attribute_except_legacy_recursive_output() {
         let backend = CatalogStub {
             names: vec![
@@ -879,7 +878,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-NIX-009")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-009"))]
     fn nix_ids_preserve_attribute_names_after_the_system_separator() {
         assert_eq!(
             parse_nix_id("nix:x86_64-linux:checks:with:colons"),
@@ -889,11 +888,11 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-NIX-011")]
-    #[bloomery("CLI-CHECK-NIX-013")]
-    #[bloomery("CLI-CHECK-NIX-014")]
-    #[bloomery("CLI-CHECK-NIX-016")]
-    #[bloomery("CLI-CHECK-NIX-017")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-011"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-013"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-014"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-016"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-017"))]
     fn nix_invocations_are_pure_lock_safe_and_pass_attribute_names_as_literals() {
         let malicious = "bad\"; builtins.abort \"injected ${value}";
         let discovery = strings(&discover_args("x86_64-linux"));
@@ -925,7 +924,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-NIX-016")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-016"))]
     fn real_nix_parses_unicode_control_and_quoted_check_attribute_names() {
         if !nix_is_available() {
             eprintln!("skipping real-Nix attribute parser test: Nix store is unavailable");
@@ -997,7 +996,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-NIX-012")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-012"))]
     fn a_missing_nix_executable_is_an_operational_error() {
         let missing = NixCli::with_executable("/missing/bloomery-nix-cli");
         let error = missing
@@ -1007,7 +1006,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-NIX-012")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-012"))]
     fn an_unavailable_nix_cli_fails_the_formatter_instead_of_skipping_it() {
         let missing = NixCli::with_executable("/missing/bloomery-nix-cli");
         let log = std::env::temp_dir().join("bloomery-missing-nix-format.log");
@@ -1056,7 +1055,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-DETAIL-024")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-024"))]
     fn nix_log_paths_are_parsed_from_failure_hints_and_store_paths_are_validated() {
         let path = "/nix/store/0123456789abcdfghijklmnpqrsvwxyz-failed-check.drv";
         let output = format!("error: check failed\nFor full logs, run 'nix log {path}'.\n");

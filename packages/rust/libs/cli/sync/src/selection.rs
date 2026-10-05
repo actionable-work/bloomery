@@ -137,13 +137,12 @@ mod tests {
         BARE_UPDATE_VALUE, Ecosystem, UpdatePlan, UpdateSelection, parse_cli_update,
         parse_update_list,
     };
-    use bloomery_test_macros::bloomery;
     use std::collections::BTreeSet;
 
     #[test]
-    #[bloomery("CLI-SYNC-INTERFACE-001")]
-    #[bloomery("CLI-SYNC-INTERFACE-005")]
-    #[bloomery("CLI-SYNC-INTERFACE-006")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-001"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-005"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-006"))]
     fn update_selection_accepts_bare_and_explicit_forms() {
         assert_eq!(
             parse_cli_update(None).expect("no update flag"),
@@ -160,8 +159,8 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-INTERFACE-002")]
-    #[bloomery("CLI-SYNC-INTERFACE-011")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-002"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-011"))]
     fn duplicate_names_are_deduplicated_and_order_is_irrelevant() {
         let forward = parse_update_list("rust,nix,rust").expect("forward list");
         let reverse = parse_update_list("nix,rust").expect("reverse list");
@@ -170,10 +169,10 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-INTERFACE-003")]
-    #[bloomery("CLI-SYNC-INTERFACE-007")]
-    #[bloomery("CLI-SYNC-INTERFACE-008")]
-    #[bloomery("CLI-SYNC-INTERFACE-009")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-003"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-007"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-008"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-009"))]
     fn update_plans_restrict_explicit_updates_and_expand_bare_updates() {
         let reconcile = UpdatePlan::new(&UpdateSelection::None);
         assert!(!reconcile.update_nix && !reconcile.update_rust);
@@ -188,9 +187,9 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-INTERFACE-012")]
-    #[bloomery("CLI-SYNC-INTERFACE-013")]
-    #[bloomery("CLI-SYNC-INTERFACE-014")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-012"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-013"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-014"))]
     fn invalid_update_lists_are_usage_errors() {
         for invalid in ["", "unknown", "rust,,nix", ",rust", "nix,"] {
             let error = parse_update_list(invalid).expect_err("invalid update list");

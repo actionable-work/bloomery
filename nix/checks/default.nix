@@ -9,6 +9,7 @@
 }:
 {
   "core:unit-tests" = import ./unit-tests.nix {inherit bloomery;};
+  "core:proc-macro-crate-type" = import ./proc-macro-crate-type.nix {inherit pkgs workspace;};
   "core:treefmt-check" = import ./treefmt-check.nix {
     inherit pkgs treefmt root;
   };

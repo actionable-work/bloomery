@@ -12,6 +12,7 @@ workspaces, and repository-local Bloomery metadata.
 | `packages/rust/libs/cli/` | CLI parsing, application, command, and presentation libraries. |
 | `packages/rust/libs/docs/` | Documentation content, UI, and server libraries. |
 | `lib/` | Reusable Nix library: builders, workspace discovery, profiles, overrides, locks, docs, and modules. |
+| `templates/` | Bundled scaffolding templates copied by `bloomery init`; each immediate child is a template named by its directory. |
 | `nix/checks/` | Flake checks, including documentation asset validation and workspace checks. |
 | `nix/lib/` | Shared Nix helpers used by the flake. |
 | `tests/` | Isolated consumer workspaces, Nix integration fixtures, and test support. |
@@ -34,7 +35,7 @@ The Rust workspace contains these binaries and libraries:
 | `packages/rust/libs/shared/model` | `bloomery-model` | `PARSER/CONFIGURATION`, `PARSER/REQUIREMENTS` |
 | `packages/rust/libs/shared/workspace` | `bloomery-workspace` | `PARSER/WORKSPACE` |
 | `packages/rust/libs/shared/scanning` | `bloomery-scanning` | `PARSER/SCANNING` |
-| `packages/rust/libs/shared/test-macros` | `bloomery-test-macros` | Rust evidence annotations in `PARSER/SCANNING` |
+| `packages/rust/libs/shared/test-macros` | `bloomery-test-macros` | Proc-macro build-graph fixture in `NIXLIB/GRAPH` |
 | `packages/rust/bins/docs` | `bloomery-docs` | `DOCS/SERVER` |
 | `packages/rust/libs/docs/docs-server` | `bloomery-docs-server` | `DOCS/SERVER` |
 | `packages/rust/libs/docs/content` | `bloomery-content` | `DOCS/CONTENT` |

@@ -112,3 +112,14 @@ design = "design/filesets.md#assets-and-auxiliary-trees"
 type = "ubiquitous"
 system = "the Bloomery repository's Nix test-support builders"
 action = "materialize only the manifest, entrypoints, and Nix API files inspected by their respective tests before constructing scripts or symlink targets"
+
+[[requirements]]
+id = "NIX-SOURCES-FILESETS-011"
+title = "The bundled template catalog is an isolated CLI input"
+manual = false
+design = "design/filesets.md#assets-and-auxiliary-trees"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery repository's Nix builders"
+action = "materialize the templates directory as an explicit fileset input of the crate that bundles it"

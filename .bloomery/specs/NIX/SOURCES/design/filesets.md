@@ -85,3 +85,9 @@ flake root is not an isolated input. Identity coverage imports these actual
 overrides against paired enclosing snapshots so unrelated prose preserves
 support and consumer identities while edits to selected support files change
 consuming tests only.
+
+The bundled template catalog at `templates/` is an auxiliary input of the crate
+that ships `bloomery init`. It lives outside that crate's directory, so an
+explicit fileset selects it and materializes it at a stable path. Template edits
+change only derivations that bundle the catalog. Templates are scaffolding
+inputs, not workspace member sources, and remain outside scanner targets.

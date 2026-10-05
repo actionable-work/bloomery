@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/{{project}}", "crates/{{project}}_server"]
+resolver = "2"

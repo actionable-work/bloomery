@@ -1,0 +1,117 @@
+group = "COMMAND"
+
+[[requirements]]
+id = "CLI-INIT-COMMAND-001"
+title = "The CLI exposes init"
+manual = false
+design = "design/init.md#invocation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery"
+action = "expose the init subcommand"
+
+[[requirements]]
+id = "CLI-INIT-COMMAND-002"
+title = "Init accepts an optional target directory"
+manual = false
+design = "design/init.md#invocation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery init"
+action = "accept an optional positional target directory"
+
+[[requirements]]
+id = "CLI-INIT-COMMAND-003"
+title = "Init defaults to the current directory"
+manual = false
+design = "design/init.md#target-directory"
+
+[requirements.ears]
+type = "event"
+trigger = "the target directory is omitted"
+system = "bloomery init"
+action = "scaffold into the process's current working directory"
+
+[[requirements]]
+id = "CLI-INIT-COMMAND-004"
+title = "Init creates a missing target directory"
+manual = false
+design = "design/init.md#target-directory"
+
+[requirements.ears]
+type = "event"
+trigger = "the target directory does not exist"
+system = "bloomery init"
+action = "create it before writing template files"
+
+[[requirements]]
+id = "CLI-INIT-COMMAND-005"
+title = "Init warns and exits on a non-empty target"
+manual = false
+design = "design/init.md#target-directory"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "the target directory contains entries and --force is not supplied"
+system = "bloomery init"
+action = "print a warning naming the target and exit nonzero before writing any file"
+
+[[requirements]]
+id = "CLI-INIT-COMMAND-006"
+title = "Init is exempt from the flake preflight"
+manual = false
+design = "design/init.md#preflight-exemptions"
+
+[requirements.ears]
+type = "event"
+trigger = "init runs in a directory without flake.nix"
+system = "bloomery init"
+action = "scaffold without the shared flake setup error"
+
+[[requirements]]
+id = "CLI-INIT-COMMAND-007"
+title = "Init validates arguments before writing"
+manual = false
+design = "design/init.md#preflight-exemptions"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "an init argument or target guard is rejected"
+system = "bloomery init"
+action = "leave the target unchanged"
+
+[[requirements]]
+id = "CLI-INIT-COMMAND-008"
+title = "Init accepts a force flag"
+manual = false
+design = "design/init.md#invocation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery init"
+action = "accept --force"
+
+[[requirements]]
+id = "CLI-INIT-COMMAND-009"
+title = "Force overwrites colliding files"
+manual = false
+design = "design/init.md#target-directory"
+
+[requirements.ears]
+type = "event"
+trigger = "the target contains a path that the template also provides and --force is supplied"
+system = "bloomery init"
+action = "overwrite the existing path with the template content"
+
+[[requirements]]
+id = "CLI-INIT-COMMAND-010"
+title = "Force preserves unrelated entries"
+manual = false
+design = "design/init.md#target-directory"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery init"
+action = "leave target entries that the template does not provide in place"

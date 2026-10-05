@@ -502,7 +502,6 @@ fn write_completion(
 mod tests {
     use super::{CommandOutput, CommandRunner, SyncError, SyncReport, run};
     use crate::{UpdateSelection, parse_update_list};
-    use bloomery_test_macros::bloomery;
     use std::collections::BTreeSet;
     use std::ffi::{OsStr, OsString};
     use std::fs;
@@ -716,19 +715,19 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-001")]
-    #[bloomery("CLI-SYNC-LOCKS-004")]
-    #[bloomery("CLI-SYNC-LOCKS-007")]
-    #[bloomery("CLI-SYNC-LOCKS-010")]
-    #[bloomery("CLI-SYNC-LOCKS-027")]
-    #[bloomery("CLI-SYNC-LOCKS-028")]
-    #[bloomery("CLI-SYNC-LOCKS-029")]
-    #[bloomery("CLI-SYNC-LOCKS-030")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-005")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-025")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-026")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-027")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-028")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-001"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-004"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-007"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-010"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-027"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-028"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-029"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-030"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-005"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-025"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-026"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-027"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-028"))]
     fn normal_sync_creates_missing_locks_without_specs_directory() {
         let fixture = Fixture::new();
         fixture.write_config("");
@@ -764,11 +763,11 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-004")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-021")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-022")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-023")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-024")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-004"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-021"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-022"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-023"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-024"))]
     fn absent_configuration_fails_sync_before_lock_operations() {
         let fixture = Fixture::new();
         let mut runner = FakeRunner::default();
@@ -783,10 +782,10 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-002")]
-    #[bloomery("CLI-SYNC-LOCKS-011")]
-    #[bloomery("CLI-SYNC-LOCKS-012")]
-    #[bloomery("CLI-SYNC-LOCKS-013")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-002"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-011"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-012"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-013"))]
     fn rust_update_runs_cargo_update_and_preserves_the_manifest() {
         let fixture = Fixture::new();
         fixture.write_config(
@@ -827,8 +826,8 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-003")]
-    #[bloomery("CLI-SYNC-LOCKS-014")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-003"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-014"))]
     fn nix_updates_run_first_and_only_when_selected() {
         let fixture = Fixture::new();
         fixture.write_config(
@@ -858,7 +857,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-011")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-011"))]
     fn normal_reconciliation_preserves_an_existing_compatible_cargo_lock() {
         let fixture = Fixture::new();
         fixture.write_config(
@@ -885,8 +884,8 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-015")]
-    #[bloomery("CLI-SYNC-LOCKS-016")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-015"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-016"))]
     fn normal_sync_leaves_flake_lock_untouched_and_does_not_require_nix() {
         let fixture = Fixture::new();
         fixture.write_config(
@@ -909,7 +908,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-INTERFACE-016")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-016"))]
     fn explicit_nix_selection_without_a_flake_fails_before_any_command() {
         let fixture = Fixture::new();
         fs::remove_file(fixture.root.join("flake.nix")).expect("remove flake");
@@ -926,8 +925,8 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-040")]
-    #[bloomery("CLI-SYNC-INTERFACE-010")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-040"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-010"))]
     fn missing_root_flake_blocks_sync_before_lock_operations() {
         let fixture = Fixture::new();
         fs::remove_file(fixture.root.join("flake.nix")).expect("remove flake");
@@ -944,8 +943,8 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-008")]
-    #[bloomery("CLI-SYNC-LOCKS-030")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-008"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-030"))]
     fn absent_cargo_manifest_fails_preflight_without_invoking_tools() {
         let fixture = Fixture::new();
         fs::remove_file(fixture.root.join("Cargo.toml")).expect("remove manifest");
@@ -959,7 +958,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-031")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-031"))]
     fn unavailable_required_executables_fail_before_any_mutation() {
         let fixture = Fixture::new();
         fixture.write_config("");
@@ -989,7 +988,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-032")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-032"))]
     fn malformed_present_configuration_fails_preflight_before_tool_invocation() {
         let fixture = Fixture::new();
         fixture.write_config("[scanners\n");
@@ -1005,7 +1004,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-032")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-032"))]
     fn dangling_configuration_symlink_is_not_treated_as_missing() {
         let fixture = Fixture::new();
         fs::create_dir_all(fixture.root.join(".bloomery")).expect("config parent");
@@ -1020,9 +1019,9 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-009")]
-    #[bloomery("CLI-SYNC-LOCKS-033")]
-    #[bloomery("CLI-SYNC-LOCKS-034")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-009"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-033"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-034"))]
     fn tool_failures_identify_the_stage_keep_stderr_and_stop_the_pipeline() {
         let fixture = Fixture::new();
         fixture.write_config(
@@ -1044,10 +1043,10 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-035")]
-    #[bloomery("CLI-SYNC-LOCKS-036")]
-    #[bloomery("CLI-SYNC-LOCKS-037")]
-    #[bloomery("CLI-SYNC-LOCKS-042")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-035"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-036"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-037"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-042"))]
     fn later_failures_report_completed_stages_keep_cargo_changes_and_give_recovery_guidance() {
         let fixture = Fixture::new();
         fixture.write_config(
@@ -1073,9 +1072,9 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-038")]
-    #[bloomery("CLI-SYNC-LOCKS-039")]
-    #[bloomery("CLI-SYNC-INTERFACE-009")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-038"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-039"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-009"))]
     fn successful_summary_reports_reconciled_locks_and_selected_updates() {
         let fixture = Fixture::new();
         fixture.write_config(
@@ -1095,10 +1094,10 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-SYNC-LOCKS-041")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-003")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-005")]
-    #[bloomery("CLI-SYNC-RECOMMENDATIONS-017")]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-041"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-003"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-005"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-017"))]
     fn recommendation_notices_are_advisory_sorted_and_written_to_stderr() {
         let fixture = Fixture::new();
         fixture.write_config("");

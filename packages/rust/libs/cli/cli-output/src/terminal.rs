@@ -214,7 +214,6 @@ fn clamp_to_width(text: &str, width: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::{TerminalFacts, TransientLine};
-    use bloomery_test_macros::bloomery;
     use std::io::{self, Write};
     use std::sync::{Arc, Mutex};
 
@@ -226,7 +225,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-001")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-001"))]
     fn eligible_user_terminals_render_progress() {
         let facts = eligible();
         assert!(facts.progress_eligible(false));
@@ -239,7 +238,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-002")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-002"))]
     fn redirected_stderr_never_writes_progress() {
         let facts = TerminalFacts::default();
         assert!(!facts.progress_eligible(false));
@@ -251,7 +250,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-003")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-003"))]
     fn ci_markers_suppress_progress_even_on_a_terminal() {
         let active = TerminalFacts {
             stderr_is_terminal: true,
@@ -320,13 +319,13 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-004")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-004"))]
     fn json_mode_suppresses_progress() {
         assert!(!eligible().progress_eligible(true));
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-005")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-005"))]
     fn dumb_terminals_suppress_progress() {
         let facts = TerminalFacts {
             stderr_is_terminal: true,
@@ -337,7 +336,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-006")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-006"))]
     fn no_color_keeps_progress_without_styling() {
         let facts = TerminalFacts {
             stderr_is_terminal: true,
@@ -362,7 +361,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-024")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-024"))]
     fn changed_snapshots_trigger_redraws() {
         let mut output = Vec::new();
         let mut line = TransientLine::new(&mut output, true, 80, false);
@@ -375,7 +374,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-025")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-025"))]
     fn unchanged_snapshots_produce_no_writes() {
         let mut output = Vec::new();
         {
@@ -391,7 +390,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-026")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-026"))]
     fn updates_replace_one_line_and_never_wrap_when_narrow() {
         let mut output = Vec::new();
         {
@@ -410,7 +409,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-027")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-027"))]
     fn concurrent_updates_share_one_serialized_writer() {
         #[derive(Clone)]
         struct Shared(Arc<Mutex<Vec<u8>>>);
@@ -459,7 +458,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-028")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-028"))]
     fn final_reporting_clears_the_transient_line() {
         let mut output = Vec::new();
         {
@@ -474,7 +473,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-029")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-029"))]
     fn a_failing_progress_sink_disables_rendering() {
         struct Failing;
         impl Write for Failing {
@@ -495,7 +494,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-026")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-026"))]
     fn queried_terminal_width_wins_over_the_columns_hint() {
         // A 60-column terminal exporting COLUMNS=80 must format to 60 so the
         // transient replacement never wraps.

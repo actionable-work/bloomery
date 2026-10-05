@@ -376,7 +376,6 @@ fn finish_assigned(state: &CollectorState, outcome: Finish) {
 mod tests {
     use super::{AssignedWork, InternalJsonParser, NixProgressCollector, NixRecord, parse_record};
     use crate::check_command::progress::{DerivationEvent, ProgressEvent, ProgressSink};
-    use bloomery_test_macros::bloomery;
     use std::collections::BTreeMap;
     use std::sync::mpsc::{self, Receiver};
 
@@ -410,7 +409,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-022")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-022"))]
     fn build_activities_normalize_to_derivation_events() {
         let (sink, receiver) = sink();
         let collector = NixProgressCollector::new(sink);
@@ -431,7 +430,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-022")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-022"))]
     fn substitution_activities_use_structured_output_metadata() {
         let (sink, receiver) = sink();
         let collector = NixProgressCollector::new(sink);
@@ -457,7 +456,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-020")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-020"))]
     fn unattributable_substitutions_leave_metrics_unknown() {
         let (sink, receiver) = sink();
         let collector = NixProgressCollector::new(sink);
@@ -473,8 +472,8 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-020")]
-    #[bloomery("CLI-CHECK-PROGRESS-023")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-020"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-023"))]
     fn malformed_and_unknown_records_leave_metrics_unknown() {
         let (sink, receiver) = sink();
         let collector = NixProgressCollector::new(sink);
@@ -492,7 +491,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-020")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-020"))]
     fn an_incomplete_final_record_keeps_metrics_unknown() {
         let (sink, receiver) = sink();
         let collector = NixProgressCollector::new(sink);
@@ -507,7 +506,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-013")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-013"))]
     fn per_derivation_build_results_advance_success_during_the_request() {
         let (sink, receiver) = sink();
         let collector = NixProgressCollector::new(sink);
@@ -537,7 +536,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-013")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-013"))]
     fn activity_stops_alone_do_not_establish_build_success() {
         let (sink, receiver) = sink();
         let collector = NixProgressCollector::new(sink);
@@ -550,7 +549,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-015")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-015"))]
     fn per_derivation_substitution_results_advance_cached_work() {
         let (sink, receiver) = sink();
         let collector = NixProgressCollector::new(sink);
@@ -570,7 +569,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-019")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-019"))]
     fn per_derivation_store_reuse_results_exclude_finished_work() {
         let (sink, receiver) = sink();
         let collector = NixProgressCollector::new(sink);
@@ -586,7 +585,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-023")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-023"))]
     fn split_and_truncated_frames_are_reassembled_without_losing_records() {
         let (sink, receiver) = sink();
         let collector = NixProgressCollector::new(sink);
@@ -604,7 +603,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("CLI-CHECK-PROGRESS-023")]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-023"))]
     fn fallback_builds_reclassify_a_substituted_derivation() {
         let (sink, receiver) = sink();
         let collector = NixProgressCollector::new(sink);

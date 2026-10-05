@@ -47,7 +47,6 @@ mod tests {
     use super::register_pages;
     use crate::assets::{BLOOMERY_CSS, BLOOMERY_FAVICON, BLOOMERY_LOGO};
     use bloomery_content::all_pages;
-    use bloomery_test_macros::bloomery;
     use std::future::Future;
     use std::sync::Arc;
     use std::task::{Context, Poll, Wake, Waker};
@@ -113,7 +112,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("DOCS-UI-ROUTES-001")]
+    #[cfg_attr(any(), bloomery("DOCS-UI-ROUTES-001"))]
     fn registers_and_serves_the_home_page() {
         let (status, html) = get(&router(), "/");
         assert_eq!(status, 200);
@@ -121,7 +120,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("DOCS-UI-ROUTES-002")]
+    #[cfg_attr(any(), bloomery("DOCS-UI-ROUTES-002"))]
     fn exposes_every_catalog_page_at_its_short_route() {
         let router = router();
         for page in all_pages() {
@@ -133,7 +132,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("DOCS-UI-ROUTES-003")]
+    #[cfg_attr(any(), bloomery("DOCS-UI-ROUTES-003"))]
     fn exposes_every_catalog_page_at_its_docs_route() {
         let router = router();
         for page in all_pages() {
@@ -149,7 +148,7 @@ mod tests {
     }
 
     #[test]
-    #[bloomery("DOCS-UI-ROUTES-004")]
+    #[cfg_attr(any(), bloomery("DOCS-UI-ROUTES-004"))]
     fn documentation_pages_use_the_shared_site_layout() {
         let (status, html) = get(&router(), "/docs/overview");
         assert_eq!(status, 200);

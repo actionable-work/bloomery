@@ -6,15 +6,14 @@ use crate::check_command::execution::validate_execution_selection;
 use crate::check_command::test_support::{
     FakeNix, fixture, invoke, lock_fixture_flake, nix_is_available, request,
 };
-use bloomery_test_macros::bloomery;
 use serde_json::Value;
 use std::fs;
 use std::sync::atomic::Ordering;
 
 #[test]
-#[bloomery("CLI-CHECK-SELECT-001")]
-#[bloomery("CLI-CHECK-SELECT-010")]
-#[bloomery("CLI-CHECK-SELECT-012")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-001"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-010"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-012"))]
 fn default_and_explicit_selection_choose_static_and_requested_system_catalogs() {
     let (root, cache) = fixture(true);
     let static_backend = FakeNix::default();
@@ -50,7 +49,7 @@ fn default_and_explicit_selection_choose_static_and_requested_system_catalogs() 
 }
 
 #[test]
-#[bloomery("CLI-CHECK-SELECT-013")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-013"))]
 fn default_check_execution_without_a_flake_returns_the_shared_setup_error() {
     let (root, cache) = fixture(false);
     let backend = FakeNix::default();
@@ -71,7 +70,7 @@ fn default_check_execution_without_a_flake_returns_the_shared_setup_error() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-SELECT-014")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-014"))]
 fn execution_selection_rejects_an_empty_catalog() {
     assert_eq!(
         validate_execution_selection(&[]).unwrap_err().code,
@@ -80,7 +79,7 @@ fn execution_selection_rejects_an_empty_catalog() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-SELECT-015")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-015"))]
 fn explicit_nix_selection_without_a_flake_is_an_error() {
     let (root, cache) = fixture(false);
     let mut args = request();
@@ -97,7 +96,7 @@ fn explicit_nix_selection_without_a_flake_is_an_error() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-SELECT-011")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-011"))]
 fn explicitly_requested_systems_without_a_checks_output_are_errors() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -119,7 +118,7 @@ fn explicitly_requested_systems_without_a_checks_output_are_errors() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-SELECT-020")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-020"))]
 fn explicitly_selected_system_with_empty_checks_is_a_valid_static_only_run() {
     let (root, cache) = fixture(true);
     let backend = FakeNix::default();
@@ -142,8 +141,8 @@ fn explicitly_selected_system_with_empty_checks_is_a_valid_static_only_run() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-SELECT-011")]
-#[bloomery("CLI-CHECK-SELECT-020")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-011"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-020"))]
 fn real_nix_distinguishes_missing_system_outputs_from_empty_check_sets() {
     if !nix_is_available() {
         eprintln!("skipping real-Nix selected-system test: Nix store is unavailable");
@@ -193,11 +192,11 @@ fn real_nix_distinguishes_missing_system_outputs_from_empty_check_sets() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-SELECT-005")]
-#[bloomery("CLI-CHECK-SELECT-012")]
-#[bloomery("CLI-CHECK-SELECT-015")]
-#[bloomery("CLI-INTERFACE-FLAGS-008")]
-#[bloomery("CLI-INTERFACE-FLAGS-009")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-005"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-012"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-015"))]
+#[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-008"))]
+#[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-009"))]
 fn unmatched_selectors_bad_scopes_and_execution_options_are_usage_errors() {
     let mut args = request();
     args.selectors = vec!["unknown:*".to_owned()];
@@ -226,7 +225,7 @@ fn unmatched_selectors_bad_scopes_and_execution_options_are_usage_errors() {
 }
 
 #[test]
-#[bloomery("CLI-INTERFACE-FLAGS-009")]
+#[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-009"))]
 fn zero_limits_return_a_usage_error_from_the_command_entrypoint() {
     let (root, cache) = fixture(true);
     let mut args = request();
@@ -245,7 +244,7 @@ fn zero_limits_return_a_usage_error_from_the_command_entrypoint() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-CONTRACT-001")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-CONTRACT-001"))]
 fn check_fails_when_workspace_structure_is_invalid() {
     let (root, cache) = fixture(true);
     fs::remove_file(root.join(".bloomery/specs/CLI/CHECK/README.md"))
@@ -266,7 +265,7 @@ fn check_fails_when_workspace_structure_is_invalid() {
 }
 
 #[test]
-#[bloomery("CLI-CHECK-CONTRACT-002")]
+#[cfg_attr(any(), bloomery("CLI-CHECK-CONTRACT-002"))]
 fn check_fails_when_automated_traceability_is_invalid() {
     let (root, cache) = fixture(true);
     let requirement = root.join(".bloomery/specs/CLI/CHECK/requirements/CONTRACT.toml");

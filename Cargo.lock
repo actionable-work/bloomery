@@ -202,7 +202,6 @@ dependencies = [
  "bloomery-cli-output",
  "bloomery-cli-types",
  "bloomery-model",
- "bloomery-test-macros",
  "bloomery-workspace",
  "serde_json",
 ]
@@ -222,10 +221,10 @@ dependencies = [
  "bloomery-cli-output",
  "bloomery-cli-parser",
  "bloomery-cli-types",
+ "bloomery-init",
  "bloomery-model",
  "bloomery-review",
  "bloomery-sync",
- "bloomery-test-macros",
  "bloomery-workspace",
  "serde_json",
 ]
@@ -234,10 +233,10 @@ dependencies = [
 name = "bloomery-cli-output"
 version = "0.1.0"
 dependencies = [
+ "bloomery-init",
  "bloomery-model",
  "bloomery-review",
  "bloomery-sync",
- "bloomery-test-macros",
  "serde_json",
 ]
 
@@ -256,9 +255,6 @@ version = "0.1.0"
 [[package]]
 name = "bloomery-content"
 version = "0.1.0"
-dependencies = [
- "bloomery-test-macros",
-]
 
 [[package]]
 name = "bloomery-docs"
@@ -271,17 +267,22 @@ dependencies = [
 name = "bloomery-docs-server"
 version = "0.1.0"
 dependencies = [
- "bloomery-test-macros",
  "bloomery-ui",
  "tokio",
  "topcoat",
 ]
 
 [[package]]
+name = "bloomery-init"
+version = "0.1.0"
+dependencies = [
+ "bloomery-sync",
+]
+
+[[package]]
 name = "bloomery-model"
 version = "0.1.0"
 dependencies = [
- "bloomery-test-macros",
  "serde",
  "toml",
 ]
@@ -291,7 +292,6 @@ name = "bloomery-review"
 version = "0.1.0"
 dependencies = [
  "bloomery-model",
- "bloomery-test-macros",
  "serde",
 ]
 
@@ -300,7 +300,6 @@ name = "bloomery-scanning"
 version = "0.1.0"
 dependencies = [
  "bloomery-model",
- "bloomery-test-macros",
  "oxc_allocator",
  "oxc_ast",
  "oxc_parser",
@@ -314,7 +313,6 @@ name = "bloomery-sync"
 version = "0.1.0"
 dependencies = [
  "bloomery-model",
- "bloomery-test-macros",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -330,7 +328,6 @@ name = "bloomery-ui"
 version = "0.1.0"
 dependencies = [
  "bloomery-content",
- "bloomery-test-macros",
  "topcoat",
 ]
 
@@ -339,7 +336,6 @@ name = "bloomery-workspace"
 version = "0.1.0"
 dependencies = [
  "bloomery-model",
- "bloomery-test-macros",
  "serde_yaml",
  "toml",
 ]

@@ -1,8 +1,8 @@
 # Human and machine-readable output
 
-Every application command (`check`, `review`, and `sync`) accepts the same global
-`--json` flag, before or after the subcommand. No command has a separate JSON
-flag or format selector. It emits one JSON document on stdout, with no ANSI
+Every application command (`init`, `check`, `review`, and `sync`) accepts the
+same global `--json` flag, before or after the subcommand. No command has a
+separate JSON flag or format selector. It emits one JSON document on stdout, with no ANSI
 escapes, progress text, or human-formatted banners mixed into the document.
 Usage and operational failures requested with `--json` are also represented as
 JSON while retaining their normal exit codes. Parser help remains
@@ -34,6 +34,9 @@ failures on stderr. Color never changes the textual content or ordering.
 
 ## JSON contracts
 
+- `init --json` emits one object with the command name, status, target
+directory, selected template, and created paths. Failure responses carry the
+same command identity and an error description.
 - `check --json` emits a compact bounded object with run ID, status, outcome
   counts, and a paginated `failures` array. Optional scope identifies subset
   runs. Successful checks are represented by counts, not individual records.
