@@ -1,0 +1,48 @@
+group = "VALIDATION"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-VALIDATION-001"
+title = "Build keys are type-validated by the CLI"
+manual = false
+design = "design/schema-catalog.md#validation"
+
+[requirements.ears]
+type = "event"
+trigger = "config.toml contains a build-table key"
+system = "the configuration loader"
+action = "validate the value against the catalogued schema type before any consuming command runs"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-VALIDATION-002"
+title = "Unknown build keys are rejected"
+manual = false
+design = "design/schema-catalog.md#validation"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a build table contains a key absent from the schema catalog"
+system = "the configuration loader"
+action = "report a ConfigurationError without scanning or evaluating the workspace"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-VALIDATION-003"
+title = "Enum and union values are enforced"
+manual = false
+design = "design/schema-catalog.md#build-tables"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a build key is set to a value outside its catalogued enum or union set"
+system = "the configuration loader"
+action = "report a ConfigurationError"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-VALIDATION-004"
+title = "Nix retains package resolution authority"
+manual = false
+design = "design/schema-catalog.md#validation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the configuration loader"
+action = "validate package-valued keys as strings while leaving nixpkgs attribute resolution to Nix evaluation"

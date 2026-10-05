@@ -219,4 +219,15 @@ mod tests {
             entry.benefit.contains("scanning") || entry.benefit.contains("evidence")
         }));
     }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECOMMENDATIONS-029"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-019"))]
+    fn materialized_configuration_suppresses_recommendations() {
+        // Keys written by `bloomery config upgrade` are explicit and win over advice.
+        let materialized = raw("[scanners.rust]\nenabled = false\n\
+             [scanners.playwright]\nenabled = false\n\
+             [scanners.nix]\nenabled = false\n");
+        assert!(missing_recommendations(&materialized).is_empty());
+    }
 }

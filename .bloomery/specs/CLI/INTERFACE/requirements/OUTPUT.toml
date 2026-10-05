@@ -94,3 +94,15 @@ type = "event"
 trigger = "a non-init command or parser help is requested without flake.nix and --json is selected"
 system = "the bloomery CLI"
 action = "emit one JSON error with guidance to set up a Bloomery flake.nix"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-009"
+title = "Config JSON emits a structured result or failure"
+manual = false
+design = "design/output.md#json-contracts"
+
+[requirements.ears]
+type = "event"
+trigger = "a config command is invoked with --json"
+system = "bloomery config"
+action = "emit structured key, value, configured, change, or added-key information"

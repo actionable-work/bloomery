@@ -1,0 +1,149 @@
+group = "COMMANDS"
+
+[[requirements]]
+id = "CLI-CONFIG-COMMANDS-001"
+title = "The CLI exposes config"
+manual = false
+design = "design/editing.md#invocation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "expose the config subcommand"
+
+[[requirements]]
+id = "CLI-CONFIG-COMMANDS-002"
+title = "Config exposes get"
+manual = false
+design = "design/editing.md#read-commands"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config"
+action = "expose the get subcommand"
+
+[[requirements]]
+id = "CLI-CONFIG-COMMANDS-003"
+title = "Config exposes set"
+manual = false
+design = "design/editing.md#mutation-semantics"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config"
+action = "expose the set subcommand"
+
+[[requirements]]
+id = "CLI-CONFIG-COMMANDS-004"
+title = "Config exposes unset"
+manual = false
+design = "design/editing.md#mutation-semantics"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config"
+action = "expose the unset subcommand"
+
+[[requirements]]
+id = "CLI-CONFIG-COMMANDS-005"
+title = "Config exposes list"
+manual = false
+design = "design/editing.md#read-commands"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config"
+action = "expose the list subcommand"
+
+[[requirements]]
+id = "CLI-CONFIG-COMMANDS-006"
+title = "Config exposes upgrade"
+manual = false
+design = "design/upgrade.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config"
+action = "expose the upgrade subcommand"
+
+[[requirements]]
+id = "CLI-CONFIG-COMMANDS-007"
+title = "Mutating config commands create missing configuration"
+manual = false
+design = "design/editing.md#missing-configuration"
+
+[requirements.ears]
+type = "event"
+trigger = "a mutating config command runs without .bloomery/config.toml"
+system = "bloomery config"
+action = "create the .bloomery directory and an empty configuration file, then continue"
+
+[[requirements]]
+id = "CLI-CONFIG-COMMANDS-008"
+title = "Config does not load specifications"
+manual = false
+design = "design/editing.md#invocation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config"
+action = "operate without loading the specification tree or scanning source"
+
+[[requirements]]
+id = "CLI-CONFIG-COMMANDS-009"
+title = "Config is exempt from the flake preflight"
+manual = false
+design = "design/editing.md#invocation"
+
+[requirements.ears]
+type = "event"
+trigger = "a config command runs in a root without flake.nix"
+system = "bloomery config"
+action = "continue without the shared flake setup error"
+
+[[requirements]]
+id = "CLI-CONFIG-COMMANDS-010"
+title = "Config warns without a Bloomery flake"
+manual = false
+design = "design/editing.md#invocation"
+
+[requirements.ears]
+type = "event"
+trigger = "a config command runs in a root without flake.nix"
+system = "bloomery config"
+action = "emit an advisory warning naming the missing Bloomery flake"
+
+[[requirements]]
+id = "CLI-CONFIG-COMMANDS-011"
+title = "The missing-flake warning is non-fatal"
+manual = false
+design = "design/editing.md#output-and-exit-codes"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config"
+action = "keep the missing-flake warning advisory so the command's normal exit code is unchanged"
+
+[[requirements]]
+id = "CLI-CONFIG-COMMANDS-012"
+title = "Missing configuration is warned about"
+manual = false
+design = "design/editing.md#missing-configuration"
+
+[requirements.ears]
+type = "event"
+trigger = "a config command creates a missing configuration file"
+system = "bloomery config"
+action = "emit an advisory warning naming the created path"
+
+[[requirements]]
+id = "CLI-CONFIG-COMMANDS-013"
+title = "Read-only commands do not create configuration"
+manual = false
+design = "design/editing.md#missing-configuration"
+
+[requirements.ears]
+type = "event"
+trigger = "config get, config list, config upgrade --dry-run, or config upgrade --diff runs without .bloomery/config.toml"
+system = "bloomery config"
+action = "report against defaults without creating the file"

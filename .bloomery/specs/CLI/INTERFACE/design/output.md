@@ -1,7 +1,8 @@
 # Human and machine-readable output
 
-Every application command (`init`, `check`, `review`, and `sync`) accepts the
-same global `--json` flag, before or after the subcommand. No command has a
+Every application command (`init`, `check`, `review`, `sync`, and `config`)
+accepts the same global `--json` flag, before or after the subcommand. No
+command has a
 separate JSON flag or format selector. It emits one JSON document on stdout, with no ANSI
 escapes, progress text, or human-formatted banners mixed into the document.
 Usage and operational failures requested with `--json` are also represented as
@@ -28,7 +29,9 @@ change. Redirecting stdout alone does not suppress terminal stderr progress;
 `NO_COLOR` disables its styling, not the updates. See
 [check progress](../../CHECK/design/progress.md) and
 [check summaries](../../CHECK/design/diagnostics.md). Review retains its indented requirement tree while
-highlighting area/feature/group labels, IDs, and the final count. Sync highlights
+highlighting area/feature/group labels, IDs, and the final count. Config prints
+command, key, and value lines and marks keys as configured or default. Sync
+highlights
 stage progress and completion on stdout, and warnings, recommendations, and
 failures on stderr. Color never changes the textual content or ordering.
 
@@ -55,6 +58,16 @@ same command identity and an error description.
   stages, whether locks may be partially synchronized, and recovery guidance
   when needed. Notices remain structured data rather than being printed as
   human-formatted stderr lines.
+- `config --json` emits an object with `command: "config"`, the subcommand, and
+  `status`. Success includes the addressed key with its effective value,
+  configured flag, and recommendation status for `get`, the sorted key records
+  for `list`, the affected key and whether the file changed for `set` and
+  `unset`, and the sorted added key paths and written flag for `upgrade` or the
+  recommendation differences for `upgrade --diff`. An absent `flake.nix` or a
+  configuration file that the command created adds a structured warning field.
+  Failure carries the same command identity and an
+  error description. See the
+  [config editing contract](../../CONFIG/design/editing.md#output-and-exit-codes).
 
 JSON is UTF-8, deterministic for the same retained result, and contains no color
 codes. The JSON option does not alter the command's exit-code contract.

@@ -221,18 +221,21 @@ dependencies = [
  "bloomery-cli-output",
  "bloomery-cli-parser",
  "bloomery-cli-types",
+ "bloomery-config",
  "bloomery-init",
  "bloomery-model",
  "bloomery-review",
  "bloomery-sync",
  "bloomery-workspace",
  "serde_json",
+ "toml",
 ]
 
 [[package]]
 name = "bloomery-cli-output"
 version = "0.1.0"
 dependencies = [
+ "bloomery-config",
  "bloomery-init",
  "bloomery-model",
  "bloomery-review",
@@ -251,6 +254,17 @@ dependencies = [
 [[package]]
 name = "bloomery-cli-types"
 version = "0.1.0"
+
+[[package]]
+name = "bloomery-config"
+version = "0.1.0"
+dependencies = [
+ "bloomery-cli-types",
+ "bloomery-model",
+ "serde",
+ "toml",
+ "toml_edit",
+]
 
 [[package]]
 name = "bloomery-content"
@@ -2128,6 +2142,7 @@ dependencies = [
  "indexmap",
  "toml_datetime",
  "toml_parser",
+ "toml_writer",
  "winnow",
 ]
 

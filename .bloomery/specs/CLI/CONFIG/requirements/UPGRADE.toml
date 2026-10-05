@@ -1,0 +1,233 @@
+group = "UPGRADE"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-001"
+title = "Upgrade adds absent recommended keys"
+manual = false
+design = "design/upgrade.md#upgrade-semantics"
+
+[requirements.ears]
+type = "event"
+trigger = "config upgrade runs"
+system = "bloomery config"
+action = "add every recommended catalog key absent from the raw file"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-002"
+title = "Upgrade preserves present keys"
+manual = false
+design = "design/upgrade.md#upgrade-semantics"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config upgrade"
+action = "preserve the value, comments, and formatting of every key already present in the raw file"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-003"
+title = "Upgrade adds missing parent tables"
+manual = false
+design = "design/upgrade.md#upgrade-semantics"
+
+[requirements.ears]
+type = "event"
+trigger = "an absent recommended key has an absent parent table"
+system = "bloomery config upgrade"
+action = "create the parent table for the added key"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-004"
+title = "Upgrade uses catalog defaults"
+manual = false
+design = "design/upgrade.md#schema-catalog"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config upgrade"
+action = "derive every added value from the schema catalog"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-005"
+title = "Upgrade leaves complete files untouched"
+manual = false
+design = "design/upgrade.md#idempotence"
+
+[requirements.ears]
+type = "event"
+trigger = "the raw file already contains every recommended catalog key"
+system = "bloomery config upgrade"
+action = "leave the configuration byte-for-byte unchanged"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-006"
+title = "Upgrade is idempotent"
+manual = false
+design = "design/upgrade.md#idempotence"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config upgrade"
+action = "make no further change on a repeated invocation"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-007"
+title = "Upgrade rejects invalid configurations"
+manual = false
+design = "design/upgrade.md#validation-and-publication"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "the current configuration is malformed, unreadable, or invalid"
+system = "bloomery config upgrade"
+action = "report a ConfigurationError without writing"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-008"
+title = "Upgrade validates the upgraded result"
+manual = false
+design = "design/upgrade.md#validation-and-publication"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config upgrade"
+action = "validate the complete upgraded configuration before writing"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-009"
+title = "Upgrade publishes atomically"
+manual = false
+design = "design/upgrade.md#validation-and-publication"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config upgrade"
+action = "publish the upgraded configuration through a temporary file and atomic rename"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-010"
+title = "Upgrade reports added keys"
+manual = false
+design = "design/upgrade.md#output"
+
+[requirements.ears]
+type = "event"
+trigger = "config upgrade adds keys"
+system = "bloomery config"
+action = "report the added key paths in sorted order"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-011"
+title = "Dry-run reports without writing"
+manual = false
+design = "design/upgrade.md#upgrade-semantics"
+
+[requirements.ears]
+type = "event"
+trigger = "config upgrade is invoked with --dry-run"
+system = "bloomery config"
+action = "report the keys that would be added without modifying the file"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-012"
+title = "Upgrade materializes build-table recommendations"
+manual = false
+design = "design/upgrade.md#schema-catalog"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config upgrade"
+action = "materialize recommended keys from the build tables as well as the spec and scanner tables"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-013"
+title = "Keys without recommendations are not materialized"
+manual = false
+design = "design/upgrade.md#schema-catalog"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config upgrade"
+action = "leave keys without a recommended default absent"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-014"
+title = "Diff compares recommendations with current configuration"
+manual = false
+design = "design/upgrade.md#recommendation-diff"
+
+[requirements.ears]
+type = "event"
+trigger = "config upgrade is invoked with --diff"
+system = "bloomery config"
+action = "report each recommended key's recommended value and current value"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-015"
+title = "Diff marks missing recommended keys"
+manual = false
+design = "design/upgrade.md#recommendation-diff"
+
+[requirements.ears]
+type = "event"
+trigger = "a recommended key is absent from the current configuration"
+system = "bloomery config"
+action = "mark it as absent and would-be-added in the diff"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-016"
+title = "Diff writes nothing"
+manual = false
+design = "design/upgrade.md#recommendation-diff"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config upgrade --diff"
+action = "report the recommendation comparison without modifying the file"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-017"
+title = "Diff does not change differing values"
+manual = false
+design = "design/upgrade.md#recommendation-diff"
+
+[requirements.ears]
+type = "event"
+trigger = "a present value differs from its recommended default during --diff"
+system = "bloomery config upgrade"
+action = "report the difference without changing the value"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-018"
+title = "Diff and dry-run are mutually exclusive"
+manual = false
+design = "design/upgrade.md#recommendation-diff"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "config upgrade is invoked with both --diff and --dry-run"
+system = "bloomery config"
+action = "return a usage error"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-019"
+title = "Materialized keys suppress recommendations"
+manual = false
+design = "design/upgrade.md#output"
+
+[requirements.ears]
+type = "event"
+trigger = "a recommended key is materialized or explicitly set"
+system = "bloomery config"
+action = "cause sync to report the key as configured instead of missing"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-020"
+title = "Upgrade materializes a missing configuration"
+manual = false
+design = "design/upgrade.md#validation-and-publication"
+
+[requirements.ears]
+type = "event"
+trigger = "a writing config upgrade runs without .bloomery/config.toml"
+system = "bloomery config upgrade"
+action = "create the file and add every recommended catalog key"

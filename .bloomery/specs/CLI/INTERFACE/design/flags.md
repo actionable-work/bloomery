@@ -20,6 +20,10 @@ commands:
 | `check details` | `--offset`, `--limit` | nonnegative offset, positive limit | failure-focused offset, limit 40 |
 | `review` | `--json` | flag | human-readable text |
 | `sync` | `--json` | flag | human-readable text |
+| `config` | `--json` | flag | human-readable text |
+| `config list` | `--prefix` | dotted key prefix | all catalogued keys |
+| `config upgrade` | `--dry-run` | flag | write the upgraded file |
+| `config upgrade` | `--diff` | flag | do not compare recommendations |
 | `sync` | `--update[=LIST]` | optional comma-separated `nix`, `rust` list | no upgrades; reconcile Cargo and Bloomery locks |
 | all commands | `-h`, `--help` | — | — |
 
@@ -57,3 +61,13 @@ Unknown values, empty elements, an explicit empty list, and repeated flags are
 usage errors; duplicate names are deduplicated. Every successful sync still
 reconciles Cargo.lock and regenerates bloomery.lock. See the
 [sync selection contract](../../SYNC/design/sync.md#invocation-and-update-selection).
+
+For config, `--prefix` is accepted only by `config list` and restricts the
+listing to keys whose dotted path starts with the supplied value; an unknown
+prefix yields an empty listing. `--dry-run` is accepted only by `config
+upgrade` and reports the keys that would be added without writing, while
+`--diff` reports the recommended-versus-current comparison without writing.
+`--dry-run` and `--diff` are mutually exclusive and both are usage errors on
+other config subcommands. See the
+[config editing contract](../../CONFIG/design/editing.md) and
+[upgrade contract](../../CONFIG/design/upgrade.md).

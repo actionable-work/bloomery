@@ -1,0 +1,224 @@
+group = "EDITING"
+
+[[requirements]]
+id = "CLI-CONFIG-EDITING-001"
+title = "Keys resolve against the CLI-owned schema"
+manual = false
+design = "design/editing.md#key-addressing-and-type-safety"
+
+[requirements.ears]
+type = "event"
+trigger = "a config command addresses a dotted key path"
+system = "bloomery config"
+action = "resolve the path against the CLI-owned configuration schema"
+
+[[requirements]]
+id = "CLI-CONFIG-EDITING-002"
+title = "Unknown keys are usage errors"
+manual = false
+design = "design/editing.md#key-addressing-and-type-safety"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a config command addresses a key that is absent from the CLI-owned schema"
+system = "bloomery config"
+action = "return a usage error without reading or writing the file"
+
+[[requirements]]
+id = "CLI-CONFIG-EDITING-003"
+title = "Values are parsed by schema type"
+manual = false
+design = "design/editing.md#key-addressing-and-type-safety"
+
+[requirements.ears]
+type = "event"
+trigger = "a value is supplied to config set"
+system = "bloomery config"
+action = "parse the value according to the schema type of the addressed key"
+
+[[requirements]]
+id = "CLI-CONFIG-EDITING-004"
+title = "Type mismatches are usage errors"
+manual = false
+design = "design/editing.md#key-addressing-and-type-safety"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a supplied value does not match the schema type of the addressed key"
+system = "bloomery config"
+action = "return a usage error without writing"
+
+[[requirements]]
+id = "CLI-CONFIG-EDITING-005"
+title = "Get reports effective value and origin"
+manual = false
+design = "design/editing.md#read-commands"
+
+[requirements.ears]
+type = "event"
+trigger = "config get addresses a known key"
+system = "bloomery config"
+action = "report the effective value and whether the key is explicitly configured"
+
+[[requirements]]
+id = "CLI-CONFIG-EDITING-006"
+title = "Get uses the documented default for absent keys"
+manual = false
+design = "design/editing.md#read-commands"
+
+[requirements.ears]
+type = "event"
+trigger = "config get addresses a known key absent from the raw file"
+system = "bloomery config"
+action = "report the documented default and mark the key as not explicitly configured"
+
+[[requirements]]
+id = "CLI-CONFIG-EDITING-007"
+title = "List enumerates the schema"
+manual = false
+design = "design/editing.md#read-commands"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config list"
+action = "enumerate every CLI-owned schema key with its effective value and configured status"
+
+[[requirements]]
+id = "CLI-CONFIG-EDITING-008"
+title = "List filters by prefix"
+manual = false
+design = "design/editing.md#read-commands"
+
+[requirements.ears]
+type = "event"
+trigger = "config list is given a prefix"
+system = "bloomery config"
+action = "restrict the listing to keys whose dotted path starts with that prefix"
+
+[[requirements]]
+id = "CLI-CONFIG-EDITING-009"
+title = "Set upserts a leaf"
+manual = false
+design = "design/editing.md#mutation-semantics"
+
+[requirements.ears]
+type = "event"
+trigger = "config set addresses a key"
+system = "bloomery config"
+action = "replace the key value or insert the absent leaf"
+
+[[requirements]]
+id = "CLI-CONFIG-EDITING-010"
+title = "Set creates missing parent tables"
+manual = false
+design = "design/editing.md#mutation-semantics"
+
+[requirements.ears]
+type = "event"
+trigger = "config set addresses a leaf whose parent table is absent"
+system = "bloomery config"
+action = "create the missing parent tables"
+
+[[requirements]]
+id = "CLI-CONFIG-EDITING-011"
+title = "Mutations preserve unrelated content"
+manual = false
+design = "design/editing.md#mutation-semantics"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "a config mutation"
+action = "preserve every unrelated key, comment, and formatting choice"
+
+[[requirements]]
+id = "CLI-CONFIG-EDITING-012"
+title = "Build keys resolve through the catalog"
+manual = false
+design = "design/editing.md#key-addressing-and-type-safety"
+
+[requirements.ears]
+type = "event"
+trigger = "a config command addresses a Nix build-table key"
+system = "bloomery config"
+action = "resolve and validate it against the schema catalog like any other key"
+
+[[requirements]]
+id = "CLI-CONFIG-EDITING-013"
+title = "Unset removes a leaf"
+manual = false
+design = "design/editing.md#mutation-semantics"
+
+[requirements.ears]
+type = "event"
+trigger = "config unset addresses a present leaf"
+system = "bloomery config"
+action = "remove the leaf"
+
+[[requirements]]
+id = "CLI-CONFIG-EDITING-014"
+title = "Unset prunes emptied parent tables"
+manual = false
+design = "design/editing.md#mutation-semantics"
+
+[requirements.ears]
+type = "event"
+trigger = "removing a leaf empties its parent table"
+system = "bloomery config"
+action = "remove the emptied parent table"
+
+[[requirements]]
+id = "CLI-CONFIG-EDITING-015"
+title = "Unset of an absent key is a no-op"
+manual = false
+design = "design/editing.md#mutation-semantics"
+
+[requirements.ears]
+type = "event"
+trigger = "config unset addresses an absent key"
+system = "bloomery config"
+action = "succeed without changing the file"
+
+[[requirements]]
+id = "CLI-CONFIG-EDITING-016"
+title = "Mutations validate the complete result"
+manual = false
+design = "design/editing.md#atomicity-and-validation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "a config mutation"
+action = "deserialize and validate the complete resulting configuration before writing"
+
+[[requirements]]
+id = "CLI-CONFIG-EDITING-017"
+title = "Mutations publish atomically"
+manual = false
+design = "design/editing.md#atomicity-and-validation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "a config mutation"
+action = "publish the result through a temporary file and atomic rename"
+
+[[requirements]]
+id = "CLI-CONFIG-EDITING-018"
+title = "Failed mutations leave the file unchanged"
+manual = false
+design = "design/editing.md#atomicity-and-validation"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a config mutation fails validation or writing"
+system = "bloomery config"
+action = "leave the existing configuration file unchanged"
+
+[[requirements]]
+id = "CLI-CONFIG-EDITING-019"
+title = "Config reads the current file"
+manual = false
+design = "design/editing.md#invocation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "a config command"
+action = "read the configuration file at invocation rather than a cached copy"

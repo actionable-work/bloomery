@@ -1,0 +1,89 @@
+group = "CATALOG"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-001"
+title = "The schema exposes a full catalog"
+manual = false
+design = "design/schema-catalog.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the configuration schema"
+action = "enumerate every recognized config.toml key in a built-in catalog"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-002"
+title = "Catalog entries pair a key with a type and default"
+manual = false
+design = "design/schema-catalog.md#catalog-fields"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "pair each key path with its schema type and owning table"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-003"
+title = "Recommended defaults equal applied defaults"
+manual = false
+design = "design/schema-catalog.md#catalog-fields"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "use the same value that partial configuration applies to an absent key"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-004"
+title = "Catalog covers the build tables"
+manual = false
+design = "design/schema-catalog.md#build-tables"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "include the build, toolchain, profile, flags, devShell, checks, and features keys"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-005"
+title = "Catalog is versioned with the binary"
+manual = false
+design = "design/schema-catalog.md#versioning"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "ship with the Bloomery binary so a newer release can expose newly added keys"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-006"
+title = "Optional keys have no recommendation"
+manual = false
+design = "design/schema-catalog.md#catalog-fields"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "omit a recommended default for keys whose omission is semantic"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-007"
+title = "Materialization uses recommended keys only"
+manual = false
+design = "design/schema-catalog.md#catalog-fields"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "config materialization"
+action = "add only catalogued keys that carry a recommended default"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-008"
+title = "Explicit configuration takes precedence"
+manual = false
+design = "design/schema-catalog.md#versioning"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "treat an explicit value, including a materialized one, as overriding the recommendation"

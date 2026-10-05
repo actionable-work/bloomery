@@ -1,4 +1,5 @@
 [dependencies]
+bloomery-config = { path = "../config" }
 bloomery-init = { path = "../init" }
 bloomery-model = { path = "../../shared/model" }
 bloomery-review = { path = "../review" }

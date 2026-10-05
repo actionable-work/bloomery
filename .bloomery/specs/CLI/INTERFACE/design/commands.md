@@ -11,6 +11,11 @@ bloomery check failures [--run RUN] [--offset N] [--limit N] [--json]
 bloomery check details FAILURE [--run RUN] [--offset N] [--limit N] [--json]
 bloomery review [--json]
 bloomery sync [--json] [--update[=nix,rust]]
+bloomery config get KEY [--json]
+bloomery config set KEY VALUE [--json]
+bloomery config unset KEY [--json]
+bloomery config list [--prefix KEY] [--json]
+bloomery config upgrade [--dry-run] [--json]
 bloomery help [COMMAND]
 ```
 
@@ -23,8 +28,10 @@ and the application library dispatches those requests to command libraries.
 Before command handling or parser-generated help is returned, resolve the root
 from the process's current working directory and require a `flake.nix` file
 there. This applies to `check` and its nested commands, `review`, `sync`, and
-help requests. The sole exception is the workspace-bootstrap `init` command,
-which creates the flake and may run in a directory without one.
+help requests. There are two exceptions. The workspace-bootstrap `init` command
+creates the flake and may run in a directory without one. The `config` command
+edits `.bloomery/config.toml` without a flake and emits an advisory warning
+naming the missing Bloomery flake instead of failing.
 
 If `flake.nix` is absent, stop before command-specific work and emit a nonzero
 error with this message:
@@ -35,27 +42,37 @@ A Bloomery flake.nix is required; set up a Bloomery flake.nix in the current dir
 
 With `--json`, emit one structured JSON setup error with the same message. The
 preflight checks file presence only; a present flake is handled by each
-command's own behavior. No upward workspace search is performed.
+command's own behavior. No upward workspace search is performed. For `config`,
+the missing flake produces a structured warning rather than a setup error, and
+the command proceeds.
 
 ## Configuration presence
 
 After the flake preflight, require `.bloomery/config.toml` before command
-handling for `check`, its nested commands, `review`, and `sync`. Parser help and
-the `init` command are exempt. If the file is absent, stop before
-command-specific work and emit a nonzero `ConfigurationError` naming the missing
-path. With `--json`, emit one structured error with the same information. The
-specs and scanner tables are then loaded as described in
+handling for `check`, its nested commands, `review`, and `sync`. Parser help,
+the `init` command, and every `config` command are exempt. If the file is
+absent, non-config commands stop before command-specific work and emit a
+nonzero `ConfigurationError` naming the missing path. A mutating `config`
+command instead creates the `.bloomery/` directory and an empty configuration
+file, emits an advisory warning naming the created path, and continues; a
+read-only `config` command reports against defaults with the same warning
+without creating anything. With `--json`, non-config commands emit one
+structured error and `config` emits a structured warning. The specs and
+scanner tables are then loaded as described in
 [PARSER/CONFIGURATION](../../CONFIGURATION/design/config-file.md).
 
 The `check`, `review`, and `sync` commands operate on the validated root. The
-`init` command operates on its target directory instead and requires no existing
-configuration. Sync maintains lockfiles without loading specifications or
-scanning evidence. Command semantics are specified by
+`init` command operates on its target directory instead and requires no
+existing configuration. `config` creates configuration on demand and then
+edits it. Sync maintains lockfiles without loading
+specifications or scanning evidence; config edits the configuration without
+loading specifications or scanning evidence. Command semantics are specified by
 [INIT](../../INIT/README.md), [CHECK](../../CHECK/README.md),
-[REVIEW](../../REVIEW/README.md), and [SYNC](../../SYNC/README.md). Sync is a
-CLI-only replacement for the Nix lock app, not a new Nix app. The global
-`--json` flag is available after any application subcommand and their nested
-commands; see the [output contract](output.md). Check without a
-nested command executes the selected suite; list discovers checks, failures
-pages retained failures, and details seeks within retained failure output.
-Retrieval never executes tests or builds.
+[REVIEW](../../REVIEW/README.md), [SYNC](../../SYNC/README.md), and
+[CONFIG](../../CONFIG/README.md). Sync is a CLI-only replacement for the Nix
+lock app, not a new Nix app. The global `--json` flag is available after any
+application subcommand and their nested commands; see the
+[output contract](output.md). Check without a nested command executes the
+selected suite; list discovers checks, failures pages retained failures, and
+details seeks within retained failure output. Retrieval never executes tests or
+builds. Config commands are specified separately by [CONFIG](../../CONFIG/README.md).

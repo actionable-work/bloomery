@@ -1,0 +1,132 @@
+group = "OUTPUT"
+
+[[requirements]]
+id = "CLI-CONFIG-OUTPUT-001"
+title = "Config accepts JSON output"
+manual = false
+design = "design/editing.md#output-and-exit-codes"
+
+[requirements.ears]
+type = "event"
+trigger = "a config command is invoked with --json"
+system = "bloomery config"
+action = "emit one structured JSON document describing the command outcome"
+
+[[requirements]]
+id = "CLI-CONFIG-OUTPUT-002"
+title = "Get JSON identifies value origin"
+manual = false
+design = "design/editing.md#output-and-exit-codes"
+
+[requirements.ears]
+type = "event"
+trigger = "config get is invoked with --json"
+system = "bloomery config"
+action = "include the key, its effective value, and whether it is explicitly configured"
+
+[[requirements]]
+id = "CLI-CONFIG-OUTPUT-003"
+title = "List JSON emits key records"
+manual = false
+design = "design/editing.md#output-and-exit-codes"
+
+[requirements.ears]
+type = "event"
+trigger = "config list is invoked with --json"
+system = "bloomery config"
+action = "emit the sorted array of key records"
+
+[[requirements]]
+id = "CLI-CONFIG-OUTPUT-004"
+title = "Mutation JSON reports the change"
+manual = false
+design = "design/editing.md#output-and-exit-codes"
+
+[requirements.ears]
+type = "event"
+trigger = "config set or config unset is invoked with --json"
+system = "bloomery config"
+action = "identify the affected key and whether the file changed"
+
+[[requirements]]
+id = "CLI-CONFIG-OUTPUT-005"
+title = "Upgrade JSON reports added keys"
+manual = false
+design = "design/upgrade.md#output"
+
+[requirements.ears]
+type = "event"
+trigger = "config upgrade is invoked with --json"
+system = "bloomery config"
+action = "include the sorted added key paths and whether the file was written"
+
+[[requirements]]
+id = "CLI-CONFIG-OUTPUT-006"
+title = "Config usage errors exit 2"
+manual = false
+design = "design/editing.md#output-and-exit-codes"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a config command receives an unknown key, a malformed key path, or a mistyped value"
+system = "bloomery config"
+action = "return usage exit code 2 before mutation"
+
+[[requirements]]
+id = "CLI-CONFIG-OUTPUT-007"
+title = "Config failures exit 1"
+manual = false
+design = "design/editing.md#output-and-exit-codes"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a config command fails to read, validate, or write the configuration"
+system = "bloomery config"
+action = "return exit code 1"
+
+[[requirements]]
+id = "CLI-CONFIG-OUTPUT-008"
+title = "Config success exits 0"
+manual = false
+design = "design/editing.md#output-and-exit-codes"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config"
+action = "return exit code 0 after a successful read or mutation"
+
+[[requirements]]
+id = "CLI-CONFIG-OUTPUT-009"
+title = "Config JSON includes the missing-flake warning"
+manual = false
+design = "design/editing.md#output-and-exit-codes"
+
+[requirements.ears]
+type = "event"
+trigger = "a config command runs without flake.nix and --json is selected"
+system = "bloomery config"
+action = "include a structured warning field identifying the missing Bloomery flake"
+
+[[requirements]]
+id = "CLI-CONFIG-OUTPUT-010"
+title = "Diff JSON emits recommendation differences"
+manual = false
+design = "design/upgrade.md#output"
+
+[requirements.ears]
+type = "event"
+trigger = "config upgrade --diff is invoked with --json"
+system = "bloomery config"
+action = "emit the sorted requested, recommended, and current values for each catalogued key"
+
+[[requirements]]
+id = "CLI-CONFIG-OUTPUT-011"
+title = "Config JSON includes the missing-config warning"
+manual = false
+design = "design/editing.md#missing-configuration"
+
+[requirements.ears]
+type = "event"
+trigger = "a mutating config command creates a missing configuration file and --json is selected"
+system = "bloomery config"
+action = "include a structured warning field identifying the created path"

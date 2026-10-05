@@ -7,8 +7,10 @@ design tree.
 ## Required file
 
 Every repository command requires `.bloomery/config.toml`. The only exemptions
-are parser-generated help and the `init` command, which bootstraps the
-repository before configuration exists. A missing file is a
+are parser-generated help, the `init` command, which bootstraps the repository
+before configuration exists, and the `config` command, whose mutating
+operations create a missing file with a warning while its read-only operations
+report defaults without writing. For every other command a missing file is a
 `ConfigurationError`; Bloomery does not substitute defaults.
 
 ## Partial configuration
@@ -49,10 +51,11 @@ paths = ["*.nix", "nix/**/*.nix", "tests/**/*.nix"]
 
 The same file carries the Nix build tables `[build]`, `[toolchain]`,
 `[profile.release]`, `[profile.dev]`, `[flags]`, `[devShell]`, `[checks]`, and
-`[features]`. Those tables are owned by
-[NIXLIB/FLAKE](../../../NIXLIB/FLAKE/design/configuration.md); the CLI parser
-accepts them as valid configuration and does not interpret them as scanner or
-spec target configuration.
+`[features]`. Their semantics and evaluation-time resolution are owned by
+[NIXLIB/FLAKE](../../../NIXLIB/FLAKE/design/configuration.md). The CLI catalogs
+the same keys and validates their types and enum value sets during
+configuration loading, so a malformed build key fails before Nix evaluation;
+the tables are still not interpreted as scanner or spec target configuration.
 
 ## Resolution rules
 
@@ -64,17 +67,35 @@ spec target configuration.
 - A configured scanner with an invalid path or option is a configuration error,
   not an empty scan.
 
+## Recommended default catalog
+
+The [schema catalog](schema-catalog.md) is the single enumerated description of
+every recognized configuration key. It spans both the CLI-owned tables and the
+Nix build tables, and pairs each key with a schema type and, when omission has a
+single fixed effective value, a recommended default.
+
+The catalog is the source of truth for `bloomery config upgrade`, which
+materializes absent recommended keys, for `bloomery config` type validation, and
+for the advisory
+[SYNC recommendations](../../../CLI/SYNC/design/sync.md#recommendations), which
+report a subset of absent keys without writing. Catalog values equal the
+defaults applied to an absent key, so materializing them does not change the
+effective configuration. Explicit values, including materialized ones, always
+take precedence.
+
 ## Error handling
 
 A missing, unreadable, unparsable, or invalid configuration file produces a
 `ConfigurationError`. Bloomery must not silently replace a broken file with
-defaults. Parser help and `init` are the only commands that succeed without the
-file.
+defaults. Parser help, `init`, and `config` are the only commands that succeed
+without the file; `config` creates it rather than treating its absence as an
+error.
 
 ## Loading order
 
-Configuration parsing happens before workspace and source scanning. The parsed
+Configuration parsing happens before workspace and source scanning and
+validates the full schema catalog, including the build tables. The parsed
 configuration is immutable for the duration of a command so every pipeline
 stage observes one consistent set of targets. The `[build]`-family tables are
-carried through as an opaque section for the flake interface and do not change
-scanner behavior.
+type-validated and then carried through for the flake interface; they do not
+change scanner behavior.

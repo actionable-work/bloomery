@@ -11,11 +11,19 @@ Build settings live in top-level tables: `[build]`, `[toolchain]`,
 `[features]`. The `[specs]` and `[scanners.*]` tables belong to the CLI; the
 flake interface ignores them.
 
+The CLI catalogs and type-validates the build keys before evaluation, using the
+[schema catalog](../../../PARSER/CONFIGURATION/design/schema-catalog.md). The
+flake interface remains authoritative for build-table semantics,
+evaluation-time package resolution, and any validation that requires Nix
+values.
+
 ## Required configuration
 
 `.bloomery/config.toml` is required. All repository commands and `mkFlake` fail
-when it is absent; the only exemptions are parser help and the `init` command.
-When the file is missing, `mkFlake` fails evaluation with a `bloomery:`-prefixed
+when it is absent; the exemptions are parser help, the `init` command that
+bootstraps it, and the `config` command whose mutating operations create it
+with a warning. When
+the file is missing, `mkFlake` fails evaluation with a `bloomery:`-prefixed
 message naming the missing path.
 
 ## Value encoding

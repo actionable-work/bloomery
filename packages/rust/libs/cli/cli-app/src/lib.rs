@@ -2,6 +2,9 @@ use bloomery_check_command as check_command;
 use bloomery_cli_output as output;
 use bloomery_cli_parser::{ParseError, ParseErrorKind, parse_from};
 use bloomery_cli_types::{CliCommand, CliInvocation};
+use bloomery_config::{
+    ConfigError, ConfigErrorKind, ConfigOutcome, ConfigReport, ConfigWarning, DiffStatus,
+};
 use bloomery_model::{render_diagnostics, sort_diagnostics};
 use serde_json::{Value, json};
 use std::ffi::OsString;
@@ -60,6 +63,7 @@ fn run_invocation_at(
             stdout,
             stderr,
         ),
+        CliCommand::Config(args) => run_config_at(args, invocation.json_mode, root, stdout, stderr),
         command => run_workspace_command_at(command, invocation.json_mode, root, stdout, stderr),
     }
 }
@@ -82,6 +86,7 @@ fn command_name(command: &CliCommand) -> Option<&'static str> {
         CliCommand::Check(_) => Some("check"),
         CliCommand::Review => Some("review"),
         CliCommand::Sync { .. } => Some("sync"),
+        CliCommand::Config(_) => Some("config"),
     }
 }
 
@@ -174,7 +179,7 @@ fn report_parse_error_at(
         error.kind(),
         ParseErrorKind::DisplayHelp | ParseErrorKind::DisplayVersion
     ) {
-        if !flake_present(root) {
+        if !flake_present(root) && error.command() != Some("config") {
             return report_missing_flake(error.command(), error.json_mode(), stdout, stderr);
         }
         let _ = stdout.write_all(error.message().as_bytes());
@@ -309,6 +314,197 @@ fn run_sync_at(
     }
 }
 
+fn run_config_at(
+    args: bloomery_cli_types::ConfigArgs,
+    json_mode: bool,
+    root: &Path,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
+    let mut boundary = Vec::new();
+    if !flake_present(root) {
+        boundary.push(ConfigWarning::MissingFlake);
+    }
+    match bloomery_config::run(root, &args.operation) {
+        Ok(mut report) => {
+            report.prepend_warnings(boundary);
+            if json_mode {
+                if write_json(stdout, &output::config_success_json(&report)).is_err() {
+                    let _ = writeln!(stderr, "bloomery: unable to render JSON config result");
+                    return ExitCode::from(1);
+                }
+            } else {
+                render_config_warnings(&report.warnings, stderr);
+                render_config_outcome(&report, stdout);
+                let _ = stdout.flush();
+            }
+            ExitCode::SUCCESS
+        }
+        Err(error) => report_config_error(error, root, json_mode, stdout, stderr),
+    }
+}
+
+fn render_config_warnings(warnings: &[ConfigWarning], stderr: &mut impl Write) {
+    for warning in warnings {
+        let message = match warning {
+            ConfigWarning::MissingFlake => {
+                "warning: no Bloomery flake.nix in the current directory".to_owned()
+            }
+            ConfigWarning::MissingConfig { path } => {
+                format!("warning: {path} is missing; reporting documented defaults")
+            }
+            ConfigWarning::CreatedConfig { path } => format!("warning: created {path}"),
+        };
+        let _ = writeln!(stderr, "{message}");
+    }
+}
+
+fn render_config_value(value: Option<&toml::Value>) -> String {
+    value
+        .map(ToString::to_string)
+        .unwrap_or_else(|| "unset".to_owned())
+}
+
+fn render_config_outcome(report: &ConfigReport, stdout: &mut impl Write) {
+    match &report.outcome {
+        ConfigOutcome::Get { key } => {
+            let origin = if key.configured {
+                "configured"
+            } else if key.recommended {
+                "default"
+            } else {
+                "unset"
+            };
+            let _ = writeln!(
+                stdout,
+                "{} = {} ({origin})",
+                key.key,
+                render_config_value(key.value.as_ref())
+            );
+        }
+        ConfigOutcome::List { keys } => {
+            for key in keys {
+                let origin = if key.configured {
+                    "configured"
+                } else if key.recommended {
+                    "default"
+                } else {
+                    "unset"
+                };
+                let _ = writeln!(
+                    stdout,
+                    "{} = {} ({origin})",
+                    key.key,
+                    render_config_value(key.value.as_ref())
+                );
+            }
+        }
+        ConfigOutcome::Set {
+            key,
+            value,
+            changed,
+        } => {
+            if *changed {
+                let _ = writeln!(stdout, "set {key} = {value}");
+            } else {
+                let _ = writeln!(stdout, "{key} unchanged");
+            }
+        }
+        ConfigOutcome::Unset {
+            key,
+            removed,
+            changed,
+        } => {
+            if *removed {
+                let _ = writeln!(stdout, "unset {key}");
+            } else if *changed {
+                let _ = writeln!(stdout, "created configuration");
+            } else {
+                let _ = writeln!(stdout, "{key} absent");
+            }
+        }
+        ConfigOutcome::Upgrade {
+            added,
+            written,
+            differences,
+        } => {
+            if !differences.is_empty() {
+                for record in differences {
+                    let status = match record.status {
+                        DiffStatus::Equal => "equal",
+                        DiffStatus::Differing => "differs",
+                        DiffStatus::Absent => "absent",
+                        DiffStatus::Unset => "unset",
+                    };
+                    let _ = writeln!(
+                        stdout,
+                        "{}: {status} (recommended {}, current {})",
+                        record.key,
+                        render_config_value(record.recommended.as_ref()),
+                        render_config_value(record.current.as_ref())
+                    );
+                }
+            } else if added.is_empty() {
+                let _ = writeln!(stdout, "configuration already current");
+            } else {
+                for key in added {
+                    let _ = writeln!(stdout, "added {key}");
+                }
+                if !written {
+                    let _ = writeln!(stdout, "(dry run; not written)");
+                }
+            }
+        }
+    }
+}
+
+fn report_config_error(
+    error: ConfigError,
+    root: &Path,
+    json_mode: bool,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
+    let exit_code = error.exit_code();
+    if json_mode {
+        let document = match error.diagnostic() {
+            Some(diagnostic) => {
+                output::diagnostics_json("config", "failed", root, std::slice::from_ref(diagnostic))
+            }
+            None if error.kind() == ConfigErrorKind::Usage => {
+                output::usage_error_json(Some("config"), error.message())
+            }
+            None => output::config_failure_json("config", error.message()),
+        };
+        if write_json(stdout, &document).is_err() {
+            let _ = writeln!(stderr, "bloomery: unable to render JSON config error");
+            return ExitCode::from(1);
+        }
+    } else {
+        match error.diagnostic() {
+            Some(diagnostic) => {
+                let rendered = render_diagnostics(root, std::slice::from_ref(diagnostic));
+                let rendered = output::colorize_check(
+                    &rendered,
+                    output::color_enabled(output::Stream::Stderr, false),
+                );
+                let _ = stderr.write_all(rendered.as_bytes());
+            }
+            None => {
+                let _ = writeln!(
+                    stderr,
+                    "{}",
+                    output::colorize_error(
+                        &format!("error: {}", error.message()),
+                        output::color_enabled(output::Stream::Stderr, false),
+                    )
+                );
+            }
+        }
+    }
+    ExitCode::from(exit_code)
+}
+
 fn run_init_at(
     args: bloomery_cli_types::InitArgs,
     json_mode: bool,
@@ -408,6 +604,7 @@ fn run_workspace_command_at(
         CliCommand::Review => run_review_at(root, json_mode, stdout, stderr),
         CliCommand::Init(_) => unreachable!("init is dispatched before workspace loading"),
         CliCommand::Sync { .. } => unreachable!("sync is dispatched before workspace loading"),
+        CliCommand::Config(_) => unreachable!("config is dispatched before workspace loading"),
     }
 }
 
@@ -726,6 +923,7 @@ mod tests {
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-001"))]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-002"))]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-003"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-014"))]
     fn the_cli_exposes_check_review_and_sync() {
         assert!(matches!(
             Cli::try_parse_from(["bloomery", "check"])
@@ -744,6 +942,12 @@ mod tests {
                 .expect("sync command")
                 .command,
             Command::Sync { update: None }
+        ));
+        assert!(matches!(
+            Cli::try_parse_from(["bloomery", "config", "list"])
+                .expect("config command")
+                .command,
+            Command::Config(_)
         ));
     }
 
@@ -1004,13 +1208,15 @@ mod tests {
     #[test]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-003"))]
     fn all_application_commands_accept_the_same_json_flag() {
-        for command in [
-            ["bloomery", "check", "--json"],
-            ["bloomery", "init", "--json"],
-            ["bloomery", "review", "--json"],
-            ["bloomery", "sync", "--json"],
-        ] {
-            assert!(parse_json(&command).expect("--json parses"));
+        let commands: &[&[&str]] = &[
+            &["bloomery", "check", "--json"],
+            &["bloomery", "init", "--json"],
+            &["bloomery", "review", "--json"],
+            &["bloomery", "sync", "--json"],
+            &["bloomery", "config", "list", "--json"],
+        ];
+        for command in commands {
+            assert!(parse_json(command).expect("--json parses"));
         }
         assert!(parse_json(&["bloomery", "--json", "check"]).expect("global --json"));
         assert!(Cli::try_parse_from(["bloomery", "review", "--format", "json"]).is_err());
@@ -1067,7 +1273,7 @@ mod tests {
     #[test]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-005"))]
     fn every_application_command_accepts_short_and_long_help_flags() {
-        for command in ["check", "init", "review", "sync"] {
+        for command in ["check", "init", "review", "sync", "config"] {
             for flag in ["-h", "--help"] {
                 let error = Cli::try_parse_from(["bloomery", command, flag])
                     .expect_err("help flag should short-circuit parsing");
@@ -1085,6 +1291,8 @@ mod tests {
             assert!(parse_json(&["bloomery", command, "--json"]).expect("trailing --json"));
             assert!(parse_json(&["bloomery", "--json", command]).expect("leading --json"));
         }
+        assert!(parse_json(&["bloomery", "config", "list", "--json"]).expect("trailing --json"));
+        assert!(parse_json(&["bloomery", "--json", "config", "list"]).expect("leading --json"));
         assert!(Cli::try_parse_from(["bloomery", "review", "--format", "json"]).is_err());
     }
 
@@ -1173,6 +1381,331 @@ mod tests {
         let text = String::from_utf8(stdout).expect("human output");
         assert!(text.contains("basic"));
         assert!(text.contains("nix develop"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-016"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-017"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-009"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-010"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-011"))]
+    fn config_is_exempt_from_the_flake_preflight_and_warns() {
+        let root = fixture_root("config-no-flake");
+        fs::create_dir_all(&root).expect("workspace root");
+
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_args_at(
+            ["bloomery", "config", "list"],
+            &root,
+            &mut stdout,
+            &mut stderr,
+        );
+        assert_eq!(status, ExitCode::SUCCESS);
+        let text = String::from_utf8_lossy(&stderr);
+        assert!(text.contains("flake.nix"), "stderr: {text:?}");
+        assert!(
+            !root.join(".bloomery/config.toml").exists(),
+            "read-only config must not create configuration"
+        );
+
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_args_at(
+            ["bloomery", "config", "--help"],
+            &root,
+            &mut stdout,
+            &mut stderr,
+        );
+        assert_eq!(status, ExitCode::SUCCESS);
+        assert!(String::from_utf8_lossy(&stdout).contains("Usage"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-015"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-018"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-OUTPUT-009"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-OUTPUT-011"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-009"))]
+    fn mutating_config_creates_missing_configuration_with_warning() {
+        let root = fixture_root("config-create");
+        fs::create_dir_all(&root).expect("workspace root");
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_args_at(
+            [
+                "bloomery",
+                "config",
+                "set",
+                "checks.enable",
+                "false",
+                "--json",
+            ],
+            &root,
+            &mut stdout,
+            &mut stderr,
+        );
+        assert_eq!(status, ExitCode::SUCCESS);
+        assert!(stderr.is_empty());
+        let document: Value = serde_json::from_slice(&stdout).expect("config JSON");
+        assert_eq!(document["command"], "config");
+        assert_eq!(document["status"], "succeeded");
+        let warnings = document["warnings"].as_array().expect("warnings");
+        assert!(
+            warnings.iter().any(|warning| warning == "missing_flake"),
+            "warnings: {warnings:?}"
+        );
+        assert!(
+            warnings
+                .iter()
+                .any(|warning| { warning["created_config"]["path"] == ".bloomery/config.toml" }),
+            "warnings: {warnings:?}"
+        );
+        assert!(root.join(".bloomery/config.toml").is_file());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-001"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-002"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-003"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-004"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-005"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-006"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-010"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-011"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-013"))]
+    fn config_commands_expose_typed_operations() {
+        fn operation(arguments: &[&str]) -> bloomery_cli_types::ConfigOperation {
+            match Cli::try_parse_from(arguments)
+                .expect("config parse")
+                .command
+            {
+                Command::Config(args) => args.operation,
+                other => panic!("expected config, got {other:?}"),
+            }
+        }
+
+        assert_eq!(
+            operation(&["bloomery", "config", "get", "checks.enable"]),
+            bloomery_cli_types::ConfigOperation::Get {
+                key: "checks.enable".to_owned()
+            }
+        );
+        assert_eq!(
+            operation(&["bloomery", "config", "set", "checks.enable", "false"]),
+            bloomery_cli_types::ConfigOperation::Set {
+                key: "checks.enable".to_owned(),
+                value: "false".to_owned()
+            }
+        );
+        assert_eq!(
+            operation(&["bloomery", "config", "unset", "checks.enable"]),
+            bloomery_cli_types::ConfigOperation::Unset {
+                key: "checks.enable".to_owned()
+            }
+        );
+        assert_eq!(
+            operation(&["bloomery", "config", "list", "--prefix", "checks"]),
+            bloomery_cli_types::ConfigOperation::List {
+                prefix: Some("checks".to_owned())
+            }
+        );
+        assert_eq!(
+            operation(&["bloomery", "config", "upgrade", "--dry-run"]),
+            bloomery_cli_types::ConfigOperation::Upgrade {
+                dry_run: true,
+                diff: false
+            }
+        );
+        assert_eq!(
+            operation(&["bloomery", "config", "upgrade", "--diff"]),
+            bloomery_cli_types::ConfigOperation::Upgrade {
+                dry_run: false,
+                diff: true
+            }
+        );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-012"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-014"))]
+    fn config_only_flags_are_rejected_elsewhere() {
+        assert!(
+            Cli::try_parse_from(["bloomery", "config", "upgrade", "--dry-run", "--diff"]).is_err()
+        );
+        assert!(
+            Cli::try_parse_from([
+                "bloomery",
+                "config",
+                "get",
+                "checks.enable",
+                "--prefix",
+                "x"
+            ])
+            .is_err()
+        );
+        assert!(Cli::try_parse_from(["bloomery", "review", "--prefix", "x"]).is_err());
+        assert!(Cli::try_parse_from(["bloomery", "sync", "--diff"]).is_err());
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-OUTPUT-001"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-OUTPUT-002"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-OUTPUT-003"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-OUTPUT-004"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-OUTPUT-005"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-OUTPUT-010"))]
+    fn config_json_contracts() {
+        let root = fixture_root("config-json");
+        fs::create_dir_all(root.join(".bloomery")).expect("workspace root");
+        fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
+        fs::write(
+            root.join(".bloomery/config.toml"),
+            "checks.enable = false\n",
+        )
+        .expect("config");
+
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_args_at(
+            ["bloomery", "config", "get", "checks.enable", "--json"],
+            &root,
+            &mut stdout,
+            &mut stderr,
+        );
+        assert_eq!(status, ExitCode::SUCCESS);
+        let document: Value = serde_json::from_slice(&stdout).expect("get JSON");
+        assert_eq!(document["command"], "config");
+        assert_eq!(document["status"], "succeeded");
+        assert_eq!(document["result"]["operation"], "get");
+        assert_eq!(document["result"]["key"]["configured"], true);
+        assert_eq!(document["result"]["key"]["value"], false);
+
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        run_args_at(
+            ["bloomery", "config", "list", "--json"],
+            &root,
+            &mut stdout,
+            &mut stderr,
+        );
+        let document: Value = serde_json::from_slice(&stdout).expect("list JSON");
+        assert_eq!(document["result"]["operation"], "list");
+        assert!(
+            document["result"]["keys"]
+                .as_array()
+                .is_some_and(|keys| !keys.is_empty())
+        );
+
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        run_args_at(
+            [
+                "bloomery",
+                "config",
+                "set",
+                "checks.throwOnOutOfDate",
+                "true",
+                "--json",
+            ],
+            &root,
+            &mut stdout,
+            &mut stderr,
+        );
+        let document: Value = serde_json::from_slice(&stdout).expect("set JSON");
+        assert_eq!(document["result"]["operation"], "set");
+        assert_eq!(document["result"]["changed"], true);
+
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        run_args_at(
+            [
+                "bloomery",
+                "config",
+                "unset",
+                "checks.throwOnOutOfDate",
+                "--json",
+            ],
+            &root,
+            &mut stdout,
+            &mut stderr,
+        );
+        let document: Value = serde_json::from_slice(&stdout).expect("unset JSON");
+        assert_eq!(document["result"]["operation"], "unset");
+        assert_eq!(document["result"]["removed"], true);
+
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        run_args_at(
+            ["bloomery", "config", "upgrade", "--diff", "--json"],
+            &root,
+            &mut stdout,
+            &mut stderr,
+        );
+        let document: Value = serde_json::from_slice(&stdout).expect("diff JSON");
+        assert_eq!(document["result"]["operation"], "upgrade");
+        assert_eq!(document["result"]["written"], false);
+        assert!(
+            document["result"]["differences"]
+                .as_array()
+                .is_some_and(|differences| !differences.is_empty())
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-OUTPUT-006"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-OUTPUT-007"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-OUTPUT-008"))]
+    fn config_exit_codes() {
+        let root = fixture_root("config-exit");
+        fs::create_dir_all(root.join(".bloomery")).expect("workspace root");
+        fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
+        fs::write(root.join(".bloomery/config.toml"), "checks.enable = true\n").expect("config");
+
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_args_at(
+            ["bloomery", "config", "get", "checks.enable", "--json"],
+            &root,
+            &mut stdout,
+            &mut stderr,
+        );
+        assert_eq!(status, ExitCode::SUCCESS);
+
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_args_at(
+            ["bloomery", "config", "get", "checks.bogus", "--json"],
+            &root,
+            &mut stdout,
+            &mut stderr,
+        );
+        assert_eq!(status, ExitCode::from(2));
+        let document: Value = serde_json::from_slice(&stdout).expect("usage JSON");
+        assert_eq!(document["error"]["kind"], "usage");
+
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_args_at(
+            [
+                "bloomery",
+                "config",
+                "set",
+                "scanners.rust.enabled",
+                "true",
+                "--json",
+            ],
+            &root,
+            &mut stdout,
+            &mut stderr,
+        );
+        assert_eq!(status, ExitCode::from(1));
+        let document: Value = serde_json::from_slice(&stdout).expect("failure JSON");
+        assert_eq!(document["status"], "failed");
         let _ = fs::remove_dir_all(root);
     }
 

@@ -96,7 +96,7 @@ design = "design/commands.md#flake-presence-preflight"
 
 [requirements.ears]
 type = "unwanted_behavior"
-trigger = "a command other than init, including parser help, is requested from a current directory without flake.nix"
+trigger = "a command other than init and config, including parser help, is requested from a current directory without flake.nix"
 system = "the bloomery CLI"
 action = "stop before command handling with a nonzero error instructing the user to set up a Bloomery flake.nix"
 
@@ -146,3 +146,62 @@ design = "design/commands.md"
 type = "ubiquitous"
 system = "bloomery"
 action = "expose the init subcommand"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-014"
+title = "The CLI exposes config"
+manual = false
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery"
+action = "expose the config subcommand"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-015"
+title = "Mutating config commands create missing configuration"
+manual = false
+design = "design/commands.md#configuration-presence"
+
+[requirements.ears]
+type = "event"
+trigger = "a mutating config command is requested without .bloomery/config.toml"
+system = "the bloomery CLI"
+action = "create the .bloomery directory and an empty configuration file and continue"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-016"
+title = "Config is exempt from the flake preflight"
+manual = false
+design = "design/commands.md#flake-presence-preflight"
+
+[requirements.ears]
+type = "event"
+trigger = "a config command is requested from a current directory without flake.nix"
+system = "the bloomery CLI"
+action = "continue without the shared flake setup error"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-017"
+title = "Config warns when the Bloomery flake is absent"
+manual = false
+design = "design/commands.md#flake-presence-preflight"
+
+[requirements.ears]
+type = "event"
+trigger = "a config command is requested from a current directory without flake.nix"
+system = "the bloomery CLI"
+action = "emit an advisory warning naming the missing Bloomery flake"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-018"
+title = "Config warns when it creates configuration"
+manual = false
+design = "design/commands.md#configuration-presence"
+
+[requirements.ears]
+type = "event"
+trigger = "a config command creates a missing .bloomery/config.toml"
+system = "the bloomery CLI"
+action = "emit an advisory warning naming the created path"

@@ -8,7 +8,7 @@ design = "design/config-file.md#required-file"
 
 [requirements.ears]
 type = "unwanted_behavior"
-trigger = ".bloomery/config.toml is absent"
+trigger = "a repository command other than config runs without .bloomery/config.toml"
 system = "Bloomery"
 action = "report a ConfigurationError instead of substituting defaults"
 

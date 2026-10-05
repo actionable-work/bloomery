@@ -1,6 +1,6 @@
 use bloomery_cli_types::{
-    CheckArgs, CheckOperation, CliCommand, CliInvocation, DEFAULT_PAGE_LIMIT, DETAIL_PAGE_LIMIT,
-    DetailsArgs, FailureArgs, InitArgs, ListArgs,
+    CheckArgs, CheckOperation, CliCommand, CliInvocation, ConfigArgs, ConfigOperation,
+    DEFAULT_PAGE_LIMIT, DETAIL_PAGE_LIMIT, DetailsArgs, FailureArgs, InitArgs, ListArgs,
 };
 use clap::{ArgAction, Args, Parser, Subcommand, error::ErrorKind};
 use std::ffi::OsString;
@@ -98,6 +98,7 @@ fn command_from_arguments(arguments: &[OsString]) -> Option<&'static str> {
             "review" => Some("review"),
             "sync" => Some("sync"),
             "init" => Some("init"),
+            "config" => Some("config"),
             _ => None,
         })
 }
@@ -135,6 +136,8 @@ enum RawCommand {
         )]
         update: Option<String>,
     },
+    /// Read, edit, or upgrade .bloomery/config.toml.
+    Config(RawConfigArgs),
 }
 
 impl From<RawCommand> for CliCommand {
@@ -144,6 +147,69 @@ impl From<RawCommand> for CliCommand {
             RawCommand::Check(args) => Self::Check(args.into()),
             RawCommand::Review => Self::Review,
             RawCommand::Sync { update } => Self::Sync { update },
+            RawCommand::Config(args) => Self::Config(args.into()),
+        }
+    }
+}
+
+#[derive(Debug, Args)]
+struct RawConfigArgs {
+    #[command(subcommand)]
+    operation: RawConfigOperation,
+}
+
+#[derive(Debug, Subcommand)]
+enum RawConfigOperation {
+    /// Read one configuration key.
+    Get {
+        /// Dotted key path such as checks.enable.
+        key: String,
+    },
+    /// Set a configuration key value.
+    Set {
+        /// Dotted key path such as checks.enable.
+        key: String,
+        /// Value parsed according to the key's schema type.
+        value: String,
+    },
+    /// Remove a configuration key.
+    Unset {
+        /// Dotted key path such as checks.enable.
+        key: String,
+    },
+    /// List configuration keys.
+    List {
+        /// Restrict to keys whose dotted path starts with this prefix.
+        #[arg(long, value_name = "KEY")]
+        prefix: Option<String>,
+    },
+    /// Add absent recommended keys or compare recommendations.
+    Upgrade {
+        /// Report additions without writing.
+        #[arg(long, conflicts_with = "diff")]
+        dry_run: bool,
+        /// Compare recommendations with the current configuration without writing.
+        #[arg(long)]
+        diff: bool,
+    },
+}
+
+impl From<RawConfigArgs> for ConfigArgs {
+    fn from(args: RawConfigArgs) -> Self {
+        Self {
+            operation: args.operation.into(),
+        }
+    }
+}
+
+impl From<RawConfigOperation> for ConfigOperation {
+    fn from(operation: RawConfigOperation) -> Self {
+        match operation {
+            RawConfigOperation::Get { key } => Self::Get { key },
+            RawConfigOperation::Set { key, value } => Self::Set { key, value },
+            RawConfigOperation::Unset { key } => Self::Unset { key },
+            RawConfigOperation::List { prefix } => Self::List { prefix },
+            RawConfigOperation::Upgrade { dry_run, diff } => Self::Upgrade { dry_run, diff },
         }
     }
 }

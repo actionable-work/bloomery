@@ -3,12 +3,14 @@ bloomery-check-command = { path = "../check-command" }
 bloomery-cli-output = { path = "../cli-output" }
 bloomery-cli-parser = { path = "../cli-parser" }
 bloomery-cli-types = { path = "../cli-types" }
+bloomery-config = { path = "../config" }
 bloomery-init = { path = "../init" }
 bloomery-model = { path = "../../shared/model" }
 bloomery-review = { path = "../review" }
 bloomery-sync = { path = "../sync" }
 bloomery-workspace = { path = "../../shared/workspace" }
 serde_json = "1.0"
+toml = "1.1"
 
 [dev-dependencies]
 

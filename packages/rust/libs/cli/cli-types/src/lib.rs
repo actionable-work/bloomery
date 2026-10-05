@@ -15,6 +15,21 @@ pub enum CliCommand {
     Check(CheckArgs),
     Review,
     Sync { update: Option<String> },
+    Config(ConfigArgs),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConfigArgs {
+    pub operation: ConfigOperation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConfigOperation {
+    Get { key: String },
+    Set { key: String, value: String },
+    Unset { key: String },
+    List { prefix: Option<String> },
+    Upgrade { dry_run: bool, diff: bool },
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

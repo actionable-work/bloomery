@@ -88,3 +88,60 @@ type = "unwanted_behavior"
 trigger = "jobs or limit is not a positive integer, or offset is not a nonnegative integer"
 system = "the bloomery CLI"
 action = "return a usage error"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-010"
+title = "Config list filters by prefix"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "accept --prefix on config list"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-011"
+title = "Config upgrade accepts a dry run"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "accept --dry-run on config upgrade"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-012"
+title = "Config-only flags are rejected elsewhere"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "--prefix is used outside config list, or --dry-run or --diff is used outside config upgrade"
+system = "the bloomery CLI"
+action = "return a usage error"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-013"
+title = "Config upgrade accepts a diff"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "accept --diff on config upgrade"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-014"
+title = "Config diff and dry-run are mutually exclusive"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "config upgrade is invoked with both --dry-run and --diff"
+system = "the bloomery CLI"
+action = "return a usage error"

@@ -2,6 +2,7 @@ mod terminal;
 
 pub use terminal::{TerminalFacts, TransientLine};
 
+use bloomery_config::ConfigReport;
 use bloomery_init::{InitError, InitErrorKind, InitReport};
 use bloomery_model::{Diagnostic, diagnostics::SourceLocation};
 use bloomery_sync::SyncReport;
@@ -183,6 +184,26 @@ pub fn init_failure_json(error: &InitError) -> Value {
                 InitErrorKind::Operational => "operational",
             },
             "message": error.message(),
+        },
+    })
+}
+
+pub fn config_success_json(report: &ConfigReport) -> Value {
+    json!({
+        "command": "config",
+        "status": "succeeded",
+        "warnings": report.warnings,
+        "result": report.outcome,
+    })
+}
+
+pub fn config_failure_json(command: &str, message: &str) -> Value {
+    json!({
+        "command": command,
+        "status": "failed",
+        "error": {
+            "kind": "config",
+            "message": message,
         },
     })
 }

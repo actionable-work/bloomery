@@ -117,30 +117,8 @@ pub fn load(root: &Path) -> Result<Config, Diagnostic> {
 #[allow(clippy::result_large_err)]
 pub fn load_with_raw(root: &Path) -> Result<LoadedConfig, Diagnostic> {
     let path = root.join(".bloomery/config.toml");
-    let (config, raw) = match fs::read_to_string(&path) {
-        Ok(contents) => {
-            let raw = toml::from_str::<toml::Value>(&contents).map_err(|error| {
-                Diagnostic::new(
-                    "ConfigurationError",
-                    format!("Unable to parse configuration: {error}"),
-                )
-                .at(
-                    path.clone(),
-                    Some(error_span_line(&contents, error.to_string())),
-                )
-            })?;
-            let config: Config = toml::from_str(&contents).map_err(|error| {
-                Diagnostic::new(
-                    "ConfigurationError",
-                    format!("Unable to parse configuration: {error}"),
-                )
-                .at(
-                    path.clone(),
-                    Some(error_span_line(&contents, error.to_string())),
-                )
-            })?;
-            (config, Some(raw))
-        }
+    let contents = match fs::read_to_string(&path) {
+        Ok(contents) => contents,
         Err(error)
             if error.kind() == std::io::ErrorKind::NotFound
                 && fs::symlink_metadata(&path).is_err_and(|metadata_error| {
@@ -161,8 +139,39 @@ pub fn load_with_raw(root: &Path) -> Result<LoadedConfig, Diagnostic> {
             .at(path, Some(1)));
         }
     };
+    parse_contents(&contents, &path)
+}
+
+/// Parse and validate configuration contents without reading or writing a file.
+#[allow(clippy::result_large_err)]
+pub fn parse_contents(contents: &str, path: &Path) -> Result<LoadedConfig, Diagnostic> {
+    let raw = toml::from_str::<toml::Value>(contents).map_err(|error| {
+        Diagnostic::new(
+            "ConfigurationError",
+            format!("Unable to parse configuration: {error}"),
+        )
+        .at(
+            path.to_path_buf(),
+            Some(error_span_line(contents, error.to_string())),
+        )
+    })?;
+    let config: Config = toml::from_str(contents).map_err(|error| {
+        Diagnostic::new(
+            "ConfigurationError",
+            format!("Unable to parse configuration: {error}"),
+        )
+        .at(
+            path.to_path_buf(),
+            Some(error_span_line(contents, error.to_string())),
+        )
+    })?;
+    crate::catalog::validate_raw(&raw)
+        .map_err(|diagnostic| diagnostic.at(path.to_path_buf(), None))?;
     config.validate()?;
-    Ok(LoadedConfig { config, raw })
+    Ok(LoadedConfig {
+        config,
+        raw: Some(raw),
+    })
 }
 
 impl Config {
@@ -414,6 +423,71 @@ mod tests {
         )
         .expect("Nix scanner with an escaping path");
         assert_configuration_error(&root);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    fn write_config(contents: &str) -> PathBuf {
+        let root = root();
+        let config_path = root.join(".bloomery/config.toml");
+        fs::create_dir_all(config_path.parent().expect("config parent")).expect("config dir");
+        fs::write(&config_path, contents).expect("config contents");
+        root
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-VALIDATION-001"))]
+    fn build_keys_are_type_validated() {
+        for contents in [
+            "[checks]\nenable = \"yes\"\n",
+            "[build]\nprofileName = 5\n",
+            "[devShell]\npackages = [\"a\", 1]\n",
+            "[profile.release]\ncodegenUnits = 0\n",
+        ] {
+            let root = write_config(contents);
+            assert_configuration_error(&root);
+            let _ = fs::remove_dir_all(root);
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-VALIDATION-002"))]
+    fn unknown_build_keys_are_rejected() {
+        for contents in [
+            "[checks]\nbogus = true\n",
+            "[profile.release]\nbogus = true\n",
+            "[toolchain]\nbogus = \"rustc\"\n",
+            "[wat]\nenable = true\n",
+        ] {
+            let root = write_config(contents);
+            assert_configuration_error(&root);
+            let _ = fs::remove_dir_all(root);
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-VALIDATION-003"))]
+    fn enum_and_union_values_are_enforced() {
+        for contents in [
+            "[toolchain]\nlinker = \"gold\"\n",
+            "[profile.release]\npanic = \"crash\"\n",
+            "[profile.release]\nlto = \"fast\"\n",
+            "[profile.release]\noptLevel = 9\n",
+        ] {
+            let root = write_config(contents);
+            assert_configuration_error(&root);
+            let _ = fs::remove_dir_all(root);
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-VALIDATION-004"))]
+    fn package_strings_are_accepted_without_resolution() {
+        let root = write_config(
+            "[toolchain]\nrustc = \"llvmPackages.lld\"\n\
+             [devShell]\npackages = [\"rust-analyzer\", \"bacon\"]\n",
+        );
+        let config = load(&root).expect("package strings are valid configuration");
+        assert!(config.toolchain.is_some());
         let _ = fs::remove_dir_all(root);
     }
 }

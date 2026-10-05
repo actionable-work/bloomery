@@ -111,6 +111,10 @@ Use a built-in, versioned-with-the-binary catalog. Each entry contains an exact
 TOML key path, a short benefit description, and actionable configuration
 guidance. Entries must refer to keys supported by that Bloomery release;
 recommendations do not imply a new config schema or remotely fetched policy.
+This advisory subset is derived from the CLI-owned recommended-default catalog
+defined by
+[PARSER/CONFIGURATION](../../PARSER/CONFIGURATION/design/config-file.md#recommended-default-catalog);
+the corresponding default value is materialized by `bloomery config upgrade`.
 
 The initial catalog targets existing check/evidence scanner switches:
 
@@ -131,7 +135,9 @@ configuration. Compare each catalog path to the raw tree **before default
 insertion**. An absent leaf is a recommendation even if its parent table exists;
 an absent parent means its descendants are absent. An explicit leaf suppresses
 that recommendation, including `false`, `true`, or any other schema-valid
-value. An invalid value is a config error, not an absence. TOML dotted keys and
+value. Values materialized by `bloomery config upgrade` are explicit and
+therefore suppress notices; materialized or user-authored config always wins. An
+invalid value is a config error, not an absence. TOML dotted keys and
 inline tables have the same presence semantics as regular tables.
 
 For example:

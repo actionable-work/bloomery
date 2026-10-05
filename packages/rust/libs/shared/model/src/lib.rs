@@ -1,5 +1,6 @@
 #![allow(clippy::result_large_err)]
 
+pub mod catalog;
 pub mod config;
 pub mod diagnostics;
 mod domain;

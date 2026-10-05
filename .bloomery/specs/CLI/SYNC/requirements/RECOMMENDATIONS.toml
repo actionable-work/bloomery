@@ -319,3 +319,15 @@ design = "design/sync.md#missing-configuration"
 type = "ubiquitous"
 system = "bloomery sync"
 action = "refrain from creating the .bloomery directory"
+
+[[requirements]]
+id = "CLI-SYNC-RECOMMENDATIONS-029"
+title = "Materialized configuration suppresses recommendations"
+manual = false
+design = "design/sync.md#recommendations"
+
+[requirements.ears]
+type = "event"
+trigger = "bloomery config upgrade has materialized a recommended key"
+system = "bloomery sync"
+action = "treat the key as explicitly configured and emit no recommendation for it"
