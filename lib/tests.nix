@@ -1,10 +1,12 @@
 {
   pkgs,
   lib ? pkgs.lib,
+  treefmtNix ? null,
 }: let
   profile = import ./profile {inherit lib;};
   workspace = import ./workspace {inherit pkgs lib;};
-  mkFlakeTests = import ./mk-flake.test.nix {inherit pkgs lib;};
+  mkFlakeTests = import ./mk-flake.test.nix {inherit pkgs lib treefmtNix;};
+  formatterTests = import ./formatters.test.nix {inherit pkgs lib treefmtNix;};
   buildConfigTests = import ./build-config.test.nix {inherit pkgs lib;};
   mkWorkspaceTests = import ./mk-workspace.test.nix {inherit pkgs lib;};
   flakeModuleTests = import ./modules/flake-module.test.nix {inherit pkgs lib;};
@@ -19,6 +21,7 @@
     profile.tests
     // workspace.tests
     // mkFlakeTests
+    // formatterTests
     // buildConfigTests
     // mkWorkspaceTests
     // flakeModuleTests
@@ -158,6 +161,25 @@ in {
           "NIXLIB-GRAPH-MANIFEST-007"
           "NIX-SOURCES-FILESETS-011"
           "CLI-INIT-TEMPLATES-008"
+          "NIXLIB-FLAKE-CONFIGURATION-019"
+          "NIXLIB-FLAKE-ENTRYPOINTS-018"
+          "NIXLIB-FLAKE-ENTRYPOINTS-019"
+          "NIXLIB-FLAKE-FORMATTERS-001"
+          "NIXLIB-FLAKE-FORMATTERS-002"
+          "NIXLIB-FLAKE-FORMATTERS-003"
+          "NIXLIB-FLAKE-FORMATTERS-004"
+          "NIXLIB-FLAKE-FORMATTERS-005"
+          "NIXLIB-FLAKE-FORMATTERS-006"
+          "NIXLIB-FLAKE-FORMATTERS-007"
+          "NIXLIB-FLAKE-FORMATTERS-008"
+          "NIXLIB-FLAKE-FORMATTERS-009"
+          "NIXLIB-FLAKE-FORMATTERS-010"
+          "NIXLIB-FLAKE-FORMATTERS-011"
+          "NIXLIB-FLAKE-FORMATTERS-012"
+          "NIXLIB-FLAKE-FORMATTERS-013"
+          "NIXLIB-FLAKE-FORMATTERS-014"
+          "NIXLIB-FLAKE-FORMATTERS-015"
+          "NIXLIB-FLAKE-OPTIONS-019"
         ];
       };
     } ''

@@ -1,6 +1,6 @@
 [dependencies]
 bloomery-model = { path = "../../shared/model" }
-serde = { version = "1.0", features = ["derive"] }
+serde = { features = ["derive"], version = "1.0" }
 serde_json = "1.0"
 sha2 = "0.10"
 toml = "1.1"
@@ -8,6 +8,6 @@ toml = "1.1"
 [dev-dependencies]
 
 [package]
+edition = "2024"
 name = "bloomery-sync"
 version = "0.1.0"
-edition = "2024"

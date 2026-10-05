@@ -87,3 +87,25 @@ design = "design/schema-catalog.md#versioning"
 type = "ubiquitous"
 system = "the schema catalog"
 action = "treat an explicit value, including a materialized one, as overriding the recommendation"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-009"
+title = "Catalog entries carry documentation text"
+manual = false
+design = "design/schema-catalog.md#catalog-fields"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "pair each key path with documentation text that describes the key"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-010"
+title = "Catalog covers the parameterized formatter table"
+manual = false
+design = "design/schema-catalog.md#formatters"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "include the enable, before, and after keys for any formatter name under the formatters table"

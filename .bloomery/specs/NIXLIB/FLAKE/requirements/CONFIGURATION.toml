@@ -203,3 +203,14 @@ design = "design/configuration.md#checks"
 type = "ubiquitous"
 system = "the build configuration"
 action = "accept checks.noDefaultFeatures"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-019"
+title = "Formatter options are exposed"
+manual = false
+design = "design/configuration.md#formatters"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the build configuration"
+action = "accept enable, before, and after for every known formatter under the formatters table"

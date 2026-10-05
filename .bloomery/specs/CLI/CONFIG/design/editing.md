@@ -13,7 +13,11 @@ bloomery config set KEY VALUE [--json]
 bloomery config unset KEY [--json]
 bloomery config list [--prefix KEY] [--json]
 bloomery config upgrade [--dry-run | --diff] [--json]
+bloomery config document [--json]
 ```
+
+`config document` annotates configured keys with schema-catalog documentation
+and is specified by [Configuration documentation](documenting.md).
 
 Every invocation re-reads the configuration file. Config commands never load
 the specification tree, scan source, or edit lockfiles.
@@ -44,11 +48,12 @@ before any write.
 ## Missing configuration
 
 When `.bloomery/config.toml` is absent, the mutating commands `config set`,
-`config unset`, and a writing `config upgrade` create the `.bloomery/`
-directory and an empty configuration file, emit an advisory warning naming the
-created path, and continue. The effective configuration before the mutation is
-the documented defaults, and the newly created file is an empty TOML document;
-the command's own keys are then added in the same invocation.
+`config unset`, a writing `config upgrade`, and `config document` create the
+`.bloomery/` directory and an empty configuration file, emit an advisory
+warning naming the created path, and continue. The effective configuration
+before the mutation is the documented defaults, and the newly created file is
+an empty TOML document; the command's own keys are then added in the same
+invocation. `config document` has no present keys to annotate in the new file.
 
 The read-only commands `config get`, `config list`, `config upgrade --dry-run`,
 and `config upgrade --diff` never create or modify the file. They report

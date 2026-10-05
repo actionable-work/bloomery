@@ -205,3 +205,14 @@ type = "event"
 trigger = "a config command creates a missing .bloomery/config.toml"
 system = "the bloomery CLI"
 action = "emit an advisory warning naming the created path"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-019"
+title = "Config exposes document"
+manual = false
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config"
+action = "expose the document subcommand"

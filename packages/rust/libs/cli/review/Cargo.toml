@@ -1,10 +1,10 @@
 [dependencies]
 bloomery-model = { path = "../../shared/model" }
-serde = { version = "1.0", features = ["derive"] }
+serde = { features = ["derive"], version = "1.0" }
 
 [dev-dependencies]
 
 [package]
+edition = "2024"
 name = "bloomery-review"
 version = "0.1.0"
-edition = "2024"

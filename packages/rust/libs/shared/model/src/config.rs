@@ -26,6 +26,8 @@ pub struct Config {
     pub checks: Option<toml::Value>,
     #[serde(default)]
     pub features: Option<toml::Value>,
+    #[serde(default)]
+    pub formatters: Option<toml::Value>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -422,6 +424,21 @@ mod tests {
             "[scanners.nix]\nenabled = true\npaths = [\"../checks.nix\"]\n",
         )
         .expect("Nix scanner with an escaping path");
+        assert_configuration_error(&root);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-VALIDATION-005"))]
+    fn formatter_table_is_accepted_and_validated() {
+        let root = write_config(
+            "[formatters.prettier]\nenable = true\nbefore = [\"rustfmt\"]\nafter = []\n",
+        );
+        let config = load(&root).expect("[formatters] is valid configuration");
+        assert!(config.formatters.is_some());
+        let _ = fs::remove_dir_all(root);
+
+        let root = write_config("[formatters.prettier]\ncommand = \"prettier\"\n");
         assert_configuration_error(&root);
         let _ = fs::remove_dir_all(root);
     }

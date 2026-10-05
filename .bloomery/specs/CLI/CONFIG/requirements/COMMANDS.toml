@@ -147,3 +147,14 @@ type = "event"
 trigger = "config get, config list, config upgrade --dry-run, or config upgrade --diff runs without .bloomery/config.toml"
 system = "bloomery config"
 action = "report against defaults without creating the file"
+
+[[requirements]]
+id = "CLI-CONFIG-COMMANDS-014"
+title = "Config exposes document"
+manual = false
+design = "design/documenting.md#documentation-source"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config"
+action = "expose the document subcommand"

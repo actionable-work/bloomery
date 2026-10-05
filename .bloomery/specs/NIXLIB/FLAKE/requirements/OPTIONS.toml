@@ -202,3 +202,14 @@ design = "design/workspace-options.md#development-shell-checks-and-features"
 type = "ubiquitous"
 system = "the workspace option module"
 action = "default checks.noDefaultFeatures to true"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-019"
+title = "Formatter ordering options are configurable"
+manual = false
+design = "design/workspace-options.md#formatter-ordering"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace option module"
+action = "accept per-formatter enablement and before and after ordering lists"

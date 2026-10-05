@@ -7,7 +7,7 @@ mod upgrade;
 pub use error::{ConfigError, ConfigErrorKind};
 
 use bloomery_cli_types::ConfigOperation;
-use bloomery_model::catalog::{self, CatalogEntry};
+use bloomery_model::catalog::{self, KeySpec};
 use bloomery_model::config::{LoadedConfig, parse_contents};
 use serde::Serialize;
 use std::fs;
@@ -79,6 +79,10 @@ pub enum ConfigOutcome {
         written: bool,
         differences: Vec<DiffRecord>,
     },
+    Document {
+        documented: Vec<String>,
+        written: bool,
+    },
 }
 
 /// Successful result plus any warnings.
@@ -97,29 +101,30 @@ impl ConfigReport {
 }
 
 enum Resolved {
-    Get(&'static CatalogEntry),
-    Set(&'static CatalogEntry, toml::Value),
-    Unset(&'static CatalogEntry),
+    Get(KeySpec),
+    Set(KeySpec, toml::Value),
+    Unset(KeySpec),
     List(Option<String>),
     Upgrade { dry_run: bool, diff: bool },
+    Document,
 }
 
 impl Resolved {
     fn is_mutating(&self) -> bool {
         match self {
-            Self::Set(..) | Self::Unset(..) => true,
+            Self::Set(..) | Self::Unset(..) | Self::Document => true,
             Self::Upgrade { dry_run, diff } => !dry_run && !diff,
             Self::Get(_) | Self::List(_) => false,
         }
     }
 }
 
-fn entry_path(entry: &CatalogEntry) -> Vec<String> {
-    entry
-        .path
-        .iter()
-        .map(|segment| (*segment).to_owned())
-        .collect()
+fn entry_path(entry: &KeySpec) -> Vec<String> {
+    entry.path.clone()
+}
+
+fn path_refs(path: &[String]) -> Vec<&str> {
+    path.iter().map(String::as_str).collect()
 }
 
 fn resolve(operation: &ConfigOperation) -> Result<Resolved, ConfigError> {
@@ -131,7 +136,8 @@ fn resolve(operation: &ConfigOperation) -> Result<Resolved, ConfigError> {
         ConfigOperation::Set { key, value } => {
             let parts = document::parse_key(key)?;
             let entry = document::lookup_entry(&parts)?;
-            Resolved::Set(entry, document::parse_value(entry, value)?)
+            let parsed = document::parse_value(&entry, value)?;
+            Resolved::Set(entry, parsed)
         }
         ConfigOperation::Unset { key } => {
             let parts = document::parse_key(key)?;
@@ -149,16 +155,16 @@ fn resolve(operation: &ConfigOperation) -> Result<Resolved, ConfigError> {
                 diff: *diff,
             }
         }
+        ConfigOperation::Document => Resolved::Document,
     })
 }
 
-fn record(entry: &CatalogEntry, raw: Option<&toml::Value>) -> KeyRecord {
+fn record(entry: &KeySpec, raw: Option<&toml::Value>) -> KeyRecord {
+    let path = path_refs(&entry.path);
     KeyRecord {
         key: entry.path.join("."),
-        value: catalog::effective_value(raw, entry.path),
-        configured: raw
-            .and_then(|raw| catalog::raw_at(raw, entry.path))
-            .is_some(),
+        value: catalog::effective_value(raw, &path),
+        configured: raw.and_then(|raw| catalog::raw_at(raw, &path)).is_some(),
         recommended: entry.recommended.is_some(),
     }
 }
@@ -222,7 +228,7 @@ pub fn run(root: &Path, operation: &ConfigOperation) -> Result<ConfigReport, Con
                         .as_deref()
                         .is_none_or(|prefix| entry.path.join(".").starts_with(prefix))
                 })
-                .map(|entry| record(entry, raw))
+                .map(|entry| record(&KeySpec::from_entry(entry), raw))
                 .collect::<Vec<_>>();
             keys.sort_by(|left, right| left.key.cmp(&right.key));
             ConfigOutcome::List { keys }
@@ -280,6 +286,22 @@ pub fn run(root: &Path, operation: &ConfigOperation) -> Result<ConfigReport, Con
                     written,
                     differences: Vec::new(),
                 }
+            }
+        }
+        Resolved::Document => {
+            let mut document = editable_document(contents.as_deref())?;
+            let documented = match raw {
+                Some(raw) => document::document_values(&mut document, raw)?,
+                None => Vec::new(),
+            };
+            let created = !exists;
+            let changed = !documented.is_empty();
+            if changed || created {
+                publish_checked(&config_path, &document)?;
+            }
+            ConfigOutcome::Document {
+                documented,
+                written: changed || created,
             }
         }
     };
@@ -991,6 +1013,182 @@ mod tests {
             path: CONFIG_RELATIVE_PATH.to_owned()
         }));
         assert!(contents(&root).contains("enable = true"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-DOCUMENT-001"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-DOCUMENT-002"))]
+    fn document_writes_catalog_documentation_inline() {
+        let root = temp_root();
+        seed(&root, "[checks]\nenable = true\n");
+        let report = run(&root, &operation(ConfigOperation::Document)).expect("document");
+        match report.outcome {
+            ConfigOutcome::Document {
+                documented,
+                written,
+            } => {
+                assert!(written);
+                assert_eq!(documented, vec!["checks.enable".to_owned()]);
+            }
+            other => panic!("unexpected outcome: {other:?}"),
+        }
+        let after = contents(&root);
+        assert!(
+            after.contains("enable = true # Generate workspace checks."),
+            "{after}"
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-DOCUMENT-003"))]
+    fn document_leaves_absent_keys_absent() {
+        let root = temp_root();
+        seed(&root, "[checks]\nenable = true\n");
+        run(&root, &operation(ConfigOperation::Document)).expect("document");
+        let after = contents(&root);
+        assert!(!after.contains("includePackageChecks"));
+        assert!(!after.contains("throwOnOutOfDate"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-DOCUMENT-004"))]
+    fn document_preserves_configured_values() {
+        let root = temp_root();
+        seed(&root, "[checks]\nenable = false\n");
+        run(&root, &operation(ConfigOperation::Document)).expect("document");
+        assert!(contents(&root).contains("enable = false"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-DOCUMENT-005"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-DOCUMENT-012"))]
+    fn document_preserves_trailing_comments_with_fallback() {
+        let root = temp_root();
+        seed(&root, "# keep me\n[checks]\nenable = true # my note\n");
+        run(&root, &operation(ConfigOperation::Document)).expect("document");
+        let after = contents(&root);
+        assert!(after.contains("# keep me"), "{after}");
+        assert!(after.contains("enable = true # my note"), "{after}");
+        assert!(
+            after.contains("# Generate workspace checks.\nenable = true"),
+            "{after}"
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-DOCUMENT-006"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-DOCUMENT-011"))]
+    fn document_is_idempotent() {
+        let root = temp_root();
+        seed(&root, "[checks]\nenable = true\n");
+        run(&root, &operation(ConfigOperation::Document)).expect("first document");
+        let after_first = contents(&root);
+        let report = run(&root, &operation(ConfigOperation::Document)).expect("second document");
+        match report.outcome {
+            ConfigOutcome::Document {
+                documented,
+                written,
+            } => {
+                assert!(documented.is_empty());
+                assert!(!written);
+            }
+            other => panic!("unexpected outcome: {other:?}"),
+        }
+        assert_eq!(contents(&root), after_first);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-DOCUMENT-007"))]
+    fn document_creates_missing_configuration() {
+        let root = temp_root();
+        let report = run(&root, &operation(ConfigOperation::Document)).expect("document");
+        assert!(report.warnings.contains(&ConfigWarning::CreatedConfig {
+            path: CONFIG_RELATIVE_PATH.to_owned()
+        }));
+        match report.outcome {
+            ConfigOutcome::Document {
+                documented,
+                written,
+            } => {
+                assert!(documented.is_empty());
+                assert!(written);
+            }
+            other => panic!("unexpected outcome: {other:?}"),
+        }
+        assert!(root.join(CONFIG_RELATIVE_PATH).exists());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-DOCUMENT-008"))]
+    fn document_rejects_invalid_configuration() {
+        let root = temp_root();
+        seed(&root, "[checks]\nenable = \"yes\"\n");
+        let before = contents(&root);
+        let error = run(&root, &operation(ConfigOperation::Document)).expect_err("invalid config");
+        assert_eq!(error.kind(), ConfigErrorKind::Failure);
+        assert_eq!(contents(&root), before);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-DOCUMENT-009"))]
+    fn document_publishes_atomically() {
+        let root = temp_root();
+        seed(&root, "[checks]\nenable = true\n");
+        run(&root, &operation(ConfigOperation::Document)).expect("document");
+        let bloomery_dir = root.join(".bloomery");
+        let leftovers = fs::read_dir(&bloomery_dir)
+            .expect("bloomery dir")
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_name().to_string_lossy().contains(".tmp"))
+            .count();
+        assert_eq!(leftovers, 0);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-DOCUMENT-010"))]
+    fn document_reports_sorted_paths() {
+        let root = temp_root();
+        seed(&root, "[checks]\nenable = true\nthrowOnOutOfDate = false\n");
+        let report = run(&root, &operation(ConfigOperation::Document)).expect("document");
+        match report.outcome {
+            ConfigOutcome::Document { documented, .. } => {
+                let mut sorted = documented.clone();
+                sorted.sort();
+                assert_eq!(documented, sorted);
+                assert!(documented.contains(&"checks.enable".to_owned()));
+                assert!(documented.contains(&"checks.throwOnOutOfDate".to_owned()));
+            }
+            other => panic!("unexpected outcome: {other:?}"),
+        }
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-DOCUMENT-001"))]
+    fn document_covers_extra_formatter_names() {
+        let root = temp_root();
+        seed(&root, "[formatters.prettier]\nenable = true\n");
+        let report = run(&root, &operation(ConfigOperation::Document)).expect("document");
+        match report.outcome {
+            ConfigOutcome::Document { documented, .. } => {
+                assert!(documented.contains(&"formatters.prettier.enable".to_owned()));
+            }
+            other => panic!("unexpected outcome: {other:?}"),
+        }
+        let after = contents(&root);
+        assert!(
+            after.contains("Enable or disable this formatter."),
+            "{after}"
+        );
         let _ = fs::remove_dir_all(root);
     }
 }

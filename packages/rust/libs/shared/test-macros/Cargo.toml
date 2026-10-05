@@ -2,6 +2,6 @@
 proc-macro = true
 
 [package]
+edition = "2024"
 name = "bloomery-test-macros"
 version = "0.1.0"
-edition = "2024"

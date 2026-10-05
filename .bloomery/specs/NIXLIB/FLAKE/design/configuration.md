@@ -7,9 +7,9 @@ constructor or in `overrides.nix`.
 ## Configuration source
 
 Build settings live in top-level tables: `[build]`, `[toolchain]`,
-`[profile.release]`, `[profile.dev]`, `[flags]`, `[devShell]`, `[checks]`, and
-`[features]`. The `[specs]` and `[scanners.*]` tables belong to the CLI; the
-flake interface ignores them.
+`[profile.release]`, `[profile.dev]`, `[flags]`, `[devShell]`, `[checks]`,
+`[features]`, and `[formatters]`. The `[specs]` and `[scanners.*]` tables
+belong to the CLI; the flake interface ignores them.
 
 The CLI catalogs and type-validates the build keys before evaluation, using the
 [schema catalog](../../../PARSER/CONFIGURATION/design/schema-catalog.md). The
@@ -137,6 +137,25 @@ unify = true
 cratesIoIndex = "crates-io-index"
 ```
 
+## Formatters
+
+`[formatters]` tunes the formatter set and its ordering graph. Each known
+formatter, built in or supplied through the constructor's `extraFormatters`,
+has an `enable` toggle and `before`/`after` lists of formatter names. Formatter
+bodies carry Nix packages and stay in Nix; `config.toml` only enables and
+orders them. An absent table enables the default set, including the `toml-sort`
+formatter, with no ordering edges.
+
+```toml
+[formatters.toml-sort]
+enable = true
+before = ["taplo"]
+after = []
+```
+
+See [Default formatter](formatters.md) for the resolved ordering graph and
+its validation.
+
 ## Overrides
 
 Overrides stay in Nix. Built-in sys-crate overrides, colocated `overrides.nix`
@@ -147,6 +166,8 @@ arbitrary Nix values and are not represented in `config.toml`.
 ## Error handling
 
 An absent configuration file, a syntactically invalid file, an option value of
-the wrong type, an unknown key in a build table, and a package reference that
-does not resolve in nixpkgs all fail evaluation with a `bloomery:`-prefixed
-message. Bloomery never substitutes defaults for a broken configuration file.
+the wrong type, an unknown key in a build table, a formatter ordering cycle, a
+formatter self-reference, an ordering edge naming a formatter that is neither
+built in nor supplied by the flake, and a package reference that does not
+resolve in nixpkgs all fail evaluation with a `bloomery:`-prefixed message.
+Bloomery never substitutes defaults for a broken configuration file.

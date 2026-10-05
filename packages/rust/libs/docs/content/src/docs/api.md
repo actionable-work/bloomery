@@ -15,6 +15,9 @@ bloomery.mkFlake {
   # Optional Nix-valued per-crate overrides
   overrides = {};
 
+  # Optional additional formatter bodies keyed by name
+  extraFormatters = {};
+
   # Optional extra flake outputs callback: { eachSystem, perSystemWorkspace }
   extraOutputs = { eachSystem, perSystemWorkspace }: {
     # Custom flake attributes
@@ -87,6 +90,38 @@ throwOnOutOfDate = false        # error evaluation if bloomery.lock is out of da
 [features]
 unify = true                    # Cargo-style feature unification
 cratesIoIndex = "crates-io-index"
+
+[formatters.toml-sort]          # enable/disable and order built-in formatters
+enable = true                   # defaults to true
+before = ["taplo"]              # formatters that must run after this one
+after = []                      # formatters that must run before this one
+```
+
+---
+
+## `extraFormatters` Argument
+
+Formatter bodies carry a package and include globs, so they stay in Nix. Add a
+formatter by name and order it from `config.toml`:
+
+```nix
+bloomery.mkFlake {
+  inherit nixpkgs;
+  root = ./.;
+  extraFormatters.prettier = {
+    package = pkgs.prettier;
+    command = "prettier";       # optional; defaults to the package main program
+    includes = [ "**/*.ts" "**/*.tsx" ];
+    excludes = [];
+    options = [];
+  };
+}
+```
+
+```toml
+[formatters.prettier]
+enable = true
+before = ["rustfmt"]
 ```
 
 ---
@@ -125,6 +160,13 @@ The evaluated workspace attribute set returned by `mkFlake` for each system expo
 - `packages`: Release derivations for binaries (`<name>`) and, when enabled, libraries (`<crate>:lib`), plus `default` when a binary exists.
 - `apps`: Runnable release/dev binaries, documentation apps (`<crate>:doc`), and `default` when a binary exists.
 - `checks`: Comprehensive Nix check suite (`name:test`, `name:clippy`, `name:doc`, `name:doctest`, and `workspace:lock`), with optional package build checks. It does not generate a recursive `bloomery:check`; run the Bloomery CLI directly for static validation and check orchestration.
+- `formatter`: Default `treefmt` wrapper built from the resolved formatter graph, also exposed as the standard flake `formatter.<system>` output.
+- `formatterConfig`: Evaluated treefmt configuration, including each formatter's resolved priority.
+- `formatterOrder`: Enabled formatter names in their resolved order.
 - `devShell`: Preconfigured `mkShell` environment with the Rust toolchain, build utilities, and the Bloomery CLI (null when disabled).
 - `crates`: Map of all individual `.rlib` derivations in the dependency DAG.
 - `config`: Fully evaluated options configuration set.
+
+`bloomery config document` annotates configured keys with their schema
+catalog documentation, writing a trailing comment when the value has none and
+falling back to the line above when it does.

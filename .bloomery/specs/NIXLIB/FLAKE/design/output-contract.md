@@ -42,3 +42,10 @@ When enabled, `devShell` is a shell containing `rustc`, `clippy`, `cargo`,
 `nix-fast-build`, and the Bloomery CLI, plus the selected linker and user
 packages, with the configured shell hook. When disabled, `devShell` is null and
 `mkFlake` omits the default shell.
+
+## Formatter
+
+`mkFlake` exposes `formatter.<system>` as a treefmt wrapper built from the
+resolved formatter graph. The wrapper includes the default formatter set, with
+`toml-sort` enabled, and runs the enabled formatters in the resolved order. The
+output is present for every selected system regardless of check enablement.

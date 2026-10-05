@@ -3,6 +3,6 @@ bloomery-model = { path = "../model" }
 bloomery-scanning = { path = "../scanning" }
 
 [package]
+edition = "2024"
 name = "bloomery-check"
 version = "0.1.0"
-edition = "2024"

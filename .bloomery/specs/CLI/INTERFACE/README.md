@@ -24,8 +24,8 @@ and how the target repository root is selected.
 ## Responsibilities
 
 - Expose `init`, `check`, its `list`/`failures`/`details` commands, `review`,
-  `sync`, `config` with its `get`/`set`/`unset`/`list`/`upgrade` commands, and
-  parser-generated help.
+  `sync`, `config` with its `get`/`set`/`unset`/`list`/`upgrade`/`document`
+  commands, and parser-generated help.
 - Resolve the repository root from the process's current working directory.
 - Require a root `flake.nix` before every command except the workspace-bootstrap
   `init` command and the flake-exempt, warning `config` command.

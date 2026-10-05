@@ -50,8 +50,9 @@ paths = ["*.nix", "nix/**/*.nix", "tests/**/*.nix"]
 ## Build tables
 
 The same file carries the Nix build tables `[build]`, `[toolchain]`,
-`[profile.release]`, `[profile.dev]`, `[flags]`, `[devShell]`, `[checks]`, and
-`[features]`. Their semantics and evaluation-time resolution are owned by
+`[profile.release]`, `[profile.dev]`, `[flags]`, `[devShell]`, `[checks]`,
+`[features]`, and `[formatters]`. Their semantics and evaluation-time
+resolution are owned by
 [NIXLIB/FLAKE](../../../NIXLIB/FLAKE/design/configuration.md). The CLI catalogs
 the same keys and validates their types and enum value sets during
 configuration loading, so a malformed build key fails before Nix evaluation;
@@ -71,8 +72,10 @@ the tables are still not interpreted as scanner or spec target configuration.
 
 The [schema catalog](schema-catalog.md) is the single enumerated description of
 every recognized configuration key. It spans both the CLI-owned tables and the
-Nix build tables, and pairs each key with a schema type and, when omission has a
-single fixed effective value, a recommended default.
+Nix build tables, and pairs each key with a schema type, documentation text,
+and, when omission has a single fixed effective value, a recommended default.
+The documentation text is the source for the
+[`config document`](../../../CLI/CONFIG/design/documenting.md) comments.
 
 The catalog is the source of truth for `bloomery config upgrade`, which
 materializes absent recommended keys, for `bloomery config` type validation, and

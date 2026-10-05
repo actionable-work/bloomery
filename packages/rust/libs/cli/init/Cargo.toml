@@ -2,6 +2,6 @@
 bloomery-sync = { path = "../sync" }
 
 [package]
+edition = "2024"
 name = "bloomery-init"
 version = "0.1.0"
-edition = "2024"

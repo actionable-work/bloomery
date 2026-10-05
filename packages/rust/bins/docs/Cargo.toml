@@ -6,6 +6,6 @@ path = "src/main.rs"
 bloomery-docs-server = { path = "../../libs/docs/docs-server" }
 
 [package]
+edition = "2024"
 name = "bloomery-docs"
 version = "0.1.0"
-edition = "2024"

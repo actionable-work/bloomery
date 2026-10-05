@@ -30,6 +30,7 @@ pub enum ConfigOperation {
     Unset { key: String },
     List { prefix: Option<String> },
     Upgrade { dry_run: bool, diff: bool },
+    Document,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

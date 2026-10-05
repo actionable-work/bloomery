@@ -13,6 +13,7 @@ in
     root,
     systems ? defaultSystems,
     overrides ? {},
+    extraFormatters ? {},
     extraOutputs ? null,
   }: let
     lib = nixpkgs.lib;
@@ -34,6 +35,7 @@ in
       in
         bl.mkWorkspace (raw
           // {
+            extraFormatters = extraFormatters;
             devShell = raw.devShell // lib.optionalAttrs (cli != null) {bloomeryCli = cli;};
           })
     );
@@ -42,6 +44,7 @@ in
       packages = eachSystem (system: perSystemWorkspace.${system}.packages);
       apps = eachSystem (system: perSystemWorkspace.${system}.apps);
       checks = eachSystem (system: perSystemWorkspace.${system}.checks);
+      formatter = eachSystem (system: perSystemWorkspace.${system}.formatter);
       devShells = eachSystem (
         system: let
           ds = perSystemWorkspace.${system}.devShell;

@@ -6,6 +6,6 @@ path = "src/main.rs"
 bloomery-cli-app = { path = "../../libs/cli/cli-app" }
 
 [package]
+edition = "2024"
 name = "bloomery-cli"
 version = "0.1.0"
-edition = "2024"

@@ -342,4 +342,29 @@ in {
       cfg.features.cratesIoIndex == ../tests/crates-index;
     expected = true;
   };
+
+  testFormatterOptions = {
+    expr = let
+      cfg = options.evalWorkspaceOptions {
+        root = ./.;
+        formatters.rustfmt.before = ["alejandra"];
+        formatters.toml-sort.enable = false;
+        extraFormatters.prettier = {
+          package = pkgs.hello;
+          includes = ["*.ts"];
+        };
+      };
+    in {
+      before = cfg.formatters.rustfmt.before;
+      tomlSortDisabled = cfg.formatters.toml-sort.enable == false;
+      extraIncludes = cfg.extraFormatters.prettier.includes;
+      defaultEnabled = cfg.formatters.rustfmt.enable;
+    };
+    expected = {
+      before = ["alejandra"];
+      tomlSortDisabled = true;
+      extraIncludes = ["*.ts"];
+      defaultEnabled = true;
+    };
+  };
 }

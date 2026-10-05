@@ -136,7 +136,7 @@ enum RawCommand {
         )]
         update: Option<String>,
     },
-    /// Read, edit, or upgrade .bloomery/config.toml.
+    /// Read, edit, document, or upgrade .bloomery/config.toml.
     Config(RawConfigArgs),
 }
 
@@ -192,6 +192,8 @@ enum RawConfigOperation {
         #[arg(long)]
         diff: bool,
     },
+    /// Annotate configured keys with schema documentation.
+    Document,
 }
 
 impl From<RawConfigArgs> for ConfigArgs {
@@ -210,6 +212,7 @@ impl From<RawConfigOperation> for ConfigOperation {
             RawConfigOperation::Unset { key } => Self::Unset { key },
             RawConfigOperation::List { prefix } => Self::List { prefix },
             RawConfigOperation::Upgrade { dry_run, diff } => Self::Upgrade { dry_run, diff },
+            RawConfigOperation::Document => Self::Document,
         }
     }
 }

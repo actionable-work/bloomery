@@ -16,6 +16,7 @@ bloomery config set KEY VALUE [--json]
 bloomery config unset KEY [--json]
 bloomery config list [--prefix KEY] [--json]
 bloomery config upgrade [--dry-run] [--json]
+bloomery config document [--json]
 bloomery help [COMMAND]
 ```
 
@@ -64,9 +65,11 @@ scanner tables are then loaded as described in
 The `check`, `review`, and `sync` commands operate on the validated root. The
 `init` command operates on its target directory instead and requires no
 existing configuration. `config` creates configuration on demand and then
-edits it. Sync maintains lockfiles without loading
-specifications or scanning evidence; config edits the configuration without
-loading specifications or scanning evidence. Command semantics are specified by
+edits it, and its `document` subcommand annotates configured keys with the
+schema-catalog documentation without changing values. Sync maintains lockfiles
+without loading specifications or scanning evidence; config edits the
+configuration without loading specifications or scanning evidence. Command
+semantics are specified by
 [INIT](../../INIT/README.md), [CHECK](../../CHECK/README.md),
 [REVIEW](../../REVIEW/README.md), [SYNC](../../SYNC/README.md), and
 [CONFIG](../../CONFIG/README.md). Sync is a CLI-only replacement for the Nix

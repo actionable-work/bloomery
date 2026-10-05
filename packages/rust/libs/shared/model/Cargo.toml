@@ -1,10 +1,10 @@
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
+serde = { features = ["derive"], version = "1.0" }
 toml = "1.1"
 
 [dev-dependencies]
 
 [package]
+edition = "2024"
 name = "bloomery-model"
 version = "0.1.0"
-edition = "2024"

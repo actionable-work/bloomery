@@ -255,4 +255,28 @@ in {
       profileOptLevel = 2;
     };
   };
+
+  testFormattersTableIsMapped = {
+    expr = let
+      cfg = eval {
+        formatters.toml-sort.enable = false;
+        formatters.rustfmt.before = ["alejandra"];
+      };
+    in {
+      tomlSortDisabled = cfg.formatters.toml-sort.enable == false;
+      rustfmtBefore = cfg.formatters.rustfmt.before;
+    };
+    expected = {
+      tomlSortDisabled = true;
+      rustfmtBefore = ["alejandra"];
+    };
+  };
+
+  testUnknownFormatterKeyFails = {
+    expr = fails (loader.toWorkspaceArgs {
+      root = ./.;
+      config.formatters.prettier.command = "prettier";
+    });
+    expected = true;
+  };
 }

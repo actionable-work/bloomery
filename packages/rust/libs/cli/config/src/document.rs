@@ -1,8 +1,8 @@
 use crate::error::ConfigError;
-use bloomery_model::catalog::{self, CatalogEntry, DefaultValue, ValueType};
+use bloomery_model::catalog::{self, CatalogEntry, DefaultValue, KeySpec, ValueType};
 use std::fs;
 use std::path::Path;
-use toml_edit::{Array, DocumentMut, Item, Table, Value as EditValue};
+use toml_edit::{Array, DocumentMut, Item, RawString, Table, Value as EditValue};
 
 /// Split a dotted key path, rejecting empty or malformed segments.
 pub(crate) fn parse_key(key: &str) -> Result<Vec<String>, ConfigError> {
@@ -22,10 +22,10 @@ pub(crate) fn parse_key(key: &str) -> Result<Vec<String>, ConfigError> {
     Ok(segments)
 }
 
-/// Resolve a parsed key path to a catalog entry.
-pub(crate) fn lookup_entry(parts: &[String]) -> Result<&'static CatalogEntry, ConfigError> {
+/// Resolve a parsed key path to a catalog entry or parameterized key.
+pub(crate) fn lookup_entry(parts: &[String]) -> Result<KeySpec, ConfigError> {
     let reference = parts.iter().map(String::as_str).collect::<Vec<_>>();
-    catalog::lookup(&reference).ok_or_else(|| {
+    catalog::resolve(&reference).ok_or_else(|| {
         ConfigError::usage(format!("unknown configuration key: {}", parts.join(".")))
     })
 }
@@ -78,7 +78,7 @@ fn parse_typed(value_type: &ValueType, raw: &str) -> Option<toml::Value> {
 }
 
 /// Parse a supplied value according to a catalog type.
-pub(crate) fn parse_value(entry: &CatalogEntry, raw: &str) -> Result<toml::Value, ConfigError> {
+pub(crate) fn parse_value(entry: &KeySpec, raw: &str) -> Result<toml::Value, ConfigError> {
     parse_typed(&entry.value_type, raw).ok_or_else(|| {
         ConfigError::usage(format!(
             "{} must be a {}",
@@ -212,6 +212,110 @@ pub(crate) fn parse_document(contents: &str) -> Result<DocumentMut, ConfigError>
     contents
         .parse::<DocumentMut>()
         .map_err(|error| ConfigError::failure(format!("Unable to parse configuration: {error}")))
+}
+
+fn documentation_comment(documentation: &str) -> String {
+    format!("# {documentation}")
+}
+
+fn has_documentation_line(text: &str, comment: &str) -> bool {
+    text.lines().any(|line| line.trim() == comment)
+}
+
+/// Annotate one key with its catalog documentation. Returns whether the
+/// document changed. The documentation is written as a trailing comment when
+/// the value has no trailing comment, and above the key otherwise.
+fn document_key(table: &mut Table, key: &str, documentation: &str) -> bool {
+    let Some((mut key_mut, item)) = table.get_key_value_mut(key) else {
+        return false;
+    };
+    let comment = documentation_comment(documentation);
+    if let Some(value) = item.as_value_mut() {
+        let suffix = value
+            .decor()
+            .suffix()
+            .and_then(RawString::as_str)
+            .unwrap_or_default()
+            .trim()
+            .to_owned();
+        if suffix == comment {
+            return false;
+        }
+        if suffix.is_empty() {
+            value.decor_mut().set_suffix(format!(" {comment}"));
+            return true;
+        }
+    }
+    let prefix = key_mut
+        .leaf_decor()
+        .prefix()
+        .and_then(RawString::as_str)
+        .unwrap_or_default()
+        .to_owned();
+    if has_documentation_line(&prefix, &comment) {
+        return false;
+    }
+    key_mut
+        .leaf_decor_mut()
+        .set_prefix(format!("{prefix}{comment}\n"));
+    true
+}
+
+fn document_leaf(document: &mut DocumentMut, path: &[String], documentation: &str) -> bool {
+    let Some((last, parents)) = path.split_last() else {
+        return false;
+    };
+    let Some(table) = navigate_existing_mut(document.as_table_mut(), parents) else {
+        return false;
+    };
+    document_key(table, last, documentation)
+}
+
+fn formatter_extra_documentation(
+    document: &mut DocumentMut,
+    raw: &toml::Value,
+    documented: &mut Vec<String>,
+) {
+    let Some(formatters) = raw.get("formatters").and_then(toml::Value::as_table) else {
+        return;
+    };
+    for name in formatters.keys() {
+        if catalog::BUILTIN_FORMATTERS.contains(&name.as_str()) {
+            continue;
+        }
+        for field in ["enable", "before", "after"] {
+            let path = vec!["formatters".to_owned(), name.clone(), field.to_owned()];
+            let reference = path.iter().map(String::as_str).collect::<Vec<_>>();
+            let Some(spec) = catalog::resolve(&reference) else {
+                continue;
+            };
+            if document_leaf(document, &path, spec.documentation) {
+                documented.push(path.join("."));
+            }
+        }
+    }
+}
+
+/// Annotate every catalogued key present in `raw` with its documentation.
+/// Returns the sorted paths that gained a documentation comment.
+pub(crate) fn document_values(
+    document: &mut DocumentMut,
+    raw: &toml::Value,
+) -> Result<Vec<String>, ConfigError> {
+    let mut documented = Vec::new();
+    for entry in catalog::CATALOG {
+        let path = entry
+            .path
+            .iter()
+            .map(|segment| (*segment).to_owned())
+            .collect::<Vec<_>>();
+        if document_leaf(document, &path, entry.documentation) {
+            documented.push(entry.path.join("."));
+        }
+    }
+    formatter_extra_documentation(document, raw, &mut documented);
+    documented.sort();
+    Ok(documented)
 }
 
 /// Write contents beside the target and atomically rename into place.

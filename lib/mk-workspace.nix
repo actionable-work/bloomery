@@ -2,6 +2,8 @@
   pkgs,
   lib ? pkgs.lib,
   cratesIoIndex ? null,
+  # Optional treefmt-nix input used to build the default formatter output.
+  treefmtNix ? null,
   # Seam for the pinned-Git fetch so source-isolation tests can exercise the
   # production selection and build branch against a deterministic local tree.
   gitFetch ? args: builtins.fetchGit (args // {allRefs = true;}),
@@ -11,6 +13,7 @@
   profileMod = import ./profile {inherit lib;};
   defaultOverrides = import ./overrides {inherit pkgs lib;};
   optionsMod = import ./workspace/options.nix {inherit pkgs lib;};
+  formattersMod = import ./formatters.nix {inherit pkgs lib treefmtNix;};
 in
   rawArgs: let
     cfg = optionsMod.evalWorkspaceOptions rawArgs;
@@ -63,6 +66,15 @@ in
     includePackageChecks = cfg.checks.includePackageChecks;
     workspaceDependencies = cfg.checks.workspaceDependencies;
     noDefaultFeatures = cfg.checks.noDefaultFeatures;
+
+    formatterResult =
+      if treefmtNix == null
+      then null
+      else
+        formattersMod.build {
+          config = cfg.formatters;
+          extraFormatters = cfg.extraFormatters;
+        };
 
     # Discover every workspace member. source.members selects which members
     # generate outputs; unselected members remain available as dependency
@@ -967,6 +979,20 @@ in
 
     # Preconfigured development shell (direnv / nix develop)
     inherit devShell;
+
+    # Default treefmt formatter and its resolved configuration
+    formatter =
+      if formatterResult == null
+      then null
+      else formatterResult.wrapper;
+    formatterConfig =
+      if formatterResult == null
+      then null
+      else formatterResult.treefmt;
+    formatterOrder =
+      if formatterResult == null
+      then null
+      else formatterResult.order;
 
     # Parsed lockfile representation
     lock = parsed;

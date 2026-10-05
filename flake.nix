@@ -27,7 +27,10 @@
       pkgs,
       lib ? pkgs.lib,
     }:
-      import ./lib {inherit pkgs lib;};
+      import ./lib {
+        inherit pkgs lib;
+        treefmtNix = treefmt-nix;
+      };
 
     bloomeryFor = system:
       bloomeryLib {pkgs = nixpkgs.legacyPackages.${system};};
@@ -46,7 +49,10 @@
         pkgs,
         lib,
       }: let
-        bl = import ./lib {inherit pkgs lib;};
+        bl = import ./lib {
+          inherit pkgs lib;
+          treefmtNix = treefmt-nix;
+        };
         config = import ./lib/build-config.nix {inherit pkgs lib;};
       in
         (bl.mkWorkspace (config.load {root = ./.;})).packages.bloomery;
@@ -64,18 +70,11 @@
         in
           rootWorkspace.apps);
 
-        formatter = eachSystem (system: let
-          pkgs = nixpkgs.legacyPackages.${system};
-          treefmtModule = treefmt-nix.lib.evalModule pkgs ./nix/lib/treefmt-config.nix;
-        in
-          treefmtModule.config.build.wrapper);
-
         checks = eachSystem (system: let
           pkgs = nixpkgs.legacyPackages.${system};
           bloomery = bloomeryFor system;
           rootWorkspace = perSystemWorkspace.${system};
           docsPackage = rootWorkspace.packages."bloomery-docs";
-          treefmtModule = treefmt-nix.lib.evalModule pkgs ./nix/lib/treefmt-config.nix;
           testFlakeChecks = import ./nix/test-flake-checks.nix {
             inherit lib pkgs nixpkgs flake-parts system;
             bloomery = self;
@@ -84,7 +83,7 @@
             inherit lib pkgs bloomery docsPackage;
             root = ./.;
             workspace = rootWorkspace;
-            treefmt = treefmtModule.config;
+            treefmt = rootWorkspace.formatterConfig;
           };
         in
           rootChecks

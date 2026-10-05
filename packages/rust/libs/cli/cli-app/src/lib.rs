@@ -455,6 +455,21 @@ fn render_config_outcome(report: &ConfigReport, stdout: &mut impl Write) {
                 }
             }
         }
+        ConfigOutcome::Document {
+            documented,
+            written,
+        } => {
+            if documented.is_empty() {
+                let _ = writeln!(stdout, "no keys documented");
+            } else {
+                for key in documented {
+                    let _ = writeln!(stdout, "documented {key}");
+                }
+            }
+            if !written {
+                let _ = writeln!(stdout, "(not written)");
+            }
+        }
     }
 }
 
@@ -1474,6 +1489,8 @@ mod tests {
     #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-004"))]
     #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-005"))]
     #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-006"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-014"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-019"))]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-010"))]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-011"))]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-013"))]
@@ -1527,6 +1544,10 @@ mod tests {
                 diff: true
             }
         );
+        assert_eq!(
+            operation(&["bloomery", "config", "document"]),
+            bloomery_cli_types::ConfigOperation::Document
+        );
     }
 
     #[test]
@@ -1558,6 +1579,8 @@ mod tests {
     #[cfg_attr(any(), bloomery("CLI-CONFIG-OUTPUT-004"))]
     #[cfg_attr(any(), bloomery("CLI-CONFIG-OUTPUT-005"))]
     #[cfg_attr(any(), bloomery("CLI-CONFIG-OUTPUT-010"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-OUTPUT-012"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-DOCUMENT-010"))]
     fn config_json_contracts() {
         let root = fixture_root("config-json");
         fs::create_dir_all(root.join(".bloomery")).expect("workspace root");
@@ -1653,6 +1676,23 @@ mod tests {
                 .as_array()
                 .is_some_and(|differences| !differences.is_empty())
         );
+
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        run_args_at(
+            ["bloomery", "config", "document", "--json"],
+            &root,
+            &mut stdout,
+            &mut stderr,
+        );
+        let document: Value = serde_json::from_slice(&stdout).expect("document JSON");
+        assert_eq!(document["result"]["operation"], "document");
+        assert!(
+            document["result"]["documented"]
+                .as_array()
+                .is_some_and(|keys| keys.iter().any(|key| key == "checks.enable"))
+        );
+        assert_eq!(document["result"]["written"], true);
         let _ = fs::remove_dir_all(root);
     }
 

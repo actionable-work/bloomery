@@ -348,6 +348,64 @@
           description = "Path to custom crates.io index directory (null uses defaults).";
         };
       };
+
+      # ── Default Formatter Graph ────────────────────────────────────────────────
+      formatters = lib.mkOption {
+        type = types.attrsOf (types.submodule {
+          options = {
+            enable = lib.mkOption {
+              type = types.bool;
+              default = true;
+              description = "Enable or disable this formatter.";
+            };
+            before = lib.mkOption {
+              type = types.listOf types.str;
+              default = [];
+              description = "Formatters that must run after this one.";
+            };
+            after = lib.mkOption {
+              type = types.listOf types.str;
+              default = [];
+              description = "Formatters that must run before this one.";
+            };
+          };
+        });
+        default = {};
+        description = "Per-formatter enablement and ordering edges for the default formatter.";
+      };
+
+      extraFormatters = lib.mkOption {
+        type = types.attrsOf (types.submodule {
+          options = {
+            package = lib.mkOption {
+              type = types.package;
+              description = "Package providing the formatter executable.";
+            };
+            command = lib.mkOption {
+              type = types.nullOr types.str;
+              default = null;
+              description = "Executable name inside the package; defaults to the package main program.";
+            };
+            includes = lib.mkOption {
+              type = types.listOf types.str;
+              default = [];
+              description = "File globs the formatter handles.";
+            };
+            excludes = lib.mkOption {
+              type = types.listOf types.str;
+              default = [];
+              description = "File globs the formatter ignores.";
+            };
+            options = lib.mkOption {
+              type = types.listOf types.str;
+              default = [];
+              description = "Arguments passed to the formatter command.";
+            };
+          };
+        });
+        default = {};
+        description = "Additional formatter bodies supplied by the flake.";
+      };
     };
   };
 

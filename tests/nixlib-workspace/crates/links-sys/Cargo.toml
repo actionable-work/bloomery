@@ -2,7 +2,7 @@
 path = "src/lib.rs"
 
 [package]
-name = "links-sys"
-version = "0.1.0"
 edition = "2021"
 links = "lnk"
+name = "links-sys"
+version = "0.1.0"

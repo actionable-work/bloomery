@@ -2,6 +2,6 @@
 itoa = "1.0.18"
 
 [package]
+edition = "2021"
 name = "lib-core"
 version = "0.1.0"
-edition = "2021"

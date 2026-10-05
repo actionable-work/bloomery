@@ -1,0 +1,137 @@
+group = "DOCUMENT"
+
+[[requirements]]
+id = "CLI-CONFIG-DOCUMENT-001"
+title = "Documentation comes from the schema catalog"
+manual = false
+design = "design/documenting.md#documentation-source"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config document"
+action = "render each key's documentation comment from the schema catalog entry for that key"
+
+[[requirements]]
+id = "CLI-CONFIG-DOCUMENT-002"
+title = "Document writes inline documentation"
+manual = false
+design = "design/documenting.md#inline-comments"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config document"
+action = "write the catalog documentation as a trailing comment on each key explicitly present in the raw file"
+
+[[requirements]]
+id = "CLI-CONFIG-DOCUMENT-003"
+title = "Document leaves absent keys absent"
+manual = false
+design = "design/documenting.md#annotation-semantics"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config document"
+action = "leave catalog keys that are absent from the raw file absent"
+
+[[requirements]]
+id = "CLI-CONFIG-DOCUMENT-004"
+title = "Document preserves configured values"
+manual = false
+design = "design/documenting.md#annotation-semantics"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config document"
+action = "preserve every configured value, including a value that differs from its recommended default"
+
+[[requirements]]
+id = "CLI-CONFIG-DOCUMENT-005"
+title = "Document preserves unrelated comments"
+manual = false
+design = "design/documenting.md#annotation-semantics"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config document"
+action = "preserve every comment that is not a generated catalog documentation comment"
+
+[[requirements]]
+id = "CLI-CONFIG-DOCUMENT-006"
+title = "Document is idempotent"
+manual = false
+design = "design/documenting.md#idempotence"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config document"
+action = "make no further change on a repeated invocation"
+
+[[requirements]]
+id = "CLI-CONFIG-DOCUMENT-007"
+title = "Document creates a missing configuration"
+manual = false
+design = "design/documenting.md#missing-configuration"
+
+[requirements.ears]
+type = "event"
+trigger = "config document runs without .bloomery/config.toml"
+system = "bloomery config document"
+action = "create the configuration file with an advisory warning and report that no keys were documented"
+
+[[requirements]]
+id = "CLI-CONFIG-DOCUMENT-008"
+title = "Document validates the annotated result"
+manual = false
+design = "design/documenting.md#validation-and-publication"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config document"
+action = "deserialize and validate the complete annotated configuration before writing"
+
+[[requirements]]
+id = "CLI-CONFIG-DOCUMENT-009"
+title = "Document publishes atomically"
+manual = false
+design = "design/documenting.md#validation-and-publication"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery config document"
+action = "publish the annotated configuration through a temporary file and atomic rename"
+
+[[requirements]]
+id = "CLI-CONFIG-DOCUMENT-010"
+title = "Document reports the documented keys"
+manual = false
+design = "design/documenting.md#output-and-exit-codes"
+
+[requirements.ears]
+type = "event"
+trigger = "config document adds documentation comments"
+system = "bloomery config document"
+action = "report the documented key paths in sorted order"
+
+[[requirements]]
+id = "CLI-CONFIG-DOCUMENT-011"
+title = "Document with no changes succeeds"
+manual = false
+design = "design/documenting.md#output-and-exit-codes"
+
+[requirements.ears]
+type = "event"
+trigger = "every present key already carries its catalog documentation comment"
+system = "bloomery config document"
+action = "leave the file unchanged and report success"
+
+[[requirements]]
+id = "CLI-CONFIG-DOCUMENT-012"
+title = "Existing trailing comments win the inline slot"
+manual = false
+design = "design/documenting.md#inline-comments"
+
+[requirements.ears]
+type = "event"
+trigger = "a configured value already carries a trailing comment"
+system = "bloomery config document"
+action = "preserve the trailing comment and write the catalog documentation on the line above the key"

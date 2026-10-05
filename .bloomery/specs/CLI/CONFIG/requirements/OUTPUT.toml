@@ -130,3 +130,15 @@ type = "event"
 trigger = "a mutating config command creates a missing configuration file and --json is selected"
 system = "bloomery config"
 action = "include a structured warning field identifying the created path"
+
+[[requirements]]
+id = "CLI-CONFIG-OUTPUT-012"
+title = "Document JSON reports documented keys"
+manual = false
+design = "design/documenting.md#output-and-exit-codes"
+
+[requirements.ears]
+type = "event"
+trigger = "config document is invoked with --json"
+system = "bloomery config"
+action = "include the sorted documented key paths and whether the file was written"

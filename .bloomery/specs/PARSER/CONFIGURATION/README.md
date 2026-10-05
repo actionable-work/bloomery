@@ -37,8 +37,11 @@ interface.
 - Define repository-relative Nix source paths for static evidence scanning.
 - Accept the build tables without interpreting them as scanner or spec
   configuration while cataloguing and type-validating their keys.
-- Expose a schema catalog spanning every recognized key, consumed by
-  `bloomery config` and sync recommendations.
+- Catalogue the parameterized formatter enablement and ordering keys alongside
+  the build tables.
+- Expose a schema catalog spanning every recognized key, with documentation text
+  and recommended defaults, consumed by `bloomery config` and sync
+  recommendations.
 - Reject malformed or ambiguous configuration before scanning begins.
 
 ## Dependencies

@@ -46,6 +46,24 @@
       then throw "bloomery: unknown key(s) in [${name}]: ${lib.concatStringsSep ", " unknown}"
       else value;
 
+  # Formatter sub-tables are keyed by formatter name, so validate the shape of
+  # each entry rather than a fixed key list.
+  checkFormatters = value:
+    if !(isAttrs value)
+    then throw "bloomery: [formatters] must be a table in .bloomery/config.toml"
+    else
+      lib.mapAttrs (
+        name: sub: let
+          unknown = filter (key: !(elem key ["enable" "before" "after"])) (attrNames sub);
+        in
+          if !(isAttrs sub)
+          then throw "bloomery: [formatters.${name}] must be a table in .bloomery/config.toml"
+          else if unknown != []
+          then throw "bloomery: unknown key(s) in [formatters.${name}]: ${lib.concatStringsSep ", " unknown}"
+          else sub
+      )
+      value;
+
   resolvePackage = name:
     if !(isString name)
     then throw "bloomery: package values must be strings naming nixpkgs attributes"
@@ -94,6 +112,7 @@
     devShell = checkTable "devShell" allowedKeys.devShell (config.devShell or {});
     checks = checkTable "checks" allowedKeys.checks (config.checks or {});
     features = checkTable "features" allowedKeys.features (config.features or {});
+    formatters = checkFormatters (config.formatters or {});
 
     source =
       (lib.optionalAttrs (build ? cargoToml) {cargoToml = resolvePath root build.cargoToml;})
@@ -131,12 +150,13 @@
       devShell = devShellArgs;
       checks = checks;
       features = featuresArgs;
+      formatters = formatters;
     }
     // (lib.optionalAttrs (build ? profileName) {profileName = build.profileName;})
     // (lib.optionalAttrs (build ? libPackages) {createLibPackages = build.libPackages;})
     // (lib.optionalAttrs (build ? devPackages) {createDevPackages = build.devPackages;});
 in rec {
-  inherit readConfig resolvePackage resolvePath checkTable;
+  inherit readConfig resolvePackage resolvePath checkTable checkFormatters;
   load = toWorkspaceArgs;
   inherit toWorkspaceArgs;
 }

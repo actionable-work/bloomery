@@ -1,10 +1,10 @@
 [dependencies]
-clap = { version = "4", features = ["derive"] }
-ureq = { version = "2", default-features = false, features = ["json"] }
-serde = { version = "1", features = ["derive"] }
+clap = { features = ["derive"], version = "4" }
+serde = { features = ["derive"], version = "1" }
 serde_json = "1"
+ureq = { default-features = false, features = ["json"], version = "2" }
 
 [package]
+edition = "2021"
 name = "cli"
 version = "0.1.0"
-edition = "2021"

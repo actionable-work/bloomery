@@ -46,3 +46,15 @@ design = "design/schema-catalog.md#validation"
 type = "ubiquitous"
 system = "the configuration loader"
 action = "validate package-valued keys as strings while leaving nixpkgs attribute resolution to Nix evaluation"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-VALIDATION-005"
+title = "Formatter ordering keys are type-validated"
+manual = false
+design = "design/schema-catalog.md#validation"
+
+[requirements.ears]
+type = "event"
+trigger = "config.toml contains a formatter ordering key"
+system = "the configuration loader"
+action = "validate that the value is a list of formatter names before any consuming command runs"

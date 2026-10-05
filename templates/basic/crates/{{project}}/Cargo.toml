@@ -2,6 +2,6 @@
 app_core = { package = "{{project}}_core", path = "../{{project}}_core" }
 
 [package]
+edition = "2024"
 name = "{{project}}"
 version = "0.1.0"
-edition = "2024"

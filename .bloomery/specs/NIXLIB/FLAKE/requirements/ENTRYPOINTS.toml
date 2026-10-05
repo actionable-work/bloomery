@@ -190,3 +190,25 @@ type = "event"
 trigger = "the Bloomery repository evaluates its own workspace"
 system = "the root flake.nix"
 action = "use an internal constructor binding created without Bloomery CLI injection"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-018"
+title = "mkFlake exposes a per-system formatter"
+manual = false
+design = "design/entry-points.md#systems-and-output-mapping"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the mkFlake constructor"
+action = "expose formatter.<system> from each evaluated workspace"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-019"
+title = "mkFlake accepts extra formatters"
+manual = false
+design = "design/entry-points.md#extraformatters"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the mkFlake constructor"
+action = "accept an optional extraFormatters attribute set that supplies formatter bodies by name"

@@ -3,6 +3,6 @@ lib-calc = { path = "../lib-calc" }
 lib-msg = { path = "../lib-msg" }
 
 [package]
+edition = "2021"
 name = "bin-report"
 version = "0.1.0"
-edition = "2021"

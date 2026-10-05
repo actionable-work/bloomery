@@ -54,6 +54,34 @@ pub struct CatalogEntry {
     pub value_type: ValueType,
     /// Present only when omitting the key has a single fixed effective value.
     pub recommended: Option<DefaultValue>,
+    /// Documentation text rendered by `bloomery config document`.
+    pub documentation: &'static str,
+}
+
+/// A resolved key, including parameterized formatter names that have no static
+/// catalog entry.
+#[derive(Debug, Clone)]
+pub struct KeySpec {
+    pub path: Vec<String>,
+    pub value_type: ValueType,
+    pub recommended: Option<DefaultValue>,
+    pub documentation: &'static str,
+}
+
+impl KeySpec {
+    /// Build a resolved key from a static catalog entry.
+    pub fn from_entry(entry: &CatalogEntry) -> Self {
+        Self {
+            path: entry
+                .path
+                .iter()
+                .map(|segment| (*segment).to_owned())
+                .collect(),
+            value_type: entry.value_type,
+            recommended: entry.recommended,
+            documentation: entry.documentation,
+        }
+    }
 }
 
 /// Increment when the catalog changes.
@@ -88,12 +116,36 @@ const DEBUGINFO: &[ValueType] = &[
 ];
 const LINKER: &[ValueType] = &[ValueType::StringEnum(&["lld", "mold", "system"])];
 
+/// Built-in formatter names that the workspace ships and can order.
+pub const BUILTIN_FORMATTERS: &[&str] = &[
+    "alejandra",
+    "deadnix",
+    "rustfmt",
+    "shellcheck",
+    "shfmt",
+    "taplo",
+    "toml-sort",
+    "yamlfmt",
+];
+
 macro_rules! profile_field {
-    ($flavor:literal, $field:literal, $ty:expr) => {
+    ($flavor:literal, $field:literal, $ty:expr, $doc:literal) => {
         CatalogEntry {
             path: &["profile", $flavor, $field],
             value_type: $ty,
             recommended: None,
+            documentation: concat!($flavor, " profile: ", $doc),
+        }
+    };
+}
+
+macro_rules! formatter {
+    ($name:literal, $field:literal, $ty:expr, $recommended:expr, $doc:literal) => {
+        CatalogEntry {
+            path: &["formatters", $name, $field],
+            value_type: $ty,
+            recommended: $recommended,
+            documentation: $doc,
         }
     };
 }
@@ -105,209 +157,491 @@ pub const CATALOG: &[CatalogEntry] = &[
         path: &["specs", "dir"],
         value_type: ValueType::Path,
         recommended: Some(DefaultValue::String("specs")),
+        documentation: "Directory inside .bloomery/ that holds the specification tree.",
     },
     CatalogEntry {
         path: &["scanners", "rust", "enabled"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(false)),
+        documentation: "Enable the Rust evidence scanner.",
     },
     CatalogEntry {
         path: &["scanners", "rust", "paths"],
         value_type: ValueType::StringList,
         recommended: Some(DefaultValue::StringList(&[])),
+        documentation: "Repository-relative globs for Rust source files.",
     },
     CatalogEntry {
         path: &["scanners", "playwright", "enabled"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(false)),
+        documentation: "Enable the Playwright evidence scanner.",
     },
     CatalogEntry {
         path: &["scanners", "playwright", "paths"],
         value_type: ValueType::StringList,
         recommended: Some(DefaultValue::StringList(&[])),
+        documentation: "Repository-relative globs for Playwright test files.",
     },
     CatalogEntry {
         path: &["scanners", "playwright", "tag_prefix"],
         value_type: ValueType::String,
         recommended: Some(DefaultValue::String("@bloomery:")),
+        documentation: "Tag prefix that marks Bloomery metadata in Playwright tests.",
     },
     CatalogEntry {
         path: &["scanners", "nix", "enabled"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(false)),
+        documentation: "Enable the static Nix evidence scanner.",
     },
     CatalogEntry {
         path: &["scanners", "nix", "paths"],
         value_type: ValueType::StringList,
         recommended: Some(DefaultValue::StringList(&[])),
+        documentation: "Repository-relative globs for Nix source files.",
     },
     // Nix build tables.
     CatalogEntry {
         path: &["build", "cargoToml"],
         value_type: ValueType::Path,
         recommended: Some(DefaultValue::String("Cargo.toml")),
+        documentation: "Repository-relative path to the Cargo workspace manifest.",
     },
     CatalogEntry {
         path: &["build", "cargoLock"],
         value_type: ValueType::Path,
         recommended: Some(DefaultValue::String("Cargo.lock")),
+        documentation: "Repository-relative path to Cargo.lock.",
     },
     CatalogEntry {
         path: &["build", "bloomeryLock"],
         value_type: ValueType::Path,
         recommended: None,
+        documentation: "Repository-relative path to bloomery.lock; omit to auto-detect.",
     },
     CatalogEntry {
         path: &["build", "members"],
         value_type: ValueType::StringList,
         recommended: None,
+        documentation: "Crate names to build; omit to build every workspace member.",
     },
     CatalogEntry {
         path: &["build", "profileName"],
         value_type: ValueType::String,
         recommended: Some(DefaultValue::String("release")),
+        documentation: "Active Cargo profile name for release builds.",
     },
     CatalogEntry {
         path: &["build", "libPackages"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(false)),
+        documentation: "Expose <crate>:lib packages for workspace libraries.",
     },
     CatalogEntry {
         path: &["build", "devPackages"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(false)),
+        documentation: "Generate dev-profile apps for workspace binaries.",
     },
     CatalogEntry {
         path: &["toolchain", "rustc"],
         value_type: ValueType::Package,
         recommended: Some(DefaultValue::String("rustc")),
+        documentation: "nixpkgs attribute path for rustc.",
     },
     CatalogEntry {
         path: &["toolchain", "clippy"],
         value_type: ValueType::Package,
         recommended: Some(DefaultValue::String("clippy")),
+        documentation: "nixpkgs attribute path for clippy.",
     },
     CatalogEntry {
         path: &["toolchain", "cargo"],
         value_type: ValueType::Package,
         recommended: Some(DefaultValue::String("cargo")),
+        documentation: "nixpkgs attribute path for cargo.",
     },
     CatalogEntry {
         path: &["toolchain", "lld"],
         value_type: ValueType::Package,
         recommended: Some(DefaultValue::String("lld")),
+        documentation: "nixpkgs attribute path for lld.",
     },
     CatalogEntry {
         path: &["toolchain", "mold"],
         value_type: ValueType::Package,
         recommended: Some(DefaultValue::String("mold")),
+        documentation: "nixpkgs attribute path for mold.",
     },
     CatalogEntry {
         path: &["toolchain", "stdenv"],
         value_type: ValueType::Package,
         recommended: Some(DefaultValue::String("stdenv")),
+        documentation: "nixpkgs attribute path for the C toolchain.",
     },
     CatalogEntry {
         path: &["toolchain", "linker"],
         value_type: ValueType::Union(LINKER),
         recommended: None,
+        documentation: "Linker strategy: lld, mold, system, or omit for the platform default.",
     },
     // Compilation profile fields: optional overrides with no fixed default.
-    profile_field!("release", "optLevel", ValueType::Union(OPT_LEVEL)),
-    profile_field!("release", "lto", ValueType::Union(LTO)),
-    profile_field!("release", "codegenUnits", ValueType::PositiveInteger),
-    profile_field!("release", "panic", ValueType::Union(PANIC)),
-    profile_field!("release", "strip", ValueType::Union(STRIP)),
-    profile_field!("release", "linker", ValueType::String),
-    profile_field!("release", "linkArgs", ValueType::StringList),
-    profile_field!("release", "targetCpu", ValueType::String),
-    profile_field!("release", "debuginfo", ValueType::Union(DEBUGINFO)),
-    profile_field!("release", "overflowChecks", ValueType::Bool),
-    profile_field!("dev", "optLevel", ValueType::Union(OPT_LEVEL)),
-    profile_field!("dev", "lto", ValueType::Union(LTO)),
-    profile_field!("dev", "codegenUnits", ValueType::PositiveInteger),
-    profile_field!("dev", "panic", ValueType::Union(PANIC)),
-    profile_field!("dev", "strip", ValueType::Union(STRIP)),
-    profile_field!("dev", "linker", ValueType::String),
-    profile_field!("dev", "linkArgs", ValueType::StringList),
-    profile_field!("dev", "targetCpu", ValueType::String),
-    profile_field!("dev", "debuginfo", ValueType::Union(DEBUGINFO)),
-    profile_field!("dev", "overflowChecks", ValueType::Bool),
+    profile_field!(
+        "release",
+        "optLevel",
+        ValueType::Union(OPT_LEVEL),
+        "optimization level (0-3, s, z)"
+    ),
+    profile_field!(
+        "release",
+        "lto",
+        ValueType::Union(LTO),
+        "link-time optimization mode"
+    ),
+    profile_field!(
+        "release",
+        "codegenUnits",
+        ValueType::PositiveInteger,
+        "number of codegen units"
+    ),
+    profile_field!(
+        "release",
+        "panic",
+        ValueType::Union(PANIC),
+        "panic strategy"
+    ),
+    profile_field!(
+        "release",
+        "strip",
+        ValueType::Union(STRIP),
+        "debug symbol stripping"
+    ),
+    profile_field!("release", "linker", ValueType::String, "linker driver"),
+    profile_field!(
+        "release",
+        "linkArgs",
+        ValueType::StringList,
+        "extra linker arguments"
+    ),
+    profile_field!("release", "targetCpu", ValueType::String, "target CPU"),
+    profile_field!(
+        "release",
+        "debuginfo",
+        ValueType::Union(DEBUGINFO),
+        "debug info level"
+    ),
+    profile_field!(
+        "release",
+        "overflowChecks",
+        ValueType::Bool,
+        "enable integer overflow checks"
+    ),
+    profile_field!(
+        "dev",
+        "optLevel",
+        ValueType::Union(OPT_LEVEL),
+        "optimization level (0-3, s, z)"
+    ),
+    profile_field!(
+        "dev",
+        "lto",
+        ValueType::Union(LTO),
+        "link-time optimization mode"
+    ),
+    profile_field!(
+        "dev",
+        "codegenUnits",
+        ValueType::PositiveInteger,
+        "number of codegen units"
+    ),
+    profile_field!("dev", "panic", ValueType::Union(PANIC), "panic strategy"),
+    profile_field!(
+        "dev",
+        "strip",
+        ValueType::Union(STRIP),
+        "debug symbol stripping"
+    ),
+    profile_field!("dev", "linker", ValueType::String, "linker driver"),
+    profile_field!(
+        "dev",
+        "linkArgs",
+        ValueType::StringList,
+        "extra linker arguments"
+    ),
+    profile_field!("dev", "targetCpu", ValueType::String, "target CPU"),
+    profile_field!(
+        "dev",
+        "debuginfo",
+        ValueType::Union(DEBUGINFO),
+        "debug info level"
+    ),
+    profile_field!(
+        "dev",
+        "overflowChecks",
+        ValueType::Bool,
+        "enable integer overflow checks"
+    ),
     CatalogEntry {
         path: &["flags", "rustc"],
         value_type: ValueType::StringList,
         recommended: Some(DefaultValue::StringList(&["-Copt-level=3"])),
+        documentation: "Extra rustc flags for release compilation.",
     },
     CatalogEntry {
         path: &["flags", "test"],
         value_type: ValueType::StringList,
         recommended: Some(DefaultValue::StringList(&[])),
+        documentation: "Extra rustc flags for test compilation.",
     },
     CatalogEntry {
         path: &["flags", "clippy"],
         value_type: ValueType::StringList,
         recommended: Some(DefaultValue::StringList(&[])),
+        documentation: "Extra rustc flags for clippy runs.",
     },
     CatalogEntry {
         path: &["flags", "doc"],
         value_type: ValueType::StringList,
         recommended: Some(DefaultValue::StringList(&["-Dwarnings"])),
+        documentation: "Extra rustdoc flags for documentation builds.",
     },
     CatalogEntry {
         path: &["flags", "doctest"],
         value_type: ValueType::StringList,
         recommended: Some(DefaultValue::StringList(&[])),
+        documentation: "Extra rustdoc flags for doctests.",
     },
     CatalogEntry {
         path: &["devShell", "enable"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(true)),
+        documentation: "Generate the default development shell.",
     },
     CatalogEntry {
         path: &["devShell", "packages"],
         value_type: ValueType::StringList,
         recommended: Some(DefaultValue::StringList(&[])),
+        documentation: "Additional nixpkgs packages in the development shell.",
     },
     CatalogEntry {
         path: &["devShell", "shellHook"],
         value_type: ValueType::String,
         recommended: Some(DefaultValue::String("")),
+        documentation: "Shell hook run when entering the development shell.",
     },
     CatalogEntry {
         path: &["checks", "enable"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(true)),
+        documentation: "Generate workspace checks.",
     },
     CatalogEntry {
         path: &["checks", "includePackageChecks"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(true)),
+        documentation: "Include binary and library build checks.",
     },
     CatalogEntry {
         path: &["checks", "throwOnOutOfDate"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(false)),
+        documentation: "Fail evaluation when bloomery.lock is out of date.",
     },
     CatalogEntry {
         path: &["checks", "workspaceDependencies"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(true)),
+        documentation: "Validate workspace dependency declarations.",
     },
     CatalogEntry {
         path: &["checks", "noDefaultFeatures"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(true)),
+        documentation: "Require default features to be disabled on workspace dependencies.",
     },
     CatalogEntry {
         path: &["features", "unify"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(true)),
+        documentation: "Unify workspace features like Cargo's resolver.",
     },
     CatalogEntry {
         path: &["features", "cratesIoIndex"],
         value_type: ValueType::Path,
         recommended: None,
+        documentation: "Repository-relative path to a local crates.io index.",
     },
+    // Built-in formatters. Extra formatter names are addressable through the
+    // parameterized family but have no recommendation.
+    formatter!(
+        "alejandra",
+        "enable",
+        ValueType::Bool,
+        Some(DefaultValue::Bool(true)),
+        "Enable the Alejandra Nix formatter."
+    ),
+    formatter!(
+        "alejandra",
+        "before",
+        ValueType::StringList,
+        Some(DefaultValue::StringList(&[])),
+        "Formatters that must run after the Alejandra formatter."
+    ),
+    formatter!(
+        "alejandra",
+        "after",
+        ValueType::StringList,
+        Some(DefaultValue::StringList(&[])),
+        "Formatters that must run before the Alejandra formatter."
+    ),
+    formatter!(
+        "deadnix",
+        "enable",
+        ValueType::Bool,
+        Some(DefaultValue::Bool(true)),
+        "Enable the deadnix Nix formatter."
+    ),
+    formatter!(
+        "deadnix",
+        "before",
+        ValueType::StringList,
+        Some(DefaultValue::StringList(&[])),
+        "Formatters that must run after the deadnix formatter."
+    ),
+    formatter!(
+        "deadnix",
+        "after",
+        ValueType::StringList,
+        Some(DefaultValue::StringList(&[])),
+        "Formatters that must run before the deadnix formatter."
+    ),
+    formatter!(
+        "rustfmt",
+        "enable",
+        ValueType::Bool,
+        Some(DefaultValue::Bool(true)),
+        "Enable the rustfmt formatter."
+    ),
+    formatter!(
+        "rustfmt",
+        "before",
+        ValueType::StringList,
+        Some(DefaultValue::StringList(&[])),
+        "Formatters that must run after the rustfmt formatter."
+    ),
+    formatter!(
+        "rustfmt",
+        "after",
+        ValueType::StringList,
+        Some(DefaultValue::StringList(&[])),
+        "Formatters that must run before the rustfmt formatter."
+    ),
+    formatter!(
+        "shellcheck",
+        "enable",
+        ValueType::Bool,
+        Some(DefaultValue::Bool(true)),
+        "Enable the shellcheck formatter."
+    ),
+    formatter!(
+        "shellcheck",
+        "before",
+        ValueType::StringList,
+        Some(DefaultValue::StringList(&[])),
+        "Formatters that must run after the shellcheck formatter."
+    ),
+    formatter!(
+        "shellcheck",
+        "after",
+        ValueType::StringList,
+        Some(DefaultValue::StringList(&[])),
+        "Formatters that must run before the shellcheck formatter."
+    ),
+    formatter!(
+        "shfmt",
+        "enable",
+        ValueType::Bool,
+        Some(DefaultValue::Bool(true)),
+        "Enable the shfmt shell formatter."
+    ),
+    formatter!(
+        "shfmt",
+        "before",
+        ValueType::StringList,
+        Some(DefaultValue::StringList(&[])),
+        "Formatters that must run after the shfmt formatter."
+    ),
+    formatter!(
+        "shfmt",
+        "after",
+        ValueType::StringList,
+        Some(DefaultValue::StringList(&[])),
+        "Formatters that must run before the shfmt formatter."
+    ),
+    formatter!(
+        "taplo",
+        "enable",
+        ValueType::Bool,
+        Some(DefaultValue::Bool(true)),
+        "Enable the taplo TOML formatter."
+    ),
+    formatter!(
+        "taplo",
+        "before",
+        ValueType::StringList,
+        Some(DefaultValue::StringList(&[])),
+        "Formatters that must run after the taplo formatter."
+    ),
+    formatter!(
+        "taplo",
+        "after",
+        ValueType::StringList,
+        Some(DefaultValue::StringList(&[])),
+        "Formatters that must run before the taplo formatter."
+    ),
+    formatter!(
+        "toml-sort",
+        "enable",
+        ValueType::Bool,
+        Some(DefaultValue::Bool(true)),
+        "Enable the toml-sort TOML formatter."
+    ),
+    formatter!(
+        "toml-sort",
+        "before",
+        ValueType::StringList,
+        Some(DefaultValue::StringList(&[])),
+        "Formatters that must run after the toml-sort formatter."
+    ),
+    formatter!(
+        "toml-sort",
+        "after",
+        ValueType::StringList,
+        Some(DefaultValue::StringList(&[])),
+        "Formatters that must run before the toml-sort formatter."
+    ),
+    formatter!(
+        "yamlfmt",
+        "enable",
+        ValueType::Bool,
+        Some(DefaultValue::Bool(true)),
+        "Enable the yamlfmt formatter."
+    ),
+    formatter!(
+        "yamlfmt",
+        "before",
+        ValueType::StringList,
+        Some(DefaultValue::StringList(&[])),
+        "Formatters that must run after the yamlfmt formatter."
+    ),
+    formatter!(
+        "yamlfmt",
+        "after",
+        ValueType::StringList,
+        Some(DefaultValue::StringList(&[])),
+        "Formatters that must run before the yamlfmt formatter."
+    ),
 ];
 
 /// All catalog entries that carry a recommended default.
@@ -315,13 +649,52 @@ pub fn recommended_entries() -> impl Iterator<Item = &'static CatalogEntry> {
     CATALOG.iter().filter(|entry| entry.recommended.is_some())
 }
 
-/// Resolve an exact dotted path to a catalog entry.
+/// Resolve an exact dotted path to a static catalog entry.
 pub fn lookup(path: &[&str]) -> Option<&'static CatalogEntry> {
     CATALOG.iter().find(|entry| entry.path == path)
 }
 
-/// Whether a table path is a strict prefix of at least one catalog entry.
+/// Resolve a dotted path, including parameterized formatter names that have no
+/// static catalog entry.
+pub fn resolve(path: &[&str]) -> Option<KeySpec> {
+    if let Some(entry) = lookup(path) {
+        return Some(KeySpec::from_entry(entry));
+    }
+    formatter_key(path)
+}
+
+fn formatter_key(path: &[&str]) -> Option<KeySpec> {
+    let [table, _name, field] = path else {
+        return None;
+    };
+    if *table != "formatters" {
+        return None;
+    }
+    let (value_type, documentation) = match *field {
+        "enable" => (ValueType::Bool, "Enable or disable this formatter."),
+        "before" => (
+            ValueType::StringList,
+            "Formatters that must run after this formatter.",
+        ),
+        "after" => (
+            ValueType::StringList,
+            "Formatters that must run before this formatter.",
+        ),
+        _ => return None,
+    };
+    Some(KeySpec {
+        path: path.iter().map(|segment| (*segment).to_owned()).collect(),
+        value_type,
+        recommended: None,
+        documentation,
+    })
+}
+
+/// Whether a path is a recognized table that may contain catalogued leaves.
 fn is_known_table(path: &[&str]) -> bool {
+    if path == ["formatters"] || (path.len() == 2 && path[0] == "formatters") {
+        return true;
+    }
     CATALOG
         .iter()
         .any(|entry| entry.path.len() > path.len() && entry.path.starts_with(path))
@@ -398,7 +771,7 @@ fn collect_leaves<'a>(
         }
         _ => {
             let key = path.join(".");
-            match lookup(path) {
+            match resolve(path) {
                 Some(entry) => {
                     if let Err(diagnostic) = validate_value(&key, &entry.value_type, value) {
                         diagnostics.push(diagnostic);
@@ -460,8 +833,8 @@ pub fn effective_value(raw: Option<&Value>, path: &[&str]) -> Option<Value> {
 #[cfg(test)]
 mod tests {
     use super::{
-        CATALOG, CATALOG_VERSION, ValueType, effective_default, effective_value, lookup,
-        recommended_entries, validate_raw,
+        BUILTIN_FORMATTERS, CATALOG, CATALOG_VERSION, ValueType, effective_default,
+        effective_value, lookup, recommended_entries, resolve, validate_raw,
     };
     use toml::Value;
 
@@ -488,6 +861,7 @@ mod tests {
             "devShell.shellHook",
             "checks.enable",
             "features.unify",
+            "formatters.toml-sort.before",
         ] {
             assert!(
                 paths.iter().any(|candidate| candidate == expected),
@@ -567,6 +941,7 @@ mod tests {
             "devShell",
             "checks",
             "features",
+            "formatters",
         ] {
             assert!(
                 CATALOG.iter().any(|entry| entry.path[0] == prefix),
@@ -623,6 +998,52 @@ mod tests {
             effective_value(Some(&raw), &["checks", "throwOnOutOfDate"]),
             Some(Value::Boolean(false))
         );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-009"))]
+    fn catalog_entries_carry_documentation() {
+        for entry in CATALOG {
+            assert!(
+                !entry.documentation.trim().is_empty(),
+                "{} has no documentation",
+                path(entry)
+            );
+        }
+        assert_eq!(BUILTIN_FORMATTERS.len(), 8);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-010"))]
+    fn catalog_covers_the_parameterized_formatter_table() {
+        let known = resolve(&["formatters", "toml-sort", "before"]).expect("built-in formatter");
+        assert_eq!(known.value_type, ValueType::StringList);
+        assert!(known.recommended.is_some());
+        let extra = resolve(&["formatters", "prettier", "enable"]).expect("extra formatter");
+        assert_eq!(extra.value_type, ValueType::Bool);
+        assert!(extra.recommended.is_none());
+        assert!(resolve(&["formatters", "prettier", "command"]).is_none());
+        assert!(resolve(&["formatters", "prettier"]).is_none());
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-VALIDATION-005"))]
+    fn formatter_ordering_keys_are_type_validated() {
+        let valid: Value = toml::from_str(
+            "[formatters.prettier]\nenable = true\nbefore = [\"rustfmt\"]\nafter = []\n",
+        )
+        .expect("toml");
+        assert!(validate_raw(&valid).is_ok());
+
+        for contents in [
+            "[formatters.prettier]\nbefore = \"rustfmt\"\n",
+            "[formatters.prettier]\nafter = [1]\n",
+            "[formatters.prettier]\ncommand = \"prettier\"\n",
+            "[formatters]\nbogus = true\n",
+        ] {
+            let raw: Value = toml::from_str(contents).expect("toml");
+            assert!(validate_raw(&raw).is_err(), "{contents}");
+        }
     }
 
     #[test]

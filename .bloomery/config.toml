@@ -1,20 +1,64 @@
 [build]
-libPackages = false
-devPackages = true
+cargoLock = "Cargo.lock" # Repository-relative path to Cargo.lock.
+cargoToml = "Cargo.toml" # Repository-relative path to the Cargo workspace manifest.
+devPackages = true       # Generate dev-profile apps for workspace binaries.
+libPackages = false      # Expose <crate>:lib packages for workspace libraries.
+profileName = "release"  # Active Cargo profile name for release builds.
 
 [checks]
-workspaceDependencies = false
-noDefaultFeatures = false
+enable = true                 # Generate workspace checks.
+includePackageChecks = true   # Include binary and library build checks.
+noDefaultFeatures = false     # Require default features to be disabled on workspace dependencies.
+throwOnOutOfDate = false      # Fail evaluation when bloomery.lock is out of date.
+workspaceDependencies = false # Validate workspace dependency declarations.
+
+[devShell]
+enable = true  # Generate the default development shell.
+packages = []  # Additional nixpkgs packages in the development shell.
+shellHook = "" # Shell hook run when entering the development shell.
+
+[features]
+unify = true # Unify workspace features like Cargo's resolver.
+
+[flags]
+clippy = []               # Extra rustc flags for clippy runs.
+doc = ["-Dwarnings"]      # Extra rustdoc flags for documentation builds.
+doctest = []              # Extra rustdoc flags for doctests.
+rustc = ["-Copt-level=3"] # Extra rustc flags for release compilation.
+test = []                 # Extra rustc flags for test compilation.
 
 [profile.release]
-optLevel = 3
-lto = "fat"
-codegenUnits = 1
+codegenUnits = 1 # release profile: number of codegen units
+lto = "fat"      # release profile: link-time optimization mode
+optLevel = 3     # release profile: optimization level (0-3, s, z)
 
 [scanners.nix]
-enabled = true
-paths = ["*.nix", "lib/**/*.nix", "nix/**/*.nix", "tests/**/*.nix"]
+enabled = true # Enable the static Nix evidence scanner.
+paths = [
+  "*.nix",
+  "lib/**/*.nix",
+  "nix/**/*.nix",
+  "tests/**/*.nix",
+] # Repository-relative globs for Nix source files.
+
+[scanners.playwright]
+enabled = false           # Enable the Playwright evidence scanner.
+paths = []                # Repository-relative globs for Playwright test files.
+tag_prefix = "@bloomery:" # Tag prefix that marks Bloomery metadata in Playwright tests.
 
 [scanners.rust]
-enabled = true
-paths = ["packages/rust/**/*.rs"]
+enabled = true # Enable the Rust evidence scanner.
+paths = [
+  "packages/rust/**/*.rs",
+] # Repository-relative globs for Rust source files.
+
+[specs]
+dir = "specs" # Directory inside .bloomery/ that holds the specification tree.
+
+[toolchain]
+cargo = "cargo"   # nixpkgs attribute path for cargo.
+clippy = "clippy" # nixpkgs attribute path for clippy.
+lld = "lld"       # nixpkgs attribute path for lld.
+mold = "mold"     # nixpkgs attribute path for mold.
+rustc = "rustc"   # nixpkgs attribute path for rustc.
+stdenv = "stdenv" # nixpkgs attribute path for the C toolchain.

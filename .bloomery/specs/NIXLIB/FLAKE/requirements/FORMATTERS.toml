@@ -1,0 +1,173 @@
+group = "FORMATTERS"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-FORMATTERS-001"
+title = "The workspace exposes a default formatter"
+manual = false
+design = "design/formatters.md#output-contract"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "produce a default formatter for each evaluated system"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-FORMATTERS-002"
+title = "The default formatter set includes toml-sort"
+manual = false
+design = "design/formatters.md#default-formatter-set"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the default formatter set"
+action = "include a TOML sort formatter"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-FORMATTERS-003"
+title = "Absent formatter configuration enables the default set"
+manual = false
+design = "design/formatters.md#formatter-configuration"
+
+[requirements.ears]
+type = "event"
+trigger = "config.toml omits the formatters table"
+system = "the workspace builder"
+action = "enable the default formatter set with no ordering edges"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-FORMATTERS-004"
+title = "A formatter can be disabled"
+manual = false
+design = "design/formatters.md#formatter-configuration"
+
+[requirements.ears]
+type = "event"
+trigger = "a formatter's enable key is false"
+system = "the workspace builder"
+action = "omit that formatter from the default formatter"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-FORMATTERS-005"
+title = "Formatters declare ordering edges"
+manual = false
+design = "design/formatters.md#formatter-configuration"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "a formatter sub-table"
+action = "accept before and after lists naming other formatters"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-FORMATTERS-006"
+title = "Ordering edges resolve to a total order"
+manual = false
+design = "design/formatters.md#formatter-ordering-graph"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "order the enabled formatters consistently with every before and after edge"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-FORMATTERS-007"
+title = "The resolved order configures treefmt"
+manual = false
+design = "design/formatters.md#formatter-ordering-graph"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the default formatter"
+action = "run the treefmt command in an order that respects the resolved formatter graph"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-FORMATTERS-008"
+title = "Edges to disabled formatters are ignored"
+manual = false
+design = "design/formatters.md#formatter-ordering-graph"
+
+[requirements.ears]
+type = "event"
+trigger = "an ordering edge names a known formatter that is disabled"
+system = "the workspace builder"
+action = "drop that edge"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-FORMATTERS-009"
+title = "Ordering cycles are rejected"
+manual = false
+design = "design/formatters.md#validation"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "formatter ordering edges form a cycle"
+system = "the workspace builder"
+action = "fail evaluation with a bloomery-prefixed error before any formatter runs"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-FORMATTERS-010"
+title = "Self ordering edges are rejected"
+manual = false
+design = "design/formatters.md#validation"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a formatter orders itself before or after itself"
+system = "the workspace builder"
+action = "fail evaluation with a bloomery-prefixed error before any formatter runs"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-FORMATTERS-011"
+title = "Unknown formatter references are rejected"
+manual = false
+design = "design/formatters.md#validation"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "an ordering edge names a formatter that is neither built in nor supplied by the flake"
+system = "the workspace builder"
+action = "fail evaluation with a bloomery-prefixed error before any formatter runs"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-FORMATTERS-012"
+title = "Extra formatters join the formatter graph"
+manual = false
+design = "design/formatters.md#custom-formatters"
+
+[requirements.ears]
+type = "event"
+trigger = "the flake supplies an extra formatter"
+system = "the workspace builder"
+action = "add that formatter to the ordering graph alongside the built-in formatters"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-FORMATTERS-013"
+title = "Extra formatter bodies carry a package and includes"
+manual = false
+design = "design/formatters.md#custom-formatters"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "an extra formatter body"
+action = "provide the formatter package and include globs to the default formatter"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-FORMATTERS-014"
+title = "The TOML sort formatter sorts all keys"
+manual = false
+design = "design/formatters.md#default-formatter-set"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the default toml-sort formatter"
+action = "sort every key within a TOML table, not only the tables"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-FORMATTERS-015"
+title = "Requirement files keep their canonical field order"
+manual = false
+design = "design/formatters.md#default-formatter-set"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the default toml-sort formatter"
+action = "leave requirement-group files to taplo so their canonical field order is preserved"

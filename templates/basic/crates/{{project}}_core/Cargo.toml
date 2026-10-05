@@ -1,4 +1,4 @@
 [package]
+edition = "2024"
 name = "{{project}}_core"
 version = "0.1.0"
-edition = "2024"

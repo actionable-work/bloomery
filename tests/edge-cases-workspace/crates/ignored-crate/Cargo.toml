@@ -1,6 +1,6 @@
 [dependencies]
 
 [package]
+edition = "2021"
 name = "ignored-crate"
 version = "0.1.0"
-edition = "2021"

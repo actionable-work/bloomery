@@ -9,8 +9,8 @@ it does not expose a public `lib` builder surface.
 ## mkFlake
 
 `mkFlake` accepts `nixpkgs`, `root`, an optional `systems` list, an optional
-`overrides` attribute set, and an optional `extraOutputs` callback. It evaluates
-one workspace per selected system
+`overrides` attribute set, an optional `extraFormatters` attribute set, and an
+optional `extraOutputs` callback. It evaluates one workspace per selected system
 with that system's `nixpkgs.legacyPackages`. No other workspace option is
 accepted as a constructor argument; every remaining setting comes from the
 configuration file described in [Build configuration](configuration.md).
@@ -25,7 +25,9 @@ message naming the missing path.
 
 Systems default to `x86_64-linux`, `aarch64-linux`, and `aarch64-darwin`. For
 each system, `mkFlake` maps the evaluated workspace to `packages`, `apps`,
-`checks`, and `devShells.default`. The default development shell is omitted
+`checks`, `formatter.<system>`, and `devShells.default`. The default
+formatter is the treefmt wrapper described in
+[Default formatter](formatters.md). The default development shell is omitted
 when the workspace disables it, and the remaining attributes stay present.
 
 ## Bloomery CLI injection
@@ -41,6 +43,14 @@ The repository's root `flake.nix` evaluates its own workspace through an
 internal constructor binding created without CLI injection, so its development
 shell never pins a prebuilt CLI during local iteration. Only the exported
 `mkFlake` carries the CLI injection.
+
+## extraFormatters
+
+`extraFormatters` maps a formatter name to a formatter body carrying a package,
+include globs, and options. Each supplied name joins the built-in formatter set
+and may be enabled or ordered from the
+[formatter configuration](formatters.md#custom-formatters). Formatter bodies are
+Nix values, so they stay in the constructor rather than in `config.toml`.
 
 ## extraOutputs
 

@@ -1,17 +1,17 @@
 [build]
-libPackages = true
 devPackages = true
+libPackages = true
 
 [checks]
-workspaceDependencies = false
 noDefaultFeatures = false
+workspaceDependencies = false
 
 [flags]
 rustc = ["-Copt-level=3"]
 
 [profile.release]
-optLevel = 3
 codegenUnits = 16
+optLevel = 3
 
 [toolchain]
 linker = "lld"

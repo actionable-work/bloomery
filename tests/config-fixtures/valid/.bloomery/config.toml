@@ -1,6 +1,6 @@
 [build]
-libPackages = true
 devPackages = true
+libPackages = true
 
 [profile.release]
 optLevel = 2

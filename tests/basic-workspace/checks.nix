@@ -11,6 +11,7 @@
       workspace.checks
       // {
         validate-basic-workspace = assert !(builtins.hasAttr "bloomery:check" workspace.checks);
+        assert builtins.isAttrs workspace.formatter;
         assert builtins.hasAttr "workspace:lock" workspace.checks;
         assert builtins.hasAttr "bin-calc:test" workspace.checks;
         assert builtins.hasAttr "bin-calc:clippy" workspace.checks;

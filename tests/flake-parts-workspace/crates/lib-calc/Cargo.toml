@@ -2,6 +2,6 @@
 lib-core = { path = "../lib-core" }
 
 [package]
+edition = "2021"
 name = "lib-calc"
 version = "0.1.0"
-edition = "2021"

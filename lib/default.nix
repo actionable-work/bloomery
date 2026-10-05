@@ -2,6 +2,7 @@
   pkgs,
   lib ? pkgs.lib,
   cratesIoIndex ? null,
+  treefmtNix ? null,
 }: rec {
   # Submodules
   builders = import ./builders {inherit pkgs lib;};
@@ -10,7 +11,7 @@
   profile = import ./profile {inherit lib;};
   overrides = import ./overrides {inherit pkgs lib;};
   docs = import ./docs {inherit pkgs lib;};
-  tests = import ./tests.nix {inherit pkgs lib;};
+  tests = import ./tests.nix {inherit pkgs lib treefmtNix;};
   modules = {
     flake = args:
       import ./modules/flake-module.nix args;
@@ -18,7 +19,7 @@
 
   # High-level workspace builder
   mkWorkspace = import ./mk-workspace.nix {
-    inherit pkgs lib cratesIoIndex;
+    inherit pkgs lib cratesIoIndex treefmtNix;
   };
 
   # Zero-boilerplate flake builder
@@ -27,7 +28,7 @@
       pkgs,
       lib ? pkgs.lib,
     }:
-      import ./. {inherit pkgs lib;};
+      import ./. {inherit pkgs lib treefmtNix;};
   };
 
   # Convenience re-exports

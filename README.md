@@ -37,8 +37,9 @@ setting from a required `.bloomery/config.toml` at the workspace root.
 ```
 
 `mkFlake` accepts `nixpkgs`, `root`, an optional `systems` list, an optional
-`overrides` set, an optional `extraOutputs` callback, and an optional `self`.
-It does not accept workspace options as arguments.
+`overrides` set, an optional `extraFormatters` set, an optional `extraOutputs`
+callback, and an optional `self`. It does not accept workspace options as
+arguments.
 
 ```toml
 # .bloomery/config.toml (required)
@@ -73,9 +74,12 @@ Package-valued settings are nixpkgs attribute paths; path-valued settings are
 relative to the workspace root. The full table reference is in the
 [API documentation](./packages/rust/libs/docs/content/src/docs/api.md).
 
-`mkFlake` generates `packages`, `apps`, `checks`, and `devShells` across the
-selected systems (`x86_64-linux`, `aarch64-linux`, and `aarch64-darwin` by
-default).
+`mkFlake` generates `packages`, `apps`, `checks`, `formatter`, and `devShells`
+across the selected systems (`x86_64-linux`, `aarch64-linux`, and
+`aarch64-darwin` by default). The `formatter` output is a `treefmt` wrapper
+built from the `[formatters]` table, which enables and orders Bloomery's
+built-in formatters (including `toml-sort`) and any formatters supplied through
+`extraFormatters`.
 
 Synchronize locks from a workspace with the Bloomery CLI package, for example
 `nix run github:actionable-work/bloomery#bloomery -- sync`. `bloomery sync`
@@ -83,7 +87,9 @@ reconciles `Cargo.lock` and writes `bloomery.lock`; use `--update=rust`,
 `--update=nix`, or bare `--update` to request ecosystem updates. Sync requires
 `.bloomery/config.toml` and does not create or edit it. The `check`, `review`,
 and `sync` commands share `--json` for machine-readable output; human terminal
-output is colorized automatically and honors `NO_COLOR`.
+output is colorized automatically and honors `NO_COLOR`. `bloomery config
+document` annotates configured keys with the schema catalog documentation
+without changing values or adding absent keys.
 
 ### Per-Crate Overrides
 

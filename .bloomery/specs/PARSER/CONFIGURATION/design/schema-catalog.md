@@ -2,21 +2,25 @@
 
 The schema catalog is the single enumerated description of every recognized
 `.bloomery/config.toml` key. The CLI uses it to address, validate, recommend,
-and materialize configuration; the flake interface retains authority over
-build-table semantics and evaluation-time resolution.
+materialize, and document configuration; the flake interface retains authority
+over build-table semantics and evaluation-time resolution.
 
 ## Catalog fields
 
 Each catalog entry carries an exact dotted key path, a schema type, an owning
-feature, and an optional recommended default. A recommended default is present
-only when omitting the key has a single fixed Bloomery-defined effective value.
-Keys whose omission is semantic are addressable but have no recommendation:
+feature, documentation text, and an optional recommended default. A recommended
+default is present only when omitting the key has a single fixed
+Bloomery-defined effective value. Keys whose omission is semantic are
+addressable but have no recommendation:
 `build.bloomeryLock` auto-detects, `build.members` means all members,
 `toolchain.linker` is host-dependent, `features.cratesIoIndex` means none, and
 the `profile.*` fields inherit from `Cargo.toml` and rustc.
 
 `bloomery config upgrade` materializes recommended keys only. Keys without a
-recommendation remain absent unless the user sets them.
+recommendation remain absent unless the user sets them. `bloomery config
+document` renders each entry's documentation text as a TOML comment on the
+configured key, falling back to the line above when the value already carries a
+trailing comment.
 
 ## Spec and scanner tables
 
@@ -114,6 +118,31 @@ default because omission delegates to `Cargo.toml` and rustc defaults.
 | --- | --- | --- |
 | `features.unify` | boolean | `true` |
 | `features.cratesIoIndex` | repository-relative path, absent means none | none |
+
+### `[formatters]`
+
+Owned by [NIXLIB/FLAKE](../../../NIXLIB/FLAKE/README.md) and catalogued for CLI
+editing and validation, alongside the build tables. `[formatters]` tunes
+Bloomery's formatter set. The catalog describes a parameterized formatter-name
+family rather than a fixed list of names, because the flake can add formatters
+beyond the built-in set. Every name has the same sub-table shape:
+
+| Key | Type | Recommended default |
+| --- | --- | --- |
+| `formatters.<name>.enable` | boolean | `true` |
+| `formatters.<name>.before` | list of formatter names | `[]` |
+| `formatters.<name>.after` | list of formatter names | `[]` |
+
+The built-in formatter names (`deadnix`, `alejandra`, `rustfmt`, `shfmt`,
+`shellcheck`, `taplo`, `toml-sort`, and `yamlfmt`) have Bloomery-defined bodies
+and carry the recommended defaults above. A name outside that set is valid only
+when the flake supplies an
+[extra formatter body](../../../NIXLIB/FLAKE/design/formatters.md#custom-formatters),
+and its keys carry no recommendation because the flake decides which names
+exist. `before` and `after` are ordering edges: the builder resolves them into a
+total order and rejects cycles, self-references, and names that are neither
+built in nor flake-supplied. Referencing a known formatter that is disabled is
+allowed and the edge is ignored.
 
 ## Validation
 

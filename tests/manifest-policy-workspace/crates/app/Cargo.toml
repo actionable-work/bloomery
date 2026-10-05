@@ -6,6 +6,6 @@ path = "src/main.rs"
 dep = { workspace = true }
 
 [package]
+edition = "2021"
 name = "app"
 version = "0.1.0"
-edition = "2021"

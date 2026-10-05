@@ -2,6 +2,6 @@
 path = "src/lib.rs"
 
 [package]
+edition = "2021"
 name = "dep"
 version = "0.1.0"
-edition = "2021"

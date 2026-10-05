@@ -28,7 +28,8 @@ parser:
   updates Rust and Nix dependencies, and reports unconfigured recommendations.
 - [`bloomery config`](CONFIG/README.md) reads and edits every
   `.bloomery/config.toml` key through schema-typed keys, materializes absent
-  recommended keys, and compares recommendations with the current configuration.
+  recommended keys, compares recommendations with the current configuration,
+  and annotates configured keys with schema-catalog documentation.
 
 The command syntax and options are specified by the
 [CLI interface](INTERFACE/README.md). The reusable configuration, specification
@@ -47,7 +48,8 @@ help, requires a root `flake.nix`. `init` is the bootstrap exception, and
 `config` is exempt but warns when the flake is absent. Check execution
 runs the formatter before checks and may modify workspace source; lockfiles
 remain unchanged. Config edits `.bloomery/config.toml` and leaves lockfiles and
-source unchanged. Check executes Nix builds and
+source unchanged. Config documentation edits only the comment layer of the
+configuration file. Check executes Nix builds and
 writes a user-cache run store. Review remains a read-only catalog. Check does not
 own approvals, ticket management, or human review scheduling.
 Generated Nix outputs no longer include `bloomery:check`; the runner invokes
@@ -62,7 +64,7 @@ other Nix checks directly. See [Nix orchestration](CHECK/design/workspace-check.
 | [Check](CHECK/README.md) | Formatting preflight, then parallel validation with terminal progress and retained failures | [pipeline](CHECK/design/pipeline.md), [execution](CHECK/design/execution.md), [progress](CHECK/design/progress.md), [diagnostics](CHECK/design/diagnostics.md), [details](CHECK/design/details.md), [Nix orchestration](CHECK/design/workspace-check.md) |
 | [Review](REVIEW/README.md) | Deterministic manual-review catalogues | [catalog](REVIEW/design/manual-catalog.md), [output](REVIEW/design/output.md) |
 | [Sync](SYNC/README.md) | Lockfile maintenance and configuration recommendations | [synchronization](SYNC/design/sync.md) |
-| [Config](CONFIG/README.md) | Schema-typed configuration editing and upgrade | [editing](CONFIG/design/editing.md), [upgrade](CONFIG/design/upgrade.md) |
+| [Config](CONFIG/README.md) | Schema-typed configuration editing, upgrade, and documentation | [editing](CONFIG/design/editing.md), [upgrade](CONFIG/design/upgrade.md), [documentation](CONFIG/design/documenting.md) |
 
 ## System flow
 

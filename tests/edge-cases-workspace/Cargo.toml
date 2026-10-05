@@ -1,11 +1,11 @@
 [dependencies]
 
 [package]
+edition = "2021"
 name = "edge-cases-root"
 version = "0.1.0"
-edition = "2021"
 
 [workspace]
-members = ["crates/*"]
 exclude = ["crates/ignored-crate"]
+members = ["crates/*"]
 resolver = "2"

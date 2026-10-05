@@ -6,6 +6,6 @@ toml = "1.1"
 [dev-dependencies]
 
 [package]
+edition = "2024"
 name = "bloomery-workspace"
 version = "0.1.0"
-edition = "2024"

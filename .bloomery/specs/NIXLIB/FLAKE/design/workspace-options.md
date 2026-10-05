@@ -54,3 +54,12 @@ checks, optionally fails evaluation on an out-of-date lock, and independently
 enables the workspace dependency and no default features manifest checks.
 `features.unify` selects workspace feature unification for index-based
 resolution; `features.cratesIoIndex` supplies a local crates.io index.
+
+## Formatter ordering
+
+`formatters` controls Bloomery's formatter set. Each known formatter, built in
+or supplied through the constructor's `extraFormatters`, exposes an `enable`
+toggle and `before`/`after` lists of other formatter names. Enabled formatters
+form a directed graph whose edges are resolved into a total order for the
+treefmt run; cycles, self-references, and names that are neither built in nor
+supplied by the flake are evaluation errors.

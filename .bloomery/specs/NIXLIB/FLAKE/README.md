@@ -5,7 +5,8 @@ tagline: Expose one config-driven mkFlake over the workspace option schema.
 description: |
   The flake interface feature defines the single mkFlake constructor Bloomery
   exports, the required config.toml build tables it evaluates, and the
-  packages, apps, checks, and development shells produced for each system.
+  packages, apps, checks, formatters, and development shells produced for each
+  system.
 ---
 
 # Flake Interface
@@ -22,10 +23,12 @@ into the same output shape for each selected system.
 - [Build configuration](design/configuration.md)
 - [Workspace options](design/workspace-options.md)
 - [Per-system outputs](design/output-contract.md)
+- [Default formatter](design/formatters.md)
 
 ## Scope
 
 This feature covers the exported constructor, configuration loading and value
-encoding, option evaluation, system enumeration, flake attribute mapping, and
-output naming and gating. How the derivations behind those outputs compile
-belongs to [Derivation graph](../GRAPH/README.md).
+encoding, option evaluation, system enumeration, flake attribute mapping, the
+default formatter and its ordering graph, and output naming and gating. How the
+derivations behind those outputs compile belongs to
+[Derivation graph](../GRAPH/README.md).

@@ -4,6 +4,6 @@ name = "manifest-bin"
 [dependencies]
 
 [package]
+edition = "2021"
 name = "member-app"
 version = "0.1.0"
-edition = "2021"
