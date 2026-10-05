@@ -1,6 +1,6 @@
 [dependencies]
-bloomery-model = { path = "../../shared/model" }
-serde = { features = ["derive"], version = "1.0" }
+bloomery-model = { workspace = true }
+serde = { workspace = true }
 
 [dev-dependencies]
 

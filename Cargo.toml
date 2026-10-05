@@ -1,26 +1,79 @@
 [workspace]
 members = [
-  "packages/rust/bins/cli",
-  "packages/rust/bins/docs",
-  "packages/rust/libs/cli/check-command",
-  "packages/rust/libs/cli/cli-app",
-  "packages/rust/libs/cli/cli-output",
-  "packages/rust/libs/cli/cli-parser",
-  "packages/rust/libs/cli/cli-types",
-  "packages/rust/libs/cli/config",
-  "packages/rust/libs/cli/init",
-  "packages/rust/libs/cli/review",
-  "packages/rust/libs/cli/sync",
-  "packages/rust/libs/docs/content",
-  "packages/rust/libs/docs/docs-server",
-  "packages/rust/libs/docs/ui",
-  "packages/rust/libs/shared/check",
-  "packages/rust/libs/shared/model",
-  "packages/rust/libs/shared/scanning",
-  "packages/rust/libs/shared/test-macros",
-  "packages/rust/libs/shared/workspace",
+  "packages/rust/bins/*",
+  "packages/rust/libs/cli/*",
+  "packages/rust/libs/docs/*",
+  "packages/rust/libs/shared/*",
 ]
 resolver = "2"
 
 [workspace.dependencies]
-bloomery-test-macros = { path = "packages/rust/libs/shared/test-macros" }
+bloomery-check = { default-features = false, path = "packages/rust/libs/shared/check" }
+bloomery-check-command = { default-features = false, path = "packages/rust/libs/cli/check-command" }
+bloomery-cli-app = { default-features = false, path = "packages/rust/libs/cli/cli-app" }
+bloomery-cli-output = { default-features = false, path = "packages/rust/libs/cli/cli-output" }
+bloomery-cli-parser = { default-features = false, path = "packages/rust/libs/cli/cli-parser" }
+bloomery-cli-types = { default-features = false, path = "packages/rust/libs/cli/cli-types" }
+bloomery-config = { default-features = false, path = "packages/rust/libs/cli/config" }
+bloomery-content = { default-features = false, path = "packages/rust/libs/docs/content" }
+bloomery-docs-server = { default-features = false, path = "packages/rust/libs/docs/docs-server" }
+bloomery-init = { default-features = false, path = "packages/rust/libs/cli/init" }
+bloomery-model = { default-features = false, path = "packages/rust/libs/shared/model" }
+bloomery-review = { default-features = false, path = "packages/rust/libs/cli/review" }
+bloomery-scanning = { default-features = false, path = "packages/rust/libs/shared/scanning" }
+bloomery-sync = { default-features = false, path = "packages/rust/libs/cli/sync" }
+bloomery-test-macros = { default-features = false, path = "packages/rust/libs/shared/test-macros" }
+bloomery-ui = { default-features = false, path = "packages/rust/libs/docs/ui" }
+bloomery-workspace = { default-features = false, path = "packages/rust/libs/shared/workspace" }
+clap = { default-features = false, features = [
+  "color",
+  "derive",
+  "error-context",
+  "help",
+  "std",
+  "suggestions",
+  "usage",
+], version = "4.6" }
+oxc_allocator = { default-features = false, version = "0.30" }
+oxc_ast = { default-features = false, version = "0.30" }
+oxc_parser = { default-features = false, version = "0.30" }
+oxc_span = { default-features = false, version = "0.30" }
+serde = { default-features = false, features = [
+  "derive",
+  "std",
+], version = "1.0" }
+serde_json = { default-features = false, features = ["std"], version = "1.0" }
+serde_yaml = { default-features = false, version = "0.9" }
+sha2 = { default-features = false, features = ["std"], version = "0.10" }
+syn = { default-features = false, features = [
+  "clone-impls",
+  "derive",
+  "full",
+  "parsing",
+  "printing",
+  "proc-macro",
+  "visit",
+], version = "2.0" }
+tokio = { default-features = false, features = [
+  "macros",
+  "net",
+  "rt",
+  "rt-multi-thread",
+], version = "1" }
+toml = { default-features = false, features = [
+  "display",
+  "parse",
+  "serde",
+  "std",
+], version = "1.1" }
+toml_edit = { default-features = false, features = [
+  "display",
+  "parse",
+], version = "0.25" }
+topcoat = { default-features = false, features = [
+  "asset",
+  "compression",
+  "router",
+  "serve",
+  "view",
+], version = "0.9.0" }

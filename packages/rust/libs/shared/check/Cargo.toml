@@ -1,6 +1,6 @@
 [dependencies]
-bloomery-model = { path = "../model" }
-bloomery-scanning = { path = "../scanning" }
+bloomery-model = { workspace = true }
+bloomery-scanning = { workspace = true }
 
 [package]
 edition = "2024"

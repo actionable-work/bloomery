@@ -6,11 +6,11 @@ libPackages = false      # Expose <crate>:lib packages for workspace libraries.
 profileName = "release"  # Active Cargo profile name for release builds.
 
 [checks]
-enable = true                 # Generate workspace checks.
-includePackageChecks = true   # Include binary and library build checks.
-noDefaultFeatures = false     # Require default features to be disabled on workspace dependencies.
-throwOnOutOfDate = false      # Fail evaluation when bloomery.lock is out of date.
-workspaceDependencies = false # Validate workspace dependency declarations.
+enable = true                # Generate workspace checks.
+includePackageChecks = true  # Include binary and library build checks.
+noDefaultFeatures = true     # Require default features to be disabled on workspace dependencies.
+throwOnOutOfDate = true      # Fail evaluation when bloomery.lock is out of date.
+workspaceDependencies = true # Validate workspace dependency declarations.
 
 [devShell]
 enable = true  # Generate the default development shell.

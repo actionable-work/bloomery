@@ -1,9 +1,14 @@
 {lib}: let
   root = ../.;
-  manifest = builtins.fromTOML (builtins.readFile (root + "/Cargo.toml"));
-  members = manifest.workspace.members;
-  binaryMembers = builtins.filter (member: lib.hasPrefix "packages/rust/bins/" member) members;
-  libraryMembers = builtins.filter (member: lib.hasPrefix "packages/rust/libs/" member) members;
+  discover = import ./workspace/discover.nix {inherit lib;};
+  discoveredMembers = discover.discoverWorkspaceCrates {inherit root;};
+  memberPaths =
+    lib.mapAttrsToList (
+      _name: crateDir: lib.removePrefix "${toString root}/" (toString crateDir)
+    )
+    discoveredMembers;
+  binaryMembers = builtins.filter (member: lib.hasPrefix "packages/rust/bins/" member) memberPaths;
+  libraryMembers = builtins.filter (member: lib.hasPrefix "packages/rust/libs/" member) memberPaths;
   libraryCategories = ["shared" "cli" "docs"];
   libraryCategoryPrefix = category: "packages/rust/libs/${category}/";
   hasLibraryCategory = category:

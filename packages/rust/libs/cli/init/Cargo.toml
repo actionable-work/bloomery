@@ -1,5 +1,5 @@
 [dependencies]
-bloomery-sync = { path = "../sync" }
+bloomery-sync = { workspace = true }
 
 [package]
 edition = "2024"

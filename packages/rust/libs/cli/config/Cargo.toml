@@ -1,9 +1,9 @@
 [dependencies]
-bloomery-cli-types = { path = "../cli-types" }
-bloomery-model = { path = "../../shared/model" }
-serde = { features = ["derive"], version = "1.0" }
-toml = "1.1"
-toml_edit = "0.25"
+bloomery-cli-types = { workspace = true }
+bloomery-model = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
+toml_edit = { workspace = true }
 
 [package]
 edition = "2024"

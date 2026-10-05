@@ -457,7 +457,6 @@ edition = "2021"
 [packages."clap-4.6.7"]
 features = [
     "color",
-    "default",
     "derive",
     "error-context",
     "help",
@@ -2387,7 +2386,6 @@ edition = "2024"
 
 [packages."toml_edit-0.25.15+spec-1.1.0"]
 features = [
-    "default",
     "display",
     "parse",
 ]

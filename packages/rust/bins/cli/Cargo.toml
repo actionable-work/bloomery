@@ -3,7 +3,7 @@ name = "bloomery"
 path = "src/main.rs"
 
 [dependencies]
-bloomery-cli-app = { path = "../../libs/cli/cli-app" }
+bloomery-cli-app = { workspace = true }
 
 [package]
 edition = "2024"

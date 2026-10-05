@@ -1,7 +1,7 @@
 [dependencies]
-bloomery-model = { path = "../model" }
-serde_yaml = "0.9"
-toml = "1.1"
+bloomery-model = { workspace = true }
+serde_yaml = { workspace = true }
+toml = { workspace = true }
 
 [dev-dependencies]
 

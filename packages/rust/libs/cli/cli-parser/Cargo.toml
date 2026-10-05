@@ -1,6 +1,6 @@
 [dependencies]
-bloomery-cli-types = { path = "../cli-types" }
-clap = { features = ["derive"], version = "4.6" }
+bloomery-cli-types = { workspace = true }
+clap = { workspace = true }
 
 [package]
 edition = "2024"

@@ -1,16 +1,16 @@
 [dependencies]
-bloomery-check-command = { path = "../check-command" }
-bloomery-cli-output = { path = "../cli-output" }
-bloomery-cli-parser = { path = "../cli-parser" }
-bloomery-cli-types = { path = "../cli-types" }
-bloomery-config = { path = "../config" }
-bloomery-init = { path = "../init" }
-bloomery-model = { path = "../../shared/model" }
-bloomery-review = { path = "../review" }
-bloomery-sync = { path = "../sync" }
-bloomery-workspace = { path = "../../shared/workspace" }
-serde_json = "1.0"
-toml = "1.1"
+bloomery-check-command = { workspace = true }
+bloomery-cli-output = { workspace = true }
+bloomery-cli-parser = { workspace = true }
+bloomery-cli-types = { workspace = true }
+bloomery-config = { workspace = true }
+bloomery-init = { workspace = true }
+bloomery-model = { workspace = true }
+bloomery-review = { workspace = true }
+bloomery-sync = { workspace = true }
+bloomery-workspace = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
 
 [dev-dependencies]
 

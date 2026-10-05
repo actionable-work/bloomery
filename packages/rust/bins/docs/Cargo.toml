@@ -3,7 +3,7 @@ name = "bloomery-docs"
 path = "src/main.rs"
 
 [dependencies]
-bloomery-docs-server = { path = "../../libs/docs/docs-server" }
+bloomery-docs-server = { workspace = true }
 
 [package]
 edition = "2024"
