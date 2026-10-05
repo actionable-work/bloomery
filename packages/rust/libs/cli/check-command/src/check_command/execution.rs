@@ -1,5 +1,5 @@
-use super::catalog::{NixBackend, NixTaskResult, nix_log_store_path, parse_nix_id};
-use super::command::{CheckArgs, CheckContext, CheckError, discover_for_selection, report_error};
+use super::catalog::{BatchRealization, CheckPlan, NixBackend, NixTaskResult};
+use super::command::{CheckArgs, CheckContext, CheckError, plan_for_selection, report_error};
 use super::interrupt::{CancellationToken, InterruptFlag};
 use super::model::{
     CheckRecord, FailureLocation, FailureRecord, Outcome, RunRecord, RunSelection, RunStatus,
@@ -10,7 +10,7 @@ use super::progress::{ProgressEvent, ProgressReducer, ProgressReporter, Progress
 use super::scheduler::{ScheduledState, WorkerTracker, run_with_followups};
 use super::store;
 use bloomery_model::{Diagnostic, sort_diagnostics as sort_model_diagnostics};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::io::Write;
 use std::path::Path;
 use std::process::ExitCode;
@@ -39,11 +39,11 @@ pub(super) fn run_checks(
     let backend = context.backend;
     let interrupt = context.interrupt.clone();
     let cache_base = context.cache_base;
-    let catalog = match discover_for_selection(root, &args.selectors, &args.systems, backend) {
-        Ok(catalog) => catalog,
+    let planned = match plan_for_selection(root, &args.selectors, &args.systems, backend) {
+        Ok(planned) => planned,
         Err(error) => return report_error(json_mode, &error, None, stdout, stderr),
     };
-    let direct_selection = match select_ids(&catalog.ids, &args.selectors) {
+    let direct_selection = match select_ids(&planned.ids, &args.selectors) {
         Ok(ids) => ids,
         Err(message) => {
             return report_error(json_mode, &CheckError::usage(message), None, stdout, stderr);
@@ -64,7 +64,7 @@ pub(super) fn run_checks(
 
     let selection = RunSelection {
         selectors: args.selectors.clone(),
-        systems: catalog.systems.clone(),
+        systems: planned.systems.clone(),
         selected_checks: selected.iter().cloned().collect(),
         partial: !args.selectors.is_empty() || !args.systems.is_empty(),
     };
@@ -124,6 +124,8 @@ pub(super) fn run_checks(
             &selected,
             &allocation,
             backend,
+            &planned.plans,
+            &planned.dependencies,
             interrupt.clone(),
             jobs,
             args.fail_fast,
@@ -211,7 +213,7 @@ pub(super) fn run_checks(
                     selection,
                     outcomes: execution.outcomes.into_values().collect(),
                     failures,
-                    notices: catalog.notices,
+                    notices: planned.notices,
                 },
                 operational_error,
             )
@@ -244,7 +246,7 @@ pub(super) fn run_checks(
                 selection,
                 outcomes,
                 failures: Vec::new(),
-                notices: catalog.notices,
+                notices: planned.notices,
             };
             if let Err(finalize_error) = store.finalize(&allocation, &record) {
                 return report_error(
@@ -425,13 +427,6 @@ pub(super) struct FailureDraft {
     pub(super) occurrence: usize,
 }
 
-#[derive(Debug, Clone)]
-struct CatalogSelection {
-    id: String,
-    system: String,
-    attribute: String,
-}
-
 type InitialWork<'a> = (
     String,
     Box<dyn FnOnce(CancellationToken) -> InitialTask + Send + 'a>,
@@ -445,19 +440,15 @@ struct InitialTask {
 enum InitialTaskResult {
     Structure(Result<Option<bloomery_model::Context>, Vec<Diagnostic>>),
     Traceability(Result<(), Vec<Diagnostic>>),
-    NixCheck {
+    NixBatch {
         log: String,
-        result: NixTaskResult<()>,
+        result: BatchRealization,
     },
 }
 
 enum InitialState {
     StaticPassed,
     StaticFailed(Vec<Diagnostic>),
-    NixCheck {
-        log: String,
-        result: NixTaskResult<()>,
-    },
     Canceled,
     NotRun,
 }
@@ -468,6 +459,8 @@ fn execute_selected<W: Write>(
     selected: &BTreeSet<String>,
     allocation: &store::RunAllocation,
     backend: &dyn NixBackend,
+    plans: &BTreeMap<String, CheckPlan>,
+    dependencies: &BTreeMap<String, Vec<String>>,
     interrupt: InterruptFlag,
     jobs: usize,
     fail_fast: bool,
@@ -491,13 +484,12 @@ fn execute_selected<W: Write>(
     let mut operational_error = None;
     let nix_checks = selected
         .iter()
-        .filter_map(|id| {
-            parse_nix_id(id).map(|(system, attribute)| CatalogSelection {
-                id: id.clone(),
-                system: system.to_owned(),
-                attribute: attribute.to_owned(),
-            })
-        })
+        .filter(|id| id.starts_with("nix:"))
+        .cloned()
+        .collect::<Vec<_>>();
+    let batch_plans = nix_checks
+        .iter()
+        .filter_map(|id| plans.get(id).cloned())
         .collect::<Vec<_>>();
 
     let mut initial_tasks: Vec<InitialWork<'_>> = Vec::new();
@@ -512,28 +504,30 @@ fn execute_selected<W: Write>(
             }),
         ));
     }
-    for (index, check) in nix_checks.iter().enumerate() {
-        let check = check.clone();
+    if !batch_plans.is_empty() {
         let root = root.to_path_buf();
         let allocation = allocation.clone();
         let sink = sink.clone();
         initial_tasks.push((
-            check.id.clone(),
+            "nix:batch".to_owned(),
             Box::new(move |cancellation| {
-                let log_name = format!("nix-check-{index:04}.log");
-                let result = match allocation.prepare_log(&log_name) {
-                    Ok(log_path) => backend.realize_check(
+                let log_name = "nix-batch.log";
+                let result = match allocation.prepare_log(log_name) {
+                    Ok(log_path) => backend.realize_batch(
                         &root,
-                        &check.system,
-                        &check.attribute,
+                        &batch_plans,
+                        fail_fast,
                         &log_path,
                         cancellation,
                         &sink,
                     ),
-                    Err(message) => NixTaskResult::OperationalError(message),
+                    Err(message) => BatchRealization {
+                        operational_error: Some(message),
+                        ..BatchRealization::default()
+                    },
                 };
                 InitialTask {
-                    result: InitialTaskResult::NixCheck {
+                    result: InitialTaskResult::NixBatch {
                         log: format!("logs/{log_name}"),
                         result,
                     },
@@ -607,7 +601,24 @@ fn execute_selected<W: Write>(
         },
     );
     let mut initial = BTreeMap::new();
+    let mut batch_log: Option<String> = None;
+    let mut batch = BatchRealization::default();
+    let mut batch_canceled = false;
     for result in initial_report.results {
+        let id = result.id;
+        if id == "nix:batch" {
+            match result.state {
+                ScheduledState::Completed(task) => {
+                    if let InitialTaskResult::NixBatch { log, result } = task.result {
+                        batch_log = Some(log);
+                        batch = result;
+                    }
+                }
+                ScheduledState::Canceled => batch_canceled = true,
+                ScheduledState::NotRun => {}
+            }
+            continue;
+        }
         let state = match result.state {
             ScheduledState::Completed(task) => match task.result {
                 InitialTaskResult::Structure(Ok(_)) | InitialTaskResult::Traceability(Ok(())) => {
@@ -618,15 +629,38 @@ fn execute_selected<W: Write>(
                     sort_model_diagnostics(&mut diagnostics);
                     InitialState::StaticFailed(diagnostics)
                 }
-                InitialTaskResult::NixCheck { log, result } => {
-                    InitialState::NixCheck { log, result }
-                }
+                InitialTaskResult::NixBatch { .. } => continue,
             },
             ScheduledState::Canceled => InitialState::Canceled,
             ScheduledState::NotRun => InitialState::NotRun,
         };
-        initial.insert(result.id, state);
+        initial.insert(id, state);
     }
+
+    if batch.canceled {
+        batch_canceled = true;
+    }
+    if let Some(message) = batch.operational_error.clone() {
+        operational_error.get_or_insert(message);
+    }
+
+    // Resolve every selected derivation's output validity in one query.
+    let output_paths = nix_checks
+        .iter()
+        .filter_map(|id| plans.get(id))
+        .flat_map(|plan| plan.outputs.iter().cloned())
+        .collect::<Vec<_>>();
+    let valid = if output_paths.is_empty() {
+        BTreeSet::new()
+    } else {
+        match backend.validate_outputs(root, &output_paths) {
+            Ok(valid) => valid,
+            Err(message) => {
+                operational_error.get_or_insert(message);
+                BTreeSet::new()
+            }
+        }
+    };
 
     for (id, state) in initial {
         match state {
@@ -643,40 +677,84 @@ fn execute_selected<W: Write>(
                     .outcome = Outcome::Failed;
                 failures.extend(diagnostic_failures(root, &id, diagnostics, None));
             }
-            InitialState::NixCheck { log, result } => {
-                let outcome = outcomes.get_mut(&id).expect("selected Nix check");
-                outcome.logs.push(log.clone());
-                match result {
-                    NixTaskResult::Succeeded(()) => outcome.outcome = Outcome::Passed,
-                    NixTaskResult::Failed { code, message } => {
-                        outcome.outcome = Outcome::Failed;
-                        let nix_log = retained_nix_log_path(&allocation.directory, &log);
-                        failures.push(FailureDraft {
-                            check: id,
-                            code,
-                            subject: None,
-                            location: None,
-                            message,
-                            notes: Vec::new(),
-                            log: Some(log),
-                            nix_log,
-                            focus_tail: true,
-                            occurrence: failures.len(),
-                        });
-                    }
-                    NixTaskResult::Canceled => outcome.outcome = Outcome::Canceled,
-                    NixTaskResult::OperationalError(message) => {
-                        outcome.outcome = Outcome::Canceled;
-                        operational_error.get_or_insert(message);
-                    }
-                }
-            }
             InitialState::Canceled => {
                 outcomes.get_mut(&id).expect("selected task").outcome = Outcome::Canceled;
             }
             InitialState::NotRun => {
                 outcomes.get_mut(&id).expect("selected task").outcome = Outcome::NotRun;
             }
+        }
+    }
+
+    // Map the single batched realization outcome onto every selected Nix check.
+    // A check is passed only when all of its derivation outputs are valid; a
+    // failed or causally-blocked derivation is failed; fail-fast cancellation
+    // leaves incomplete checks canceled and never-started ones not_run.
+    for id in &nix_checks {
+        let Some(plan) = plans.get(id) else {
+            continue;
+        };
+        let outcome = outcomes.get_mut(id).expect("selected Nix check");
+        if let Some(log) = &batch_log {
+            outcome.logs.push(log.clone());
+        }
+        if let Some(error) = &plan.eval_error {
+            outcome.outcome = Outcome::Failed;
+            failures.push(FailureDraft {
+                check: id.clone(),
+                code: error.code.clone(),
+                subject: None,
+                location: None,
+                message: error.message.clone(),
+                notes: Vec::new(),
+                log: batch_log.clone(),
+                nix_log: None,
+                focus_tail: false,
+                occurrence: failures.len(),
+            });
+            continue;
+        }
+        let Some(derivation) = plan.derivation.clone() else {
+            outcome.outcome = Outcome::NotRun;
+            continue;
+        };
+        let all_valid =
+            !plan.outputs.is_empty() && plan.outputs.iter().all(|output| valid.contains(output));
+        let own_block = batch.failures.get(&derivation);
+        // A dependency-only failure block has no builder log of its own; prefer
+        // the causal failed dependency so details can resolve a useful log.
+        let dependency_cause = own_block
+            .is_none_or(|block| block.log_hint.is_none())
+            .then(|| causal_failure(&derivation, &batch.failures, dependencies))
+            .flatten();
+        if let Some(cause) = dependency_cause {
+            outcome.outcome = Outcome::Failed;
+            failures.push(failure_from_block(
+                id,
+                &cause,
+                batch_log.clone(),
+                cause.derivation.clone(),
+                failures.len(),
+            ));
+            continue;
+        }
+        if let Some(block) = own_block {
+            outcome.outcome = Outcome::Failed;
+            failures.push(failure_from_block(
+                id,
+                block,
+                batch_log.clone(),
+                derivation.clone(),
+                failures.len(),
+            ));
+            continue;
+        }
+        if all_valid {
+            outcome.outcome = Outcome::Passed;
+        } else if batch_canceled {
+            outcome.outcome = Outcome::Canceled;
+        } else {
+            outcome.outcome = Outcome::NotRun;
         }
     }
 
@@ -736,31 +814,72 @@ fn completed_outcome(task: &InitialTask) -> Option<Outcome> {
         InitialTaskResult::Structure(Err(_)) | InitialTaskResult::Traceability(Err(_)) => {
             Some(Outcome::Failed)
         }
-        InitialTaskResult::NixCheck { result, .. } => match result {
-            NixTaskResult::Succeeded(()) => Some(Outcome::Passed),
-            NixTaskResult::Failed { .. } => Some(Outcome::Failed),
-            NixTaskResult::Canceled => Some(Outcome::Canceled),
-            NixTaskResult::OperationalError(_) => Some(Outcome::Canceled),
-        },
+        InitialTaskResult::NixBatch { .. } => None,
     }
 }
 
 fn initial_task_stops_admission(task: &InitialTask, fail_fast: bool) -> bool {
     match &task.result {
         InitialTaskResult::Structure(Err(_)) | InitialTaskResult::Traceability(Err(_)) => fail_fast,
-        InitialTaskResult::NixCheck { result, .. } => match result {
-            NixTaskResult::Failed { .. } => fail_fast,
-            NixTaskResult::OperationalError(_) => true,
-            NixTaskResult::Succeeded(()) | NixTaskResult::Canceled => false,
-        },
+        InitialTaskResult::NixBatch { result, .. } => {
+            result.operational_error.is_some() || (fail_fast && !result.failures.is_empty())
+        }
         InitialTaskResult::Structure(Ok(_)) | InitialTaskResult::Traceability(Ok(())) => false,
     }
 }
 
-fn retained_nix_log_path(run_directory: &Path, log: &str) -> Option<String> {
-    let path = store::resolve_log_path(run_directory, log).ok()?;
-    let output = std::fs::read(path).ok()?;
-    nix_log_store_path(&output)
+fn failure_from_block(
+    check: &str,
+    block: &super::catalog::FailureBlock,
+    log: Option<String>,
+    nix_log: String,
+    occurrence: usize,
+) -> FailureDraft {
+    FailureDraft {
+        check: check.to_owned(),
+        code: block.code.clone(),
+        subject: None,
+        location: None,
+        message: if block.message.is_empty() {
+            "Nix check failed".to_owned()
+        } else {
+            block.message.clone()
+        },
+        notes: block.excerpt.clone(),
+        log,
+        nix_log: block.log_hint.clone().or(Some(nix_log)),
+        focus_tail: true,
+        occurrence,
+    }
+}
+
+/// Walk a derivation's input closure for the first failed dependency so a
+/// dependency-only failure retains a useful derivation log. The starting
+/// derivation is excluded so a check's own failure is not mistaken for a cause.
+fn causal_failure(
+    derivation: &str,
+    failures: &BTreeMap<String, super::catalog::FailureBlock>,
+    dependencies: &BTreeMap<String, Vec<String>>,
+) -> Option<super::catalog::FailureBlock> {
+    let mut queue = VecDeque::new();
+    if let Some(inputs) = dependencies.get(derivation) {
+        queue.extend(inputs.iter().cloned());
+    }
+    let mut seen = BTreeSet::new();
+    while let Some(current) = queue.pop_front() {
+        if !seen.insert(current.clone()) {
+            continue;
+        }
+        if let Some(block) = failures.get(&current) {
+            return Some(block.clone());
+        }
+        if let Some(inputs) = dependencies.get(&current) {
+            for input in inputs {
+                queue.push_back(input.clone());
+            }
+        }
+    }
+    None
 }
 
 fn diagnostic_failures(

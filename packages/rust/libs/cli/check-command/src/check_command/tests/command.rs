@@ -14,15 +14,17 @@ use std::sync::atomic::Ordering;
 #[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-001"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-010"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-012"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-018"))]
 fn default_and_explicit_selection_choose_static_and_requested_system_catalogs() {
     let (root, cache) = fixture(true);
     let static_backend = FakeNix::default();
     let (status, stdout, _) = invoke(request(), &root, &cache, &static_backend, true);
     assert_eq!(status, std::process::ExitCode::SUCCESS);
     let result: Value = serde_json::from_slice(&stdout).expect("summary JSON");
-    // Two static checks plus the implicit format:workspace gate.
+    // Two static checks plus the implicit format:workspace gate; one catalog
+    // evaluation resolves the (empty) Nix plan.
     assert_eq!(result["counts"]["passed"], 3);
-    assert_eq!(static_backend.evaluations.load(Ordering::SeqCst), 0);
+    assert_eq!(static_backend.evaluations.load(Ordering::SeqCst), 1);
     assert_eq!(static_backend.formatter_runs.load(Ordering::SeqCst), 1);
 
     let (root, cache2) = fixture(true);
@@ -41,6 +43,8 @@ fn default_and_explicit_selection_choose_static_and_requested_system_catalogs() 
     let (status, stdout, _) = invoke(args, &root, &cache2, &backend, true);
     assert_eq!(status, std::process::ExitCode::SUCCESS);
     assert_eq!(backend.systems.lock().unwrap().len(), 2);
+    // One catalog evaluation per selected system resolves both IDs and plans.
+    assert_eq!(backend.evaluations.load(Ordering::SeqCst), 2);
     let result: Value = serde_json::from_slice(&stdout).expect("partial run JSON");
     assert_eq!(result["scope"]["checks"][0], "nix:*:core:test");
     let _ = fs::remove_dir_all(root);
@@ -131,7 +135,7 @@ fn explicitly_selected_system_with_empty_checks_is_a_valid_static_only_run() {
         backend.systems.lock().unwrap().as_slice(),
         &["aarch64-linux"]
     );
-    assert_eq!(backend.evaluations.load(Ordering::SeqCst), 0);
+    assert_eq!(backend.evaluations.load(Ordering::SeqCst), 1);
     let result: Value = serde_json::from_slice(&stdout).expect("summary JSON");
     assert_eq!(result["counts"]["passed"], 3);
     assert_eq!(result["scope"]["systems"][0], "aarch64-linux");

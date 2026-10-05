@@ -270,9 +270,9 @@ design = "design/details.md#storage-and-identity"
 
 [requirements.ears]
 type = "event"
-trigger = "a failed Nix check output references a derivation log"
+trigger = "a selected Nix check fails during batched realization"
 system = "bloomery check"
-action = "retain the referenced Nix store path with the failure record"
+action = "retain its derivation store path with the failure record"
 
 [[requirements]]
 id = "CLI-CHECK-DETAIL-025"

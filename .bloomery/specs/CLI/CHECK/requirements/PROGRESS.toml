@@ -140,7 +140,7 @@ design = "design/progress.md#derivation-metrics"
 [requirements.ears]
 type = "ubiquitous"
 system = "the check progress aggregator"
-action = "deduplicate selected Nix dependency work by canonical derivation store path across clients, systems, and required outputs"
+action = "deduplicate selected Nix dependency work by canonical derivation store path across the batched realization, systems, and required outputs"
 
 [[requirements]]
 id = "CLI-CHECK-PROGRESS-013"

@@ -17,8 +17,8 @@ Preserve the existing diagnostic semantics and repository-relative locations:
 | `MissingAutomatedTest` | Automated requirement has no evidence. |
 | `ParseError` | Configuration, Markdown, TOML, source, or Nix input is invalid. |
 
-Runner failures retain captured Nix check invocation output and the referenced
-store path as seekable task details. A formatter failure is recorded under
+Runner failures retain the batched realization output and the failed check's
+derivation store path as seekable task details. A formatter failure is recorded under
 `format:workspace` with its captured `nix fmt` output. The
 `check details` command resolves a retained Nix store path on demand and includes
 the derivation log in its detail stream. Setup/discovery errors are operational

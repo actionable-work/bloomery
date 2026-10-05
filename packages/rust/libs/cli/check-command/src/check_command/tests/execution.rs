@@ -54,7 +54,6 @@ fn traceability_failure_stops_nix_work_without_waiting_for_builds() {
         nix.iter()
             .all(|outcome| matches!(outcome.outcome, Outcome::Canceled | Outcome::NotRun))
     );
-    assert!(nix.iter().any(|outcome| outcome.outcome == Outcome::NotRun));
     assert!(backend.build_commands.load(Ordering::SeqCst) <= 1);
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
@@ -62,6 +61,7 @@ fn traceability_failure_stops_nix_work_without_waiting_for_builds() {
 
 #[test]
 #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-024"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-024"))]
 fn failed_nix_checks_retain_referenced_derivation_log_paths() {
     let (root, cache) = fixture(true);
     let store_path = "/nix/store/0123456789abcdfghijklmnpqrsvwxyz-failed-check.drv";
@@ -91,6 +91,8 @@ fn failed_nix_checks_retain_referenced_derivation_log_paths() {
 #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-007"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-008"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-009"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-019"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-020"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-011"))]
 fn aliased_check_build_requests_rely_on_native_store_deduplication() {
     let (root, cache) = fixture(true);
@@ -102,8 +104,8 @@ fn aliased_check_build_requests_rely_on_native_store_deduplication() {
     args.selectors = vec!["nix:*".to_owned()];
     let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::SUCCESS);
-    assert_eq!(backend.evaluations.load(Ordering::SeqCst), 2);
-    assert_eq!(backend.build_commands.load(Ordering::SeqCst), 2);
+    assert_eq!(backend.evaluations.load(Ordering::SeqCst), 1);
+    assert_eq!(backend.build_commands.load(Ordering::SeqCst), 1);
     assert_eq!(backend.realizations.load(Ordering::SeqCst), 1);
     let result: Value = serde_json::from_slice(&stdout).expect("summary");
     assert_eq!(result["counts"]["passed"], 3);
@@ -216,6 +218,7 @@ fn real_nix_runner_builds_two_aliases_of_one_low_storage_derivation() {
 
 #[test]
 #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-005"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-021"))]
 fn default_execution_attempts_other_independent_checks_after_a_build_failure() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -263,7 +266,7 @@ fn default_jobs_are_positive_task_output_isolated_and_locks_are_unchanged() {
         .collect::<Vec<_>>();
     let (status, stdout, _) = invoke(request(), &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::SUCCESS);
-    assert_eq!(backend.evaluations.load(Ordering::SeqCst), 2);
+    assert_eq!(backend.evaluations.load(Ordering::SeqCst), 1);
     // Formatter edits persist, while repository lockfiles are untouched.
     assert_eq!(
         fs::read(root.join("formatted-source.rs")).expect("formatter edit"),
@@ -277,23 +280,22 @@ fn default_jobs_are_positive_task_output_isolated_and_locks_are_unchanged() {
     let store =
         crate::check_command::store::RunStore::open(&root, Some(&cache)).expect("retained store");
     let (retained, directory) = store.latest().expect("latest run");
-    let evaluation_logs = retained
+    let batch_logs = retained
         .outcomes
         .iter()
         .flat_map(|outcome| outcome.logs.iter())
-        .filter(|log| log.contains("nix-check"))
-        .collect::<Vec<_>>();
-    assert_eq!(evaluation_logs.len(), 2);
-    let contents = evaluation_logs
-        .iter()
-        .map(|log| {
-            let path = crate::check_command::store::resolve_log_path(&directory, log)
-                .expect("safe retained log path");
-            fs::read_to_string(path).expect("task-isolated evaluation log")
-        })
-        .collect::<Vec<_>>();
-    assert!(contents.iter().any(|log| log.contains("one")));
-    assert!(contents.iter().any(|log| log.contains("two")));
+        .filter(|log| log.contains("nix-batch"))
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(batch_logs.len(), 1);
+    let batch_log = batch_logs.iter().next().expect("batch log reference");
+    let contents = fs::read_to_string(
+        crate::check_command::store::resolve_log_path(&directory, batch_log)
+            .expect("safe retained log path"),
+    )
+    .expect("batch log");
+    assert!(contents.contains("one"));
+    assert!(contents.contains("two"));
     assert!(backend.maximum_active.load(Ordering::SeqCst) >= 1);
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
@@ -350,6 +352,7 @@ fn evaluation_failures_are_check_failures_and_store_failures_are_operational() {
 #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-007"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-008"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-010"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-022"))]
 fn fail_fast_retains_started_results_and_does_not_admit_queued_work() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -433,6 +436,7 @@ fn failure_to_finalize_a_run_never_returns_success() {
 #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-001"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-002"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-003"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-027"))]
 fn independent_nix_derivations_realize_concurrently_within_the_job_limit() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -446,7 +450,8 @@ fn independent_nix_derivations_realize_concurrently_within_the_job_limit() {
     let (status, _, _) = invoke(args, &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::SUCCESS);
     assert_eq!(backend.realizations.load(Ordering::SeqCst), 3);
-    assert_eq!(backend.maximum_active.load(Ordering::SeqCst), 2);
+    assert_eq!(backend.build_commands.load(Ordering::SeqCst), 1);
+    assert_eq!(backend.validity_queries.load(Ordering::SeqCst), 1);
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
 }
@@ -600,7 +605,7 @@ fn every_execution_shape_formats_once_before_any_check() {
         assert!(
             events[1..]
                 .iter()
-                .all(|event| event.starts_with("realize:"))
+                .all(|event| event == "batch" || event.starts_with("realize:"))
         );
         let _ = fs::remove_dir_all(root);
         let _ = fs::remove_dir_all(cache);
@@ -795,6 +800,158 @@ fn git_dirty_state_is_sampled_after_formatter_edits() {
     let store = RunStore::open(&root, Some(&cache)).expect("retained store");
     let record = store.latest().expect("retained run").0;
     assert_eq!(record.source_dirty, Some(true));
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-023"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-026"))]
+fn selective_batch_failures_are_attributed_per_check() {
+    let (root, cache) = fixture(true);
+    let backend = FakeNix {
+        names: vec!["failed".to_owned(), "passed".to_owned()],
+        unique_derivations: true,
+        failing_attributes: vec!["failed".to_owned()],
+        ..FakeNix::default()
+    };
+    let mut args = request();
+    args.selectors = vec!["nix:*".to_owned()];
+    let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::FAILURE);
+    let result: Value = serde_json::from_slice(&stdout).expect("summary");
+    assert_eq!(result["counts"]["failed"], 1);
+    assert_eq!(result["counts"]["passed"], 2);
+    let store = RunStore::open(&root, Some(&cache)).expect("retained store");
+    let (record, _) = store.latest().expect("retained run");
+    assert!(record.outcomes.iter().any(|outcome| {
+        outcome.id == "nix:x86_64-linux:failed" && outcome.outcome == Outcome::Failed
+    }));
+    assert!(record.outcomes.iter().any(|outcome| {
+        outcome.id == "nix:x86_64-linux:passed" && outcome.outcome == Outcome::Passed
+    }));
+    let failed = record
+        .failures
+        .iter()
+        .find(|failure| failure.check == "nix:x86_64-linux:failed")
+        .expect("failed check record");
+    assert_eq!(failed.nix_log.as_deref(), Some("/nix/store/failed.drv"));
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-025"))]
+fn dependency_failure_retains_a_causal_derivation_log() {
+    let (root, cache) = fixture(true);
+    let backend = FakeNix {
+        names: vec!["dependent".to_owned(), "dependency".to_owned()],
+        unique_derivations: true,
+        failing_attributes: vec!["dependency".to_owned()],
+        derivation_dependencies: vec![("dependent".to_owned(), "dependency".to_owned())],
+        ..FakeNix::default()
+    };
+    let mut args = request();
+    args.selectors = vec!["nix:*".to_owned()];
+    let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::FAILURE);
+    let result: Value = serde_json::from_slice(&stdout).expect("summary");
+    assert_eq!(result["counts"]["failed"], 2);
+    let store = RunStore::open(&root, Some(&cache)).expect("retained store");
+    let (record, _) = store.latest().expect("retained run");
+    let dependent = record
+        .failures
+        .iter()
+        .find(|failure| failure.check == "nix:x86_64-linux:dependent")
+        .expect("dependent failure record");
+    assert_eq!(
+        dependent.nix_log.as_deref(),
+        Some("/nix/store/dependency.drv")
+    );
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-023"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-025"))]
+fn real_nix_batched_failures_resolve_per_check_and_causal_logs() {
+    if !nix_is_available() {
+        eprintln!("skipping real-Nix batched failure test: Nix store is unavailable");
+        return;
+    }
+
+    let (root, cache) = fixture(true);
+    let backend = NixCli::default();
+    let system = backend.host_system(&root).expect("host Nix system");
+    let flake = format!(
+        r#"{{
+  description = "bloomery batched failure fixture";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  outputs = {{ self, nixpkgs }}:
+    let
+      pkgs = nixpkgs.legacyPackages."{system}";
+      formatter = pkgs.writeShellScriptBin "noop-formatter" "exit 0";
+      pass = builtins.derivation {{
+        name = "bloomery-batch-pass";
+        system = "{system}";
+        builder = "/bin/sh";
+        args = [ "-c" "echo ok > $out" ];
+      }};
+      fail = builtins.derivation {{
+        name = "bloomery-batch-fail";
+        system = "{system}";
+        builder = "/bin/sh";
+        args = [ "-c" "echo bad >&2; exit 1" ];
+      }};
+      dependent = builtins.derivation {{
+        name = "bloomery-batch-dependent";
+        system = "{system}";
+        builder = "/bin/sh";
+        args = [ "-c" "echo ${{fail}} > /dev/null; echo dep > $out" ];
+      }};
+    in {{
+      formatter."{system}" = formatter;
+      checks."{system}" = {{
+        pass = pass;
+        fail = fail;
+        dependent = dependent;
+      }};
+    }};
+}}"#
+    );
+    fs::write(root.join("flake.nix"), flake).expect("write batched failure fixture");
+    lock_fixture_flake(&root);
+
+    let mut args = request();
+    args.selectors = vec!["nix:*".to_owned()];
+    let (status, stdout, stderr) = invoke(args, &root, &cache, &backend, true);
+    assert_eq!(
+        status,
+        std::process::ExitCode::FAILURE,
+        "runner stderr: {}",
+        String::from_utf8_lossy(&stderr)
+    );
+    let summary: Value = serde_json::from_slice(&stdout).expect("runner summary");
+    assert_eq!(summary["counts"]["failed"], 2);
+    assert_eq!(summary["counts"]["passed"], 2);
+
+    let store = RunStore::open(&root, Some(&cache)).expect("retained store");
+    let (record, _) = store.latest().expect("retained run");
+    assert!(record.outcomes.iter().any(|outcome| {
+        outcome.id == format!("nix:{system}:pass") && outcome.outcome == Outcome::Passed
+    }));
+    let dependent = record
+        .failures
+        .iter()
+        .find(|failure| failure.check == format!("nix:{system}:dependent"))
+        .expect("dependent failure record");
+    let causal = dependent.nix_log.as_deref().expect("causal derivation");
+    assert!(
+        causal.contains("bloomery-batch-fail"),
+        "expected the causal failed derivation, got {causal}"
+    );
+
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
 }

@@ -1,4 +1,4 @@
-use super::catalog::{NixBackend, NixCli, discover_catalog};
+use super::catalog::{CheckPlan, NixBackend, NixCli, discover_catalog};
 use super::execution::run_checks;
 use super::interrupt::InterruptFlag;
 use super::model::{Notice, selector_may_match_prefix, valid_system_name};
@@ -6,7 +6,7 @@ use super::output;
 use super::retrieval::{run_details, run_failures, run_list};
 use crate::output::TerminalFacts;
 pub use bloomery_cli_types::{CheckArgs, CheckOperation, DetailsArgs, FailureArgs, ListArgs};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::{self, Write};
 use std::path::Path;
@@ -296,6 +296,87 @@ pub(super) struct Catalog {
     pub(super) ids: Vec<String>,
     pub(super) systems: Vec<String>,
     pub(super) notices: Vec<Notice>,
+}
+
+/// Full execution catalog evaluation: check IDs plus the per-system derivation
+/// plan and dependency graph resolved in one Nix evaluation per system.
+pub(super) struct PlannedCatalog {
+    pub(super) ids: Vec<String>,
+    pub(super) systems: Vec<String>,
+    pub(super) notices: Vec<Notice>,
+    pub(super) plans: BTreeMap<String, CheckPlan>,
+    pub(super) dependencies: BTreeMap<String, Vec<String>>,
+}
+
+pub(super) fn plan_for_selection(
+    root: &Path,
+    selectors: &[String],
+    requested_systems: &[String],
+    backend: &dyn NixBackend,
+) -> Result<PlannedCatalog, CheckError> {
+    if !root.join("flake.nix").is_file() {
+        return Err(CheckError {
+            code: crate::output::MISSING_FLAKE_CODE,
+            message: crate::output::MISSING_FLAKE_MESSAGE.to_owned(),
+        });
+    }
+
+    if requested_systems.is_empty()
+        && !selectors.is_empty()
+        && selectors
+            .iter()
+            .all(|selector| !selector_may_match_prefix(selector, "nix:"))
+    {
+        return Ok(PlannedCatalog {
+            ids: vec![
+                "static:structure".to_owned(),
+                "static:traceability".to_owned(),
+            ],
+            systems: Vec::new(),
+            notices: Vec::new(),
+            plans: BTreeMap::new(),
+            dependencies: BTreeMap::new(),
+        });
+    }
+
+    let systems = effective_systems(root, requested_systems, backend)?;
+    let mut ids = vec![
+        "static:structure".to_owned(),
+        "static:traceability".to_owned(),
+    ];
+    let mut notices = Vec::new();
+    let mut plans = BTreeMap::new();
+    let mut dependencies = BTreeMap::new();
+    for system in &systems {
+        let planned = backend
+            .plan_checks(root, system)
+            .map_err(CheckError::operational)?;
+        if planned.legacy {
+            notices.push(Notice {
+                code: "LegacyRecursiveCheckExcluded".to_owned(),
+                message: format!(
+                    "excluded legacy recursive check output for {system}: bloomery:check"
+                ),
+            });
+        }
+        dependencies.extend(planned.dependencies);
+        for plan in planned.plans {
+            let id = format!("nix:{system}:{}", plan.attribute);
+            plans.insert(id.clone(), plan);
+            ids.push(id);
+        }
+    }
+    ids.sort();
+    ids.dedup();
+    notices.sort_by(|left, right| left.message.cmp(&right.message));
+    notices.dedup_by(|left, right| left.code == right.code && left.message == right.message);
+    Ok(PlannedCatalog {
+        ids,
+        systems,
+        notices,
+        plans,
+        dependencies,
+    })
 }
 
 pub(super) fn discover_for_selection(

@@ -13,14 +13,14 @@ action = "permit independent static and Nix tasks to execute concurrently"
 
 [[requirements]]
 id = "CLI-CHECK-RUN-002"
-title = "Independent Nix checks execute concurrently"
+title = "Independent Nix derivations execute concurrently"
 manual = false
 design = "design/execution.md#scheduler"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "bloomery check"
-action = "permit independent Nix check realizations to execute concurrently"
+action = "permit Nix to realize independent derivations concurrently within the batched realization"
 
 [[requirements]]
 id = "CLI-CHECK-RUN-003"
@@ -31,7 +31,7 @@ design = "design/execution.md#scheduler"
 [requirements.ears]
 type = "ubiquitous"
 system = "bloomery check"
-action = "limit active check tasks to the positive --jobs value"
+action = "limit Bloomery-owned active tasks to the positive --jobs value while leaving derivation concurrency to Nix"
 
 [[requirements]]
 id = "CLI-CHECK-RUN-004"
@@ -79,7 +79,7 @@ design = "design/execution.md#scheduler"
 type = "event"
 trigger = "the first failure is observed with --fail-fast selected"
 system = "bloomery check"
-action = "stop admitting new check tasks"
+action = "stop admitting new check tasks and cancel the batched realization"
 
 [[requirements]]
 id = "CLI-CHECK-RUN-008"
@@ -91,7 +91,7 @@ design = "design/execution.md#scheduler"
 type = "event"
 trigger = "the first failure is observed with --fail-fast selected"
 system = "bloomery check"
-action = "request cancellation of its running tasks without terminating unrelated clients"
+action = "cancel the batched Nix realization without terminating unrelated Nix clients"
 
 [[requirements]]
 id = "CLI-CHECK-RUN-009"
@@ -125,7 +125,7 @@ design = "design/execution.md#exit-and-setup-failures"
 [requirements.ears]
 type = "ubiquitous"
 system = "bloomery check"
-action = "capture output separately for each task"
+action = "capture realization output in run-local logs and resolve per-check failure logs from their derivation paths"
 
 [[requirements]]
 id = "CLI-CHECK-RUN-012"

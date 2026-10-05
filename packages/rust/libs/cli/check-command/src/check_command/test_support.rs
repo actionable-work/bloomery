@@ -1,4 +1,7 @@
-use super::catalog::{NixBackend, NixTaskResult};
+use super::catalog::{
+    BatchRealization, CheckPlan, FailureBlock, NixBackend, NixTaskResult, PlanError, PlannedSystem,
+    nix_log_store_path,
+};
 use super::command::{CheckArgs, CheckContext, run_at_with};
 use super::interrupt::{CancellationToken, InterruptFlag};
 use super::progress::{DerivationEvent, ProgressSink};
@@ -23,6 +26,16 @@ pub(super) struct FakeNix {
     pub(super) names: Vec<String>,
     pub(super) discovery_error: Option<String>,
     pub(super) unique_derivations: bool,
+    /// Attributes whose derivation fails during `plan_checks` evaluation.
+    pub(super) plan_eval_failures: Vec<String>,
+    /// Attributes whose derivation fails during batched realization. When empty
+    /// and `realization_result` is a failure, every derivation fails.
+    pub(super) failing_attributes: Vec<String>,
+    /// `(dependent attribute, dependency attribute)` edges used for causal
+    /// dependency-failure attribution.
+    pub(super) derivation_dependencies: Vec<(String, String)>,
+    pub(super) validity_queries: AtomicUsize,
+    pub(super) valid_outputs: Mutex<std::collections::BTreeSet<String>>,
     pub(super) interrupt_on_evaluation: Option<InterruptFlag>,
     pub(super) force_manifest_failure: bool,
     pub(super) wait_for_cancellation: bool,
@@ -102,77 +115,180 @@ impl NixBackend for FakeNix {
             .unwrap_or(NixTaskResult::Succeeded(()))
     }
 
-    fn realize_check(
+    fn plan_checks(&self, _root: &Path, system: &str) -> Result<PlannedSystem, String> {
+        self.systems
+            .lock()
+            .expect("systems lock")
+            .push(system.to_owned());
+        self.evaluations.fetch_add(1, Ordering::SeqCst);
+        if let Some(error) = &self.discovery_error {
+            return Err(error.clone());
+        }
+        let mut plans = Vec::new();
+        for attribute in &self.names {
+            let derivation = if self.unique_derivations {
+                format!("/nix/store/{attribute}.drv")
+            } else {
+                "/nix/store/check.drv".to_owned()
+            };
+            if self.plan_eval_failures.contains(attribute) {
+                plans.push(CheckPlan {
+                    attribute: attribute.clone(),
+                    derivation: None,
+                    eval_error: Some(PlanError {
+                        code: "EvaluationFailed".to_owned(),
+                        message: format!("attribute evaluation failed for {attribute}"),
+                    }),
+                    outputs: Vec::new(),
+                });
+                continue;
+            }
+            let output = if self.unique_derivations {
+                format!("/nix/store/{attribute}-out")
+            } else {
+                "/nix/store/check-out".to_owned()
+            };
+            plans.push(CheckPlan {
+                attribute: attribute.clone(),
+                derivation: Some(derivation),
+                eval_error: None,
+                outputs: vec![output],
+            });
+        }
+        let mut dependencies = BTreeMap::new();
+        for (dependent, dependency) in &self.derivation_dependencies {
+            let dependent_drv = if self.unique_derivations {
+                format!("/nix/store/{dependent}.drv")
+            } else {
+                "/nix/store/check.drv".to_owned()
+            };
+            let dependency_drv = if self.unique_derivations {
+                format!("/nix/store/{dependency}.drv")
+            } else {
+                "/nix/store/check.drv".to_owned()
+            };
+            dependencies.insert(dependent_drv, vec![dependency_drv]);
+        }
+        Ok(PlannedSystem {
+            legacy: false,
+            plans,
+            dependencies,
+        })
+    }
+
+    fn realize_batch(
         &self,
         _root: &Path,
-        _system: &str,
-        attribute: &str,
+        plans: &[CheckPlan],
+        _fail_fast: bool,
         log_path: &Path,
         cancellation: CancellationToken,
         progress: &ProgressSink,
-    ) -> NixTaskResult<()> {
-        self.evaluations.fetch_add(1, Ordering::SeqCst);
+    ) -> BatchRealization {
         self.build_commands.fetch_add(1, Ordering::SeqCst);
         self.events
             .lock()
             .expect("event lock")
-            .push(format!("realize:{attribute}"));
-        if cancellation.is_canceled() {
-            return NixTaskResult::Canceled;
-        }
-        let derivation = if self.unique_derivations {
-            format!("/nix/store/{attribute}.drv")
-        } else {
-            "/nix/store/check.drv".to_owned()
-        };
-        let log_contents = self
-            .log_contents
-            .clone()
-            .unwrap_or_else(|| format!("build log output for {attribute}\n").into_bytes());
-        fs::write(log_path, log_contents).expect("build log");
+            .push("batch".to_owned());
+        let contents = self.log_contents.clone().unwrap_or_else(|| {
+            plans
+                .iter()
+                .map(|plan| format!("build log output for {}\n", plan.attribute))
+                .collect::<String>()
+                .into_bytes()
+        });
+        fs::write(log_path, &contents).expect("batch log");
         if self.force_manifest_failure {
             let run_directory = log_path.parent().unwrap().parent().unwrap();
             fs::create_dir(run_directory.join("manifest.json"))
                 .expect("preempt manifest publication");
         }
+        let mut build_started = Vec::new();
+        for plan in plans {
+            let emitted = self
+                .events_by_attribute
+                .lock()
+                .expect("scripted event lock")
+                .get(&plan.attribute)
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .chain(
+                    self.scripted_events
+                        .lock()
+                        .expect("scripted event lock")
+                        .clone(),
+                )
+                .collect::<Vec<_>>();
+            for event in &emitted {
+                if let DerivationEvent::BuildStarted { drv } = event {
+                    build_started.push(drv.clone());
+                }
+                progress.work(event.clone());
+            }
+        }
         if let Some(interrupt) = &self.interrupt_on_evaluation {
             interrupt.interrupt_for_test();
         }
-        let emitted = self
-            .events_by_attribute
-            .lock()
-            .expect("scripted event lock")
-            .get(attribute)
-            .cloned()
-            .unwrap_or_default()
-            .into_iter()
-            .chain(
-                self.scripted_events
-                    .lock()
-                    .expect("scripted event lock")
-                    .clone(),
-            )
-            .collect::<Vec<_>>();
-        for event in &emitted {
-            progress.work(event.clone());
+        let all_fail = matches!(self.realization_result, Some(NixTaskResult::Failed { .. }));
+        let mut failures = BTreeMap::new();
+        let mut valid = std::collections::BTreeSet::new();
+        let mut new_realizations = 0usize;
+        let hint = nix_log_store_path(&contents);
+        for plan in plans {
+            let Some(derivation) = &plan.derivation else {
+                continue;
+            };
+            let first = self
+                .built_derivations
+                .lock()
+                .expect("derivation lock")
+                .insert(derivation.clone());
+            if first {
+                new_realizations += 1;
+                let active = self.active.fetch_add(1, Ordering::SeqCst) + 1;
+                self.maximum_active.fetch_max(active, Ordering::SeqCst);
+                std::thread::sleep(Duration::from_millis(10));
+                self.active.fetch_sub(1, Ordering::SeqCst);
+            }
+            let fails = if !self.failing_attributes.is_empty() {
+                self.failing_attributes.contains(&plan.attribute)
+            } else {
+                all_fail
+            };
+            let dependency_failed =
+                self.derivation_dependencies
+                    .iter()
+                    .any(|(dependent, dependency)| {
+                        dependent == &plan.attribute && self.failing_attributes.contains(dependency)
+                    });
+            if fails {
+                let (code, message) = match &self.realization_result {
+                    Some(NixTaskResult::Failed { code, message }) => {
+                        (code.clone(), message.clone())
+                    }
+                    _ => ("NixCheckFailed".to_owned(), "build failed".to_owned()),
+                };
+                failures.insert(
+                    derivation.clone(),
+                    FailureBlock {
+                        derivation: derivation.clone(),
+                        code,
+                        message,
+                        log_hint: hint.clone().or_else(|| Some(derivation.clone())),
+                        excerpt: Vec::new(),
+                    },
+                );
+                if _fail_fast {
+                    break;
+                }
+            } else if !dependency_failed {
+                valid.extend(plan.outputs.iter().cloned());
+            }
         }
-        // Model Nix's output lock: aliases issue separate client requests,
-        // but share one realization attempt.
-        let first_realization = self
-            .built_derivations
-            .lock()
-            .expect("derivation lock")
-            .insert(derivation);
-        if first_realization {
-            self.realizations.fetch_add(1, Ordering::SeqCst);
-            let active = self.active.fetch_add(1, Ordering::SeqCst) + 1;
-            self.maximum_active.fetch_max(active, Ordering::SeqCst);
-            std::thread::sleep(Duration::from_millis(10));
-            self.active.fetch_sub(1, Ordering::SeqCst);
-        }
+        self.realizations
+            .fetch_add(new_realizations, Ordering::SeqCst);
         if self.wait_for_cancellation || self.complete_after_cancellation {
-            // A bounded wait makes delayed traceability admission fail the test
-            // instead of hanging the suite indefinitely.
             let deadline = std::time::Instant::now() + Duration::from_secs(3);
             while !cancellation.is_canceled() && std::time::Instant::now() < deadline {
                 std::thread::sleep(Duration::from_millis(1));
@@ -181,26 +297,52 @@ impl NixBackend for FakeNix {
         if let Some(barrier) = &self.hold_until_released {
             barrier.wait();
         }
-        if cancellation.is_canceled() {
-            return NixTaskResult::Canceled;
+        let interrupted = self
+            .interrupt_on_evaluation
+            .as_ref()
+            .is_some_and(|interrupt| interrupt.is_set());
+        if cancellation.is_canceled() || interrupted {
+            *self.valid_outputs.lock().expect("valid outputs lock") =
+                std::collections::BTreeSet::new();
+            return BatchRealization {
+                failures: BTreeMap::new(),
+                canceled: true,
+                operational_error: None,
+            };
         }
-        let result = self
-            .realization_result
-            .clone()
-            .unwrap_or(NixTaskResult::Succeeded(()));
-        if matches!(result, NixTaskResult::Succeeded(())) && progress.is_enabled() {
-            let mut saw_build = false;
-            for event in &emitted {
-                if let DerivationEvent::BuildStarted { drv } = event {
-                    saw_build = true;
+        *self.valid_outputs.lock().expect("valid outputs lock") = valid.clone();
+        if failures.is_empty() {
+            if build_started.is_empty() {
+                progress.emit(super::progress::ProgressEvent::DerivationMetadataAvailable);
+            } else {
+                for drv in &build_started {
                     progress.work(DerivationEvent::BuildSucceeded { drv: drv.clone() });
                 }
             }
-            if !saw_build {
-                progress.emit(super::progress::ProgressEvent::DerivationMetadataAvailable);
-            }
         }
-        result
+        BatchRealization {
+            failures,
+            canceled: false,
+            operational_error: None,
+        }
+    }
+
+    fn validate_outputs(
+        &self,
+        _root: &Path,
+        outputs: &[String],
+    ) -> Result<std::collections::BTreeSet<String>, String> {
+        self.validity_queries.fetch_add(1, Ordering::SeqCst);
+        let valid = self
+            .valid_outputs
+            .lock()
+            .expect("valid outputs lock")
+            .clone();
+        Ok(outputs
+            .iter()
+            .filter(|output| valid.contains(*output))
+            .cloned()
+            .collect())
     }
 
     fn read_derivation_log(&self, _root: &Path, store_path: &str) -> Result<Vec<u8>, String> {

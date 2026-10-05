@@ -14,12 +14,12 @@ fails, so retained metadata describes the source used by check tasks and any
 formatting edits, including partial edits from a failed formatter.
 A missing Git command or unavailable revision/status leaves the corresponding
 field null and does not fail the run. Working-tree state includes normal
-untracked files. When failed Nix output references a derivation log, retain the
+untracked files. When a selected check fails during batched realization, retain its derivation
 store path with the failure record. On `check details`, resolve that path with
 `nix log` once and retain its normalized output or unavailability result in a
-shared run-local derivation snapshot. Keep the original Nix
-command output; failure to retrieve a referenced log does not hide retained
-details or change the failed-check outcome.
+shared run-local derivation snapshot. Keep the batched realization output;
+failure to retrieve a referenced log does not hide retained details or change
+the failed-check outcome.
 
 Allocate a run before execution. Write an atomic completed manifest after
 execution; completed runs are immutable. Concurrent runs have distinct storage.

@@ -34,9 +34,8 @@ the final summary owns the pass/fail result.
 
 ## Derivation metrics
 
-Nix dependency work is separate from the check counter. Aggregate work for
-selected build requests, including their dependencies, across concurrent clients
-and systems. Deduplicate by canonical derivation store path, not check ID,
+Nix dependency work is separate from the check counter. Aggregate work for the
+batched realization, including its dependencies, across selected systems. Deduplicate by canonical derivation store path, not check ID,
 activity ID, display name, output count, or subprocess. Do not include unrelated
 Nix daemon work or count already-present store outputs as cache downloads.
 
@@ -72,7 +71,9 @@ does not establish success, and work whose success cannot be proven remains
 outstanding. Resolve output substitution identities to derivation paths using
 structured Nix metadata; store-path download counts are not derivation counts.
 Do not scrape localized human diagnostics, forward raw Nix events to the
-terminal, or sum per-client aggregate totals that can overlap.
+terminal, or sum aggregate totals from overlapping realization scopes.
+Completed derivation work may be reconciled from the post-realization outcome
+validity result when structured completion evidence is unavailable.
 
 Execution supplies final-outcome events for selected checks and the formatter
 gate to the same aggregator. One serialized renderer owns terminal writes;

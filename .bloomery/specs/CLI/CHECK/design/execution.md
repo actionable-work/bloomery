@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | `static:structure` | Configuration, workspace/frontmatter, requirements, design links | none |
 | `static:traceability` | Enabled scanners and relational evidence checks | loaded valid requirement model |
-| `nix:<system>:<attribute>` | One attribute under `checks.<system>` | Nix discovery and evaluation |
+| `nix:<system>:<attribute>` | One attribute under `checks.<system>` | Catalog evaluation |
 
 Preserve the existing static validations; these IDs group the existing passes,
 not new independent validation semantics. Static structure is a prerequisite
@@ -76,11 +76,13 @@ with valid empty check sets are distinct from missing system outputs.
 After the formatter gate passes, run independent static and Nix tasks
 concurrently. Admit traceability as soon as structure passes and a task slot is
 available, ahead of queued independent work; do not wait for Nix completion.
-All tasks share admission and cancellation. `--jobs N` is positive, defaults to
-the available logical CPU count, and has a minimum of one. The limit applies to
-Bloomery-owned active check tasks, not the serial formatter preflight, discovery
-processes, or all builders and dependencies inside the Nix daemon. Do not override
-users' Nix builder configuration to imply a global process bound.
+The Nix branch is one batched realization task; Nix realizes independent
+derivations concurrently within it. All tasks share admission and cancellation.
+`--jobs N` is positive, defaults to the available logical CPU count, and has a
+minimum of one. The limit applies to Bloomery-owned active tasks, not the serial
+formatter preflight, catalog evaluation, the batched realization, or all
+builders and dependencies inside the Nix daemon. Do not override users' Nix
+builder configuration to imply a global process bound.
 
 Track each selected check and `format:workspace` as passed, failed, blocked,
 canceled, or not_run. Queued/running are intermediate states.
@@ -88,17 +90,18 @@ Publish final-outcome transitions during execution to the
 [progress aggregator](progress.md#check-metrics); provisional not_run records do
 not mark queued work complete. Default execution attempts every
 selected check whose prerequisites permit execution; independent work continues
-after validation, evaluation, or build failures. A failed prerequisite leaves
-its dependents blocked with a link to the causal failure, not extra duplicate
-failure records. Cached Nix realizations count as passed.
+after validation, evaluation, or build failures. A failed static prerequisite
+leaves its dependents blocked with a link to the causal failure, not extra
+duplicate failure records. A failed Nix dependency marks each selected check
+that resolves to it failed. Cached Nix realizations count as passed.
 
 With `--fail-fast`, the first observed failure stops new admission and requests
-cancellation of Bloomery-owned running tasks. Record queued work as not_run and
-unfinished started work as canceled. Already completed outcomes are preserved.
-Use process ownership to avoid terminating unrelated Nix clients. Shared daemon
-or remote builds may continue; do not promise instantaneous cancellation.
-The first observed failure can differ with timing; final presentation order
-must not depend on completion order.
+cancellation of Bloomery-owned running tasks, including the batched realization.
+Record queued work as not_run and unfinished started work as canceled. Already
+completed outcomes are preserved. Use process ownership to avoid terminating
+unrelated Nix clients. Shared daemon or remote builds may continue; do not
+promise instantaneous cancellation. The first observed failure can differ with
+timing; final presentation order must not depend on completion order.
 
 ## Exit and setup failures
 
@@ -110,12 +113,13 @@ must not depend on completion order.
 | `130` | User interruption |
 
 Zero selected checks is a usage error. User interruption requests cancellation
-and retains completed results. Capture per-task logs rather than streaming them
-to normal output. Create the run store before execution; inability to create it
-is a setup error. Failure to finalize the store cannot produce exit code zero.
-Tool/discovery failures are distinct from an individual check's evaluation or
-build failure. Retain partial results when an operational failure occurs after
-execution begins. See [Nix orchestration](workspace-check.md) and
+and retains completed results. Capture realization output in run-local logs
+rather than streaming it to normal output; resolve per-check failure logs from
+their derivation paths. Create the run store before execution; inability to
+create it is a setup error. Failure to finalize the store cannot produce exit
+code zero. Tool/discovery failures are distinct from an individual check's
+evaluation or build failure. Retain partial results when an operational failure
+occurs after execution begins. See [Nix orchestration](workspace-check.md) and
 [details storage](details.md).
 
 The default full run is the readiness gate. Label any filtered or explicitly

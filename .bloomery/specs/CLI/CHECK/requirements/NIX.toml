@@ -26,7 +26,7 @@ action = "preserve other generated checks under their existing enable and packag
 id = "CLI-CHECK-NIX-006"
 title = "Every selected-system check is discoverable"
 manual = false
-design = "design/workspace-check.md#internal-wrapper"
+design = "design/workspace-check.md#catalog-evaluation"
 
 [requirements.ears]
 type = "ubiquitous"
@@ -37,7 +37,7 @@ action = "discover every non-legacy check attribute under each selected checks s
 id = "CLI-CHECK-NIX-007"
 title = "Selected derivations are realized"
 manual = false
-design = "design/workspace-check.md#internal-wrapper"
+design = "design/workspace-check.md#batched-realization"
 
 [requirements.ears]
 type = "ubiquitous"
@@ -48,7 +48,7 @@ action = "realize every selected valid check derivation whose execution is not p
 id = "CLI-CHECK-NIX-008"
 title = "Shared derivations use native store deduplication"
 manual = false
-design = "design/workspace-check.md#internal-wrapper"
+design = "design/workspace-check.md#batched-realization"
 
 [requirements.ears]
 type = "ubiquitous"
@@ -59,7 +59,7 @@ action = "allow Nix store locks to realize shared derivations only once when sel
 id = "CLI-CHECK-NIX-009"
 title = "Aliases retain individual outcomes"
 manual = false
-design = "design/workspace-check.md#internal-wrapper"
+design = "design/workspace-check.md#batched-realization"
 
 [requirements.ears]
 type = "event"
@@ -71,19 +71,19 @@ action = "record the shared realization outcome for each selected check ID"
 id = "CLI-CHECK-NIX-010"
 title = "Selected attribute evaluation failures are check failures"
 manual = false
-design = "design/workspace-check.md#internal-wrapper"
+design = "design/workspace-check.md#catalog-evaluation"
 
 [requirements.ears]
 type = "unwanted_behavior"
 trigger = "a discovered selected attribute cannot evaluate to a check derivation"
 system = "bloomery check"
-action = "record a check failure when Nix cannot evaluate a selected build installable"
+action = "record a check failure when Nix cannot evaluate a selected check attribute to a derivation"
 
 [[requirements]]
 id = "CLI-CHECK-NIX-011"
 title = "Nix-fast-build is not required"
 manual = false
-design = "design/workspace-check.md#internal-wrapper"
+design = "design/workspace-check.md#batched-realization"
 
 [requirements.ears]
 type = "ubiquitous"
@@ -117,7 +117,7 @@ action = "disable lockfile writes and updates in every Nix operation, including 
 id = "CLI-CHECK-NIX-014"
 title = "Check does not create result links"
 manual = false
-design = "design/workspace-check.md#internal-wrapper"
+design = "design/workspace-check.md#batched-realization"
 
 [requirements.ears]
 type = "ubiquitous"
@@ -138,22 +138,137 @@ action = "exclude that legacy recursive attribute with a bounded notice"
 
 [[requirements]]
 id = "CLI-CHECK-NIX-016"
-title = "Attribute names are passed safely"
+title = "Nix installables are passed safely"
 manual = false
-design = "design/workspace-check.md#internal-wrapper"
+design = "design/workspace-check.md#batched-realization"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "bloomery check"
-action = "pass each check attribute through an argument-safe quoted Nix installable path"
+action = "pass evaluated derivation store paths through argument-safe Nix installables without shell interpolation"
 
 [[requirements]]
 id = "CLI-CHECK-NIX-017"
 title = "Nix evaluation remains pure"
 manual = false
-design = "design/workspace-check.md#internal-wrapper"
+design = "design/workspace-check.md#catalog-evaluation"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "bloomery check"
 action = "run Nix operations without impure evaluation mode"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-018"
+title = "Catalog evaluation is batched per system"
+manual = false
+design = "design/workspace-check.md#catalog-evaluation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "evaluate every selected system's check catalog and derivation paths in one Nix evaluation per system"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-019"
+title = "Aggregate realization needs no generated check"
+manual = false
+design = "design/workspace-check.md#aggregate-realization"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "realize selected derivations in one batched invocation without requiring a generated aggregate or symlink check output"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-020"
+title = "Realization does not re-evaluate the flake"
+manual = false
+design = "design/workspace-check.md#batched-realization"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "pass evaluated derivation store paths so batched realization performs no flake evaluation"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-021"
+title = "Default realization keeps going"
+manual = false
+design = "design/workspace-check.md#batched-realization"
+
+[requirements.ears]
+type = "event"
+trigger = "a selected derivation fails in default execution mode"
+system = "bloomery check"
+action = "continue realizing independent derivations whose prerequisites permit execution"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-022"
+title = "Fail-fast cancels the batched realization"
+manual = false
+design = "design/workspace-check.md#batched-realization"
+
+[requirements.ears]
+type = "event"
+trigger = "the first failed derivation is observed with --fail-fast selected"
+system = "bloomery check"
+action = "cancel the batched realization and leave unstarted selected checks not_run"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-023"
+title = "Check outcomes are independent of invocation exit status"
+manual = false
+design = "design/workspace-check.md#batched-realization"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "resolve each selected check outcome from per-derivation realization evidence and store validity rather than the aggregate invocation exit status"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-024"
+title = "Failed checks expose their derivation log"
+manual = false
+design = "design/workspace-check.md#batched-realization"
+
+[requirements.ears]
+type = "event"
+trigger = "a selected check fails during batched realization"
+system = "bloomery check"
+action = "retain its derivation store path for on-demand log retrieval"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-025"
+title = "Dependency failures retain a causal derivation"
+manual = false
+design = "design/workspace-check.md#batched-realization"
+
+[requirements.ears]
+type = "event"
+trigger = "a selected check fails only because a dependency derivation failed"
+system = "bloomery check"
+action = "retain the causal failed derivation path so its log can be retrieved"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-026"
+title = "Batch failure blocks are attributed per check"
+manual = false
+design = "design/workspace-check.md#batched-realization"
+
+[requirements.ears]
+type = "event"
+trigger = "the batched realization output contains a failure block naming a derivation"
+system = "bloomery check"
+action = "associate the retained block with every selected check that resolves to that derivation"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-027"
+title = "Output validity is resolved once"
+manual = false
+design = "design/workspace-check.md#batched-realization"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check"
+action = "resolve the selected derivations' post-realization output validity in one structured query"

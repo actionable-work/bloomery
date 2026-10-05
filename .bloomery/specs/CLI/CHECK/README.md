@@ -1,13 +1,13 @@
 ---
 id: CHECK
 name: Format-Gated Check Runner
-tagline: Formatting first, then parallel checks with bounded failure output.
+tagline: Formatting first, then concurrent static and batched Nix checks with bounded failure output.
 description: |
   Check is the workspace testing entry point. Every command requires a root
   `flake.nix`. Check execution runs `nix fmt` before static specification
   validation and Nix check derivations; a formatting failure always stops the
-  run. After formatting succeeds, check tasks run concurrently, with terminal
-  work metrics and seekable retained failures.
+  run. After formatting succeeds, static checks and one batched Nix realization
+  run concurrently, with terminal work metrics and seekable retained failures.
 ---
 
 # `bloomery check`
@@ -34,7 +34,8 @@ substitute for executing the selected Nix checks.
   from the [PARSER area](../../PARSER/README.md).
 - Require the shared root-flake preflight for every command.
 - Run `nix fmt` before selected checks and stop on formatting failure.
-- Run independent static and Nix work concurrently with bounded scheduling.
+- Run independent static and Nix work concurrently with bounded scheduling,
+  realizing the selected Nix derivations in one batched invocation.
 - Complete selected checks unless fail-fast, interruption, or a formatting
   failure prevents execution.
 - Display check completion and deduplicated Nix work metrics only on user
