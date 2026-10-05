@@ -552,9 +552,15 @@ mod tests {
             let manifest = files.get("Cargo.toml").expect("manifest");
             assert!(manifest.contains("[workspace]"), "{name} workspace");
             assert!(manifest.contains("resolver = \"2\""), "{name} resolver");
-            assert_eq!(
-                files.get(".bloomery/config.toml").copied(),
-                Some("[build]\n")
+            let config = files.get(".bloomery/config.toml").expect("config");
+            assert!(config.contains("[build]"), "{name} build table");
+            assert!(
+                config.contains("workspaceDependencies = false"),
+                "{name} workspace dependency opt-out"
+            );
+            assert!(
+                config.contains("noDefaultFeatures = false"),
+                "{name} default feature opt-out"
             );
             assert!(files.contains_key(".gitignore"), "{name} gitignore");
             let gitignore = files.get(".gitignore").expect("gitignore");

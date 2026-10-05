@@ -50,6 +50,7 @@ hyphenated names, and underscored names.
 
 `devShell` controls shell generation, extra packages, and the shell hook.
 `checks` enables or disables generated checks, includes or omits package build
-checks, and optionally fails evaluation on an out-of-date lock.
+checks, optionally fails evaluation on an out-of-date lock, and independently
+enables the workspace dependency and no default features manifest checks.
 `features.unify` selects workspace feature unification for index-based
 resolution; `features.cratesIoIndex` supplies a local crates.io index.

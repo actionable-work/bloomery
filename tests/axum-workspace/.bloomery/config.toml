@@ -2,6 +2,10 @@
 libPackages = true
 devPackages = true
 
+[checks]
+workspaceDependencies = false
+noDefaultFeatures = false
+
 [flags]
 rustc = ["-Copt-level=3"]
 

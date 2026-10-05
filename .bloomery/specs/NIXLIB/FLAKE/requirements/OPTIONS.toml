@@ -180,3 +180,25 @@ design = "design/workspace-options.md#development-shell-checks-and-features"
 type = "ubiquitous"
 system = "the workspace option module"
 action = "accept features.unify and features.cratesIoIndex"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-017"
+title = "Workspace dependency check defaults to on"
+manual = false
+design = "design/workspace-options.md#development-shell-checks-and-features"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace option module"
+action = "default checks.workspaceDependencies to true"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-018"
+title = "Default features check defaults to on"
+manual = false
+design = "design/workspace-options.md#development-shell-checks-and-features"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace option module"
+action = "default checks.noDefaultFeatures to true"

@@ -19,6 +19,8 @@ in {
       linker = cfg.toolchain.linker;
       libPackages = cfg.createLibPackages;
       devPackages = cfg.createDevPackages;
+      workspaceDependencies = cfg.checks.workspaceDependencies;
+      noDefaultFeatures = cfg.checks.noDefaultFeatures;
     };
     expected = {
       hasRoot = true;
@@ -33,6 +35,25 @@ in {
         else null;
       libPackages = false;
       devPackages = false;
+      workspaceDependencies = true;
+      noDefaultFeatures = true;
+    };
+  };
+
+  testManifestCheckOptions = {
+    expr = let
+      cfg = options.evalWorkspaceOptions {
+        root = ./.;
+        checks.workspaceDependencies = false;
+        checks.noDefaultFeatures = false;
+      };
+    in {
+      workspaceDependencies = cfg.checks.workspaceDependencies;
+      noDefaultFeatures = cfg.checks.noDefaultFeatures;
+    };
+    expected = {
+      workspaceDependencies = false;
+      noDefaultFeatures = false;
     };
   };
 

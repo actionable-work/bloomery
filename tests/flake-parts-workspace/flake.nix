@@ -30,6 +30,8 @@
       in {
         bloomery.workspace = {
           root = ./.;
+          checks.workspaceDependencies = false;
+          checks.noDefaultFeatures = false;
         };
         checks = workspace.checks // extraChecks system workspace;
       };

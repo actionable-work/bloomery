@@ -24,8 +24,11 @@ When checks are enabled, `checks` contains `<crate>:test`, `<crate>:clippy`,
 `<crate>:doc`, and `<crate>:doctest` for workspace crates; `<crate>:doctest`
 exists only for crates with a library entrypoint. Package checks `<bin>:bin`
 and `<crate>:lib` are included when package checks are enabled.
-`workspace:lock` validates lock consistency. Bloomery never generates a
-recursive `bloomery:check` output.
+`workspace:lock` validates lock consistency, `workspace:dependencies`
+validates dependency inheritance, and `workspace:default-features` validates
+disabled default features; each manifest check is omitted when its `[checks]`
+toggle is disabled. Bloomery never generates a recursive `bloomery:check`
+output.
 
 ## Derivation and metadata outputs
 

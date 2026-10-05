@@ -1,0 +1,6 @@
+[workspace]
+members = ["crates/app", "crates/dep"]
+resolver = "2"
+
+[workspace.dependencies]
+dep = { path = "crates/dep", default-features = false }

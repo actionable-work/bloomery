@@ -61,6 +61,8 @@ in
       else cratesIoIndex;
     throwOnOutOfDate = cfg.checks.throwOnOutOfDate;
     includePackageChecks = cfg.checks.includePackageChecks;
+    workspaceDependencies = cfg.checks.workspaceDependencies;
+    noDefaultFeatures = cfg.checks.noDefaultFeatures;
 
     # Discover every workspace member. source.members selects which members
     # generate outputs; unselected members remain available as dependency
@@ -224,6 +226,7 @@ in
     builderDoc = builders.docCrateWith {inherit rustc stdenv;};
     builderDocTest = builders.doctestCrateWith {inherit rustc stdenv mold lld defaultLinker;};
     builderLockCheck = import ./workspace/lock-check.nix {inherit pkgs lib;};
+    builderManifestCheck = import ./workspace/manifest-check.nix {inherit pkgs lib;};
 
     mkCheckName = crateName: checkType: "${crateName}:${checkType}";
 
@@ -874,6 +877,34 @@ in
       };
     };
 
+    manifestPolicyInputs = {
+      workspaceDependencies = rootToml.workspace.dependencies or {};
+      members =
+        lib.mapAttrsToList (name: crateDir: {
+          inherit name;
+          toml = builtins.fromTOML (builtins.readFile (crateDir + "/Cargo.toml"));
+        })
+        discoveredWorkspaceMembers;
+    };
+
+    manifestPolicy = workspace.manifestPolicy.evaluate manifestPolicyInputs;
+
+    manifestChecks =
+      (lib.optionalAttrs workspaceDependencies {
+        "workspace:dependencies" = builderManifestCheck {
+          name = "workspace-dependencies";
+          violations = manifestPolicy.workspaceDependencyViolations;
+          repair = "Declare each dependency once in [workspace.dependencies] and reference it with { workspace = true }.";
+        };
+      })
+      // (lib.optionalAttrs noDefaultFeatures {
+        "workspace:default-features" = builderManifestCheck {
+          name = "workspace-default-features";
+          violations = manifestPolicy.defaultFeatureViolations;
+          repair = "Set default-features = false on every [workspace.dependencies] entry and any member override.";
+        };
+      });
+
     checks =
       if cfg.checks.enable
       then
@@ -887,6 +918,7 @@ in
           else {}
         )
         // workspaceLockCheck
+        // manifestChecks
       else {};
 
     devShell =

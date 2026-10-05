@@ -147,6 +147,8 @@ in {
           enable = false;
           includePackageChecks = false;
           throwOnOutOfDate = true;
+          workspaceDependencies = false;
+          noDefaultFeatures = false;
         };
         features = {
           unify = false;
@@ -160,6 +162,8 @@ in {
       checksEnabled = cfg.checks.enable;
       includePackageChecks = cfg.checks.includePackageChecks;
       throwOnOutOfDate = cfg.checks.throwOnOutOfDate;
+      workspaceDependencies = cfg.checks.workspaceDependencies;
+      noDefaultFeatures = cfg.checks.noDefaultFeatures;
       unify = cfg.features.unify;
       cratesIoIndex = cfg.features.cratesIoIndex;
     };
@@ -170,6 +174,8 @@ in {
       checksEnabled = false;
       includePackageChecks = false;
       throwOnOutOfDate = true;
+      workspaceDependencies = false;
+      noDefaultFeatures = false;
       unify = false;
       cratesIoIndex = ./. + "/crates-io-index";
     };

@@ -5,6 +5,7 @@
   mkWorkspace = import ./mk-workspace.nix {inherit pkgs lib;};
   library = import ./default.nix {inherit pkgs lib;};
   lockCheckSource = builtins.readFile ./workspace/lock-check.nix;
+  manifestCheckSource = builtins.readFile ./workspace/manifest-check.nix;
   workspaceSource = builtins.readFile ./mk-workspace.nix;
   metadataWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
@@ -19,6 +20,14 @@
   workspaceWithChecksDisabled = mkWorkspace {
     root = ../tests/basic-workspace;
     checks.enable = false;
+  };
+  workspaceWithoutWorkspaceDependencyCheck = mkWorkspace {
+    root = ../tests/basic-workspace;
+    checks.workspaceDependencies = false;
+  };
+  workspaceWithoutDefaultFeaturesCheck = mkWorkspace {
+    root = ../tests/basic-workspace;
+    checks.noDefaultFeatures = false;
   };
   crossPkgs = pkgs.pkgsCross.aarch64-multiplatform;
   crossLibrary = import ./default.nix {
@@ -155,6 +164,44 @@ in {
       omitsPackageChecksWhenDisabled = true;
       keepsLockCheckWhenPackageChecksAreDisabled = true;
       disablesAllChecks = true;
+    };
+  };
+
+  testManifestChecksAreGeneratedAndGated = {
+    expr = {
+      hasWorkspaceDependencies = builtins.hasAttr "workspace:dependencies" metadataWorkspace.checks;
+      hasDefaultFeatures = builtins.hasAttr "workspace:default-features" metadataWorkspace.checks;
+      omitsWorkspaceDependenciesWhenDisabled = !(builtins.hasAttr "workspace:dependencies" workspaceWithoutWorkspaceDependencyCheck.checks);
+      keepsDefaultFeaturesWhenWorkspaceDependenciesDisabled = builtins.hasAttr "workspace:default-features" workspaceWithoutWorkspaceDependencyCheck.checks;
+      omitsDefaultFeaturesWhenDisabled = !(builtins.hasAttr "workspace:default-features" workspaceWithoutDefaultFeaturesCheck.checks);
+      keepsWorkspaceDependenciesWhenDefaultFeaturesDisabled = builtins.hasAttr "workspace:dependencies" workspaceWithoutDefaultFeaturesCheck.checks;
+      disablesAllChecks =
+        !(builtins.hasAttr "workspace:dependencies" workspaceWithChecksDisabled.checks)
+        && !(builtins.hasAttr "workspace:default-features" workspaceWithChecksDisabled.checks);
+    };
+    expected = {
+      hasWorkspaceDependencies = true;
+      hasDefaultFeatures = true;
+      omitsWorkspaceDependenciesWhenDisabled = true;
+      keepsDefaultFeaturesWhenWorkspaceDependenciesDisabled = true;
+      omitsDefaultFeaturesWhenDisabled = true;
+      keepsWorkspaceDependenciesWhenDefaultFeaturesDisabled = true;
+      disablesAllChecks = true;
+    };
+  };
+
+  testManifestChecksAreReadOnlyAndExplainRepairs = {
+    expr = {
+      hasWriteOperation = lib.hasInfix "builtins.writeFile" manifestCheckSource;
+      hasWorkspaceDependencyRepair =
+        lib.hasInfix "workspace = true" workspaceSource
+        && lib.hasInfix "[workspace.dependencies]" workspaceSource;
+      hasDefaultFeaturesRepair = lib.hasInfix "default-features = false" workspaceSource;
+    };
+    expected = {
+      hasWriteOperation = false;
+      hasWorkspaceDependencyRepair = true;
+      hasDefaultFeaturesRepair = true;
     };
   };
 

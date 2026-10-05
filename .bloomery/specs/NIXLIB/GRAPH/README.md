@@ -20,11 +20,12 @@ build.
 
 - [Lock data and graph resolution](design/resolution.md)
 - [Derivation contracts](design/derivations.md)
+- [Manifest policy checks](design/manifest-checks.md)
 
 ## Scope
 
 This feature covers graph inputs, workspace discovery, feature and dependency
 resolution, crate sourcing, crate identity, binary discovery, build scripts,
-propagation metadata, asset flow, and the check derivations built from the
-graph. Fileset selection mechanics are owned by
+propagation metadata, asset flow, and the workspace check derivations. Fileset
+selection mechanics are owned by
 [NIX/SOURCES](../../NIX/SOURCES/README.md).

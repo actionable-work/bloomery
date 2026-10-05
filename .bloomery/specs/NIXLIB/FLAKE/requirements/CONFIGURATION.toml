@@ -181,3 +181,25 @@ type = "unwanted_behavior"
 trigger = "config.toml is unreadable or contains invalid TOML"
 system = "the mkFlake constructor"
 action = "fail evaluation with a bloomery-prefixed error instead of substituting defaults"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-017"
+title = "Workspace dependency check option is exposed"
+manual = false
+design = "design/configuration.md#checks"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the build configuration"
+action = "accept checks.workspaceDependencies"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-018"
+title = "Default features check option is exposed"
+manual = false
+design = "design/configuration.md#checks"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the build configuration"
+action = "accept checks.noDefaultFeatures"

@@ -32,7 +32,7 @@
     ];
     flags = ["rustc" "test" "clippy" "doc" "doctest"];
     devShell = ["enable" "packages" "shellHook"];
-    checks = ["enable" "includePackageChecks" "throwOnOutOfDate"];
+    checks = ["enable" "includePackageChecks" "throwOnOutOfDate" "workspaceDependencies" "noDefaultFeatures"];
     features = ["unify" "cratesIoIndex"];
   };
 

@@ -208,3 +208,51 @@ type = "event"
 trigger = "the workspace builder receives no Bloomery CLI derivation"
 system = "the workspace builder"
 action = "generate the default development shell without the Bloomery CLI while retaining the toolchain and user packages"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-019"
+title = "Workspace dependency check is gated independently"
+manual = false
+design = "design/output-contract.md#checks"
+
+[requirements.ears]
+type = "event"
+trigger = "checks are enabled and checks.workspaceDependencies is disabled"
+system = "the workspace builder"
+action = "omit the workspace:dependencies check while retaining the remaining checks"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-020"
+title = "Enabled workspace dependency check is generated"
+manual = false
+design = "design/output-contract.md#checks"
+
+[requirements.ears]
+type = "event"
+trigger = "checks are enabled and checks.workspaceDependencies is enabled"
+system = "the workspace builder"
+action = "expose a workspace:dependencies check"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-021"
+title = "Default features check is gated independently"
+manual = false
+design = "design/output-contract.md#checks"
+
+[requirements.ears]
+type = "event"
+trigger = "checks are enabled and checks.noDefaultFeatures is disabled"
+system = "the workspace builder"
+action = "omit the workspace:default-features check while retaining the remaining checks"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-022"
+title = "Enabled default features check is generated"
+manual = false
+design = "design/output-contract.md#checks"
+
+[requirements.ears]
+type = "event"
+trigger = "checks are enabled and checks.noDefaultFeatures is enabled"
+system = "the workspace builder"
+action = "expose a workspace:default-features check"

@@ -115,13 +115,16 @@ shellHook = "echo ready"
 
 ## Checks
 
-`[checks]` carries `enable`, `includePackageChecks`, and `throwOnOutOfDate`.
+`[checks]` carries `enable`, `includePackageChecks`, `throwOnOutOfDate`,
+`workspaceDependencies`, and `noDefaultFeatures`.
 
 ```toml
 [checks]
 enable = true
 includePackageChecks = true
 throwOnOutOfDate = false
+workspaceDependencies = true
+noDefaultFeatures = true
 ```
 
 ## Features

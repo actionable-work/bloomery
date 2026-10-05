@@ -1,0 +1,83 @@
+group = "MANIFEST"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-MANIFEST-001"
+title = "Non-inherited member dependencies fail the workspace dependency check"
+manual = false
+design = "design/manifest-checks.md#workspace-dependency-policy"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a workspace member dependency does not set workspace = true or declares its own path, git, version, or registry source"
+system = "the workspace:dependencies check"
+action = "fail and name the offending member and dependency"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-MANIFEST-002"
+title = "Fully inherited member dependencies pass the workspace dependency check"
+manual = false
+design = "design/manifest-checks.md#workspace-dependency-policy"
+
+[requirements.ears]
+type = "event"
+trigger = "every workspace member dependency sets workspace = true"
+system = "the workspace:dependencies check"
+action = "succeed without reporting a violation"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-MANIFEST-003"
+title = "Enabled default features fail the no default features check"
+manual = false
+design = "design/manifest-checks.md#no-default-features-policy"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a dependency consumed by a workspace member has an effective default-features value other than false"
+system = "the workspace:default-features check"
+action = "fail and name the offending member and dependency"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-MANIFEST-004"
+title = "Workspace dependency entries disable default features"
+manual = false
+design = "design/manifest-checks.md#no-default-features-policy"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a [workspace.dependencies] entry omits default-features = false"
+system = "the workspace:default-features check"
+action = "fail and name the offending dependency"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-MANIFEST-005"
+title = "Disabled default features pass the no default features check"
+manual = false
+design = "design/manifest-checks.md#no-default-features-policy"
+
+[requirements.ears]
+type = "event"
+trigger = "every dependency consumed by a workspace member has an effective default-features value of false"
+system = "the workspace:default-features check"
+action = "succeed without reporting a violation"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-MANIFEST-006"
+title = "Manifest policy checks are read-only"
+manual = false
+design = "design/manifest-checks.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace:dependencies and workspace:default-features checks"
+action = "read the root and member manifests during evaluation and realize a read-only derivation"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-MANIFEST-007"
+title = "Manifest names normalize to Cargo spellings"
+manual = false
+design = "design/manifest-checks.md#name-normalization"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace manifest policy checks"
+action = "normalize recognized dependency table and key spellings to Cargo's canonical hyphenated names before evaluating the policies"

@@ -289,6 +289,16 @@ pub const CATALOG: &[CatalogEntry] = &[
         recommended: Some(DefaultValue::Bool(false)),
     },
     CatalogEntry {
+        path: &["checks", "workspaceDependencies"],
+        value_type: ValueType::Bool,
+        recommended: Some(DefaultValue::Bool(true)),
+    },
+    CatalogEntry {
+        path: &["checks", "noDefaultFeatures"],
+        value_type: ValueType::Bool,
+        recommended: Some(DefaultValue::Bool(true)),
+    },
+    CatalogEntry {
         path: &["features", "unify"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(true)),
@@ -494,6 +504,16 @@ mod tests {
             ValueType::Bool
         );
         assert_eq!(
+            lookup(&["checks", "workspaceDependencies"])
+                .unwrap()
+                .value_type,
+            ValueType::Bool
+        );
+        assert_eq!(
+            lookup(&["checks", "noDefaultFeatures"]).unwrap().value_type,
+            ValueType::Bool
+        );
+        assert_eq!(
             lookup(&["scanners", "rust", "paths"]).unwrap().value_type,
             ValueType::StringList
         );
@@ -524,6 +544,14 @@ mod tests {
         );
         assert_eq!(
             effective_default(&["checks", "includePackageChecks"]),
+            Some(Value::Boolean(true))
+        );
+        assert_eq!(
+            effective_default(&["checks", "workspaceDependencies"]),
+            Some(Value::Boolean(true))
+        );
+        assert_eq!(
+            effective_default(&["checks", "noDefaultFeatures"]),
             Some(Value::Boolean(true))
         );
     }

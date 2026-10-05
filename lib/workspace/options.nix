@@ -323,6 +323,16 @@
           default = false;
           description = "Fail evaluation immediately if Cargo.lock or bloomery.lock is out of date.";
         };
+        workspaceDependencies = lib.mkOption {
+          type = types.bool;
+          default = true;
+          description = "Require every workspace member dependency to inherit from [workspace.dependencies] using workspace = true.";
+        };
+        noDefaultFeatures = lib.mkOption {
+          type = types.bool;
+          default = true;
+          description = "Require every dependency consumed by a workspace member to disable default features.";
+        };
       };
 
       # ── Feature Resolution ───────────────────────────────────────────────────

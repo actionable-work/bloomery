@@ -2,6 +2,10 @@
 libPackages = false
 devPackages = true
 
+[checks]
+workspaceDependencies = false
+noDefaultFeatures = false
+
 [profile.release]
 optLevel = 3
 lto = "fat"
