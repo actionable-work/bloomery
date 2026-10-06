@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-01-01T00:00:00+00:00",
+  "machine": {
+    "kernel": "6.0.0-test",
+    "cpu_model": "Benchmark CPU Model",
+    "physical_cores": 8,
+    "logical_cores": 16,
+    "memory_bytes": 34359738368
+  },
+  "environment": {
+    "system": "x86_64-linux",
+    "nixpkgs_revision": "0000000000000000000000000000000000000000",
+    "rust_version": "rustc 1.90.0",
+    "max_jobs": 1,
+    "cores": 16,
+    "fixtures": {
+      "simple": "Single binary and one library with a single registry dependency.",
+      "standard": "Workspace with axum and clap dependencies across several members."
+    },
+    "scenarios": {
+      "no-change": "Unmodified workspace build."
+    }
+  },
+  "builders": {}
+}

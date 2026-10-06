@@ -1,0 +1,179 @@
+group = "SCENARIOS"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-SCENARIOS-001"
+title = "A no-change build scenario exists"
+manual = false
+design = "design/scenarios.md#scenario-catalog"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark suite"
+action = "measure an unmodified default-package build"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-SCENARIOS-002"
+title = "A single-member source change build scenario exists"
+manual = false
+design = "design/scenarios.md#scenario-catalog"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark suite"
+action = "measure a default-package build after editing one member's source"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-SCENARIOS-003"
+title = "A member-dependency source change build scenario exists"
+manual = false
+design = "design/scenarios.md#scenario-catalog"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark suite"
+action = "measure a default-package build after editing a member that other members depend on"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-SCENARIOS-004"
+title = "A registry dependency change build scenario exists"
+manual = false
+design = "design/scenarios.md#scenario-catalog"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark suite"
+action = "measure a default-package build after changing a workspace registry dependency version"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-SCENARIOS-005"
+title = "A new-member build scenario exists"
+manual = false
+design = "design/scenarios.md#scenario-catalog"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark suite"
+action = "measure a default-package build after adding a workspace member and wiring it in"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-SCENARIOS-006"
+title = "A no-change check scenario exists"
+manual = false
+design = "design/scenarios.md#check-scenarios"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark suite"
+action = "measure a full flake check of the unmodified workspace"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-SCENARIOS-007"
+title = "A single-member source change check scenario exists"
+manual = false
+design = "design/scenarios.md#check-scenarios"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark suite"
+action = "measure a full flake check after editing one member's source"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-SCENARIOS-008"
+title = "A member-dependency source change check scenario exists"
+manual = false
+design = "design/scenarios.md#check-scenarios"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark suite"
+action = "measure a full flake check after editing a member that other members depend on"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-SCENARIOS-009"
+title = "A registry dependency change check scenario exists"
+manual = false
+design = "design/scenarios.md#check-scenarios"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark suite"
+action = "measure a full flake check after changing a workspace registry dependency version"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-SCENARIOS-010"
+title = "Scenarios declare their mutation and affected set"
+manual = false
+design = "design/scenarios.md#scenario-model"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "each benchmark scenario"
+action = "declare its baseline, mutation target, applied edit, and affected member set"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-SCENARIOS-011"
+title = "The harness restores baseline before each timed run"
+manual = false
+design = "design/scenarios.md#mutation-contract"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark harness"
+action = "restore the baseline workspace and derived inputs before every timed run"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-SCENARIOS-012"
+title = "Mutations stay within their declared target"
+manual = false
+design = "design/scenarios.md#mutation-contract"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "each benchmark mutation"
+action = "edit only the declared target without changing profile, features, linker, platform, or undeclared dependencies"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-SCENARIOS-013"
+title = "Preparation regenerates derived dependency inputs"
+manual = false
+design = "design/scenarios.md#mutation-contract"
+
+[requirements.ears]
+type = "event"
+trigger = "a scenario changes dependency data"
+system = "the benchmark harness"
+action = "regenerate Cargo and Bloomery locks and any builder-generated Nix before timing"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-SCENARIOS-014"
+title = "Check scenarios use builder-idiomatic granularity"
+manual = false
+design = "design/scenarios.md#check-scenarios"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark check scenarios"
+action = "run Bloomery per-crate checks and each alternative's own check granularity"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-SCENARIOS-015"
+title = "Input-changing scenarios force a cache miss"
+manual = false
+design = "design/scenarios.md#mutation-contract"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "each scenario that changes workspace or dependency inputs"
+action = "change the affected inputs so the timed build cannot reuse a cached result"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-SCENARIOS-016"
+title = "External dependency changes evict changed outputs"
+manual = false
+design = "design/scenarios.md#mutation-contract"
+
+[requirements.ears]
+type = "event"
+trigger = "a scenario changes an external dependency"
+system = "the benchmark harness"
+action = "delete the changed derivations from the store before timing while keeping unchanged and fixed-output paths"

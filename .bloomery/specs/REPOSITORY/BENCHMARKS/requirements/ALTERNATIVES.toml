@@ -1,0 +1,90 @@
+group = "ALTERNATIVES"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-ALTERNATIVES-001"
+title = "Benchmarks include a crane builder"
+manual = false
+design = "design/alternatives.md#selected-builders"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark suite"
+action = "provide a builder subflake that compiles the shared fixture with crane"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-ALTERNATIVES-002"
+title = "Benchmarks include a cargo2nix builder"
+manual = false
+design = "design/alternatives.md#selected-builders"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark suite"
+action = "provide a builder subflake that compiles the shared fixture with cargo2nix"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-ALTERNATIVES-003"
+title = "Benchmarks include a crate2nix builder"
+manual = false
+design = "design/alternatives.md#selected-builders"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark suite"
+action = "provide a builder subflake that compiles the shared fixture with crate2nix"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-ALTERNATIVES-004"
+title = "Benchmarks include a naersk builder"
+manual = false
+design = "design/alternatives.md#selected-builders"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark suite"
+action = "provide a builder subflake that compiles the shared fixture with naersk"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-ALTERNATIVES-006"
+title = "Builder inputs are pinned to exact revisions"
+manual = false
+design = "design/alternatives.md#selection-criteria"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "each builder subflake"
+action = "pin its ecosystem builder input to an exact revision in the benchmark lockfile"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-ALTERNATIVES-007"
+title = "All builders evaluate one nixpkgs revision"
+manual = false
+design = "design/alternatives.md#fairness-constraints"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark harness"
+action = "force every builder subflake to evaluate the repository nixpkgs revision"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-ALTERNATIVES-008"
+title = "All builders use one Rust toolchain version"
+manual = false
+design = "design/alternatives.md#fairness-constraints"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "each builder subflake"
+action = "compile the fixture with the benchmark Rust toolchain version or record a pinned-version deviation in the report"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-ALTERNATIVES-009"
+title = "The nixpkgs rustPlatform baseline is optional"
+manual = false
+design = "design/alternatives.md#optional-baselines"
+
+[requirements.ears]
+type = "optional"
+feature = "the nixpkgs rustPlatform baseline is enabled"
+system = "the benchmark suite"
+action = "compile the shared fixture with rustPlatform under the standard builder contract"

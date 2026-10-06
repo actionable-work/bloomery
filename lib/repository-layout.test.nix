@@ -84,4 +84,14 @@ in {
       && builtins.pathExists (root + "/.bloomery/specs/REPOSITORY");
     expected = true;
   };
+
+  testBenchmarksFixturesResideUnderBenchmarks = {
+    expr =
+      builtins.pathExists (root + "/benchmarks/run.sh")
+      && builtins.pathExists (root + "/benchmarks/fixtures/simple/Cargo.toml")
+      && builtins.pathExists (root + "/benchmarks/fixtures/standard/Cargo.toml")
+      && builtins.pathExists (root + "/benchmarks/flakes/bloomery/flake.nix")
+      && builtins.pathExists (root + "/benchmarks/results/history.json");
+    expected = true;
+  };
 }

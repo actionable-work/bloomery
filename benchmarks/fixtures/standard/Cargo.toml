@@ -1,0 +1,26 @@
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = 3
+
+[workspace]
+members = [
+  "crates/app",
+  "crates/build",
+  "crates/leaf",
+  "crates/macros",
+  "crates/server",
+  "crates/shared",
+  "crates/util",
+]
+resolver = "2"
+
+[workspace.dependencies]
+axum = "0.8"
+clap = { features = ["derive"], version = "4.6" }
+itoa = "=1.0.10"
+util = { path = "crates/util" }
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"

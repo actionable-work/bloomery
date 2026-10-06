@@ -1,0 +1,7 @@
+[dependencies]
+util = { workspace = true }
+
+[package]
+edition = "2021"
+name = "shared"
+version = "0.1.0"

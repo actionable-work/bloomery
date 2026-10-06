@@ -258,6 +258,40 @@ in
       };
     };
 
+    testMkFlakeExtraOutputsAppsMerge = {
+      expr = let
+        flakeOutputs = mkFlake {
+          nixpkgs = mockNixpkgs;
+          systems = [pkgs.system];
+          root = ../tests/basic-workspace;
+          extraOutputs = {
+            eachSystem,
+            perSystemWorkspace,
+            ...
+          }: {
+            apps = eachSystem (
+              system:
+                perSystemWorkspace.${system}.apps
+                // {
+                  bench = {
+                    type = "app";
+                    program = "${pkgs.hello}/bin/hello";
+                  };
+                }
+            );
+          };
+        };
+        apps = flakeOutputs.apps.${pkgs.system};
+      in {
+        keepsWorkspaceApp = builtins.hasAttr "bin-calc:dev" apps;
+        addsBenchApp = apps.bench.type == "app";
+      };
+      expected = {
+        keepsWorkspaceApp = true;
+        addsBenchApp = true;
+      };
+    };
+
     testMkFlakeExtraOutputsWorkspaceContext = {
       expr = let
         flakeOutputs = mkFlake {

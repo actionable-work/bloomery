@@ -1,0 +1,7 @@
+[dependencies]
+util = { path = "../util" }
+
+[package]
+edition = "2021"
+name = "app"
+version = "0.1.0"

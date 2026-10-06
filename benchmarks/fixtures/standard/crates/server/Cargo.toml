@@ -1,0 +1,9 @@
+[dependencies]
+axum = { workspace = true }
+leaf = { path = "../leaf" }
+shared = { path = "../shared" }
+
+[package]
+edition = "2021"
+name = "server"
+version = "0.1.0"

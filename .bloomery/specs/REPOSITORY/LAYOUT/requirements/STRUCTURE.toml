@@ -109,3 +109,14 @@ design = "design/repository-layout.md#repository-self-composition"
 type = "ubiquitous"
 system = "the repository root flake"
 action = "expose the test workspace checks through mkFlake sub-flake expansion"
+
+[[requirements]]
+id = "REPOSITORY-LAYOUT-STRUCTURE-011"
+title = "Benchmark fixtures reside under benchmarks"
+manual = false
+design = "design/repository-layout.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery repository"
+action = "keep the benchmark flake, fixture groups, per-builder subflakes, and harness under benchmarks"

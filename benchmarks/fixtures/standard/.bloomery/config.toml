@@ -1,0 +1,6 @@
+[build]
+devPackages = true
+
+[checks]
+noDefaultFeatures = false
+workspaceDependencies = false

@@ -1,0 +1,57 @@
+{
+  "system": "x86_64-linux",
+  "fixtures": [
+    {
+      "id": "simple",
+      "path": "benchmarks/fixtures/simple",
+      "description": "Single binary and one library with a single registry dependency."
+    },
+    {
+      "id": "standard",
+      "path": "benchmarks/fixtures/standard",
+      "description": "Workspace with axum and clap dependencies across several members."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "no-change",
+      "description": "Unmodified workspace build.",
+      "target": null,
+      "mutation": "none",
+      "affected": [],
+      "variants": ["build", "check"]
+    },
+    {
+      "id": "member-source",
+      "description": "Edit the default binary's source.",
+      "target": "crates/app/src/main.rs",
+      "mutation": "source-nonce",
+      "affected": ["app"],
+      "variants": ["build", "check"]
+    },
+    {
+      "id": "member-dependency-source",
+      "description": "Edit an internal dependency consumed by several members.",
+      "target": "crates/util/src/lib.rs",
+      "mutation": "source-nonce",
+      "affected": ["util", "shared", "leaf", "server", "app"],
+      "variants": ["build", "check"]
+    },
+    {
+      "id": "registry-dependency",
+      "description": "Change the workspace registry dependency version.",
+      "target": "Cargo.toml",
+      "mutation": "registry-version",
+      "affected": ["util", "shared", "leaf", "server", "app"],
+      "variants": ["build", "check"]
+    },
+    {
+      "id": "member-add",
+      "description": "Add a workspace member and wire it into the default binary.",
+      "target": "Cargo.toml",
+      "mutation": "member-add",
+      "affected": ["app"],
+      "variants": ["build"]
+    }
+  ]
+}

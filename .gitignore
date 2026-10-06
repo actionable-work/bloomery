@@ -2,3 +2,9 @@ target/
 result
 result-*
 .direnv/
+benchmarks/.work/
+benchmarks/results/raw/
+benchmarks/results/logs/
+benchmarks/results/meta.json
+__pycache__/
+*.pyc

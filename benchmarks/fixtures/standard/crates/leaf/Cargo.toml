@@ -1,0 +1,8 @@
+[dependencies]
+macros = { path = "../macros" }
+util = { workspace = true }
+
+[package]
+edition = "2021"
+name = "leaf"
+version = "0.1.0"

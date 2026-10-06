@@ -1,0 +1,10 @@
+[dependencies]
+clap = { workspace = true }
+leaf = { path = "../leaf" }
+server = { path = "../server" }
+shared = { path = "../shared" }
+
+[package]
+edition = "2021"
+name = "app"
+version = "0.1.0"

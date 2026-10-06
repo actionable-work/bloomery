@@ -1,0 +1,12 @@
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = 3
+
+[workspace]
+members = ["crates/app", "crates/util"]
+resolver = "2"
+
+[workspace.dependencies]
+itoa = "=1.0.10"
+util = { path = "crates/util" }

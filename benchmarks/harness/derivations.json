@@ -1,0 +1,759 @@
+{
+  "simple": {
+    "bloomery": {
+      "member-add": {
+        "build": [
+          "app-0.1.0",
+          "rust-crate-extra_<nonce>-0.1.0"
+        ]
+      },
+      "member-dependency-source": {
+        "build": [
+          "app-0.1.0",
+          "rust-crate-util-0.1.0"
+        ],
+        "check": [
+          "app-0.1.0",
+          "app-0.1.0-clippy",
+          "app-0.1.0-doc",
+          "app-0.1.0-test",
+          "rust-crate-util-0.1.0",
+          "util-0.1.0-clippy",
+          "util-0.1.0-doc",
+          "util-0.1.0-doctest",
+          "util-0.1.0-test"
+        ]
+      },
+      "member-source": {
+        "build": [
+          "app-0.1.0"
+        ],
+        "check": [
+          "app-0.1.0",
+          "app-0.1.0-clippy",
+          "app-0.1.0-doc",
+          "app-0.1.0-test"
+        ]
+      },
+      "no-change": {
+        "build": [],
+        "check": []
+      },
+      "registry-dependency": {
+        "build": [
+          "app-0.1.0",
+          "rust-crate-itoa-1.0.9",
+          "rust-crate-util-0.1.0"
+        ],
+        "check": [
+          "app-0.1.0",
+          "app-0.1.0-clippy",
+          "app-0.1.0-doc",
+          "app-0.1.0-test",
+          "rust-crate-itoa-1.0.9",
+          "rust-crate-util-0.1.0",
+          "util-0.1.0-clippy",
+          "util-0.1.0-doc",
+          "util-0.1.0-doctest",
+          "util-0.1.0-test"
+        ]
+      }
+    },
+    "cargo2nix": {
+      "member-add": {
+        "build": [
+          "crate-app-0.1.0",
+          "crate-extra_<nonce>-0.1.0",
+          "crate-util-0.1.0"
+        ]
+      },
+      "member-dependency-source": {
+        "build": [
+          "crate-app-0.1.0",
+          "crate-util-0.1.0"
+        ],
+        "check": [
+          "crate-app-0.1.0",
+          "crate-util-0.1.0"
+        ]
+      },
+      "member-source": {
+        "build": [
+          "crate-app-0.1.0",
+          "crate-util-0.1.0"
+        ],
+        "check": [
+          "crate-app-0.1.0",
+          "crate-util-0.1.0"
+        ]
+      },
+      "no-change": {
+        "build": [],
+        "check": []
+      },
+      "registry-dependency": {
+        "build": [
+          "crate-app-0.1.0",
+          "crate-itoa-1.0.9",
+          "crate-util-0.1.0"
+        ],
+        "check": [
+          "crate-app-0.1.0",
+          "crate-itoa-1.0.9",
+          "crate-util-0.1.0"
+        ]
+      }
+    },
+    "crane": {
+      "member-add": {
+        "build": [
+          "Cargo.toml",
+          "cargo-package-0.0.1",
+          "cargo-package-deps-0.0.1",
+          "source"
+        ]
+      },
+      "member-dependency-source": {
+        "build": [
+          "cargo-package-0.0.1"
+        ],
+        "check": [
+          "cargo-package-clippy-0.0.1",
+          "cargo-package-doc-0.0.1",
+          "cargo-package-test-0.0.1"
+        ]
+      },
+      "member-source": {
+        "build": [
+          "cargo-package-0.0.1"
+        ],
+        "check": [
+          "cargo-package-clippy-0.0.1",
+          "cargo-package-doc-0.0.1",
+          "cargo-package-test-0.0.1"
+        ]
+      },
+      "no-change": {
+        "build": [],
+        "check": []
+      },
+      "registry-dependency": {
+        "build": [
+          "Cargo.toml",
+          "cargo-package-0.0.1",
+          "cargo-package-deps-0.0.1",
+          "cargo-package-itoa-1.0.9",
+          "source",
+          "vendor-cargo-deps",
+          "vendor-registry"
+        ],
+        "check": [
+          "Cargo.toml",
+          "cargo-package-clippy-0.0.1",
+          "cargo-package-deps-0.0.1",
+          "cargo-package-doc-0.0.1",
+          "cargo-package-itoa-1.0.9",
+          "cargo-package-test-0.0.1",
+          "source",
+          "vendor-cargo-deps",
+          "vendor-registry"
+        ]
+      }
+    },
+    "crate2nix": {
+      "member-add": {
+        "build": [
+          "rust_app-0.1.0",
+          "rust_extra_<nonce>-0.1.0"
+        ]
+      },
+      "member-dependency-source": {
+        "build": [
+          "rust_app-0.1.0",
+          "rust_util-0.1.0"
+        ],
+        "check": [
+          "rust_app-0.1.0",
+          "rust_util-0.1.0"
+        ]
+      },
+      "member-source": {
+        "build": [
+          "rust_app-0.1.0"
+        ],
+        "check": [
+          "rust_app-0.1.0"
+        ]
+      },
+      "no-change": {
+        "build": [],
+        "check": []
+      },
+      "registry-dependency": {
+        "build": [
+          "rust_app-0.1.0",
+          "rust_itoa-1.0.9",
+          "rust_util-0.1.0"
+        ],
+        "check": [
+          "rust_app-0.1.0",
+          "rust_itoa-1.0.9",
+          "rust_util-0.1.0"
+        ]
+      }
+    },
+    "naersk": {
+      "member-add": {
+        "build": [
+          "Cargo.lock",
+          "Cargo.toml",
+          "dummy-src",
+          "rust-workspace-deps-unknown",
+          "rust-workspace-unknown"
+        ]
+      },
+      "member-dependency-source": {
+        "build": [
+          "rust-workspace-unknown"
+        ],
+        "check": [
+          "rust-workspace-unknown"
+        ]
+      },
+      "member-source": {
+        "build": [
+          "rust-workspace-unknown"
+        ],
+        "check": [
+          "rust-workspace-unknown"
+        ]
+      },
+      "no-change": {
+        "build": [],
+        "check": []
+      },
+      "registry-dependency": {
+        "build": [
+          "Cargo.lock",
+          "Cargo.toml",
+          "config",
+          "crates-io-dependencies",
+          "dummy-src",
+          "rust-workspace-deps-unknown",
+          "rust-workspace-unknown",
+          "unpack-itoa-1.0.9"
+        ],
+        "check": [
+          "Cargo.lock",
+          "Cargo.toml",
+          "config",
+          "crates-io-dependencies",
+          "dummy-src",
+          "rust-workspace-deps-unknown",
+          "rust-workspace-unknown",
+          "unpack-itoa-1.0.9"
+        ]
+      }
+    },
+    "rustPlatform": {
+      "member-add": {
+        "build": [
+          "app-0.1.0",
+          "cargo-vendor-dir"
+        ]
+      },
+      "member-dependency-source": {
+        "build": [
+          "app-0.1.0",
+          "cargo-vendor-dir"
+        ],
+        "check": [
+          "cargo-vendor-dir",
+          "workspace-tests-0.1.0"
+        ]
+      },
+      "member-source": {
+        "build": [
+          "app-0.1.0",
+          "cargo-vendor-dir"
+        ],
+        "check": [
+          "cargo-vendor-dir",
+          "workspace-tests-0.1.0"
+        ]
+      },
+      "no-change": {
+        "build": [],
+        "check": []
+      },
+      "registry-dependency": {
+        "build": [
+          "app-0.1.0",
+          "cargo-vendor-dir",
+          "crate-itoa-1.0.9.tar.gz",
+          "itoa-1.0.9"
+        ],
+        "check": [
+          "cargo-vendor-dir",
+          "itoa-1.0.9",
+          "workspace-tests-0.1.0"
+        ]
+      }
+    }
+  },
+  "standard": {
+    "bloomery": {
+      "member-add": {
+        "build": [
+          "app-0.1.0",
+          "rust-crate-axum-0.8.9",
+          "rust-crate-extra_<nonce>-0.1.0",
+          "rust-crate-hyper-1.12.0",
+          "rust-crate-hyper-util-0.1.21",
+          "rust-crate-server-0.1.0"
+        ]
+      },
+      "member-dependency-source": {
+        "build": [
+          "app-0.1.0",
+          "rust-crate-leaf-0.1.0",
+          "rust-crate-server-0.1.0",
+          "rust-crate-shared-0.1.0",
+          "rust-crate-util-0.1.0"
+        ],
+        "check": [
+          "app-0.1.0",
+          "app-0.1.0-clippy",
+          "app-0.1.0-doc",
+          "app-0.1.0-test",
+          "leaf-0.1.0-clippy",
+          "leaf-0.1.0-doc",
+          "leaf-0.1.0-doctest",
+          "leaf-0.1.0-test",
+          "rust-crate-leaf-0.1.0",
+          "rust-crate-server-0.1.0",
+          "rust-crate-shared-0.1.0",
+          "rust-crate-util-0.1.0",
+          "server-0.1.0-clippy",
+          "server-0.1.0-doc",
+          "server-0.1.0-doctest",
+          "server-0.1.0-test",
+          "shared-0.1.0-clippy",
+          "shared-0.1.0-doc",
+          "shared-0.1.0-doctest",
+          "shared-0.1.0-test",
+          "util-0.1.0-clippy",
+          "util-0.1.0-doc",
+          "util-0.1.0-doctest",
+          "util-0.1.0-test"
+        ]
+      },
+      "member-source": {
+        "build": [
+          "app-0.1.0"
+        ],
+        "check": [
+          "app-0.1.0",
+          "app-0.1.0-clippy",
+          "app-0.1.0-doc",
+          "app-0.1.0-test"
+        ]
+      },
+      "no-change": {
+        "build": [],
+        "check": []
+      },
+      "registry-dependency": {
+        "build": [
+          "app-0.1.0",
+          "rust-crate-axum-0.8.9",
+          "rust-crate-axum-core-0.5.6",
+          "rust-crate-http-1.5.0",
+          "rust-crate-http-body-1.1.0",
+          "rust-crate-http-body-util-0.1.5",
+          "rust-crate-hyper-1.12.0",
+          "rust-crate-hyper-util-0.1.21",
+          "rust-crate-itoa-1.0.9",
+          "rust-crate-leaf-0.1.0",
+          "rust-crate-serde_json-1.0.151",
+          "rust-crate-serde_path_to_error-0.1.20",
+          "rust-crate-serde_urlencoded-0.7.1",
+          "rust-crate-server-0.1.0",
+          "rust-crate-shared-0.1.0",
+          "rust-crate-util-0.1.0"
+        ],
+        "check": [
+          "app-0.1.0",
+          "app-0.1.0-clippy",
+          "app-0.1.0-doc",
+          "app-0.1.0-test",
+          "leaf-0.1.0-clippy",
+          "leaf-0.1.0-doc",
+          "leaf-0.1.0-doctest",
+          "leaf-0.1.0-test",
+          "rust-crate-axum-0.8.9",
+          "rust-crate-axum-core-0.5.6",
+          "rust-crate-http-1.5.0",
+          "rust-crate-http-body-1.1.0",
+          "rust-crate-http-body-util-0.1.5",
+          "rust-crate-hyper-1.12.0",
+          "rust-crate-hyper-util-0.1.21",
+          "rust-crate-itoa-1.0.9",
+          "rust-crate-leaf-0.1.0",
+          "rust-crate-serde_json-1.0.151",
+          "rust-crate-serde_path_to_error-0.1.20",
+          "rust-crate-serde_urlencoded-0.7.1",
+          "rust-crate-server-0.1.0",
+          "rust-crate-shared-0.1.0",
+          "rust-crate-util-0.1.0",
+          "server-0.1.0-clippy",
+          "server-0.1.0-doc",
+          "server-0.1.0-doctest",
+          "server-0.1.0-test",
+          "shared-0.1.0-clippy",
+          "shared-0.1.0-doc",
+          "shared-0.1.0-doctest",
+          "shared-0.1.0-test",
+          "util-0.1.0-clippy",
+          "util-0.1.0-doc",
+          "util-0.1.0-doctest",
+          "util-0.1.0-test"
+        ]
+      }
+    },
+    "cargo2nix": {
+      "member-add": {
+        "build": [
+          "crate-app-0.1.0",
+          "crate-axum-0.8.9",
+          "crate-extra_<nonce>-0.1.0",
+          "crate-hyper-1.12.0",
+          "crate-hyper-util-0.1.21",
+          "crate-leaf-0.1.0",
+          "crate-macros-0.1.0",
+          "crate-server-0.1.0",
+          "crate-shared-0.1.0",
+          "crate-util-0.1.0"
+        ]
+      },
+      "member-dependency-source": {
+        "build": [
+          "crate-app-0.1.0",
+          "crate-leaf-0.1.0",
+          "crate-macros-0.1.0",
+          "crate-server-0.1.0",
+          "crate-shared-0.1.0",
+          "crate-util-0.1.0"
+        ],
+        "check": [
+          "crate-app-0.1.0",
+          "crate-leaf-0.1.0",
+          "crate-macros-0.1.0",
+          "crate-server-0.1.0",
+          "crate-shared-0.1.0",
+          "crate-util-0.1.0"
+        ]
+      },
+      "member-source": {
+        "build": [
+          "crate-app-0.1.0",
+          "crate-leaf-0.1.0",
+          "crate-macros-0.1.0",
+          "crate-server-0.1.0",
+          "crate-shared-0.1.0",
+          "crate-util-0.1.0"
+        ],
+        "check": [
+          "crate-app-0.1.0",
+          "crate-leaf-0.1.0",
+          "crate-macros-0.1.0",
+          "crate-server-0.1.0",
+          "crate-shared-0.1.0",
+          "crate-util-0.1.0"
+        ]
+      },
+      "no-change": {
+        "build": [],
+        "check": []
+      },
+      "registry-dependency": {
+        "build": [
+          "crate-app-0.1.0",
+          "crate-axum-0.8.9",
+          "crate-axum-core-0.5.6",
+          "crate-http-1.5.0",
+          "crate-http-body-1.1.0",
+          "crate-http-body-util-0.1.5",
+          "crate-hyper-1.12.0",
+          "crate-hyper-util-0.1.21",
+          "crate-itoa-1.0.9",
+          "crate-leaf-0.1.0",
+          "crate-macros-0.1.0",
+          "crate-serde_json-1.0.151",
+          "crate-serde_path_to_error-0.1.20",
+          "crate-serde_urlencoded-0.7.1",
+          "crate-server-0.1.0",
+          "crate-shared-0.1.0",
+          "crate-util-0.1.0"
+        ],
+        "check": [
+          "crate-app-0.1.0",
+          "crate-axum-0.8.9",
+          "crate-axum-core-0.5.6",
+          "crate-http-1.5.0",
+          "crate-http-body-1.1.0",
+          "crate-http-body-util-0.1.5",
+          "crate-hyper-1.12.0",
+          "crate-hyper-util-0.1.21",
+          "crate-itoa-1.0.9",
+          "crate-leaf-0.1.0",
+          "crate-macros-0.1.0",
+          "crate-serde_json-1.0.151",
+          "crate-serde_path_to_error-0.1.20",
+          "crate-serde_urlencoded-0.7.1",
+          "crate-server-0.1.0",
+          "crate-shared-0.1.0",
+          "crate-util-0.1.0"
+        ]
+      }
+    },
+    "crane": {
+      "member-add": {
+        "build": [
+          "Cargo.toml",
+          "cargo-package-0.1.0",
+          "cargo-package-deps-0.1.0",
+          "source",
+          "vendor-cargo-deps",
+          "vendor-registry"
+        ]
+      },
+      "member-dependency-source": {
+        "build": [
+          "cargo-package-0.1.0"
+        ],
+        "check": [
+          "cargo-package-clippy-0.1.0",
+          "cargo-package-doc-0.1.0",
+          "cargo-package-test-0.1.0"
+        ]
+      },
+      "member-source": {
+        "build": [
+          "cargo-package-0.1.0"
+        ],
+        "check": [
+          "cargo-package-clippy-0.1.0",
+          "cargo-package-doc-0.1.0",
+          "cargo-package-test-0.1.0"
+        ]
+      },
+      "no-change": {
+        "build": [],
+        "check": []
+      },
+      "registry-dependency": {
+        "build": [
+          "Cargo.toml",
+          "cargo-package-0.1.0",
+          "cargo-package-deps-0.1.0",
+          "source",
+          "vendor-cargo-deps",
+          "vendor-registry"
+        ],
+        "check": [
+          "Cargo.toml",
+          "cargo-package-clippy-0.1.0",
+          "cargo-package-deps-0.1.0",
+          "cargo-package-doc-0.1.0",
+          "cargo-package-hyper-1.12.0",
+          "cargo-package-itoa-1.0.9",
+          "cargo-package-test-0.1.0",
+          "source",
+          "vendor-cargo-deps",
+          "vendor-registry"
+        ]
+      }
+    },
+    "crate2nix": {
+      "member-add": {
+        "build": [
+          "rust_app-0.1.0",
+          "rust_axum-0.8.9",
+          "rust_extra_<nonce>-0.1.0",
+          "rust_hyper-1.12.0",
+          "rust_hyper-util-0.1.21",
+          "rust_server-0.1.0"
+        ]
+      },
+      "member-dependency-source": {
+        "build": [
+          "rust_app-0.1.0",
+          "rust_leaf-0.1.0",
+          "rust_server-0.1.0",
+          "rust_shared-0.1.0",
+          "rust_util-0.1.0"
+        ],
+        "check": [
+          "rust_app-0.1.0",
+          "rust_leaf-0.1.0",
+          "rust_server-0.1.0",
+          "rust_shared-0.1.0",
+          "rust_util-0.1.0"
+        ]
+      },
+      "member-source": {
+        "build": [
+          "rust_app-0.1.0"
+        ],
+        "check": [
+          "rust_app-0.1.0"
+        ]
+      },
+      "no-change": {
+        "build": [],
+        "check": []
+      },
+      "registry-dependency": {
+        "build": [
+          "rust_app-0.1.0",
+          "rust_axum-0.8.9",
+          "rust_axum-core-0.5.6",
+          "rust_http-1.5.0",
+          "rust_http-body-1.1.0",
+          "rust_http-body-util-0.1.5",
+          "rust_hyper-1.12.0",
+          "rust_hyper-util-0.1.21",
+          "rust_itoa-1.0.9",
+          "rust_leaf-0.1.0",
+          "rust_serde_json-1.0.151",
+          "rust_serde_path_to_error-0.1.20",
+          "rust_serde_urlencoded-0.7.1",
+          "rust_server-0.1.0",
+          "rust_shared-0.1.0",
+          "rust_util-0.1.0"
+        ],
+        "check": [
+          "rust_app-0.1.0",
+          "rust_axum-0.8.9",
+          "rust_axum-core-0.5.6",
+          "rust_http-1.5.0",
+          "rust_http-body-1.1.0",
+          "rust_http-body-util-0.1.5",
+          "rust_hyper-1.12.0",
+          "rust_hyper-util-0.1.21",
+          "rust_itoa-1.0.9",
+          "rust_leaf-0.1.0",
+          "rust_serde_json-1.0.151",
+          "rust_serde_path_to_error-0.1.20",
+          "rust_serde_urlencoded-0.7.1",
+          "rust_server-0.1.0",
+          "rust_shared-0.1.0",
+          "rust_util-0.1.0"
+        ]
+      }
+    },
+    "naersk": {
+      "member-add": {
+        "build": [
+          "Cargo.lock",
+          "Cargo.toml",
+          "config",
+          "crates-io-dependencies",
+          "dummy-src",
+          "rust-workspace-deps-unknown",
+          "rust-workspace-unknown"
+        ]
+      },
+      "member-dependency-source": {
+        "build": [
+          "rust-workspace-unknown"
+        ],
+        "check": [
+          "rust-workspace-unknown"
+        ]
+      },
+      "member-source": {
+        "build": [
+          "rust-workspace-unknown"
+        ],
+        "check": [
+          "rust-workspace-unknown"
+        ]
+      },
+      "no-change": {
+        "build": [],
+        "check": []
+      },
+      "registry-dependency": {
+        "build": [
+          "Cargo.lock",
+          "Cargo.toml",
+          "config",
+          "crates-io-dependencies",
+          "dummy-src",
+          "rust-workspace-deps-unknown",
+          "rust-workspace-unknown"
+        ],
+        "check": [
+          "Cargo.lock",
+          "Cargo.toml",
+          "config",
+          "crates-io-dependencies",
+          "dummy-src",
+          "rust-workspace-deps-unknown",
+          "rust-workspace-unknown",
+          "unpack-hyper-1.12.0",
+          "unpack-itoa-1.0.9"
+        ]
+      }
+    },
+    "rustPlatform": {
+      "member-add": {
+        "build": [
+          "app-0.1.0",
+          "cargo-vendor-dir",
+          "hyper-1.12.0"
+        ]
+      },
+      "member-dependency-source": {
+        "build": [
+          "app-0.1.0",
+          "cargo-vendor-dir"
+        ],
+        "check": [
+          "cargo-vendor-dir",
+          "workspace-tests-0.1.0"
+        ]
+      },
+      "member-source": {
+        "build": [
+          "app-0.1.0",
+          "cargo-vendor-dir"
+        ],
+        "check": [
+          "cargo-vendor-dir",
+          "workspace-tests-0.1.0"
+        ]
+      },
+      "no-change": {
+        "build": [],
+        "check": []
+      },
+      "registry-dependency": {
+        "build": [
+          "app-0.1.0",
+          "cargo-vendor-dir",
+          "hyper-1.12.0",
+          "itoa-1.0.9"
+        ],
+        "check": [
+          "cargo-vendor-dir",
+          "hyper-1.12.0",
+          "itoa-1.0.9",
+          "workspace-tests-0.1.0"
+        ]
+      }
+    }
+  }
+}

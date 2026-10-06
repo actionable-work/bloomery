@@ -12,7 +12,7 @@
   docsPackage = rootWorkspace.packages."bloomery-docs";
 in
   (import ./checks {
-    inherit lib pkgs bloomery docsPackage;
+    inherit lib pkgs nixpkgs bloomery docsPackage system;
     root = ../.;
     workspace = rootWorkspace;
     treefmt = rootWorkspace.formatterConfig;

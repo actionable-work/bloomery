@@ -1,0 +1,133 @@
+group = "FIXTURES"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-FIXTURES-001"
+title = "All builders consume a fixture workspace through a path input"
+manual = false
+design = "design/fixtures.md#fixture-groups"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark subflakes"
+action = "consume the selected fixture group through a local workspace path input"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-FIXTURES-002"
+title = "The fixture contains a binary depending on an internal library"
+manual = false
+design = "design/fixtures.md#fixture-groups"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark workspace"
+action = "contain a binary member that depends on an internal library member"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-FIXTURES-003"
+title = "The fixture contains a shared internal dependency"
+manual = false
+design = "design/fixtures.md#fixture-groups"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark workspace"
+action = "contain a library member consumed by more than one other member"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-FIXTURES-004"
+title = "The fixture declares a workspace registry dependency"
+manual = false
+design = "design/fixtures.md#fixture-groups"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark workspace"
+action = "declare a crates.io dependency in the workspace dependency table"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-FIXTURES-005"
+title = "The fixture contains a build script"
+manual = false
+design = "design/fixtures.md#fixture-groups"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark workspace"
+action = "contain a member with a build script"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-FIXTURES-006"
+title = "The fixture contains a proc-macro crate"
+manual = false
+design = "design/fixtures.md#fixture-groups"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark workspace"
+action = "contain a proc-macro member consumed by another member"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-FIXTURES-007"
+title = "The fixture contains test and doctest targets"
+manual = false
+design = "design/fixtures.md#fixture-groups"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark workspace"
+action = "contain a member with unit tests and a library member with a doctest"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-FIXTURES-008"
+title = "Every builder exposes a default package"
+manual = false
+design = "design/fixtures.md#builder-contract"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "each builder subflake"
+action = "expose packages.<system>.default as the built workspace binary"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-FIXTURES-009"
+title = "Every builder exposes a check suite"
+manual = false
+design = "design/fixtures.md#builder-contract"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "each builder subflake"
+action = "expose its idiomatic test and clippy derivations under checks.<system>"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-FIXTURES-010"
+title = "Benchmark subflakes stay out of root flake outputs"
+manual = false
+design = "design/fixtures.md#check-isolation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the root flake"
+action = "omit benchmark subflake packages, apps, and checks from its outputs"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-FIXTURES-011"
+title = "The builder contract has a structural validation check"
+manual = false
+design = "design/fixtures.md#validation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the repository checks"
+action = "validate the benchmark builder contract without running timed measurements"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-FIXTURES-012"
+title = "Benchmarks provide a simple and a standard fixture group"
+manual = false
+design = "design/fixtures.md#fixture-groups"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark fixtures"
+action = "provide a simple single-dependency group and a standard axum and clap group with shared scenario targets"

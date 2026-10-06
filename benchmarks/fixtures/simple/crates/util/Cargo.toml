@@ -1,0 +1,7 @@
+[dependencies]
+itoa = { workspace = true }
+
+[package]
+edition = "2021"
+name = "util"
+version = "0.1.0"

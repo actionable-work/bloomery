@@ -1,0 +1,259 @@
+group = "HARNESS"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-001"
+title = "Hyperfine drives the measurements"
+manual = false
+design = "design/harness.md#hyperfine-protocol"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark harness"
+action = "run each builder and scenario as a hyperfine benchmark"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-002"
+title = "Each benchmark exports machine-readable samples"
+manual = false
+design = "design/harness.md#hyperfine-protocol"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark harness"
+action = "export one JSON result file per builder and scenario"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-003"
+title = "Results aggregate into a comparison report"
+manual = false
+design = "design/harness.md#report"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark harness"
+action = "report sample count, mean, standard deviation, minimum, maximum, and the ratio to Bloomery per builder and scenario"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-004"
+title = "Timed runs fix Nix parallelism"
+manual = false
+design = "design/harness.md#environment"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark harness"
+action = "fix --max-jobs and --cores for every timed run"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-005"
+title = "Scenarios share one warm store"
+manual = false
+design = "design/harness.md#store-state"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark harness"
+action = "reuse dependency and baseline artifacts across scenarios from one warm store"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-006"
+title = "Scenario outputs are evicted between timed runs"
+manual = false
+design = "design/harness.md#store-state"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark harness"
+action = "evict the scenario's realized outputs before each timed run while retaining dependency artifacts"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-007"
+title = "Timed runs use one target system"
+manual = false
+design = "design/harness.md#environment"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark harness"
+action = "narrow timed runs to one target platform"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-008"
+title = "The report records run metadata"
+manual = false
+design = "design/harness.md#report"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark report"
+action = "record builder revisions, nixpkgs revision, toolchain version, system, host, parallelism, and preparation steps"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-009"
+title = "Builder failures cannot appear as measurements"
+manual = false
+design = "design/harness.md#report"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a builder fails to evaluate or build"
+system = "the benchmark harness"
+action = "exit non-zero and report the failure instead of emitting a zero or missing timing"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-010"
+title = "One documented command runs the suite"
+manual = false
+design = "design/harness.md#entry-point"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark harness"
+action = "expose a single entry point that runs every builder and scenario"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-011"
+title = "Timed runs access no network"
+manual = false
+design = "design/harness.md#environment"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark harness"
+action = "pre-seed the store so timed runs perform no network fetches"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-012"
+title = "The benchmarks flake exposes a bench app"
+manual = false
+design = "design/harness.md#entry-point"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmarks subflake"
+action = "expose apps.<system>.bench that runs the benchmark harness"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-014"
+title = "Preparation applies mutations and regenerates derived inputs"
+manual = false
+design = "design/harness.md#preparation"
+
+[requirements.ears]
+type = "event"
+trigger = "a benchmark run is prepared"
+system = "the benchmark harness"
+action = "apply the scenario mutation and regenerate locks and generated Nix before the timed command"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-015"
+title = "Timed runs only execute the builder"
+manual = false
+design = "design/harness.md#hyperfine-protocol"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "each timed benchmark run"
+action = "execute only the builder build or check command"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-016"
+title = "Baseline artifacts are seeded before timing"
+manual = false
+design = "design/harness.md#store-state"
+
+[requirements.ears]
+type = "event"
+trigger = "a builder's scenarios begin"
+system = "the benchmark harness"
+action = "build the baseline package and checks once to warm the shared store"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-017"
+title = "A run restores fixtures from the baseline snapshot at the start"
+manual = false
+design = "design/harness.md#baseline-snapshot"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark harness"
+action = "restore each selected fixture from its baseline snapshot at the start of a run"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-018"
+title = "An interrupted run cannot corrupt the baseline snapshot"
+manual = false
+design = "design/harness.md#baseline-snapshot"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a run is interrupted after a scenario mutation is applied"
+system = "the benchmark harness"
+action = "preserve the existing baseline snapshot so the next run restores the unmutated fixture"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-019"
+title = "The baseline snapshot refreshes on request"
+manual = false
+design = "design/harness.md#baseline-snapshot"
+
+[requirements.ears]
+type = "event"
+trigger = "a run passes --refresh-baseline"
+system = "the benchmark harness"
+action = "re-snapshot each selected fixture from its current state"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-020"
+title = "The benchmarks tree is a flake"
+manual = false
+design = "design/harness.md#entry-point"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmarks directory"
+action = "define a flake that exposes the bench app"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-025"
+title = "The root flake exposes a host bench app"
+manual = false
+design = "design/harness.md#entry-point"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the repository root flake"
+action = "expose apps.<system>.bench that runs the benchmark harness"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-027"
+title = "The harness logs the derivations each benchmark builds"
+manual = false
+design = "design/harness.md#derivation-logging"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark harness"
+action = "write each timed command's output and the derivations it built under benchmarks/results/logs"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-028"
+title = "Timed runs use no substituters"
+manual = false
+design = "design/harness.md#store-state"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "each timed benchmark run"
+action = "disable substituters and fail if a substitution is observed"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-HARNESS-029"
+title = "Benchmarks verify the derivations they build"
+manual = false
+design = "design/harness.md#derivation-expectations"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the benchmark harness"
+action = "compare the derivations each benchmark built against the names recorded in benchmarks/harness/derivations.json"

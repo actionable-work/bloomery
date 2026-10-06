@@ -1,10 +1,12 @@
 {
   lib,
   pkgs,
+  nixpkgs,
   bloomery,
   workspace,
   treefmt,
   docsPackage,
+  system,
   root ? ../..,
 }:
 {
@@ -16,5 +18,10 @@
   "core:validate-docs-assets" = import ./validate-docs-assets.nix {
     inherit pkgs docsPackage;
   };
+  "core:benchmarks" = import ./benchmarks.nix {
+    inherit lib pkgs nixpkgs bloomery system root;
+  };
+  "core:benchmarks-report" = import ./benchmarks-report.nix {inherit pkgs root;};
+  "core:benchmarks-snapshot" = import ./benchmarks-snapshot.nix {inherit pkgs root;};
 }
 // (import ./workspace.nix {inherit lib workspace;})

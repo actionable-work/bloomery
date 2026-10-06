@@ -83,6 +83,34 @@
               inherit lib nixpkgs self bloomeryFor perSystemWorkspace system;
             }
         );
+        apps = eachSystem (
+          system: let
+            pkgs = nixpkgs.legacyPackages.${system};
+            bloomeryCli = perSystemWorkspace.${system}.packages.bloomery;
+            bench = pkgs.writeShellApplication {
+              name = "bloomery-bench";
+              runtimeInputs = [
+                pkgs.bash
+                pkgs.cargo
+                pkgs.git
+                pkgs.hyperfine
+                pkgs.python3
+                pkgs.rustc
+              ];
+              text = ''
+                export BLOOMERY_BIN="${bloomeryCli}/bin/bloomery"
+                exec ${pkgs.bash}/bin/bash ${./benchmarks/run.sh} "$@"
+              '';
+            };
+          in
+            perSystemWorkspace.${system}.apps
+            // {
+              bench = {
+                type = "app";
+                program = "${bench}/bin/bloomery-bench";
+              };
+            }
+        );
       };
     })
     // {

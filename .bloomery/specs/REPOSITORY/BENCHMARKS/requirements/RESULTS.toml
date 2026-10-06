@@ -1,0 +1,124 @@
+group = "RESULTS"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-RESULTS-001"
+title = "Each run regenerates the current-state report"
+manual = false
+design = "design/results.md#current-state-report"
+
+[requirements.ears]
+type = "event"
+trigger = "a benchmark run completes"
+system = "the benchmark harness"
+action = "regenerate benchmarks/results/current.md from that run"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-RESULTS-002"
+title = "The current-state report carries the timing table"
+manual = false
+design = "design/results.md#current-state-report"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the current-state report"
+action = "list builder, sample count, mean, standard deviation, minimum, maximum, and ratio to Bloomery per scenario"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-RESULTS-003"
+title = "The current-state report names the machine"
+manual = false
+design = "design/results.md#machine-identity"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the current-state report"
+action = "record the CPU model, physical core count, logical core count, and total memory of the benchmark machine"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-RESULTS-004"
+title = "Each run appends a history entry"
+manual = false
+design = "design/results.md#history-log"
+
+[requirements.ears]
+type = "event"
+trigger = "a benchmark run completes"
+system = "the benchmark harness"
+action = "append one run entry to benchmarks/results/history.json without rewriting earlier entries"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-RESULTS-005"
+title = "History entries carry run metadata"
+manual = false
+design = "design/results.md#history-log"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "each history entry"
+action = "record the run timestamp, machine identity and memory, revisions, parallelism, and per-builder scenario statistics"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-RESULTS-006"
+title = "History distinguishes machines"
+manual = false
+design = "design/results.md#machine-identity"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the history log"
+action = "keep runs from different machines distinguishable by their machine identity"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-RESULTS-007"
+title = "Results are grouped by fixture"
+manual = false
+design = "design/results.md#current-state-report"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the current-state report"
+action = "present a separate summary and details sub-section for each fixture group"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-RESULTS-008"
+title = "The summary states per-builder check coverage"
+manual = false
+design = "design/results.md#current-state-report"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "each fixture summary"
+action = "state which checks each builder runs and call out builders whose check variant is only a package build"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-RESULTS-009"
+title = "The report describes each fixture group"
+manual = false
+design = "design/results.md#current-state-report"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the current-state report"
+action = "describe each fixture group in the process section and under its summary"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-RESULTS-010"
+title = "The report documents each test case"
+manual = false
+design = "design/results.md#current-state-report"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the current-state report"
+action = "list each scenario with its variants and its description"
+
+[[requirements]]
+id = "REPOSITORY-BENCHMARKS-RESULTS-011"
+title = "The report states a feature matrix"
+manual = false
+design = "design/results.md#current-state-report"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the current-state report"
+action = "show what each tool builds and mark check numbers that do not cover a full suite"

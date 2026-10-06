@@ -16,6 +16,7 @@ workspaces, and repository-local Bloomery metadata.
 | `nix/checks/` | Flake checks, including documentation asset validation and workspace checks. |
 | `nix/lib/` | Shared Nix helpers used by the flake. |
 | `tests/` | Isolated consumer workspaces, Nix integration fixtures, and test support. |
+| `benchmarks/` | Benchmark subflake: fixture groups, per-builder subflakes, and the hyperfine harness; outside root flake composition. |
 | `.bloomery/config.toml` | Required Bloomery configuration: scanner and spec targets plus the Nix build tables consumed by the flake interface. |
 | `.bloomery/specs/` | Bloomery area and feature specifications for this repository. |
 
@@ -54,3 +55,11 @@ The repository composes its isolated consumer workspaces through the native
 sub-flake mechanism. `.bloomery/config.toml` declares each `tests/<name>`
 workspace as a named `[flakes.<name>]` entry with check elevation enabled, and
 the root flake exposes their checks through `mkFlake` sub-flake expansion.
+
+Benchmark subflakes under `benchmarks/` are not declared as configured
+sub-flakes. They pin ecosystem builder inputs and are evaluated and built only
+by the benchmark harness, so they add no root flake outputs or inputs. The
+`benchmarks/` directory is its own flake: it exposes the `bench` runner app and
+records the derivation expectations used to verify each benchmark. The root
+flake exposes the same `bench` runner app. The benchmark contract is specified by
+[BENCHMARKS](../../BENCHMARKS/README.md).
