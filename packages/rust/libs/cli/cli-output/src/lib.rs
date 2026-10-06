@@ -5,6 +5,7 @@ pub use terminal::{TerminalFacts, TransientLine};
 use bloomery_config::ConfigReport;
 use bloomery_init::{InitError, InitErrorKind, InitReport};
 use bloomery_model::{Diagnostic, diagnostics::SourceLocation};
+use bloomery_spec::SpecReport;
 use bloomery_sync::SyncReport;
 use serde_json::{Value, json};
 use std::io::{self, IsTerminal, Write};
@@ -203,6 +204,25 @@ pub fn config_failure_json(command: &str, message: &str) -> Value {
         "status": "failed",
         "error": {
             "kind": "config",
+            "message": message,
+        },
+    })
+}
+
+pub fn spec_success_json(report: &SpecReport) -> Value {
+    json!({
+        "command": "spec",
+        "status": "succeeded",
+        "result": report.outcome,
+    })
+}
+
+pub fn spec_failure_json(command: &str, message: &str) -> Value {
+    json!({
+        "command": command,
+        "status": "failed",
+        "error": {
+            "kind": "spec",
             "message": message,
         },
     })

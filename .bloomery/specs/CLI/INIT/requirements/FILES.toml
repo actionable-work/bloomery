@@ -75,7 +75,7 @@ design = "design/templates.md#common-files"
 [requirements.ears]
 type = "ubiquitous"
 system = "a generated .bloomery/config.toml"
-action = "rely on the documented default build settings"
+action = "rely on the documented default build settings and default scanner paths"
 
 [[requirements]]
 id = "CLI-INIT-FILES-008"
@@ -152,7 +152,7 @@ design = "design/templates.md#basic-workspace"
 [requirements.ears]
 type = "ubiquitous"
 system = "the basic workspace template"
-action = "contain a library crate at crates/{{project}}_core"
+action = "contain a library crate at packages/rust/{{project}}_core"
 
 [[requirements]]
 id = "CLI-INIT-FILES-015"
@@ -163,7 +163,7 @@ design = "design/templates.md#basic-workspace"
 [requirements.ears]
 type = "ubiquitous"
 system = "the basic workspace template"
-action = "contain a thin binary crate at crates/{{project}} that calls the core library"
+action = "contain a thin binary crate at packages/rust/{{project}} that calls the core library"
 
 [[requirements]]
 id = "CLI-INIT-FILES-016"
@@ -174,7 +174,7 @@ design = "design/templates.md#axum-server"
 [requirements.ears]
 type = "ubiquitous"
 system = "the axum server template"
-action = "contain a library crate at crates/{{project}}_server providing the router and handlers"
+action = "contain a library crate at packages/rust/{{project}}_server providing the router and handlers"
 
 [[requirements]]
 id = "CLI-INIT-FILES-017"
@@ -185,7 +185,7 @@ design = "design/templates.md#axum-server"
 [requirements.ears]
 type = "ubiquitous"
 system = "the axum server template"
-action = "contain a thin binary crate at crates/{{project}} that starts the server library"
+action = "contain a thin binary crate at packages/rust/{{project}} that starts the server library"
 
 [[requirements]]
 id = "CLI-INIT-FILES-018"
@@ -196,7 +196,7 @@ design = "design/templates.md#topcoat-website"
 [requirements.ears]
 type = "ubiquitous"
 system = "the topcoat website template"
-action = "contain a library crate at crates/{{project}}_ui providing pages and assets"
+action = "contain a library crate at packages/rust/{{project}}_ui providing pages and assets"
 
 [[requirements]]
 id = "CLI-INIT-FILES-019"
@@ -207,7 +207,7 @@ design = "design/templates.md#topcoat-website"
 [requirements.ears]
 type = "ubiquitous"
 system = "the topcoat website template"
-action = "contain a library crate at crates/{{project}}_server that registers UI pages and serves the site"
+action = "contain a library crate at packages/rust/{{project}}_server that registers UI pages and serves the site"
 
 [[requirements]]
 id = "CLI-INIT-FILES-020"
@@ -218,7 +218,7 @@ design = "design/templates.md#topcoat-website"
 [requirements.ears]
 type = "ubiquitous"
 system = "the topcoat website template"
-action = "contain a thin binary crate at crates/{{project}} that starts the server library"
+action = "contain a thin binary crate at packages/rust/{{project}} that starts the server library"
 
 [[requirements]]
 id = "CLI-INIT-FILES-021"

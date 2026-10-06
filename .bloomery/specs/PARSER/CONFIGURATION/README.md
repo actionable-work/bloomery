@@ -4,8 +4,8 @@ name: Bloomery Configuration
 tagline: Required roots, scanner paths, and parser options.
 description: |
   Configuration controls where requirements are discovered and which source
-  trees are inspected for static references. It selects scanner behavior
-  without changing requirement identity or the architecture model.
+  trees are inspected for static references and test sites. It selects scanner
+  behavior without changing requirement identity or the architecture model.
 ---
 
 # Configuration
@@ -29,12 +29,14 @@ during loading and passes through for the flake interface.
 - Require `.bloomery/config.toml` for repository commands while exempting help,
   `init`, and `config`, whose mutating commands create a missing file with a
   warning.
-- Use validated defaults for tables and keys omitted from a present file.
+- Use validated defaults for tables and keys omitted from a present file,
+  including enabling every supported scanner by default.
 - Locate the specs root relative to `.bloomery/`.
 - Enable or disable supported scanners.
 - Define source globs relative to the repository root.
 - Define Playwright tag prefixes.
 - Define repository-relative Nix source paths for static evidence scanning.
+- Define repository-relative Nix test globs for candidate discovery.
 - Accept the build tables without interpreting them as scanner or spec
   configuration while cataloguing and type-validating their keys.
 - Catalogue the parameterized formatter enablement and ordering keys alongside

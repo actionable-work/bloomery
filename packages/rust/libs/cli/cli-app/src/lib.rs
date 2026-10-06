@@ -1,11 +1,12 @@
 use bloomery_check_command as check_command;
 use bloomery_cli_output as output;
 use bloomery_cli_parser::{ParseError, ParseErrorKind, parse_from};
-use bloomery_cli_types::{CliCommand, CliInvocation};
+use bloomery_cli_types::{CliCommand, CliInvocation, SpecArgs};
 use bloomery_config::{
     ConfigError, ConfigErrorKind, ConfigOutcome, ConfigReport, ConfigWarning, DiffStatus,
 };
 use bloomery_model::{render_diagnostics, sort_diagnostics};
+use bloomery_spec::{SpecError, SpecOutcome, SpecReport};
 use serde_json::{Value, json};
 use std::ffi::OsString;
 use std::io::{self, Write};
@@ -87,6 +88,7 @@ fn command_name(command: &CliCommand) -> Option<&'static str> {
         CliCommand::Review => Some("review"),
         CliCommand::Sync { .. } => Some("sync"),
         CliCommand::Config(_) => Some("config"),
+        CliCommand::Spec(_) => Some("spec"),
     }
 }
 
@@ -617,6 +619,7 @@ fn run_workspace_command_at(
     match command {
         CliCommand::Check(args) => check_command::run_at(args, json_mode, root, stdout, stderr),
         CliCommand::Review => run_review_at(root, json_mode, stdout, stderr),
+        CliCommand::Spec(args) => run_spec_at(args, json_mode, root, stdout, stderr),
         CliCommand::Init(_) => unreachable!("init is dispatched before workspace loading"),
         CliCommand::Sync { .. } => unreachable!("sync is dispatched before workspace loading"),
         CliCommand::Config(_) => unreachable!("config is dispatched before workspace loading"),
@@ -694,6 +697,154 @@ fn run_review_at(
         let _ = stdout.write_all(rendered.as_bytes());
         ExitCode::SUCCESS
     }
+}
+
+fn run_spec_at(
+    args: SpecArgs,
+    json_mode: bool,
+    root: &Path,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
+    match bloomery_spec::run_at(&args.operation, root) {
+        Ok(report) => {
+            if json_mode {
+                if write_json(stdout, &output::spec_success_json(&report)).is_err() {
+                    let _ = writeln!(stderr, "bloomery: unable to render JSON spec result");
+                    return ExitCode::from(1);
+                }
+            } else {
+                render_spec_success(&report, stdout);
+            }
+            ExitCode::SUCCESS
+        }
+        Err(error) => report_spec_error(error, json_mode, stdout, stderr),
+    }
+}
+
+fn render_spec_success(report: &SpecReport, stdout: &mut impl Write) {
+    match &report.outcome {
+        SpecOutcome::List { records } => {
+            for record in records {
+                let _ = writeln!(
+                    stdout,
+                    "[{}] {} ({}/{}/{}, {})",
+                    record.id,
+                    record.title,
+                    record.area,
+                    record.feature,
+                    record.group,
+                    record.design_ref
+                );
+            }
+        }
+        SpecOutcome::Show { record } => {
+            let _ = writeln!(stdout, "[{}] {}", record.id, record.title);
+            let _ = writeln!(
+                stdout,
+                "{} {} {}",
+                record.area, record.feature, record.group
+            );
+            let mode = if record.manual { "manual" } else { "automated" };
+            let _ = writeln!(stdout, "{}", mode);
+            let _ = writeln!(stdout, "{}", record.statement);
+            let _ = writeln!(stdout, "Design: {}", record.design_ref);
+        }
+        SpecOutcome::Add {
+            id,
+            path,
+            created_group,
+        } => {
+            if *created_group {
+                let _ = writeln!(stdout, "added {id} and created group {path}");
+            } else {
+                let _ = writeln!(stdout, "added {id} to {path}");
+            }
+        }
+        SpecOutcome::Set { id, field, changed } => {
+            if *changed {
+                let _ = writeln!(stdout, "set {id}.{field}");
+            } else {
+                let _ = writeln!(stdout, "{id}.{field} unchanged");
+            }
+        }
+        SpecOutcome::Remove { id, pruned_group } => {
+            if *pruned_group {
+                let _ = writeln!(stdout, "removed {id} and pruned its empty group");
+            } else {
+                let _ = writeln!(stdout, "removed {id}");
+            }
+        }
+        SpecOutcome::Trace { requirements } => {
+            for requirement in requirements {
+                let _ = writeln!(stdout, "[{}] {}", requirement.id, requirement.title);
+                if requirement.references.is_empty() {
+                    let _ = writeln!(stdout, "    (no tied tests)");
+                }
+                for reference in &requirement.references {
+                    match reference.line {
+                        Some(line) => {
+                            let _ = writeln!(
+                                stdout,
+                                "    {} {}:{line}",
+                                reference.scanner, reference.path
+                            );
+                        }
+                        None => {
+                            let _ =
+                                writeln!(stdout, "    {} {}", reference.scanner, reference.path);
+                        }
+                    }
+                }
+            }
+        }
+        SpecOutcome::Candidates { candidates } => {
+            if candidates.is_empty() {
+                let _ = writeln!(stdout, "no untied tests");
+            }
+            for candidate in candidates {
+                let name = candidate.name.as_deref().unwrap_or("<unnamed>");
+                match candidate.line {
+                    Some(line) => {
+                        let _ = writeln!(
+                            stdout,
+                            "{} {name} {}:{line}",
+                            candidate.scanner, candidate.path
+                        );
+                    }
+                    None => {
+                        let _ = writeln!(stdout, "{} {name} {}", candidate.scanner, candidate.path);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn report_spec_error(
+    error: SpecError,
+    json_mode: bool,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
+    let exit_code = error.exit_code();
+    if json_mode {
+        let document = output::spec_failure_json("spec", error.message());
+        if write_json(stdout, &document).is_err() {
+            let _ = writeln!(stderr, "bloomery: unable to render JSON spec error");
+            return ExitCode::from(1);
+        }
+    } else {
+        let _ = writeln!(
+            stderr,
+            "{}",
+            output::colorize_error(
+                &format!("error: {}", error.message()),
+                output::color_enabled(output::Stream::Stderr, false)
+            )
+        );
+    }
+    ExitCode::from(exit_code)
 }
 
 fn write_json(writer: &mut impl Write, value: &Value) -> io::Result<()> {
@@ -1020,6 +1171,9 @@ mod tests {
             &["bloomery", "check", "details", "f1"],
             &["bloomery", "review"],
             &["bloomery", "sync"],
+            &["bloomery", "spec", "list"],
+            &["bloomery", "spec", "candidates"],
+            &["bloomery", "spec", "trace", "CLI-INTERFACE-COMMANDS-001"],
             &["bloomery", "help"],
             &["bloomery", "help", "check"],
             &["bloomery", "--help"],
@@ -1116,6 +1270,8 @@ mod tests {
             &["bloomery", "check", "list"][..],
             &["bloomery", "review"][..],
             &["bloomery", "sync"][..],
+            &["bloomery", "spec", "list"][..],
+            &["bloomery", "spec", "candidates"][..],
         ] {
             let root = fixture_root("missing-config");
             fs::create_dir_all(&root).expect("workspace root");
@@ -1306,9 +1462,171 @@ mod tests {
             assert!(parse_json(&["bloomery", command, "--json"]).expect("trailing --json"));
             assert!(parse_json(&["bloomery", "--json", command]).expect("leading --json"));
         }
+        for args in [
+            ["bloomery", "spec", "list", "--json"],
+            ["bloomery", "--json", "spec", "list"],
+            ["bloomery", "spec", "candidates", "--json"],
+            ["bloomery", "--json", "spec", "candidates"],
+        ] {
+            assert!(parse_json(&args).expect("spec --json"));
+        }
         assert!(parse_json(&["bloomery", "config", "list", "--json"]).expect("trailing --json"));
         assert!(parse_json(&["bloomery", "--json", "config", "list"]).expect("leading --json"));
         assert!(Cli::try_parse_from(["bloomery", "review", "--format", "json"]).is_err());
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-020"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-021"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-022"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-023"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-024"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-025"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-026"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-027"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-015"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-016"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-017"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-018"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-019"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-020"))]
+    fn clap_parses_every_spec_subcommand() {
+        use bloomery_cli_types::SpecOperation;
+
+        let operation =
+            |args: &[&str]| match Cli::try_parse_from(args).expect("spec command").command {
+                Command::Spec(args) => args.operation,
+                other => panic!("expected spec, got {other:?}"),
+            };
+
+        assert_eq!(
+            operation(&["bloomery", "spec", "list"]),
+            SpecOperation::List {
+                area: None,
+                feature: None,
+                group: None,
+            }
+        );
+        assert_eq!(
+            operation(&[
+                "bloomery",
+                "spec",
+                "list",
+                "--area",
+                "A",
+                "--feature",
+                "F",
+                "--group",
+                "G",
+            ]),
+            SpecOperation::List {
+                area: Some("A".into()),
+                feature: Some("F".into()),
+                group: Some("G".into()),
+            }
+        );
+        assert_eq!(
+            operation(&["bloomery", "spec", "show", "A-F-G-001"]),
+            SpecOperation::Show {
+                id: "A-F-G-001".into(),
+            }
+        );
+        assert_eq!(
+            operation(&[
+                "bloomery",
+                "spec",
+                "add",
+                "A-F-G-001",
+                "--title",
+                "Title",
+                "--ears",
+                "{ type = \"ubiquitous\", system = \"s\", action = \"a\" }",
+                "--design",
+                "design/x.md",
+                "--manual",
+            ]),
+            SpecOperation::Add {
+                id: "A-F-G-001".into(),
+                title: "Title".into(),
+                ears: "{ type = \"ubiquitous\", system = \"s\", action = \"a\" }".into(),
+                design: Some("design/x.md".into()),
+                manual: true,
+            }
+        );
+        assert_eq!(
+            operation(&["bloomery", "spec", "set", "A-F-G-001", "title", "New"]),
+            SpecOperation::Set {
+                id: "A-F-G-001".into(),
+                field: "title".into(),
+                value: "New".into(),
+            }
+        );
+        assert_eq!(
+            operation(&["bloomery", "spec", "remove", "A-F-G-001"]),
+            SpecOperation::Remove {
+                id: "A-F-G-001".into(),
+            }
+        );
+        assert_eq!(
+            operation(&["bloomery", "spec", "trace", "A-F-G-001", "A-F-G-002"]),
+            SpecOperation::Trace {
+                ids: vec!["A-F-G-001".into(), "A-F-G-002".into()],
+            }
+        );
+        assert_eq!(
+            operation(&["bloomery", "spec", "candidates"]),
+            SpecOperation::Candidates
+        );
+
+        assert!(Cli::try_parse_from(["bloomery", "spec", "show", "ID", "--area", "A"]).is_err());
+        assert!(Cli::try_parse_from(["bloomery", "spec", "add", "ID", "--ears", "{}"]).is_err());
+        assert!(Cli::try_parse_from(["bloomery", "spec", "add", "ID", "--title", "T"]).is_err());
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-010"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-011"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-012"))]
+    fn spec_json_contracts() {
+        let root = fixture_workspace("CLI-CHECK-CONTRACT-001", false);
+
+        for (arguments, operation) in [
+            (vec!["bloomery", "spec", "list", "--json"], "list"),
+            (
+                vec![
+                    "bloomery",
+                    "spec",
+                    "show",
+                    "CLI-CHECK-CONTRACT-001",
+                    "--json",
+                ],
+                "show",
+            ),
+            (
+                vec![
+                    "bloomery",
+                    "spec",
+                    "trace",
+                    "CLI-CHECK-CONTRACT-001",
+                    "--json",
+                ],
+                "trace",
+            ),
+            (
+                vec!["bloomery", "spec", "candidates", "--json"],
+                "candidates",
+            ),
+        ] {
+            let mut stdout = Vec::new();
+            let mut stderr = Vec::new();
+            let status = run_args_at(arguments.iter().copied(), &root, &mut stdout, &mut stderr);
+            assert_eq!(status, ExitCode::SUCCESS, "arguments: {arguments:?}");
+            let document: Value = serde_json::from_slice(&stdout).expect("spec JSON");
+            assert_eq!(document["command"], "spec");
+            assert_eq!(document["status"], "succeeded");
+            assert_eq!(document["result"]["operation"], operation);
+        }
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]
@@ -1735,8 +2053,8 @@ mod tests {
                 "bloomery",
                 "config",
                 "set",
-                "scanners.rust.enabled",
-                "true",
+                "scanners.playwright.tag_prefix",
+                "",
                 "--json",
             ],
             &root,

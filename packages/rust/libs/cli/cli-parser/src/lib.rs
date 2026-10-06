@@ -1,6 +1,7 @@
 use bloomery_cli_types::{
     CheckArgs, CheckOperation, CliCommand, CliInvocation, ConfigArgs, ConfigOperation,
-    DEFAULT_PAGE_LIMIT, DETAIL_PAGE_LIMIT, DetailsArgs, FailureArgs, InitArgs, ListArgs,
+    DEFAULT_PAGE_LIMIT, DETAIL_PAGE_LIMIT, DetailsArgs, FailureArgs, InitArgs, ListArgs, SpecArgs,
+    SpecOperation,
 };
 use clap::{ArgAction, Args, Parser, Subcommand, error::ErrorKind};
 use std::ffi::OsString;
@@ -99,6 +100,7 @@ fn command_from_arguments(arguments: &[OsString]) -> Option<&'static str> {
             "sync" => Some("sync"),
             "init" => Some("init"),
             "config" => Some("config"),
+            "spec" => Some("spec"),
             _ => None,
         })
 }
@@ -138,6 +140,8 @@ enum RawCommand {
     },
     /// Read, edit, document, or upgrade .bloomery/config.toml.
     Config(RawConfigArgs),
+    /// List, edit, and trace repository specification records.
+    Spec(RawSpecArgs),
 }
 
 impl From<RawCommand> for CliCommand {
@@ -148,6 +152,7 @@ impl From<RawCommand> for CliCommand {
             RawCommand::Review => Self::Review,
             RawCommand::Sync { update } => Self::Sync { update },
             RawCommand::Config(args) => Self::Config(args.into()),
+            RawCommand::Spec(args) => Self::Spec(args.into()),
         }
     }
 }
@@ -157,7 +162,6 @@ struct RawConfigArgs {
     #[command(subcommand)]
     operation: RawConfigOperation,
 }
-
 #[derive(Debug, Subcommand)]
 enum RawConfigOperation {
     /// Read one configuration key.
@@ -213,6 +217,114 @@ impl From<RawConfigOperation> for ConfigOperation {
             RawConfigOperation::List { prefix } => Self::List { prefix },
             RawConfigOperation::Upgrade { dry_run, diff } => Self::Upgrade { dry_run, diff },
             RawConfigOperation::Document => Self::Document,
+        }
+    }
+}
+
+#[derive(Debug, Args)]
+struct RawSpecArgs {
+    #[command(subcommand)]
+    operation: RawSpecOperation,
+}
+
+#[derive(Debug, Subcommand)]
+enum RawSpecOperation {
+    /// List requirement records.
+    List {
+        /// Restrict to one area identifier.
+        #[arg(long, value_name = "AREA")]
+        area: Option<String>,
+        /// Restrict to one feature identifier.
+        #[arg(long, value_name = "FEATURE")]
+        feature: Option<String>,
+        /// Restrict to one requirement group.
+        #[arg(long, value_name = "GROUP")]
+        group: Option<String>,
+    },
+    /// Show one requirement record.
+    Show {
+        /// Full requirement ID.
+        id: String,
+    },
+    /// Create a requirement record.
+    Add {
+        /// Full requirement ID; its segments derive the target file.
+        id: String,
+        /// Human-readable record title.
+        #[arg(long, value_name = "TITLE")]
+        title: String,
+        /// EARS clause as a TOML inline table.
+        #[arg(long, value_name = "TOML")]
+        ears: String,
+        /// Feature-relative design path with an optional anchor.
+        #[arg(long, value_name = "PATH")]
+        design: Option<String>,
+        /// Mark the record as human-reviewed instead of automated.
+        #[arg(long)]
+        manual: bool,
+    },
+    /// Replace one field of a requirement record.
+    Set {
+        /// Full requirement ID.
+        id: String,
+        /// Field to replace: title, manual, design, or ears.
+        field: String,
+        /// New field value.
+        value: String,
+    },
+    /// Delete a requirement record.
+    Remove {
+        /// Full requirement ID.
+        id: String,
+    },
+    /// Report the tests statically tied to one or more requirements.
+    Trace {
+        /// Full requirement IDs.
+        #[arg(required = true, num_args = 1.., value_name = "ID")]
+        ids: Vec<String>,
+    },
+    /// Report discovered tests that are not tied to any requirement.
+    Candidates,
+}
+
+impl From<RawSpecArgs> for SpecArgs {
+    fn from(args: RawSpecArgs) -> Self {
+        Self {
+            operation: args.operation.into(),
+        }
+    }
+}
+
+impl From<RawSpecOperation> for SpecOperation {
+    fn from(operation: RawSpecOperation) -> Self {
+        match operation {
+            RawSpecOperation::List {
+                area,
+                feature,
+                group,
+            } => Self::List {
+                area,
+                feature,
+                group,
+            },
+            RawSpecOperation::Show { id } => Self::Show { id },
+            RawSpecOperation::Add {
+                id,
+                title,
+                ears,
+                design,
+                manual,
+            } => Self::Add {
+                id,
+                title,
+                ears,
+                design,
+                manual,
+            },
+            RawSpecOperation::Set { id, field, value } => Self::Set { id, field, value },
+            RawSpecOperation::Remove { id } => Self::Remove { id },
+            RawSpecOperation::Trace { ids } => Self::Trace { ids },
+            RawSpecOperation::Candidates => Self::Candidates,
         }
     }
 }

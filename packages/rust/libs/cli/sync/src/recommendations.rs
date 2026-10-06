@@ -15,17 +15,17 @@ const CATALOG: &[Recommendation] = &[
     Recommendation {
         path: &["scanners", "rust", "enabled"],
         benefit: "Rust evidence scanning links annotated Rust tests to requirements.",
-        guidance: "Configure repository-relative `paths` when enabling this scanner.",
+        guidance: "Enabled by default over `packages/rust/**/*.rs`; set `paths` to override.",
     },
     Recommendation {
         path: &["scanners", "playwright", "enabled"],
         benefit: "Playwright evidence scanning links tagged browser tests to requirements.",
-        guidance: "Configure repository-relative `paths` when enabling this scanner.",
+        guidance: "Enabled by default over `packages/playwright/**/*.spec.ts` and `packages/playwright/**/*.test.ts`; set `paths` to override.",
     },
     Recommendation {
         path: &["scanners", "nix", "enabled"],
         benefit: "Nix evidence scanning links static check metadata to requirements.",
-        guidance: "Configure repository-relative `paths` for `passthru.bloomery` metadata.",
+        guidance: "Enabled by default over the default Nix paths; set `paths` for `passthru.bloomery` metadata.",
     },
 ];
 

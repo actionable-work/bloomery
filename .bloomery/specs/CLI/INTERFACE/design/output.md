@@ -1,6 +1,7 @@
 # Human and machine-readable output
 
-Every application command (`init`, `check`, `review`, `sync`, and `config`)
+Every application command (`init`, `check`, `review`, `sync`, `spec`, and
+`config`)
 accepts the same global `--json` flag, before or after the subcommand. No
 command has a
 separate JSON flag or format selector. It emits one JSON document on stdout, with no ANSI
@@ -68,6 +69,16 @@ same command identity and an error description.
   Failure carries the same command identity and an
   error description. See the
   [config editing contract](../../CONFIG/design/editing.md#output-and-exit-codes).
+- `spec --json` emits an object with `command: "spec"`, the subcommand, and
+  `status`. Read results include the sorted record list for `list`, or the
+  addressed record with its fields and canonical EARS statement for `show`.
+  Mutations report the affected ID and fields; `remove` reports the removed ID
+  and whether its group file was pruned. `spec trace` emits one record per
+  requested requirement with its tied test references, each carrying the
+  scanner kind, repository-relative path, and line. `spec candidates` emits an
+  array of untied test sites with the scanner kind, test name when available,
+  path, and line. Failure carries the same command identity and an error
+  description.
 
 JSON is UTF-8, deterministic for the same retained result, and contains no color
 codes. The JSON option does not alter the command's exit-code contract.

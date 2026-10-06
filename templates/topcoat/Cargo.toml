@@ -1,7 +1,7 @@
 [workspace]
 members = [
-  "crates/{{project}}",
-  "crates/{{project}}_server",
-  "crates/{{project}}_ui",
+  "packages/rust/{{project}}",
+  "packages/rust/{{project}}_server",
+  "packages/rust/{{project}}_ui",
 ]
 resolver = "2"

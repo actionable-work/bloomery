@@ -11,6 +11,13 @@ bloomery check failures [--run RUN] [--offset N] [--limit N] [--json]
 bloomery check details FAILURE [--run RUN] [--offset N] [--limit N] [--json]
 bloomery review [--json]
 bloomery sync [--json] [--update[=nix,rust]]
+bloomery spec list [--area AREA] [--feature FEATURE] [--group GROUP] [--json]
+bloomery spec show ID [--json]
+bloomery spec add ID --title TITLE --ears TOML [--design PATH] [--manual] [--json]
+bloomery spec set ID FIELD VALUE [--json]
+bloomery spec remove ID [--json]
+bloomery spec trace ID... [--json]
+bloomery spec candidates [--json]
 bloomery config get KEY [--json]
 bloomery config set KEY VALUE [--json]
 bloomery config unset KEY [--json]
@@ -50,28 +57,33 @@ the command proceeds.
 ## Configuration presence
 
 After the flake preflight, require `.bloomery/config.toml` before command
-handling for `check`, its nested commands, `review`, and `sync`. Parser help,
-the `init` command, and every `config` command are exempt. If the file is
-absent, non-config commands stop before command-specific work and emit a
-nonzero `ConfigurationError` naming the missing path. A mutating `config`
-command instead creates the `.bloomery/` directory and an empty configuration
-file, emits an advisory warning naming the created path, and continues; a
-read-only `config` command reports against defaults with the same warning
-without creating anything. With `--json`, non-config commands emit one
-structured error and `config` emits a structured warning. The specs and
-scanner tables are then loaded as described in
-[PARSER/CONFIGURATION](../../CONFIGURATION/design/config-file.md).
+handling for `check`, its nested commands, `review`, `sync`, and `spec`. Parser
+help,
+ the `init` command, and every `config` command are exempt. If the file is
+ absent, non-config commands stop before command-specific work and emit a
+ nonzero `ConfigurationError` naming the missing path. A mutating `config`
+ command instead creates the `.bloomery/` directory and an empty configuration
+ file, emits an advisory warning naming the created path, and continues; a
+ read-only `config` command reports against defaults with the same warning
+ without creating anything. With `--json`, non-config commands emit one
+ structured error and `config` emits a structured warning. The specs and
+ scanner tables are then loaded as described in
+ [PARSER/CONFIGURATION](../../../PARSER/CONFIGURATION/design/config-file.md).
 
-The `check`, `review`, and `sync` commands operate on the validated root. The
+The `check`, `review`, `sync`, and `spec` commands operate on the validated
+root. The
 `init` command operates on its target directory instead and requires no
 existing configuration. `config` creates configuration on demand and then
 edits it, and its `document` subcommand annotates configured keys with the
 schema-catalog documentation without changing values. Sync maintains lockfiles
 without loading specifications or scanning evidence; config edits the
-configuration without loading specifications or scanning evidence. Command
+configuration without loading specifications or scanning evidence; spec applies
+read-only record edits without scanning source, while its trace and candidate
+commands scan configured source without writing. Command
 semantics are specified by
 [INIT](../../INIT/README.md), [CHECK](../../CHECK/README.md),
-[REVIEW](../../REVIEW/README.md), [SYNC](../../SYNC/README.md), and
+[REVIEW](../../REVIEW/README.md), [SYNC](../../SYNC/README.md),
+[SPEC](../../SPEC/README.md), and
 [CONFIG](../../CONFIG/README.md). Sync is a CLI-only replacement for the Nix
 lock app, not a new Nix app. The global `--json` flag is available after any
 application subcommand and their nested commands; see the

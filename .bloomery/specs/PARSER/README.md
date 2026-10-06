@@ -1,11 +1,12 @@
 ---
 id: PARSER
 name: Bloomery Parsing and Evidence Area
-tagline: Resolve repository specifications and statically extract requirement evidence.
+tagline: Resolve repository specifications and statically extract requirement evidence and test sites.
 description: |
   The PARSER area defines the shared input contracts used by Bloomery
-  commands: configuration, grouped requirements, workspace documents, and
-  source-evidence references. It resolves these inputs into a common model while
+  commands: configuration, grouped requirements, workspace documents,
+  source-evidence references, and discovered test sites. It resolves these
+  inputs into a common model while
   retaining stable identities, source locations, and structured diagnostics.
 ---
 
@@ -24,7 +25,7 @@ source inputs. Command-level validation and review behavior remain in the
 | [Configuration](CONFIGURATION/README.md) | Config defaults, validation, and scanner targets | [config file](CONFIGURATION/design/config-file.md), [scanner targets](CONFIGURATION/design/scanner-targets.md) |
 | [Requirements](REQUIREMENTS/README.md) | EARS record format, identifiers, and domain model | [format](REQUIREMENTS/design/format.md), [identifiers](REQUIREMENTS/design/identifiers.md), [domain model](REQUIREMENTS/design/domain-model.md) |
 | [Workspace](WORKSPACE/README.md) | Specification discovery, document contracts, and design links | [layout](WORKSPACE/design/layout.md), [document contracts](WORKSPACE/design/document-contracts.md) |
-| [Scanning](SCANNING/README.md) | Static evidence extraction from Rust, Playwright, and Nix | [overview](SCANNING/design/overview.md), [Rust](SCANNING/design/rust.md), [Playwright](SCANNING/design/playwright.md), [Nix](SCANNING/design/nix.md) |
+| [Scanning](SCANNING/README.md) | Static evidence and test discovery from Rust, Playwright, and Nix | [overview](SCANNING/design/overview.md), [Rust](SCANNING/design/rust.md), [Playwright](SCANNING/design/playwright.md), [Nix](SCANNING/design/nix.md), [test discovery](SCANNING/design/test-discovery.md) |
 
 ## Implementation boundaries
 

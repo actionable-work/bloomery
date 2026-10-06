@@ -343,8 +343,8 @@ mod tests {
         assert!(lock.files_present_at_lock, "lock runs after scaffolding");
         let manifest = std::fs::read_to_string(target.join("Cargo.toml")).expect("manifest");
         assert!(!manifest.contains("{{project}}"));
-        assert!(manifest.contains("crates/app"));
-        assert!(target.join("crates/app_core/src/lib.rs").is_file());
+        assert!(manifest.contains("packages/rust/app"));
+        assert!(target.join("packages/rust/app_core/src/lib.rs").is_file());
         let _ = std::fs::remove_dir_all(root);
     }
 
@@ -366,8 +366,8 @@ mod tests {
         )
         .expect("init succeeds");
         assert_eq!(report.template, "axum");
-        assert!(target.join("crates/app_server/src/lib.rs").is_file());
-        assert!(target.join("crates/app/src/main.rs").is_file());
+        assert!(target.join("packages/rust/app_server/src/lib.rs").is_file());
+        assert!(target.join("packages/rust/app/src/main.rs").is_file());
         let _ = std::fs::remove_dir_all(root);
     }
 
@@ -390,9 +390,9 @@ mod tests {
         )
         .expect("init succeeds");
         assert_eq!(report.template, "topcoat");
-        assert!(target.join("crates/app_ui/src/lib.rs").is_file());
-        assert!(target.join("crates/app_server/src/lib.rs").is_file());
-        assert!(target.join("crates/app/src/main.rs").is_file());
+        assert!(target.join("packages/rust/app_ui/src/lib.rs").is_file());
+        assert!(target.join("packages/rust/app_server/src/lib.rs").is_file());
+        assert!(target.join("packages/rust/app/src/main.rs").is_file());
         let _ = std::fs::remove_dir_all(root);
     }
 
@@ -573,7 +573,11 @@ mod tests {
                     .is_some_and(|envrc| envrc.contains("use flake")),
                 "{name} direnv"
             );
-            assert!(manifest.contains("crates/"), "{name} multi-crate");
+            assert!(manifest.contains("packages/rust/"), "{name} multi-crate");
+            assert!(
+                !config.contains("[scanners"),
+                "{name} config relies on default scanner paths"
+            );
             assert!(
                 files.keys().any(|path| path.ends_with("src/lib.rs")),
                 "{name} library crate"

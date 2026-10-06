@@ -16,6 +16,43 @@ pub enum CliCommand {
     Review,
     Sync { update: Option<String> },
     Config(ConfigArgs),
+    Spec(SpecArgs),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpecArgs {
+    pub operation: SpecOperation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SpecOperation {
+    List {
+        area: Option<String>,
+        feature: Option<String>,
+        group: Option<String>,
+    },
+    Show {
+        id: String,
+    },
+    Add {
+        id: String,
+        title: String,
+        ears: String,
+        design: Option<String>,
+        manual: bool,
+    },
+    Set {
+        id: String,
+        field: String,
+        value: String,
+    },
+    Remove {
+        id: String,
+    },
+    Trace {
+        ids: Vec<String>,
+    },
+    Candidates,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

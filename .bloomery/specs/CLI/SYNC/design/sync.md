@@ -130,9 +130,9 @@ The initial catalog targets existing check/evidence scanner switches:
 
 | Key | Benefit / guidance |
 | --- | --- |
-| `scanners.rust.enabled` | Rust evidence scanning; configure repository-relative `paths` when enabling |
-| `scanners.playwright.enabled` | Playwright evidence scanning; configure repository-relative `paths` when enabling |
-| `scanners.nix.enabled` | Nix check evidence scanning; configure repository-relative `paths` for `passthru.bloomery` metadata when enabling |
+| `scanners.rust.enabled` | Rust evidence scanning; enabled by default over `packages/rust/**/*.rs` |
+| `scanners.playwright.enabled` | Playwright evidence scanning; enabled by default over `packages/playwright/**/*.spec.ts` and `packages/playwright/**/*.test.ts` |
+| `scanners.nix.enabled` | Nix check evidence scanning; enabled by default over the default Nix paths |
 
 These are the existing scanner keys associated with check evidence. The Nix
 build `[checks]` table is a separate build configuration surface and is not part

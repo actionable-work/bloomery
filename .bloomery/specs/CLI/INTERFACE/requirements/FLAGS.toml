@@ -53,7 +53,7 @@ design = "design/flags.md#shared-purpose-options"
 [requirements.ears]
 type = "ubiquitous"
 system = "the bloomery CLI"
-action = "expose the same --json option for init, check, review, and sync"
+action = "expose the same --json option for init, check, review, sync, and spec"
 
 [[requirements]]
 id = "CLI-INTERFACE-FLAGS-007"
@@ -145,3 +145,70 @@ type = "unwanted_behavior"
 trigger = "config upgrade is invoked with both --dry-run and --diff"
 system = "the bloomery CLI"
 action = "return a usage error"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-015"
+title = "Spec list filters by area"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "accept --area on spec list"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-016"
+title = "Spec list filters by feature"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "accept --feature on spec list"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-017"
+title = "Spec list filters by group"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "accept --group on spec list"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-018"
+title = "Spec filter flags are rejected elsewhere"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "--area, --feature, or --group is used outside spec list"
+system = "the bloomery CLI"
+action = "return a usage error"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-019"
+title = "Spec add declares the record fields"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "require --title and --ears on spec add and accept optional --design and --manual"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-020"
+title = "Spec set addresses a field positionally"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "accept a field name and value as positional arguments on spec set"

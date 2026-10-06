@@ -20,6 +20,14 @@ commands:
 | `check details` | `--offset`, `--limit` | nonnegative offset, positive limit | failure-focused offset, limit 40 |
 | `review` | `--json` | flag | human-readable text |
 | `sync` | `--json` | flag | human-readable text |
+| `spec` | `--json` | flag | human-readable text |
+| `spec list` | `--area` | area identifier | all areas |
+| `spec list` | `--feature` | feature identifier | all features |
+| `spec list` | `--group` | group name | all groups |
+| `spec add` | `--title` | literal title | required |
+| `spec add` | `--ears` | TOML inline table | required |
+| `spec add` | `--design` | feature-relative path with optional anchor | feature README |
+| `spec add` | `--manual` | flag | automated verification |
 | `config` | `--json` | flag | human-readable text |
 | `config list` | `--prefix` | dotted key prefix | all catalogued keys |
 | `config upgrade` | `--dry-run` | flag | write the upgraded file |
@@ -71,3 +79,13 @@ upgrade` and reports the keys that would be added without writing, while
 other config subcommands. See the
 [config editing contract](../../CONFIG/design/editing.md) and
 [upgrade contract](../../CONFIG/design/upgrade.md).
+
+For spec, `--area`, `--feature`, and `--group` are accepted only by `spec list`
+and restrict the listing to records matching every supplied filter; an unmatched
+filter yields an empty listing. `spec add` requires `--title` and `--ears` and
+accepts at most one `--design` value and the `--manual` flag. `spec set` takes a
+positional field and value rather than flags, and `spec remove`, `spec trace`,
+and `spec candidates` take only positional arguments. Filter flags are usage
+errors on every spec subcommand except `spec list`. See the
+[spec editing contract](../../SPEC/design/editing.md) and
+[traceability contract](../../SPEC/design/trace.md).

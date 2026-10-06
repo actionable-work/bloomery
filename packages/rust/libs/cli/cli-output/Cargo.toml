@@ -3,6 +3,7 @@ bloomery-config = { workspace = true }
 bloomery-init = { workspace = true }
 bloomery-model = { workspace = true }
 bloomery-review = { workspace = true }
+bloomery-spec = { workspace = true }
 bloomery-sync = { workspace = true }
 serde_json = { workspace = true }
 

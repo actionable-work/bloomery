@@ -1,0 +1,183 @@
+group = "TRACE"
+
+[[requirements]]
+id = "CLI-SPEC-TRACE-001"
+title = "Trace accepts multiple requirement IDs"
+manual = false
+design = "design/trace.md#trace"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec trace"
+action = "accept one or more exact requirement IDs"
+
+[[requirements]]
+id = "CLI-SPEC-TRACE-002"
+title = "Trace reports tied tests"
+manual = false
+design = "design/trace.md#trace"
+
+[requirements.ears]
+type = "event"
+trigger = "spec trace addresses a declared requirement"
+system = "bloomery spec"
+action = "report every statically discovered test reference with its scanner kind, path, and line"
+
+[[requirements]]
+id = "CLI-SPEC-TRACE-003"
+title = "Trace succeeds when no tests are tied"
+manual = false
+design = "design/trace.md#trace"
+
+[requirements.ears]
+type = "event"
+trigger = "spec trace addresses a declared requirement with no tied tests"
+system = "bloomery spec"
+action = "report an empty reference list and succeed"
+
+[[requirements]]
+id = "CLI-SPEC-TRACE-004"
+title = "Trace rejects unknown IDs"
+manual = false
+design = "design/trace.md#trace"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "spec trace addresses an ID absent from the declared requirements"
+system = "bloomery spec"
+action = "return a usage error naming the ID"
+
+[[requirements]]
+id = "CLI-SPEC-TRACE-005"
+title = "Trace orders references deterministically"
+manual = false
+design = "design/trace.md#trace"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec trace"
+action = "order tied test references by scanner, path, and line"
+
+[[requirements]]
+id = "CLI-SPEC-TRACE-006"
+title = "Candidates report untied tests"
+manual = false
+design = "design/trace.md#candidates"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec candidates"
+action = "list discovered test sites that carry no requirement reference"
+
+[[requirements]]
+id = "CLI-SPEC-TRACE-007"
+title = "Candidates exclude tied tests"
+manual = false
+design = "design/trace.md#candidates"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec candidates"
+action = "omit test sites that reference a declared requirement"
+
+[[requirements]]
+id = "CLI-SPEC-TRACE-008"
+title = "Candidates order test sites deterministically"
+manual = false
+design = "design/trace.md#candidates"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec candidates"
+action = "order candidate test sites by scanner, path, and line"
+
+[[requirements]]
+id = "CLI-SPEC-TRACE-009"
+title = "Candidates report scanner, name, and location"
+manual = false
+design = "design/trace.md#candidates"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec candidates"
+action = "report each candidate's scanner kind, test name when available, repository-relative path, and line"
+
+[[requirements]]
+id = "CLI-SPEC-TRACE-010"
+title = "Candidates never create requirements"
+manual = false
+design = "design/trace.md#candidates"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec candidates"
+action = "report candidates without creating or modifying any requirement record"
+
+[[requirements]]
+id = "CLI-SPEC-TRACE-011"
+title = "Candidates do not fail on untied tests"
+manual = false
+design = "design/trace.md#candidates"
+
+[requirements.ears]
+type = "event"
+trigger = "spec candidates finds untied tests"
+system = "bloomery spec"
+action = "report them successfully rather than returning a failure"
+
+[[requirements]]
+id = "CLI-SPEC-TRACE-012"
+title = "Trace and candidates execute no tests"
+manual = false
+design = "design/trace.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec trace and bloomery spec candidates"
+action = "refrain from executing discovered tests, applications, or derivations"
+
+[[requirements]]
+id = "CLI-SPEC-TRACE-013"
+title = "Trace and candidates use configured scanners"
+manual = false
+design = "design/trace.md#discovery-boundary"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec trace and bloomery spec candidates"
+action = "use only enabled scanners over their configured source paths"
+
+[[requirements]]
+id = "CLI-SPEC-TRACE-014"
+title = "Trace and candidates leave the workspace unchanged"
+manual = false
+design = "design/trace.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec trace and bloomery spec candidates"
+action = "leave the specification tree, configuration, source files, and lockfiles unchanged"
+
+[[requirements]]
+id = "CLI-SPEC-TRACE-015"
+title = "Tagged Nix test files are traceable"
+manual = false
+design = "design/trace.md#discovery-boundary"
+
+[requirements.ears]
+type = "event"
+trigger = "a file matched by scanners.nix.testPaths declares passthru.bloomery metadata"
+system = "bloomery spec trace"
+action = "report the metadata reference among the requirement's tied tests"
+
+[[requirements]]
+id = "CLI-SPEC-TRACE-016"
+title = "Untagged Nix test files are candidates"
+manual = false
+design = "design/trace.md#discovery-boundary"
+
+[requirements.ears]
+type = "event"
+trigger = "a file matched by scanners.nix.testPaths declares no passthru.bloomery metadata"
+system = "bloomery spec candidates"
+action = "report the file as an untied graduation candidate"

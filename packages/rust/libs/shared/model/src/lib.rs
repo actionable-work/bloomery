@@ -9,7 +9,7 @@ pub use config::Config;
 pub use diagnostics::{Diagnostic, SourceLocation, render_diagnostics, sort_diagnostics};
 pub use domain::{
     Area, Context, DesignReference, EarsStatement, Evidence, Feature, MarkdownFrontmatter,
-    Requirement, RequirementEntry, RequirementGroup, RequirementGroupFile,
+    Requirement, RequirementEntry, RequirementGroup, RequirementGroupFile, TestSite,
 };
 
 #[cfg(test)]

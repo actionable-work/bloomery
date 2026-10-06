@@ -1,0 +1,124 @@
+group = "COMMANDS"
+
+[[requirements]]
+id = "CLI-SPEC-COMMANDS-001"
+title = "The CLI exposes spec"
+manual = false
+design = "design/editing.md#invocation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "expose the spec subcommand"
+
+[[requirements]]
+id = "CLI-SPEC-COMMANDS-002"
+title = "Spec exposes list"
+manual = false
+design = "design/editing.md#reads"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec"
+action = "expose the list subcommand"
+
+[[requirements]]
+id = "CLI-SPEC-COMMANDS-003"
+title = "Spec exposes show"
+manual = false
+design = "design/editing.md#reads"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec"
+action = "expose the show subcommand"
+
+[[requirements]]
+id = "CLI-SPEC-COMMANDS-004"
+title = "Spec exposes add"
+manual = false
+design = "design/editing.md#additions"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec"
+action = "expose the add subcommand"
+
+[[requirements]]
+id = "CLI-SPEC-COMMANDS-005"
+title = "Spec exposes set"
+manual = false
+design = "design/editing.md#field-updates"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec"
+action = "expose the set subcommand"
+
+[[requirements]]
+id = "CLI-SPEC-COMMANDS-006"
+title = "Spec exposes remove"
+manual = false
+design = "design/editing.md#removal"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec"
+action = "expose the remove subcommand"
+
+[[requirements]]
+id = "CLI-SPEC-COMMANDS-007"
+title = "Spec exposes trace"
+manual = false
+design = "design/trace.md#trace"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec"
+action = "expose the trace subcommand"
+
+[[requirements]]
+id = "CLI-SPEC-COMMANDS-008"
+title = "Spec exposes candidates"
+manual = false
+design = "design/trace.md#candidates"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec"
+action = "expose the candidates subcommand"
+
+[[requirements]]
+id = "CLI-SPEC-COMMANDS-009"
+title = "Spec uses the configured specification root"
+manual = false
+design = "design/editing.md#invocation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec"
+action = "resolve records below the configured .bloomery specs directory"
+
+[[requirements]]
+id = "CLI-SPEC-COMMANDS-010"
+title = "Read commands scan no evidence"
+manual = false
+design = "design/editing.md#reads"
+
+[requirements.ears]
+type = "event"
+trigger = "spec list or spec show runs"
+system = "bloomery spec"
+action = "operate on the specification tree without scanning source"
+
+[[requirements]]
+id = "CLI-SPEC-COMMANDS-011"
+title = "Mutations scan no evidence"
+manual = false
+design = "design/editing.md#preservation-and-atomicity"
+
+[requirements.ears]
+type = "event"
+trigger = "spec add, spec set, or spec remove runs"
+system = "bloomery spec"
+action = "operate on the specification tree without scanning source"

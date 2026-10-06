@@ -108,7 +108,7 @@ design = "design/commands.md#configuration-presence"
 
 [requirements.ears]
 type = "unwanted_behavior"
-trigger = "check, review, or sync is requested without .bloomery/config.toml"
+trigger = "check, review, sync, or spec is requested without .bloomery/config.toml"
 system = "the bloomery CLI"
 action = "stop before command-specific work with a nonzero ConfigurationError naming the missing path"
 
@@ -216,3 +216,91 @@ design = "design/commands.md"
 type = "ubiquitous"
 system = "bloomery config"
 action = "expose the document subcommand"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-020"
+title = "The CLI exposes spec"
+manual = false
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery"
+action = "expose the spec subcommand"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-021"
+title = "Spec exposes list"
+manual = false
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec"
+action = "expose the list subcommand"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-022"
+title = "Spec exposes show"
+manual = false
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec"
+action = "expose the show subcommand"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-023"
+title = "Spec exposes add"
+manual = false
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec"
+action = "expose the add subcommand"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-024"
+title = "Spec exposes set"
+manual = false
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec"
+action = "expose the set subcommand"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-025"
+title = "Spec exposes remove"
+manual = false
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec"
+action = "expose the remove subcommand"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-026"
+title = "Spec exposes trace"
+manual = false
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec"
+action = "expose the trace subcommand"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-027"
+title = "Spec exposes candidates"
+manual = false
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec"
+action = "expose the candidates subcommand"

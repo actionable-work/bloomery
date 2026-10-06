@@ -1,0 +1,147 @@
+group = "DISCOVERY"
+
+[[requirements]]
+id = "PARSER-SCANNING-DISCOVERY-001"
+title = "Rust scanner discovers test functions"
+manual = false
+design = "design/test-discovery.md#rust-tests"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Rust scanner"
+action = "discover every function carrying a test attribute as a test site"
+
+[[requirements]]
+id = "PARSER-SCANNING-DISCOVERY-002"
+title = "Playwright scanner discovers test calls"
+manual = false
+design = "design/test-discovery.md#playwright-tests"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Playwright scanner"
+action = "discover every test or test.describe call as a test site"
+
+[[requirements]]
+id = "PARSER-SCANNING-DISCOVERY-003"
+title = "Discovered tests retain names and locations"
+manual = false
+design = "design/test-discovery.md#model"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "test discovery"
+action = "associate each discovered test site with its name when available and its source location"
+
+[[requirements]]
+id = "PARSER-SCANNING-DISCOVERY-004"
+title = "Discovered tests retain requirement references"
+manual = false
+design = "design/test-discovery.md#model"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "test discovery"
+action = "attach the requirement references extracted from a test site to that site"
+
+[[requirements]]
+id = "PARSER-SCANNING-DISCOVERY-005"
+title = "Discovered tests are unique by location"
+manual = false
+design = "design/test-discovery.md#model"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "test discovery"
+action = "report each test site once per source location"
+
+[[requirements]]
+id = "PARSER-SCANNING-DISCOVERY-006"
+title = "Non-test declarations are not test sites"
+manual = false
+design = "design/test-discovery.md#rust-tests"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Rust scanner"
+action = "refrain from reporting functions without a test attribute as test sites"
+
+[[requirements]]
+id = "PARSER-SCANNING-DISCOVERY-007"
+title = "Non-test calls are not test sites"
+manual = false
+design = "design/test-discovery.md#playwright-tests"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Playwright scanner"
+action = "refrain from reporting non-test call expressions as test sites"
+
+[[requirements]]
+id = "PARSER-SCANNING-DISCOVERY-008"
+title = "Nix test paths are discovered"
+manual = false
+design = "design/test-discovery.md#nix-tests"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "test discovery"
+action = "discover each file matched by scanners.nix.testPaths as a Nix test site when the Nix scanner is enabled"
+
+[[requirements]]
+id = "PARSER-SCANNING-DISCOVERY-009"
+title = "Test discovery does not execute tests"
+manual = false
+design = "design/test-discovery.md#static-boundary"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "test discovery"
+action = "refrain from compiling, executing, evaluating, or instantiating the discovered tests"
+
+[[requirements]]
+id = "PARSER-SCANNING-DISCOVERY-010"
+title = "Unparsable files do not contribute partial sites"
+manual = false
+design = "design/test-discovery.md#static-boundary"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a configured source file fails to parse"
+system = "test discovery"
+action = "report a scanner diagnostic without contributing test sites from that file"
+
+[[requirements]]
+id = "PARSER-SCANNING-DISCOVERY-011"
+title = "Untagged Nix test files are candidates"
+manual = false
+design = "design/test-discovery.md#nix-tests"
+
+[requirements.ears]
+type = "event"
+trigger = "a file matched by scanners.nix.testPaths declares no passthru.bloomery metadata"
+system = "test discovery"
+action = "report the file as a test site with no requirement references"
+
+[[requirements]]
+id = "PARSER-SCANNING-DISCOVERY-012"
+title = "Tagged Nix test files are tied"
+manual = false
+design = "design/test-discovery.md#nix-tests"
+
+[requirements.ears]
+type = "event"
+trigger = "a file matched by scanners.nix.testPaths declares passthru.bloomery metadata"
+system = "test discovery"
+action = "attach the declared requirement IDs to the file's test site"
+
+[[requirements]]
+id = "PARSER-SCANNING-DISCOVERY-013"
+title = "Nix discovery uses configured paths and metadata only"
+manual = false
+design = "design/test-discovery.md#nix-tests"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "Nix test discovery"
+action = "recognize test files by scanners.nix.testPaths and their metadata without evaluating checks attributes"

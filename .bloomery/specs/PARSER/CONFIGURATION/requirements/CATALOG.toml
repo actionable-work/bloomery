@@ -142,3 +142,36 @@ design = "design/schema-catalog.md#flakes"
 type = "ubiquitous"
 system = "the schema catalog"
 action = "omit any flakes key that would elevate an output family other than packages, apps, or checks"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-014"
+title = "Scanners are enabled by default"
+manual = false
+design = "design/schema-catalog.md#spec-and-scanner-tables"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "recommend enabled = true for the rust, playwright, and nix scanners"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-015"
+title = "Scanner paths have repository-relative defaults"
+manual = false
+design = "design/schema-catalog.md#spec-and-scanner-tables"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "recommend repository-relative source globs for each scanner's paths key"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-016"
+title = "Nix test paths are catalogued"
+manual = false
+design = "design/schema-catalog.md#spec-and-scanner-tables"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "catalogue scanners.nix.testPaths with a recommended default of [\"**/*.test.nix\"]"

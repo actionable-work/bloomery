@@ -85,7 +85,7 @@ impl KeySpec {
 }
 
 /// Increment when the catalog changes.
-pub const CATALOG_VERSION: u32 = 2;
+pub const CATALOG_VERSION: u32 = 3;
 
 const OPT_LEVEL: &[ValueType] = &[
     ValueType::UnsignedUpTo(3),
@@ -162,25 +162,28 @@ pub const CATALOG: &[CatalogEntry] = &[
     CatalogEntry {
         path: &["scanners", "rust", "enabled"],
         value_type: ValueType::Bool,
-        recommended: Some(DefaultValue::Bool(false)),
+        recommended: Some(DefaultValue::Bool(true)),
         documentation: "Enable the Rust evidence scanner.",
     },
     CatalogEntry {
         path: &["scanners", "rust", "paths"],
         value_type: ValueType::StringList,
-        recommended: Some(DefaultValue::StringList(&[])),
+        recommended: Some(DefaultValue::StringList(&["packages/rust/**/*.rs"])),
         documentation: "Repository-relative globs for Rust source files.",
     },
     CatalogEntry {
         path: &["scanners", "playwright", "enabled"],
         value_type: ValueType::Bool,
-        recommended: Some(DefaultValue::Bool(false)),
+        recommended: Some(DefaultValue::Bool(true)),
         documentation: "Enable the Playwright evidence scanner.",
     },
     CatalogEntry {
         path: &["scanners", "playwright", "paths"],
         value_type: ValueType::StringList,
-        recommended: Some(DefaultValue::StringList(&[])),
+        recommended: Some(DefaultValue::StringList(&[
+            "packages/playwright/**/*.spec.ts",
+            "packages/playwright/**/*.test.ts",
+        ])),
         documentation: "Repository-relative globs for Playwright test files.",
     },
     CatalogEntry {
@@ -192,14 +195,25 @@ pub const CATALOG: &[CatalogEntry] = &[
     CatalogEntry {
         path: &["scanners", "nix", "enabled"],
         value_type: ValueType::Bool,
-        recommended: Some(DefaultValue::Bool(false)),
+        recommended: Some(DefaultValue::Bool(true)),
         documentation: "Enable the static Nix evidence scanner.",
     },
     CatalogEntry {
         path: &["scanners", "nix", "paths"],
         value_type: ValueType::StringList,
-        recommended: Some(DefaultValue::StringList(&[])),
+        recommended: Some(DefaultValue::StringList(&[
+            "*.nix",
+            "lib/**/*.nix",
+            "nix/**/*.nix",
+            "tests/**/*.nix",
+        ])),
         documentation: "Repository-relative globs for Nix source files.",
+    },
+    CatalogEntry {
+        path: &["scanners", "nix", "testPaths"],
+        value_type: ValueType::StringList,
+        recommended: Some(DefaultValue::StringList(&["**/*.test.nix"])),
+        documentation: "Repository-relative globs for Nix test files discovered as candidates.",
     },
     // Nix build tables.
     CatalogEntry {
@@ -947,7 +961,13 @@ mod tests {
         );
         assert_eq!(
             effective_default(&["scanners", "rust", "enabled"]),
-            Some(Value::Boolean(false))
+            Some(Value::Boolean(true))
+        );
+        assert_eq!(
+            effective_default(&["scanners", "rust", "paths"]),
+            Some(Value::Array(vec![Value::String(
+                "packages/rust/**/*.rs".into()
+            )]))
         );
         assert_eq!(
             effective_default(&["flags", "rustc"]),
@@ -988,9 +1008,61 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-014"))]
+    fn scanners_are_enabled_by_default() {
+        for path in ["rust", "playwright", "nix"] {
+            assert_eq!(
+                effective_default(&["scanners", path, "enabled"]),
+                Some(Value::Boolean(true)),
+                "scanners.{path}.enabled"
+            );
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-015"))]
+    fn scanner_paths_have_repository_relative_defaults() {
+        for (scanner, expected) in [
+            ("rust", vec!["packages/rust/**/*.rs"]),
+            (
+                "playwright",
+                vec![
+                    "packages/playwright/**/*.spec.ts",
+                    "packages/playwright/**/*.test.ts",
+                ],
+            ),
+            (
+                "nix",
+                vec!["*.nix", "lib/**/*.nix", "nix/**/*.nix", "tests/**/*.nix"],
+            ),
+        ] {
+            let expected = expected
+                .into_iter()
+                .map(|value| Value::String(value.to_owned()))
+                .collect::<Vec<_>>();
+            assert_eq!(
+                effective_default(&["scanners", scanner, "paths"]),
+                Some(Value::Array(expected)),
+                "scanners.{scanner}.paths"
+            );
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-016"))]
+    fn nix_test_paths_are_catalogued() {
+        let entry = resolve(&["scanners", "nix", "testPaths"]).expect("testPaths entry");
+        assert_eq!(entry.value_type, ValueType::StringList);
+        assert_eq!(
+            entry.recommended,
+            Some(DefaultValue::StringList(&["**/*.test.nix"]))
+        );
+    }
+
+    #[test]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-005"))]
     fn catalog_version_tracks_the_binary() {
-        assert_eq!(CATALOG_VERSION, 2);
+        assert_eq!(CATALOG_VERSION, 3);
         assert!(!CATALOG.is_empty());
     }
 

@@ -1,0 +1,59 @@
+group = "PARSING"
+
+[[requirements]]
+id = "PARSER-SCANNING-PARSING-001"
+title = "Each file is parsed at most once per command"
+manual = false
+design = "design/overview.md#parse-once"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "a scanner pass"
+action = "parse each source file at most once during one command invocation"
+
+[[requirements]]
+id = "PARSER-SCANNING-PARSING-002"
+title = "Repeated access reuses the cached syntax tree"
+manual = false
+design = "design/overview.md#parse-once"
+
+[requirements.ears]
+type = "event"
+trigger = "reference extraction and test discovery both require the same source file"
+system = "the scanner pass"
+action = "reuse the single cached syntax tree for both roles"
+
+[[requirements]]
+id = "PARSER-SCANNING-PARSING-003"
+title = "Overlapping globs parse a file once"
+manual = false
+design = "design/overview.md#parse-once"
+
+[requirements.ears]
+type = "event"
+trigger = "one source file matches multiple configured or built-in patterns"
+system = "the scanner pass"
+action = "parse the file once and retain a single syntax tree"
+
+[[requirements]]
+id = "PARSER-SCANNING-PARSING-004"
+title = "The parse cache is command-scoped"
+manual = false
+design = "design/overview.md#parse-once"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the parse cache"
+action = "exist only for the duration of one command invocation and never persist or cross command runs"
+
+[[requirements]]
+id = "PARSER-SCANNING-PARSING-005"
+title = "Parse failures are reported once per file per command"
+manual = false
+design = "design/overview.md#parse-once"
+
+[requirements.ears]
+type = "event"
+trigger = "a source file fails to parse while reference extraction and test discovery both request it"
+system = "the scanner pass"
+action = "report one parse diagnostic and contribute neither references nor test sites from that file"

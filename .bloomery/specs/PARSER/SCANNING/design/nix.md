@@ -16,7 +16,8 @@ checks.x86_64-linux.auth-integration = pkgs.runCommand "auth-integration" {
 '';
 ```
 
-The scanner walks the repository-relative `scanners.nix.paths` globs and
+The scanner walks the repository-relative `scanners.nix.paths` globs plus the
+`scanners.nix.testPaths` test globs and
 statically tokenizes matching Nix source files. It extracts literal IDs from
 both `passthru.bloomery = [ ... ];` and a nested
 `passthru = { bloomery = [ ... ]; };` attribute set, retaining each string's
@@ -25,6 +26,19 @@ create evidence.
 
 Metadata should contain literal, contract-valid requirement IDs. Dynamically
 computed IDs cannot be discovered statically and are not evidence.
+
+## Test discovery
+
+Nix test files are selected by the configured `scanners.nix.testPaths` globs,
+which default to `["**/*.test.nix"]`. When the Nix scanner is enabled,
+discovery enumerates the matching repository-relative files and treats each as
+a test site named by its file stem. An empty `testPaths` list disables Nix
+test-file discovery. The file's
+`passthru.bloomery` metadata supplies the site's references: a `.test.nix` file
+with no metadata is an untied graduation candidate, and one with metadata is
+tied. Discovery never evaluates the file, so it recognizes tests by configured
+glob and metadata rather than by evaluating `checks.*` attributes. See the
+[test discovery contract](test-discovery.md#nix-tests).
 
 ## Static boundary
 

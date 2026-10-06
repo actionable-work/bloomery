@@ -1,5 +1,6 @@
+use crate::ScanOutput;
 use crate::files::expand_globs;
-use bloomery_model::{Diagnostic, Evidence, SourceLocation};
+use bloomery_model::{Diagnostic, Evidence, SourceLocation, TestSite};
 use oxc_allocator::Allocator;
 use oxc_ast::{
     Visit,
@@ -13,16 +14,22 @@ use oxc_span::SourceType;
 use std::fs;
 use std::path::Path;
 
+#[cfg(test)]
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+#[cfg(test)]
+pub(crate) static PARSE_COUNT: AtomicUsize = AtomicUsize::new(0);
+
 pub fn scan(
     root: &Path,
     patterns: &[String],
     tag_prefix: &str,
-) -> Result<Vec<Evidence>, Vec<Diagnostic>> {
+) -> Result<ScanOutput, Vec<Diagnostic>> {
     let paths = match expand_globs(root, patterns) {
         Ok(paths) => paths,
         Err(error) => return Err(vec![Diagnostic::new("ScannerError", error)]),
     };
-    let mut evidence = Vec::new();
+    let mut output = ScanOutput::default();
     let mut diagnostics = Vec::new();
     for path in paths {
         let contents = match fs::read_to_string(&path) {
@@ -40,12 +47,7 @@ pub fn scan(
         };
 
         let allocator = Allocator::default();
-        let parsed = Parser::new(
-            &allocator,
-            &contents,
-            SourceType::default().with_typescript(true),
-        )
-        .parse();
+        let parsed = parse(&allocator, &contents);
         if !parsed.errors.is_empty() {
             diagnostics.push(
                 Diagnostic::new(
@@ -64,28 +66,40 @@ pub fn scan(
             source: &contents,
             path: &path,
             tag_prefix,
-            evidence: Vec::new(),
+            output: ScanOutput::default(),
         };
         visitor.visit_program(&parsed.program);
-        evidence.extend(visitor.evidence);
+        output.absorb(visitor.output);
     }
     if diagnostics.is_empty() {
-        Ok(evidence)
+        Ok(output)
     } else {
         Err(diagnostics)
     }
+}
+
+fn parse<'a>(allocator: &'a Allocator, contents: &'a str) -> oxc_parser::ParserReturn<'a> {
+    #[cfg(test)]
+    PARSE_COUNT.fetch_add(1, Ordering::Relaxed);
+    Parser::new(
+        allocator,
+        contents,
+        SourceType::default().with_typescript(true),
+    )
+    .parse()
 }
 
 struct PlaywrightVisitor<'source> {
     source: &'source str,
     path: &'source Path,
     tag_prefix: &'source str,
-    evidence: Vec<Evidence>,
+    output: ScanOutput,
 }
 
 impl<'ast> Visit<'ast> for PlaywrightVisitor<'_> {
     fn visit_call_expression(&mut self, expression: &CallExpression<'ast>) {
         if is_test_call(&expression.callee) {
+            let mut references = Vec::new();
             for argument in &expression.arguments {
                 let Some(options) = object_expression(argument) else {
                     continue;
@@ -113,21 +127,36 @@ impl<'ast> Visit<'ast> for PlaywrightVisitor<'_> {
                         let Some(id) = value.strip_prefix(self.tag_prefix) else {
                             continue;
                         };
-                        self.evidence.push(Evidence {
+                        let line = line_for_offset(self.source, literal.span.start);
+                        self.output.evidence.push(Evidence {
                             id: id.to_owned(),
-                            location: SourceLocation::new(
-                                self.path,
-                                Some(line_for_offset(self.source, literal.span.start)),
-                            ),
+                            location: SourceLocation::new(self.path, Some(line)),
                             scanner: "playwright",
                         });
+                        references.push(id.to_owned());
                     }
                 }
             }
+            let name = first_string_argument(&expression.arguments);
+            let line = line_for_offset(self.source, expression.span.start);
+            self.output.tests.push(TestSite {
+                scanner: "playwright",
+                name,
+                location: SourceLocation::new(self.path, Some(line)),
+                references,
+            });
         }
         self.visit_expression(&expression.callee);
         self.visit_arguments(&expression.arguments);
     }
+}
+
+fn first_string_argument(arguments: &[Argument<'_>]) -> Option<String> {
+    let first = arguments.first()?;
+    let Argument::StringLiteral(literal) = first else {
+        return None;
+    };
+    Some(literal.value.to_string())
 }
 
 fn is_test_call(callee: &Expression<'_>) -> bool {

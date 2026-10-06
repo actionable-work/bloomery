@@ -30,5 +30,11 @@ The EARS enum owns canonical statement generation. The context owns resolution
 and identity alignment. Formatters consume these types without reparsing TOML,
 Markdown, or source files.
 
+Static scanning additionally produces test sites that pair a source location
+with zero or more requirement references, as specified by the
+[test discovery contract](../../SCANNING/design/test-discovery.md). Test sites are
+a scanning output consumed by the CLI candidate projection and do not alter
+requirement identity.
+
 All IDs and paths retain their original spelling. Natural numeric ordering is a
 presentation concern and must not mutate stored identifiers.

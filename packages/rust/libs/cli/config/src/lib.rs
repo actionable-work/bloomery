@@ -696,11 +696,11 @@ mod tests {
         let error = run(
             &root,
             &operation(ConfigOperation::Set {
-                key: "scanners.rust.enabled".to_owned(),
-                value: "true".to_owned(),
+                key: "scanners.playwright.tag_prefix".to_owned(),
+                value: String::new(),
             }),
         )
-        .expect_err("enabling a scanner without paths is invalid");
+        .expect_err("an empty Playwright tag prefix is invalid");
         assert_eq!(error.kind(), ConfigErrorKind::Failure);
         assert_eq!(contents(&root), before);
         let _ = fs::remove_dir_all(root);

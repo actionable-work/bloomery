@@ -52,33 +52,35 @@ pub struct ScannersConfig {
     pub nix: NixScannerConfig,
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RustScannerConfig {
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub enabled: bool,
-    #[serde(default)]
+    #[serde(default = "default_rust_paths")]
     pub paths: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PlaywrightScannerConfig {
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub enabled: bool,
-    #[serde(default)]
+    #[serde(default = "default_playwright_paths")]
     pub paths: Vec<String>,
     #[serde(default = "default_tag_prefix")]
     pub tag_prefix: String,
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct NixScannerConfig {
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub enabled: bool,
-    #[serde(default)]
+    #[serde(default = "default_nix_paths")]
     pub paths: Vec<String>,
+    #[serde(default = "default_nix_test_paths", rename = "testPaths")]
+    pub test_paths: Vec<String>,
 }
 
 fn default_specs_dir() -> String {
@@ -89,6 +91,34 @@ fn default_tag_prefix() -> String {
     "@bloomery:".to_owned()
 }
 
+fn default_true() -> bool {
+    true
+}
+
+fn default_rust_paths() -> Vec<String> {
+    vec!["packages/rust/**/*.rs".to_owned()]
+}
+
+fn default_playwright_paths() -> Vec<String> {
+    vec![
+        "packages/playwright/**/*.spec.ts".to_owned(),
+        "packages/playwright/**/*.test.ts".to_owned(),
+    ]
+}
+
+fn default_nix_paths() -> Vec<String> {
+    vec![
+        "*.nix".to_owned(),
+        "lib/**/*.nix".to_owned(),
+        "nix/**/*.nix".to_owned(),
+        "tests/**/*.nix".to_owned(),
+    ]
+}
+
+fn default_nix_test_paths() -> Vec<String> {
+    vec!["**/*.test.nix".to_owned()]
+}
+
 impl Default for SpecsConfig {
     fn default() -> Self {
         Self {
@@ -97,12 +127,31 @@ impl Default for SpecsConfig {
     }
 }
 
+impl Default for RustScannerConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_true(),
+            paths: default_rust_paths(),
+        }
+    }
+}
+
 impl Default for PlaywrightScannerConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
-            paths: Vec::new(),
+            enabled: default_true(),
+            paths: default_playwright_paths(),
             tag_prefix: default_tag_prefix(),
+        }
+    }
+}
+
+impl Default for NixScannerConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_true(),
+            paths: default_nix_paths(),
+            test_paths: default_nix_test_paths(),
         }
     }
 }
@@ -201,6 +250,7 @@ impl Config {
             ));
         }
         validate_file_scanner("nix", self.scanners.nix.enabled, &self.scanners.nix.paths)?;
+        validate_paths("scanners.nix.testPaths", &self.scanners.nix.test_paths)?;
         Ok(())
     }
 
@@ -244,6 +294,10 @@ fn validate_file_scanner(name: &str, enabled: bool, patterns: &[String]) -> Resu
             format!("scanners.{name}.paths must contain at least one pattern"),
         ));
     }
+    validate_paths(&format!("scanners.{name}.paths"), patterns)
+}
+
+fn validate_paths(name: &str, patterns: &[String]) -> Result<(), Diagnostic> {
     for pattern in patterns {
         let path = Path::new(pattern);
         if pattern.trim().is_empty()
@@ -254,7 +308,7 @@ fn validate_file_scanner(name: &str, enabled: bool, patterns: &[String]) -> Resu
         {
             return Err(Diagnostic::new(
                 "ConfigurationError",
-                format!("scanners.{name}.paths contains an invalid repository path: {pattern}"),
+                format!("{name} contains an invalid repository path: {pattern}"),
             ));
         }
     }
@@ -285,18 +339,36 @@ mod tests {
         std::env::temp_dir().join(format!("bloomery-config-{suffix}"))
     }
 
+    fn assert_default_scanner_paths(
+        rust: &RustScannerConfig,
+        playwright: &PlaywrightScannerConfig,
+        nix: &NixScannerConfig,
+    ) {
+        assert_eq!(rust.paths, ["packages/rust/**/*.rs"]);
+        assert_eq!(
+            playwright.paths,
+            [
+                "packages/playwright/**/*.spec.ts",
+                "packages/playwright/**/*.test.ts"
+            ]
+        );
+        assert_eq!(playwright.tag_prefix, "@bloomery:");
+        assert_eq!(
+            nix.paths,
+            ["*.nix", "lib/**/*.nix", "nix/**/*.nix", "tests/**/*.nix"]
+        );
+        assert_eq!(nix.test_paths, ["**/*.test.nix"]);
+    }
+
     fn assert_default_scanners(
         rust: &RustScannerConfig,
         playwright: &PlaywrightScannerConfig,
         nix: &NixScannerConfig,
     ) {
-        assert!(!rust.enabled);
-        assert!(rust.paths.is_empty());
-        assert!(!playwright.enabled);
-        assert!(playwright.paths.is_empty());
-        assert_eq!(playwright.tag_prefix, "@bloomery:");
-        assert!(!nix.enabled);
-        assert!(nix.paths.is_empty());
+        assert!(rust.enabled);
+        assert!(playwright.enabled);
+        assert!(nix.enabled);
+        assert_default_scanner_paths(rust, playwright, nix);
     }
 
     fn assert_configuration_error(root: &Path) {
@@ -346,11 +418,51 @@ mod tests {
         .expect("partial scanner config");
         let config = load(&root).expect("omitted scanner keys should default");
         assert_eq!(config.specs.dir, "specs");
-        assert_default_scanners(
+        assert!(!config.scanners.rust.enabled);
+        assert!(!config.scanners.playwright.enabled);
+        assert!(!config.scanners.nix.enabled);
+        assert_default_scanner_paths(
             &config.scanners.rust,
             &config.scanners.playwright,
             &config.scanners.nix,
         );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-015"))]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-016"))]
+    fn nix_test_paths_default_override_and_validation() {
+        let root = root();
+        let config_path = root.join(".bloomery/config.toml");
+        fs::create_dir_all(config_path.parent().expect("config parent")).expect("config dir");
+
+        fs::write(&config_path, "").expect("empty config");
+        let config = load(&root).expect("empty config should use defaults");
+        assert_eq!(config.scanners.nix.test_paths, ["**/*.test.nix"]);
+
+        fs::write(
+            &config_path,
+            "[scanners.nix]\ntestPaths = [\"specs/**/*.test.nix\"]\n",
+        )
+        .expect("explicit testPaths");
+        let config = load(&root).expect("explicit testPaths should load");
+        assert_eq!(config.scanners.nix.test_paths, ["specs/**/*.test.nix"]);
+        assert_eq!(
+            config.scanners.nix.paths,
+            ["*.nix", "lib/**/*.nix", "nix/**/*.nix", "tests/**/*.nix"]
+        );
+
+        fs::write(&config_path, "[scanners.nix]\ntestPaths = []\n").expect("empty testPaths");
+        let config = load(&root).expect("empty testPaths disables discovery");
+        assert!(config.scanners.nix.test_paths.is_empty());
+
+        fs::write(
+            &config_path,
+            "[scanners.nix]\ntestPaths = [\"../escaped.test.nix\"]\n",
+        )
+        .expect("escaping testPaths");
+        assert_configuration_error(&root);
         let _ = fs::remove_dir_all(root);
     }
 

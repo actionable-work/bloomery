@@ -5,7 +5,7 @@ tagline: Define the user-visible command syntax and options for the bloomery exe
 description: |
   The interface feature specifies the command tree, invocation root, shared
   flake-presence preflight, flags, and output modes exposed by `bloomery`.
-  Command behavior is specified separately by the CHECK, REVIEW, SYNC, and
+  Command behavior is specified separately by the CHECK, REVIEW, SYNC, SPEC, and
   CONFIG features.
 ---
 
@@ -24,7 +24,8 @@ and how the target repository root is selected.
 ## Responsibilities
 
 - Expose `init`, `check`, its `list`/`failures`/`details` commands, `review`,
-  `sync`, `config` with its `get`/`set`/`unset`/`list`/`upgrade`/`document`
+  `sync`, `spec` with its `list`/`show`/`add`/`set`/`remove`/`trace`/`candidates`
+  commands, `config` with its `get`/`set`/`unset`/`list`/`upgrade`/`document`
   commands, and parser-generated help.
 - Resolve the repository root from the process's current working directory.
 - Require a root `flake.nix` before every command except the workspace-bootstrap
@@ -33,8 +34,9 @@ and how the target repository root is selected.
   help, `init`, and flake-exempt `config`, whose mutating commands create a
   missing file with a warning.
 - Specify shared `--json`, check selection/execution/retrieval options, command-specific
-  `sync --update`, `config --prefix`/`config --dry-run`/`config --diff`, and `init
+  `sync --update`, `spec list` filters, `config --prefix`/`config --dry-run`/`config
+  --diff`, and `init
   --template`/`init --force` values.
 - Define human-readable terminal coloring and stable JSON output contracts.
-- Keep command syntax distinct from init, check, review, sync, and config
+- Keep command syntax distinct from init, check, review, sync, spec, and config
   semantics.

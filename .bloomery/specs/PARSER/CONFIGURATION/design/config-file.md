@@ -29,23 +29,28 @@ dir = "specs"
 [scanners.rust]
 enabled = true
 paths = [
-  "crates/*/src/**/*.rs",
-  "crates/*/tests/**/*.rs",
-  "tests/**/*.rs",
+  "packages/rust/**/*.rs",
 ]
 
 [scanners.playwright]
 enabled = true
 paths = [
-  "e2e/**/*.spec.ts",
-  "frontend/tests/**/*.test.ts",
+  "packages/playwright/**/*.spec.ts",
+  "packages/playwright/**/*.test.ts",
 ]
 tag_prefix = "@bloomery:"
 
 [scanners.nix]
 enabled = true
-paths = ["*.nix", "nix/**/*.nix", "tests/**/*.nix"]
+paths = ["*.nix", "lib/**/*.nix", "nix/**/*.nix", "tests/**/*.nix"]
+testPaths = ["**/*.test.nix"]
 ```
+
+All three scanners are enabled by default, so an empty configuration scans
+the default paths above. `scanners.nix.testPaths` selects the Nix test files
+that [test discovery](../../SCANNING/design/test-discovery.md) treats as test
+sites; an empty list disables Nix test-file discovery while `scanners.nix.paths`
+still supplies `passthru.bloomery` references.
 
 ## Build tables
 
@@ -78,10 +83,14 @@ checks = "individual"
 ## Resolution rules
 
 - `specs.dir` is relative to `.bloomery/`.
-- Rust, Playwright, and Nix paths are relative to the repository root.
+- Rust, Playwright, and Nix paths, including `scanners.nix.testPaths`, are
+  relative to the repository root.
 - `flakes.<name>.path` is relative to the repository root and stays inside it.
 - The Nix scanner extracts literal requirement IDs from `passthru.bloomery`
-  metadata in matched Nix source files; it does not evaluate the flake.
+  metadata in files matched by `scanners.nix.paths` or
+  `scanners.nix.testPaths`; it does not evaluate the flake.
+- The Nix scanner treats files matched by `scanners.nix.testPaths` as test sites
+  for candidate discovery; an empty list disables that discovery.
 - A disabled scanner contributes no references and performs no tool lookup.
 - A configured scanner with an invalid path or option is a configuration error,
   not an empty scan.

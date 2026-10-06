@@ -33,7 +33,7 @@ design = "design/output.md"
 [requirements.ears]
 type = "ubiquitous"
 system = "the bloomery CLI"
-action = "accept --json for init, check, review, and sync"
+action = "accept --json for init, check, review, sync, and spec"
 
 [[requirements]]
 id = "CLI-INTERFACE-OUTPUT-004"
@@ -106,3 +106,39 @@ type = "event"
 trigger = "a config command is invoked with --json"
 system = "bloomery config"
 action = "emit structured key, value, configured, change, or added-key information"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-010"
+title = "Spec JSON emits a structured result or failure"
+manual = false
+design = "design/output.md#json-contracts"
+
+[requirements.ears]
+type = "event"
+trigger = "a spec command is invoked with --json"
+system = "bloomery spec"
+action = "emit structured record, field, change, or error information"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-011"
+title = "Spec trace JSON emits tied test references"
+manual = false
+design = "design/output.md#json-contracts"
+
+[requirements.ears]
+type = "event"
+trigger = "spec trace is invoked with --json"
+system = "bloomery spec"
+action = "emit one record per requested requirement with its scanner, path, and line references"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-012"
+title = "Spec candidates JSON emits untied test sites"
+manual = false
+design = "design/output.md#json-contracts"
+
+[requirements.ears]
+type = "event"
+trigger = "spec candidates is invoked with --json"
+system = "bloomery spec"
+action = "emit an array of untied test sites with scanner, name, path, and line"

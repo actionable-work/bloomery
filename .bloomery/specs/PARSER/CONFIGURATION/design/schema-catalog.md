@@ -29,13 +29,14 @@ Owned by [PARSER/CONFIGURATION](../README.md) and consumed by the CLI.
 | Key | Type | Recommended default |
 | --- | --- | --- |
 | `specs.dir` | path inside `.bloomery/` | `"specs"` |
-| `scanners.rust.enabled` | boolean | `false` |
-| `scanners.rust.paths` | list of repository-relative globs | `[]` |
-| `scanners.playwright.enabled` | boolean | `false` |
-| `scanners.playwright.paths` | list of repository-relative globs | `[]` |
+| `scanners.rust.enabled` | boolean | `true` |
+| `scanners.rust.paths` | list of repository-relative globs | `["packages/rust/**/*.rs"]` |
+| `scanners.playwright.enabled` | boolean | `true` |
+| `scanners.playwright.paths` | list of repository-relative globs | `["packages/playwright/**/*.spec.ts", "packages/playwright/**/*.test.ts"]` |
 | `scanners.playwright.tag_prefix` | non-empty string | `"@bloomery:"` |
-| `scanners.nix.enabled` | boolean | `false` |
-| `scanners.nix.paths` | list of repository-relative globs | `[]` |
+| `scanners.nix.enabled` | boolean | `true` |
+| `scanners.nix.paths` | list of repository-relative globs | `["*.nix", "lib/**/*.nix", "nix/**/*.nix", "tests/**/*.nix"]` |
+| `scanners.nix.testPaths` | list of repository-relative globs | `["**/*.test.nix"]` |
 
 ## Build tables
 

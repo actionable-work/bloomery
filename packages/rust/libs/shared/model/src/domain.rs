@@ -141,6 +141,16 @@ pub struct Evidence {
     pub scanner: &'static str,
 }
 
+/// A statically discovered test declaration with the requirement references it
+/// carries. An empty `references` vector marks an untied graduation candidate.
+#[derive(Debug, Clone)]
+pub struct TestSite {
+    pub scanner: &'static str,
+    pub name: Option<String>,
+    pub location: SourceLocation,
+    pub references: Vec<String>,
+}
+
 #[derive(Debug, Clone)]
 pub struct Context {
     pub root: PathBuf,

@@ -1,0 +1,272 @@
+group = "EDITING"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-001"
+title = "Duplicate IDs are rejected"
+manual = false
+design = "design/editing.md#additions"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "spec add addresses an ID that already exists in the specification tree"
+system = "bloomery spec"
+action = "return a usage error without writing"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-002"
+title = "Additions require existing architecture documents"
+manual = false
+design = "design/editing.md#identifier-derived-location"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "spec add addresses an area or feature whose README does not exist"
+system = "bloomery spec"
+action = "return an error naming the missing document without creating it"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-003"
+title = "Additions create a missing group file"
+manual = false
+design = "design/editing.md#additions"
+
+[requirements.ears]
+type = "event"
+trigger = "spec add addresses a group file that does not exist"
+system = "bloomery spec"
+action = "create the group file with its matching group field and insert the record"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-004"
+title = "Invalid identifiers are rejected"
+manual = false
+design = "design/editing.md#identifier-derived-location"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "spec add addresses an ID that does not match the requirement identifier grammar"
+system = "bloomery spec"
+action = "return a usage error without writing"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-005"
+title = "Invalid EARS records are rejected"
+manual = false
+design = "design/editing.md#additions"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a spec mutation would produce a record with an unknown EARS type or a missing required clause field"
+system = "bloomery spec"
+action = "return an error without writing"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-006"
+title = "Design references are validated"
+manual = false
+design = "design/editing.md#additions"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a spec mutation supplies a design path or anchor that does not resolve"
+system = "bloomery spec"
+action = "return an error without writing"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-007"
+title = "Set replaces one addressed field"
+manual = false
+design = "design/editing.md#field-updates"
+
+[requirements.ears]
+type = "event"
+trigger = "spec set addresses a known field of a record"
+system = "bloomery spec"
+action = "replace only that field and leave the remaining fields unchanged"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-008"
+title = "Set replaces the complete EARS clause"
+manual = false
+design = "design/editing.md#field-updates"
+
+[requirements.ears]
+type = "event"
+trigger = "spec set addresses the ears field"
+system = "bloomery spec"
+action = "replace the complete EARS clause so no field from a prior clause survives"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-009"
+title = "Unknown fields are usage errors"
+manual = false
+design = "design/editing.md#field-updates"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "spec set addresses a field outside title, manual, design, and ears"
+system = "bloomery spec"
+action = "return a usage error without writing"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-010"
+title = "Mutations preserve unrelated content"
+manual = false
+design = "design/editing.md#preservation-and-atomicity"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "a spec mutation"
+action = "preserve every unrelated record, comment, key order, and formatting choice"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-011"
+title = "Mutations validate the complete result"
+manual = false
+design = "design/editing.md#preservation-and-atomicity"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "a spec mutation"
+action = "validate the complete resulting requirement tree before writing"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-012"
+title = "Mutations publish atomically"
+manual = false
+design = "design/editing.md#preservation-and-atomicity"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "a spec mutation"
+action = "publish the changed group file through a temporary file and atomic rename"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-013"
+title = "Failed mutations leave the tree unchanged"
+manual = false
+design = "design/editing.md#preservation-and-atomicity"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a spec mutation fails validation or writing"
+system = "bloomery spec"
+action = "leave the existing specification tree unchanged"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-014"
+title = "Remove deletes a record"
+manual = false
+design = "design/editing.md#removal"
+
+[requirements.ears]
+type = "event"
+trigger = "spec remove addresses a present record"
+system = "bloomery spec"
+action = "delete the record"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-015"
+title = "Remove prunes an emptied group file"
+manual = false
+design = "design/editing.md#removal"
+
+[requirements.ears]
+type = "event"
+trigger = "removing a record empties a group file while the feature retains another group"
+system = "bloomery spec"
+action = "remove the emptied group file"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-016"
+title = "Remove preserves the last feature group"
+manual = false
+design = "design/editing.md#removal"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "spec remove addresses the last requirement group of a feature"
+system = "bloomery spec"
+action = "return an error naming the feature without writing"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-017"
+title = "List orders records deterministically"
+manual = false
+design = "design/editing.md#output-and-exit-codes"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery spec list"
+action = "order records by area, feature, group, and numeric sequence"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-018"
+title = "List filters by identity"
+manual = false
+design = "design/editing.md#reads"
+
+[requirements.ears]
+type = "event"
+trigger = "spec list is given one or more area, feature, or group filters"
+system = "bloomery spec"
+action = "restrict the listing to records matching every supplied filter"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-019"
+title = "Unmatched filters yield an empty listing"
+manual = false
+design = "design/editing.md#reads"
+
+[requirements.ears]
+type = "event"
+trigger = "spec list is given a filter that matches no record"
+system = "bloomery spec"
+action = "report an empty listing without failing"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-020"
+title = "Show reports one record"
+manual = false
+design = "design/editing.md#reads"
+
+[requirements.ears]
+type = "event"
+trigger = "spec show addresses a known record"
+system = "bloomery spec"
+action = "report its fields, canonical EARS statement, and resolved design reference"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-021"
+title = "Unknown IDs are usage errors"
+manual = false
+design = "design/editing.md#output-and-exit-codes"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "spec show, spec set, or spec remove addresses an ID absent from the specification tree"
+system = "bloomery spec"
+action = "return a usage error naming the ID"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-022"
+title = "Spec mutations leave configuration and locks unchanged"
+manual = false
+design = "design/editing.md#preservation-and-atomicity"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "a spec mutation"
+action = "leave configuration and lockfiles unchanged"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-023"
+title = "Design may be cleared"
+manual = false
+design = "design/editing.md#field-updates"
+
+[requirements.ears]
+type = "event"
+trigger = "spec set addresses the design field with an empty value"
+system = "bloomery spec"
+action = "clear the record's explicit design reference"

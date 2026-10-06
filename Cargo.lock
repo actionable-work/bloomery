@@ -225,6 +225,7 @@ dependencies = [
  "bloomery-init",
  "bloomery-model",
  "bloomery-review",
+ "bloomery-spec",
  "bloomery-sync",
  "bloomery-workspace",
  "serde_json",
@@ -239,6 +240,7 @@ dependencies = [
  "bloomery-init",
  "bloomery-model",
  "bloomery-review",
+ "bloomery-spec",
  "bloomery-sync",
  "serde_json",
 ]
@@ -320,6 +322,19 @@ dependencies = [
  "oxc_span",
  "serde_json",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "bloomery-spec"
+version = "0.1.0"
+dependencies = [
+ "bloomery-cli-types",
+ "bloomery-model",
+ "bloomery-scanning",
+ "bloomery-workspace",
+ "serde",
+ "toml",
+ "toml_edit",
 ]
 
 [[package]]

@@ -3,7 +3,7 @@ use bloomery_scanning::scan_all;
 use std::collections::BTreeMap;
 
 pub fn run(context: &Context) -> Result<(), Vec<Diagnostic>> {
-    let evidence = scan_all(context)?;
+    let evidence = scan_all(context)?.evidence;
     let mut diagnostics = Vec::new();
     let mut declared = BTreeMap::new();
     for (area, feature, requirement) in context.requirements() {

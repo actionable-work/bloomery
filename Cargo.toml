@@ -21,6 +21,7 @@ bloomery-init = { default-features = false, path = "packages/rust/libs/cli/init"
 bloomery-model = { default-features = false, path = "packages/rust/libs/shared/model" }
 bloomery-review = { default-features = false, path = "packages/rust/libs/cli/review" }
 bloomery-scanning = { default-features = false, path = "packages/rust/libs/shared/scanning" }
+bloomery-spec = { default-features = false, path = "packages/rust/libs/cli/spec" }
 bloomery-sync = { default-features = false, path = "packages/rust/libs/cli/sync" }
 bloomery-test-macros = { default-features = false, path = "packages/rust/libs/shared/test-macros" }
 bloomery-ui = { default-features = false, path = "packages/rust/libs/docs/ui" }

@@ -29,8 +29,10 @@ Every template provides the same bootstrap files:
   Bloomery CLI.
 - `Cargo.toml` declares a `[workspace]` with `resolver = "2"` and the
   template's member crates.
-- `.bloomery/config.toml` is present and relies on the documented default build
-  settings rather than overriding them.
+- `.bloomery/config.toml` does not override the scanner settings. Generated
+  workspaces rely on the [documented default scanner paths](../../../PARSER/CONFIGURATION/design/schema-catalog.md#spec-and-scanner-tables),
+  so the template crates live under `packages/rust/` and the configured
+  defaults discover them without per-template overrides.
 - `.bloomery/specs/` contains a limited area, feature, design, and requirement
   skeleton matching the template's crates.
 - `.gitignore` ignores `target/`, `result`, `result-*`, and `.direnv/`.
@@ -55,8 +57,8 @@ crate layout.
 
 The `basic` template is a multi-crate Rust workspace:
 
-- `crates/{{project}}_core` is the library holding the greeting logic.
-- `crates/{{project}}` is a thin binary that calls the library.
+- `packages/rust/{{project}}_core` is the library holding the greeting logic.
+- `packages/rust/{{project}}` is a thin binary that calls the library.
 
 Its `APP/CORE` feature seeds one automated requirement for the greeting
 behavior, backed by a tagged unit test in the core library.
@@ -65,9 +67,10 @@ behavior, backed by a tagged unit test in the core library.
 
 The `axum` template is a multi-crate Rust workspace:
 
-- `crates/{{project}}_server` is the library holding the router and handlers,
+- `packages/rust/{{project}}_server` is the library holding the router and
+  handlers,
   declaring `axum`, `tokio`, `serde`, and `serde_json` dependencies.
-- `crates/{{project}}` is a thin binary that starts the server.
+- `packages/rust/{{project}}` is a thin binary that starts the server.
 
 Its `SERVER/HTTP` feature seeds automated requirements for the index and health
 routes, backed by tagged unit tests in the server library.
@@ -76,11 +79,11 @@ routes, backed by tagged unit tests in the server library.
 
 The `topcoat` template is a multi-crate Rust workspace with a server/UI split:
 
-- `crates/{{project}}_ui` is the library holding pages, components, and static
-  assets.
-- `crates/{{project}}_server` is the library that registers the UI pages onto
-  the router and serves the site, depending on the UI crate.
-- `crates/{{project}}` is a thin binary that starts the server.
+- `packages/rust/{{project}}_ui` is the library holding pages, components, and
+  static assets.
+- `packages/rust/{{project}}_server` is the library that registers the UI pages
+  onto the router and serves the site, depending on the UI crate.
+- `packages/rust/{{project}}` is a thin binary that starts the server.
 
 It seeds `SITE/UI` and `SITE/SERVER` features with automated requirements for
 page registration and serving, backed by tagged unit tests in the UI and server
