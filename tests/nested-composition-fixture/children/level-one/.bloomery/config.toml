@@ -1,0 +1,6 @@
+[devShell]
+enable = false
+
+[flakes.level-two]
+checks = "individual"
+path = "children/level-two"

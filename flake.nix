@@ -30,21 +30,28 @@
       import ./lib {
         inherit pkgs lib;
         treefmtNix = treefmt-nix;
+        flakeParts = flake-parts;
       };
 
     bloomeryFor = system:
       bloomeryLib {pkgs = nixpkgs.legacyPackages.${system};};
 
+    # The Bloomery API injectable into sub-flake inputs by default, so nested
+    # `bloomery.mkFlake` calls inherit it without the caller threading `self`.
+    bloomeryApi = {inherit mkFlake;};
+
     # The repository builds its own workspace without a pinned CLI so local
     # iteration is never shadowed by a prebuilt binary.
     mkSelfFlake = import ./lib/mk-flake.nix {
       inherit bloomeryLib;
+      defaultInputs = {bloomery = bloomeryApi;};
     };
 
     # Consumers always receive the Bloomery CLI in the default development
     # shell, built from this flake's workspace with their nixpkgs.
     mkFlake = import ./lib/mk-flake.nix {
       inherit bloomeryLib;
+      defaultInputs = {bloomery = bloomeryApi;};
       bloomeryCli = {
         pkgs,
         lib,
@@ -61,33 +68,21 @@
     (mkSelfFlake {
       inherit nixpkgs systems;
       root = ./.;
+      self = {
+        inputs = {
+          inherit nixpkgs treefmt-nix flake-parts;
+        };
+      };
       extraOutputs = {
         eachSystem,
         perSystemWorkspace,
       }: {
-        apps = eachSystem (system: let
-          rootWorkspace = perSystemWorkspace.${system};
-        in
-          rootWorkspace.apps);
-
-        checks = eachSystem (system: let
-          pkgs = nixpkgs.legacyPackages.${system};
-          bloomery = bloomeryFor system;
-          rootWorkspace = perSystemWorkspace.${system};
-          docsPackage = rootWorkspace.packages."bloomery-docs";
-          testFlakeChecks = import ./nix/test-flake-checks.nix {
-            inherit lib pkgs nixpkgs flake-parts system;
-            bloomery = self;
-          };
-          rootChecks = import ./nix/checks {
-            inherit lib pkgs bloomery docsPackage;
-            root = ./.;
-            workspace = rootWorkspace;
-            treefmt = rootWorkspace.formatterConfig;
-          };
-        in
-          rootChecks
-          // testFlakeChecks);
+        checks = eachSystem (
+          system:
+            import ./nix/root-checks.nix {
+              inherit lib nixpkgs self bloomeryFor perSystemWorkspace system;
+            }
+        );
       };
     })
     // {

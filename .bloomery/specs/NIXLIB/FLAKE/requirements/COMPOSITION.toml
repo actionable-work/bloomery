@@ -1,0 +1,237 @@
+group = "COMPOSITION"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-001"
+title = "Sub-flake composition is off by default"
+manual = false
+design = "design/composition.md#configuration"
+
+[requirements.ears]
+type = "event"
+trigger = "config.toml contains no flakes table"
+system = "the mkFlake constructor"
+action = "elevate no sub-flake outputs into the main flake"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-002"
+title = "Each sub-flake entry requires a path"
+manual = false
+design = "design/composition.md#configuration"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a flakes entry omits path or sets it to an empty string"
+system = "the mkFlake constructor"
+action = "fail evaluation with a bloomery-prefixed error"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-003"
+title = "Elevation toggles default to off"
+manual = false
+design = "design/composition.md#configuration"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the build configuration"
+action = "default flakes.<name>.packages and flakes.<name>.apps to false and flakes.<name>.checks to none"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-004"
+title = "Sub-flake paths stay inside the repository"
+manual = false
+design = "design/composition.md#configuration"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a flakes entry names a path outside the repository root or a directory without flake.nix"
+system = "the mkFlake constructor"
+action = "fail evaluation with a bloomery-prefixed error"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-005"
+title = "Sub-flakes are evaluated per selected system"
+manual = false
+design = "design/composition.md#evaluation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the mkFlake constructor"
+action = "import each configured sub-flake and read its outputs for every selected system"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-006"
+title = "Sub-flake evaluation is pure"
+manual = false
+design = "design/composition.md#evaluation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the mkFlake constructor"
+action = "evaluate configured sub-flakes without builtins.getFlake, network access, impure mode, or import-from-derivation"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-007"
+title = "Missing system outputs contribute nothing"
+manual = false
+design = "design/composition.md#evaluation"
+
+[requirements.ears]
+type = "event"
+trigger = "a configured sub-flake exposes no package, app, or check attribute for a selected system"
+system = "the mkFlake constructor"
+action = "contribute no output for that family and system while the remaining outputs still evaluate"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-008"
+title = "Enabled packages are elevated under the flake name"
+manual = false
+design = "design/composition.md#elevated-packages-and-apps"
+
+[requirements.ears]
+type = "event"
+trigger = "flakes.<name>.packages is enabled"
+system = "the mkFlake constructor"
+action = "expose each named sub-flake package as packages.<system>.<name>:<package>"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-009"
+title = "Enabled apps are elevated under the flake name"
+manual = false
+design = "design/composition.md#elevated-packages-and-apps"
+
+[requirements.ears]
+type = "event"
+trigger = "flakes.<name>.apps is enabled"
+system = "the mkFlake constructor"
+action = "expose each named sub-flake app as apps.<system>.<name>:<app>"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-010"
+title = "Sub-flake defaults never replace the main defaults"
+manual = false
+design = "design/composition.md#elevated-packages-and-apps"
+
+[requirements.ears]
+type = "event"
+trigger = "a sub-flake exposes a default package or app and its elevation toggle is enabled"
+system = "the mkFlake constructor"
+action = "expose it under the name prefix while leaving the main packages.default and apps.default unchanged"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-011"
+title = "Individual checks are elevated under the flake name"
+manual = false
+design = "design/composition.md#elevated-checks"
+
+[requirements.ears]
+type = "event"
+trigger = "flakes.<name>.checks is individual"
+system = "the mkFlake constructor"
+action = "expose each sub-flake check as checks.<system>.<name>:<check>"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-012"
+title = "Aggregate checks realize every sub-flake check"
+manual = false
+design = "design/composition.md#elevated-checks"
+
+[requirements.ears]
+type = "event"
+trigger = "flakes.<name>.checks is aggregate"
+system = "the mkFlake constructor"
+action = "expose one checks.<system>.<name>:checks derivation that depends on every sub-flake check for that system"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-013"
+title = "Aggregate checks fail when a sub-flake check fails"
+manual = false
+design = "design/composition.md#elevated-checks"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "an aggregate sub-flake check has a failing sub-flake check"
+system = "the mkFlake constructor"
+action = "make the aggregate check fail"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-014"
+title = "Disabled check elevation exposes no sub-flake checks"
+manual = false
+design = "design/composition.md#elevated-checks"
+
+[requirements.ears]
+type = "event"
+trigger = "flakes.<name>.checks is none"
+system = "the mkFlake constructor"
+action = "expose no check from that sub-flake"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-015"
+title = "Elevated checks ignore the main check toggles"
+manual = false
+design = "design/composition.md#elevated-checks"
+
+[requirements.ears]
+type = "event"
+trigger = "the main workspace disables checks but a sub-flake enables check elevation"
+system = "the mkFlake constructor"
+action = "still expose the elevated sub-flake checks"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-016"
+title = "Only packages, apps, and checks are elevatable"
+manual = false
+design = "design/composition.md#output-restrictions"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a flakes entry contains a key other than path, packages, apps, or checks"
+system = "the mkFlake constructor"
+action = "fail evaluation instead of elevating another output family"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-017"
+title = "Elevated name collisions are evaluation errors"
+manual = false
+design = "design/composition.md#name-collisions"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "an elevated attribute duplicates another attribute in the same main-flake output and system"
+system = "the mkFlake constructor"
+action = "fail evaluation with a bloomery-prefixed error"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-018"
+title = "Main workspace outputs remain alongside elevated outputs"
+manual = false
+design = "design/composition.md#name-collisions"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the mkFlake constructor"
+action = "generate the main workspace packages, apps, and checks unchanged while adding elevated sub-flake outputs"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-019"
+title = "Composition recurses through nested sub-flakes"
+manual = false
+design = "design/composition.md#nesting"
+
+[requirements.ears]
+type = "event"
+trigger = "a configured sub-flake itself configures sub-flakes"
+system = "the mkFlake constructor"
+action = "compose the nested sub-flake outputs into the sub-flake and elevate them under the parent's name prefix"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-020"
+title = "Nested sub-flakes inherit the main flake inputs"
+manual = false
+design = "design/composition.md#nesting"
+
+[requirements.ears]
+type = "event"
+trigger = "a configured sub-flake calls mkFlake without passing self"
+system = "the mkFlake constructor"
+action = "supply the main flake's inputs, including the Bloomery mkFlake binding, to that call by default"

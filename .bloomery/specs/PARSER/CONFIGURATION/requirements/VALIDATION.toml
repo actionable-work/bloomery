@@ -58,3 +58,27 @@ type = "event"
 trigger = "config.toml contains a formatter ordering key"
 system = "the configuration loader"
 action = "validate that the value is a list of formatter names before any consuming command runs"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-VALIDATION-006"
+title = "Sub-flake elevation keys are type-validated"
+manual = false
+design = "design/schema-catalog.md#validation"
+
+[requirements.ears]
+type = "event"
+trigger = "config.toml contains a flakes entry key"
+system = "the configuration loader"
+action = "validate the packages and apps booleans, the checks enum, and the path string before any consuming command runs"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-VALIDATION-007"
+title = "Unsupported sub-flake elevation keys are rejected"
+manual = false
+design = "design/schema-catalog.md#validation"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a flakes entry contains a key absent from the schema catalog"
+system = "the configuration loader"
+action = "report a ConfigurationError without evaluating the main or sub-flakes"

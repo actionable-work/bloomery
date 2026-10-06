@@ -2,10 +2,11 @@
   pkgs,
   lib ? pkgs.lib,
   treefmtNix ? null,
+  flakeParts ? null,
 }: let
   profile = import ./profile {inherit lib;};
   workspace = import ./workspace {inherit pkgs lib;};
-  mkFlakeTests = import ./mk-flake.test.nix {inherit pkgs lib treefmtNix;};
+  mkFlakeTests = import ./mk-flake.test.nix {inherit pkgs lib treefmtNix flakeParts;};
   formatterTests = import ./formatters.test.nix {inherit pkgs lib treefmtNix;};
   buildConfigTests = import ./build-config.test.nix {inherit pkgs lib;};
   mkWorkspaceTests = import ./mk-workspace.test.nix {inherit pkgs lib;};
@@ -47,6 +48,8 @@ in {
           "REPOSITORY-LAYOUT-STRUCTURE-004"
           "REPOSITORY-LAYOUT-STRUCTURE-005"
           "REPOSITORY-LAYOUT-STRUCTURE-006"
+          "REPOSITORY-LAYOUT-STRUCTURE-009"
+          "REPOSITORY-LAYOUT-STRUCTURE-010"
           "NIX-SOURCES-IDENTITY-001"
           "NIX-SOURCES-IDENTITY-002"
           "NIX-SOURCES-IDENTITY-003"
@@ -185,6 +188,28 @@ in {
           "NIXLIB-FLAKE-FORMATTERS-014"
           "NIXLIB-FLAKE-FORMATTERS-015"
           "NIXLIB-FLAKE-OPTIONS-019"
+          "NIXLIB-FLAKE-ENTRYPOINTS-020"
+          "NIXLIB-FLAKE-ENTRYPOINTS-021"
+          "NIXLIB-FLAKE-COMPOSITION-001"
+          "NIXLIB-FLAKE-COMPOSITION-002"
+          "NIXLIB-FLAKE-COMPOSITION-003"
+          "NIXLIB-FLAKE-COMPOSITION-004"
+          "NIXLIB-FLAKE-COMPOSITION-005"
+          "NIXLIB-FLAKE-COMPOSITION-006"
+          "NIXLIB-FLAKE-COMPOSITION-007"
+          "NIXLIB-FLAKE-COMPOSITION-008"
+          "NIXLIB-FLAKE-COMPOSITION-009"
+          "NIXLIB-FLAKE-COMPOSITION-010"
+          "NIXLIB-FLAKE-COMPOSITION-011"
+          "NIXLIB-FLAKE-COMPOSITION-012"
+          "NIXLIB-FLAKE-COMPOSITION-013"
+          "NIXLIB-FLAKE-COMPOSITION-014"
+          "NIXLIB-FLAKE-COMPOSITION-015"
+          "NIXLIB-FLAKE-COMPOSITION-016"
+          "NIXLIB-FLAKE-COMPOSITION-017"
+          "NIXLIB-FLAKE-COMPOSITION-018"
+          "NIXLIB-FLAKE-COMPOSITION-019"
+          "NIXLIB-FLAKE-COMPOSITION-020"
           "CLI-SYNC-LOCKS-045"
         ];
       };

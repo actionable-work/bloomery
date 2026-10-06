@@ -9,11 +9,16 @@ it does not expose a public `lib` builder surface.
 ## mkFlake
 
 `mkFlake` accepts `nixpkgs`, `root`, an optional `systems` list, an optional
-`overrides` attribute set, an optional `extraFormatters` attribute set, and an
-optional `extraOutputs` callback. It evaluates one workspace per selected system
-with that system's `nixpkgs.legacyPackages`. No other workspace option is
-accepted as a constructor argument; every remaining setting comes from the
-configuration file described in [Build configuration](configuration.md).
+`overrides` attribute set, an optional `extraFormatters` attribute set, an
+optional `extraOutputs` callback, and an optional main-flake `self`. It
+evaluates one workspace per selected system with that system's
+`nixpkgs.legacyPackages`. No other workspace option is accepted as a
+constructor argument; every remaining setting comes from the configuration
+file described in [Build configuration](configuration.md).
+
+When `[flakes]` composition is configured, `mkFlake` uses `self` to resolve
+each sub-flake's inputs and forwards them to the sub-flake's `outputs`; see
+[Sub-flake composition](composition.md).
 
 ## Configuration requirement
 
@@ -58,4 +63,7 @@ Nix values, so they stay in the constructor rather than in `config.toml`.
 function over the selected systems, and `perSystemWorkspace` holds every
 per-system workspace output including `crates`, `lock`, and `config`. The
 returned attribute set is merged after the base flake attributes, so it can add
-or replace outputs.
+or replace outputs. A returned `checks` attribute is merged with the generated
+checks per system instead of replacing them, so an extra set of checks — such
+as repository-specific root checks — extends the main workspace and elevated
+sub-flake checks.

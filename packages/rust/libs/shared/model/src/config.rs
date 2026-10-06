@@ -28,6 +28,10 @@ pub struct Config {
     pub features: Option<toml::Value>,
     #[serde(default)]
     pub formatters: Option<toml::Value>,
+    // Sub-flake composition. Owned and evaluated by the flake interface; kept
+    // opaque to the CLI apart from schema cataloguing and type validation.
+    #[serde(default)]
+    pub flakes: Option<toml::Value>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -506,5 +510,52 @@ mod tests {
         let config = load(&root).expect("package strings are valid configuration");
         assert!(config.toolchain.is_some());
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-SECTIONS-002"))]
+    fn flakes_table_is_accepted_as_valid_configuration() {
+        let root = write_config(
+            "[flakes.tests-basic]\npath = \"tests/basic-workspace\"\n\
+             packages = true\napps = false\nchecks = \"individual\"\n",
+        );
+        let config = load(&root).expect("flakes table should be accepted");
+        assert_eq!(config.specs.dir, "specs");
+        assert_default_scanners(
+            &config.scanners.rust,
+            &config.scanners.playwright,
+            &config.scanners.nix,
+        );
+        assert!(config.flakes.is_some());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-VALIDATION-006"))]
+    fn flake_elevation_keys_are_type_validated() {
+        for contents in [
+            "[flakes.x]\npath = 5\n",
+            "[flakes.x]\npath = \"tests/x\"\npackages = \"yes\"\n",
+            "[flakes.x]\npath = \"tests/x\"\napps = [1]\n",
+            "[flakes.x]\npath = \"tests/x\"\nchecks = \"always\"\n",
+        ] {
+            let root = write_config(contents);
+            assert_configuration_error(&root);
+            let _ = fs::remove_dir_all(root);
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-VALIDATION-007"))]
+    fn unsupported_flake_elevation_keys_are_rejected() {
+        for contents in [
+            "[flakes.x]\npath = \"tests/x\"\ndevShells = true\n",
+            "[flakes.x]\npath = \"tests/x\"\nformatter = true\n",
+            "[flakes.x]\npath = \"tests/x\"\nbogus = true\n",
+        ] {
+            let root = write_config(contents);
+            assert_configuration_error(&root);
+            let _ = fs::remove_dir_all(root);
+        }
     }
 }

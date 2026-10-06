@@ -281,4 +281,61 @@ in {
     });
     expected = true;
   };
+
+  testFlakeElevationDefaults = {
+    expr = let
+      flakes = loader.checkFlakes {
+        tests-basic.path = "tests/basic-workspace";
+      };
+    in {
+      path = flakes.tests-basic.path;
+      packages = flakes.tests-basic.packages;
+      apps = flakes.tests-basic.apps;
+      checks = flakes.tests-basic.checks;
+    };
+    expected = {
+      path = "tests/basic-workspace";
+      packages = false;
+      apps = false;
+      checks = "none";
+    };
+  };
+
+  testFlakeInvalidShapesFail = {
+    expr = map fails [
+      (loader.checkFlakes {x = {packages = true;};})
+      (loader.checkFlakes {
+        x = {
+          path = "tests/x";
+          bogus = true;
+        };
+      })
+      (loader.checkFlakes {
+        x = {
+          path = "tests/x";
+          packages = "yes";
+        };
+      })
+      (loader.checkFlakes {
+        x = {
+          path = "tests/x";
+          apps = 1;
+        };
+      })
+      (loader.checkFlakes {
+        x = {
+          path = "tests/x";
+          checks = "always";
+        };
+      })
+      (loader.checkFlakes {x = {path = "../outside";};})
+      (loader.checkFlakes {x = {path = "/absolute";};})
+    ];
+    expected = [true true true true true true true];
+  };
+
+  testFlakeMissingDirectoryFails = {
+    expr = fails (loader.loadFlakes ../tests/composition-missing-fixture);
+    expected = true;
+  };
 }

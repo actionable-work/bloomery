@@ -2,13 +2,16 @@
   pkgs,
   lib ? pkgs.lib,
   treefmtNix ? null,
+  flakeParts ? null,
 }: let
+  bloomeryApi = {inherit mkFlake;};
   mkFlake = import ./mk-flake.nix {
     bloomeryLib = {
       pkgs,
       lib,
     }:
       import ./. {inherit pkgs lib treefmtNix;};
+    defaultInputs = {bloomery = bloomeryApi;};
   };
   mkFlakeWithCli = import ./mk-flake.nix {
     bloomeryLib = {
@@ -17,6 +20,17 @@
     }:
       import ./. {inherit pkgs lib treefmtNix;};
     bloomeryCli = {pkgs, ...}: pkgs.hello;
+    defaultInputs = {bloomery = bloomeryApi;};
+  };
+
+  # Main-flake `self` for tests that evaluate the repository root, whose config
+  # composes the test workspaces as configured sub-flakes.
+  compositionSelf = {
+    inputs =
+      {
+        bloomery = {inherit mkFlake;};
+      }
+      // lib.optionalAttrs (flakeParts != null) {flake-parts = flakeParts;};
   };
   mockNixpkgs = {
     inherit lib;
@@ -122,6 +136,7 @@ in
           nixpkgs = mockNixpkgs;
           systems = [pkgs.system];
           root = ../.;
+          self = compositionSelf;
         };
         packages = flakeOutputs.packages.${pkgs.system};
       in {
@@ -223,6 +238,26 @@ in
       expected = false;
     };
 
+    testMkFlakeExtraOutputsChecksAreAdditive = {
+      expr = let
+        flakeOutputs = mkFlake {
+          nixpkgs = mockNixpkgs;
+          systems = [pkgs.system];
+          root = ../tests/composition-fixture;
+          extraOutputs = {eachSystem, ...}: {
+            checks = eachSystem (_system: {extra = pkgs.hello;});
+          };
+        };
+      in {
+        keepsSubFlakeCheck = builtins.hasAttr "complete:complete:check" flakeOutputs.checks.${pkgs.system};
+        addsExtraCheck = builtins.hasAttr "extra" flakeOutputs.checks.${pkgs.system};
+      };
+      expected = {
+        keepsSubFlakeCheck = true;
+        addsExtraCheck = true;
+      };
+    };
+
     testMkFlakeExtraOutputsWorkspaceContext = {
       expr = let
         flakeOutputs = mkFlake {
@@ -293,7 +328,167 @@ in
 
     testMkFlakeArgumentSurface = {
       expr = builtins.attrNames (builtins.functionArgs mkFlake);
-      expected = ["extraFormatters" "extraOutputs" "nixpkgs" "overrides" "root" "systems"];
+      expected = ["extraFormatters" "extraOutputs" "nixpkgs" "overrides" "root" "self" "systems"];
+    };
+
+    testMkFlakeCompositionOffByDefault = {
+      expr = let
+        flakeOutputs = mkFlake {
+          nixpkgs = mockNixpkgs;
+          systems = [pkgs.system];
+          root = ../tests/default-bin;
+        };
+      in {
+        packages = builtins.attrNames flakeOutputs.packages.${pkgs.system};
+        apps = builtins.attrNames flakeOutputs.apps.${pkgs.system};
+      };
+      expected = {
+        packages = ["default" "host-app"];
+        apps = ["default" "host-app" "host-app:doc"];
+      };
+    };
+
+    testMkFlakeElevatesPackagesAndApps = {
+      expr = let
+        flakeOutputs = mkFlake {
+          nixpkgs = mockNixpkgs;
+          systems = [pkgs.system];
+          root = ../tests/composition-fixture;
+        };
+        packages = flakeOutputs.packages.${pkgs.system};
+        apps = flakeOutputs.apps.${pkgs.system};
+      in {
+        hasMainPackage = builtins.hasAttr "default" packages;
+        hasMainApp = builtins.hasAttr "default" apps;
+        hasSubPackage = builtins.hasAttr "complete:complete-pkg" packages;
+        hasOnlyPackage = builtins.hasAttr "packages-only:only-pkg" packages;
+        hasSubApp = builtins.hasAttr "complete:complete-app" apps;
+        subAppIsApp = apps."complete:complete-app".type == "app";
+        offContributesNothing = !(lib.any (name: lib.hasPrefix "off:" name) (builtins.attrNames packages ++ builtins.attrNames apps));
+      };
+      expected = {
+        hasMainPackage = true;
+        hasMainApp = true;
+        hasSubPackage = true;
+        hasOnlyPackage = true;
+        hasSubApp = true;
+        subAppIsApp = true;
+        offContributesNothing = true;
+      };
+    };
+
+    testMkFlakeElevatesIndividualChecksAndAggregate = {
+      expr = let
+        flakeOutputs = mkFlake {
+          nixpkgs = mockNixpkgs;
+          systems = [pkgs.system];
+          root = ../tests/composition-fixture;
+          self = compositionSelf;
+        };
+        checks = flakeOutputs.checks.${pkgs.system};
+        aggregate = checks."aggregate:checks";
+      in {
+        hasCheck = builtins.hasAttr "complete:complete:check" checks;
+        hasOther = builtins.hasAttr "complete:complete:other" checks;
+        hasAggregate = builtins.hasAttr "aggregate:checks" checks;
+        aggregateIsDerivation = aggregate.type == "derivation";
+        mainChecksDisabled = !(builtins.hasAttr "workspace:lock" checks);
+      };
+      expected = {
+        hasCheck = true;
+        hasOther = true;
+        hasAggregate = true;
+        aggregateIsDerivation = true;
+        mainChecksDisabled = true;
+      };
+    };
+
+    testMkFlakeSkipsMissingSubFlakeFamilies = {
+      expr = let
+        flakeOutputs = mkFlake {
+          nixpkgs = mockNixpkgs;
+          systems = [pkgs.system];
+          root = ../tests/composition-fixture;
+        };
+        apps = flakeOutputs.apps.${pkgs.system};
+        checks = flakeOutputs.checks.${pkgs.system};
+      in {
+        noMissingApps = !(lib.any (name: lib.hasPrefix "packages-only:" name) (builtins.attrNames apps));
+        noMissingChecks = !(lib.any (name: lib.hasPrefix "packages-only:" name) (builtins.attrNames checks));
+      };
+      expected = {
+        noMissingApps = true;
+        noMissingChecks = true;
+      };
+    };
+
+    testMkFlakeCompositionEvaluatesPurely = {
+      expr =
+        (builtins.tryEval (
+          builtins.attrNames
+          (mkFlake {
+            nixpkgs = mockNixpkgs;
+            systems = [pkgs.system];
+            root = ../tests/composition-fixture;
+          }).checks.${
+            pkgs.system
+          }
+        )).success;
+      expected = true;
+    };
+
+    testMkFlakeElevatedCollisionFails = {
+      expr =
+        !(builtins.tryEval (
+          builtins.attrNames
+          (mkFlake {
+            nixpkgs = mockNixpkgs;
+            systems = [pkgs.system];
+            root = ../tests/composition-collision-fixture;
+          }).checks.${
+            pkgs.system
+          }
+        )).success;
+      expected = true;
+    };
+
+    testMkFlakeRepositoryComposition = {
+      expr = let
+        flakeOutputs = mkFlake {
+          nixpkgs = mockNixpkgs;
+          systems = [pkgs.system];
+          root = ../.;
+          self = compositionSelf;
+        };
+        checks = flakeOutputs.checks.${pkgs.system};
+        names = builtins.attrNames checks;
+      in {
+        hasBasicCheck = lib.any (name: lib.hasPrefix "basic-workspace:" name) names;
+        hasAxumCheck = lib.any (name: lib.hasPrefix "axum-workspace:" name) names;
+      };
+      expected = {
+        hasBasicCheck = true;
+        hasAxumCheck = true;
+      };
+    };
+
+    testMkFlakeNestedComposition = {
+      expr = let
+        flakeOutputs = mkFlake {
+          nixpkgs = mockNixpkgs;
+          systems = [pkgs.system];
+          root = ../tests/nested-composition-fixture;
+        };
+        checks = flakeOutputs.checks.${pkgs.system};
+        names = builtins.attrNames checks;
+      in {
+        hasLevelOne = lib.any (name: lib.hasPrefix "level-one:" name) names;
+        hasNestedLevelTwo = builtins.hasAttr "level-one:level-two:check" checks;
+      };
+      expected = {
+        hasLevelOne = true;
+        hasNestedLevelTwo = true;
+      };
     };
   }
   // formatterTests

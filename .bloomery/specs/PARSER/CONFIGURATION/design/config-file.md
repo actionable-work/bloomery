@@ -58,10 +58,28 @@ the same keys and validates their types and enum value sets during
 configuration loading, so a malformed build key fails before Nix evaluation;
 the tables are still not interpreted as scanner or spec target configuration.
 
+## Sub-flake composition
+
+The `[flakes]` table is a parameterized family keyed by sub-flake name and is
+consumed by the [NIXLIB/FLAKE composition design](../../../NIXLIB/FLAKE/design/composition.md).
+Each `[flakes.<name>]` entry carries a required repository-relative `path`, a
+`packages` boolean, an `apps` boolean, and a `checks` mode of `"none"`,
+`"individual"`, or `"aggregate"`. The elevation keys default to off, so an
+entry contributes nothing until a family is enabled.
+
+```toml
+[flakes.tests-basic]
+path = "tests/basic-workspace"
+packages = true
+apps = true
+checks = "individual"
+```
+
 ## Resolution rules
 
 - `specs.dir` is relative to `.bloomery/`.
 - Rust, Playwright, and Nix paths are relative to the repository root.
+- `flakes.<name>.path` is relative to the repository root and stays inside it.
 - The Nix scanner extracts literal requirement IDs from `passthru.bloomery`
   metadata in matched Nix source files; it does not evaluate the flake.
 - A disabled scanner contributes no references and performs no tool lookup.

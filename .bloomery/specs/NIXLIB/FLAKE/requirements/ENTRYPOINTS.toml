@@ -101,6 +101,18 @@ system = "the mkFlake constructor"
 action = "call extraOutputs with eachSystem and perSystemWorkspace"
 
 [[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-021"
+title = "extraOutputs checks extend generated checks"
+manual = false
+design = "design/entry-points.md#extraoutputs"
+
+[requirements.ears]
+type = "event"
+trigger = "extraOutputs returns checks"
+system = "the mkFlake constructor"
+action = "merge them per system with the generated main workspace and elevated sub-flake checks instead of replacing them"
+
+[[requirements]]
 id = "NIXLIB-FLAKE-ENTRYPOINTS-010"
 title = "extraOutputs can add or replace flake outputs"
 manual = false
@@ -212,3 +224,14 @@ design = "design/entry-points.md#extraformatters"
 type = "ubiquitous"
 system = "the mkFlake constructor"
 action = "accept an optional extraFormatters attribute set that supplies formatter bodies by name"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-020"
+title = "mkFlake accepts the main flake self for composition"
+manual = false
+design = "design/entry-points.md#mkflake"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the mkFlake constructor"
+action = "accept an optional main-flake self and use it to resolve configured sub-flake inputs"

@@ -47,3 +47,10 @@ records where that integration and the broader Nix library live; the detailed
 contracts of those Nix subsystems remain outside this feature's scope.
 [Source isolation](../../../NIX/SOURCES/README.md) owns fileset selection and
 rebuild boundaries for the reusable builders and repository test-support inputs.
+
+## Repository self-composition
+
+The repository composes its isolated consumer workspaces through the native
+sub-flake mechanism. `.bloomery/config.toml` declares each `tests/<name>`
+workspace as a named `[flakes.<name>]` entry with check elevation enabled, and
+the root flake exposes their checks through `mkFlake` sub-flake expansion.

@@ -1,0 +1,10 @@
+[devShell]
+enable = false
+
+[flakes.a]
+checks = "individual"
+path = "children/collide"
+
+[flakes."a:b"]
+checks = "aggregate"
+path = "children/collide"

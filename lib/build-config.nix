@@ -65,6 +65,41 @@
       )
       value;
 
+  # Sub-flake entries are keyed by name, so validate each entry's shape and
+  # normalize the elevation toggles to their documented defaults.
+  checkFlakes = value:
+    if !(isAttrs value)
+    then throw "bloomery: [flakes] must be a table in .bloomery/config.toml"
+    else
+      lib.mapAttrs (
+        name: sub: let
+          unknown = filter (key: !(elem key ["path" "packages" "apps" "checks"])) (attrNames sub);
+          path = sub.path or null;
+          checks = sub.checks or "none";
+        in
+          if !(isAttrs sub)
+          then throw "bloomery: [flakes.${name}] must be a table in .bloomery/config.toml"
+          else if unknown != []
+          then throw "bloomery: unknown key(s) in [flakes.${name}]: ${lib.concatStringsSep ", " unknown}"
+          else if !(isString path) || path == ""
+          then throw "bloomery: [flakes.${name}].path must be a non-empty string in .bloomery/config.toml"
+          else if lib.hasPrefix "/" path || elem ".." (lib.splitString "/" path)
+          then throw "bloomery: [flakes.${name}].path must stay inside the workspace root"
+          else if sub ? packages && !(builtins.isBool sub.packages)
+          then throw "bloomery: [flakes.${name}].packages must be a boolean"
+          else if sub ? apps && !(builtins.isBool sub.apps)
+          then throw "bloomery: [flakes.${name}].apps must be a boolean"
+          else if !(elem checks ["none" "individual" "aggregate"])
+          then throw "bloomery: [flakes.${name}].checks must be none, individual, or aggregate"
+          else {
+            inherit path;
+            packages = sub.packages or false;
+            apps = sub.apps or false;
+            inherit checks;
+          }
+      )
+      value;
+
   resolvePackage = name:
     if !(isString name)
     then throw "bloomery: package values must be strings naming nixpkgs attributes"
@@ -159,7 +194,21 @@
     // (lib.optionalAttrs (build ? libPackages) {createLibPackages = build.libPackages;})
     // (lib.optionalAttrs (build ? devPackages) {createDevPackages = build.devPackages;});
 in rec {
-  inherit readConfig resolvePackage resolvePath checkTable checkFormatters;
+  inherit readConfig resolvePackage resolvePath checkTable checkFormatters checkFlakes;
   load = toWorkspaceArgs;
   inherit toWorkspaceArgs;
+
+  # Sub-flake composition is a flake-level concern, so it is loaded separately
+  # from the workspace options to avoid feeding undeclared options into
+  # evalWorkspaceOptions.
+  loadFlakes = root: let
+    flakes = checkFlakes ((readConfig root).flakes or {});
+  in
+    lib.mapAttrs (
+      name: sub:
+        if builtins.pathExists (root + "/${sub.path}/flake.nix")
+        then sub
+        else throw "bloomery: sub-flake '${name}' has no flake.nix at ${sub.path}"
+    )
+    flakes;
 }

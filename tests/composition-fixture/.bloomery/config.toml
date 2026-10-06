@@ -1,0 +1,23 @@
+[checks]
+enable = false
+
+[devShell]
+enable = false
+
+[flakes.aggregate]
+checks = "aggregate"
+path = "children/complete"
+
+[flakes.complete]
+apps = true
+checks = "individual"
+packages = true
+path = "children/complete"
+
+[flakes.off]
+path = "children/packages-only"
+
+[flakes.packages-only]
+apps = true
+packages = true
+path = "children/packages-only"

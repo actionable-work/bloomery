@@ -1139,6 +1139,24 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-028"))]
+    fn catalog_discovery_includes_elevated_sub_flake_attributes() {
+        let backend = CatalogStub {
+            names: vec![
+                "basic-workspace:workspace:lock".to_owned(),
+                "aggregate:checks".to_owned(),
+            ],
+        };
+        let (catalog, notices) =
+            discover_catalog(Path::new("."), &["x86_64-linux".to_owned()], &backend)
+                .expect("catalog");
+
+        assert!(catalog.contains(&"nix:x86_64-linux:basic-workspace:workspace:lock".to_owned()));
+        assert!(catalog.contains(&"nix:x86_64-linux:aggregate:checks".to_owned()));
+        assert!(notices.is_empty());
+    }
+
+    #[test]
     #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-009"))]
     fn nix_ids_preserve_attribute_names_after_the_system_separator() {
         assert_eq!(

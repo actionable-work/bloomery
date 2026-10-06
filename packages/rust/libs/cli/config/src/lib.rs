@@ -398,6 +398,10 @@ mod tests {
             "checks.enable",
             "profile.release.optLevel",
             "toolchain.rustc",
+            "flakes.tests-basic.path",
+            "flakes.tests-basic.packages",
+            "flakes.tests-basic.apps",
+            "flakes.tests-basic.checks",
         ] {
             run(
                 &root,

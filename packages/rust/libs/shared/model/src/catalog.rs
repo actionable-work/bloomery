@@ -85,7 +85,7 @@ impl KeySpec {
 }
 
 /// Increment when the catalog changes.
-pub const CATALOG_VERSION: u32 = 1;
+pub const CATALOG_VERSION: u32 = 2;
 
 const OPT_LEVEL: &[ValueType] = &[
     ValueType::UnsignedUpTo(3),
@@ -654,13 +654,13 @@ pub fn lookup(path: &[&str]) -> Option<&'static CatalogEntry> {
     CATALOG.iter().find(|entry| entry.path == path)
 }
 
-/// Resolve a dotted path, including parameterized formatter names that have no
-/// static catalog entry.
+/// Resolve a dotted path, including parameterized formatter and sub-flake
+/// names that have no static catalog entry.
 pub fn resolve(path: &[&str]) -> Option<KeySpec> {
     if let Some(entry) = lookup(path) {
         return Some(KeySpec::from_entry(entry));
     }
-    formatter_key(path)
+    formatter_key(path).or_else(|| flake_key(path))
 }
 
 fn formatter_key(path: &[&str]) -> Option<KeySpec> {
@@ -690,9 +690,46 @@ fn formatter_key(path: &[&str]) -> Option<KeySpec> {
     })
 }
 
+fn flake_key(path: &[&str]) -> Option<KeySpec> {
+    let [table, _name, field] = path else {
+        return None;
+    };
+    if *table != "flakes" {
+        return None;
+    }
+    let (value_type, documentation) = match *field {
+        "path" => (
+            ValueType::Path,
+            "Repository-relative path to a sub-flake directory.",
+        ),
+        "packages" => (
+            ValueType::Bool,
+            "Elevate the sub-flake's packages into the main flake.",
+        ),
+        "apps" => (
+            ValueType::Bool,
+            "Elevate the sub-flake's apps into the main flake.",
+        ),
+        "checks" => (
+            ValueType::StringEnum(&["none", "individual", "aggregate"]),
+            "Sub-flake check elevation: none, individual, or aggregate.",
+        ),
+        _ => return None,
+    };
+    Some(KeySpec {
+        path: path.iter().map(|segment| (*segment).to_owned()).collect(),
+        value_type,
+        recommended: None,
+        documentation,
+    })
+}
+
 /// Whether a path is a recognized table that may contain catalogued leaves.
 fn is_known_table(path: &[&str]) -> bool {
     if path == ["formatters"] || (path.len() == 2 && path[0] == "formatters") {
+        return true;
+    }
+    if path == ["flakes"] || (path.len() == 2 && path[0] == "flakes") {
         return true;
     }
     CATALOG
@@ -953,7 +990,7 @@ mod tests {
     #[test]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-005"))]
     fn catalog_version_tracks_the_binary() {
-        assert_eq!(CATALOG_VERSION, 1);
+        assert_eq!(CATALOG_VERSION, 2);
         assert!(!CATALOG.is_empty());
     }
 
@@ -1033,6 +1070,44 @@ mod tests {
         assert_eq!(entry.value_type, ValueType::Bool);
         assert_eq!(entry.recommended, Some(DefaultValue::Bool(true)));
         assert!(resolve(&["features", "unify"]).is_none());
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-012"))]
+    fn catalog_covers_the_parameterized_sub_flake_table() {
+        let path = resolve(&["flakes", "tests-basic", "path"]).expect("sub-flake path");
+        assert_eq!(path.value_type, ValueType::Path);
+        assert!(path.recommended.is_none());
+        assert_eq!(
+            resolve(&["flakes", "tests-basic", "packages"])
+                .expect("sub-flake packages")
+                .value_type,
+            ValueType::Bool
+        );
+        assert_eq!(
+            resolve(&["flakes", "tests-basic", "apps"])
+                .expect("sub-flake apps")
+                .value_type,
+            ValueType::Bool
+        );
+        assert_eq!(
+            resolve(&["flakes", "tests-basic", "checks"])
+                .expect("sub-flake checks")
+                .value_type,
+            ValueType::StringEnum(&["none", "individual", "aggregate"])
+        );
+        assert!(resolve(&["flakes", "tests-basic"]).is_none());
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-013"))]
+    fn no_other_output_family_is_catalogued_for_elevation() {
+        for field in ["devShells", "formatter", "legacyPackages", "nixosModules"] {
+            assert!(
+                resolve(&["flakes", "tests-basic", field]).is_none(),
+                "{field} must not be elevatable"
+            );
+        }
     }
 
     #[test]

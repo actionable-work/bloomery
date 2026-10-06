@@ -1,0 +1,5 @@
+[devShell]
+enable = false
+
+[flakes.missing]
+path = "absent-child"

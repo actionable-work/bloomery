@@ -120,3 +120,25 @@ design = "design/schema-catalog.md#build-tables"
 type = "ubiquitous"
 system = "the schema catalog"
 action = "catalogue the feature unification toggle as build.unify with a recommended default of true"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-012"
+title = "Catalog covers the parameterized sub-flake table"
+manual = false
+design = "design/schema-catalog.md#flakes"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "include the path, packages, apps, and checks keys for any named entry under the flakes table"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-013"
+title = "No output family other than packages, apps, and checks is catalogued for elevation"
+manual = false
+design = "design/schema-catalog.md#flakes"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "omit any flakes key that would elevate an output family other than packages, apps, or checks"

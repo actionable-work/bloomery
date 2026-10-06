@@ -14,9 +14,9 @@ Bloomery reads `.bloomery/config.toml` from the repository root. The file is
 required for every repository command except parser help and `init`.
 Configuration is declarative input to discovery and scanning; it is not a second
 source of requirement identity or lifecycle state. The file also carries the
-build tables consumed by [NIXLIB/FLAKE](../../NIXLIB/FLAKE/README.md), which the
-parser type-validates during loading and passes through for the flake
-interface.
+build tables and the sub-flake composition table consumed by
+[NIXLIB/FLAKE](../../NIXLIB/FLAKE/README.md), which the parser type-validates
+during loading and passes through for the flake interface.
 
 ## Design documents
 
@@ -39,6 +39,8 @@ interface.
   configuration while cataloguing and type-validating their keys.
 - Catalogue the parameterized formatter enablement and ordering keys alongside
   the build tables.
+- Catalogue the parameterized sub-flake composition table and its per-flake
+  elevation keys alongside the build tables.
 - Expose a schema catalog spanning every recognized key, with documentation text
   and recommended defaults, consumed by `bloomery config` and sync
   recommendations.
@@ -52,4 +54,6 @@ source-specific options; Nix evidence is read statically from source metadata. [
 configuration errors as an early failure and does not proceed with an
 incomplete configuration. [CLI/CONFIG](../../CLI/CONFIG/README.md) edits every
 catalogued table, including the build tables, through the schema and its
-recommended-default catalog.
+recommended-default catalog. The
+[NIXLIB/FLAKE composition table](../../NIXLIB/FLAKE/design/composition.md) is
+catalogued here and evaluated by `mkFlake`.

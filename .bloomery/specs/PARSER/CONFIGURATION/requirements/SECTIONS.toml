@@ -11,3 +11,15 @@ type = "event"
 trigger = "the build tables are present"
 system = "the configuration parser"
 action = "load spec and scanner configuration without interpreting the build tables as scanner targets"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-SECTIONS-002"
+title = "The sub-flake table is not scanner configuration"
+manual = false
+design = "design/config-file.md#sub-flake-composition"
+
+[requirements.ears]
+type = "event"
+trigger = "the flakes table is present"
+system = "the configuration parser"
+action = "catalogue and type-validate the sub-flake composition keys without interpreting them as scanner targets"

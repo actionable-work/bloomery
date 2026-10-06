@@ -272,3 +272,27 @@ design = "design/workspace-check.md#batched-realization"
 type = "ubiquitous"
 system = "bloomery check"
 action = "resolve the selected derivations' post-realization output validity in one structured query"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-028"
+title = "Elevated sub-flake checks are discovered"
+manual = false
+design = "design/workspace-check.md#catalog-evaluation"
+
+[requirements.ears]
+type = "event"
+trigger = "the main flake elevates sub-flake checks under checks.<system>"
+system = "bloomery check"
+action = "discover and realize them through the same catalog evaluation as any other check attribute"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-029"
+title = "Aggregate sub-flake checks are one realized check"
+manual = false
+design = "design/workspace-check.md#aggregate-realization"
+
+[requirements.ears]
+type = "event"
+trigger = "the main flake exposes an aggregate sub-flake check"
+system = "bloomery check"
+action = "treat the aggregate as one check whose realization builds every sub-flake check it depends on"

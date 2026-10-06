@@ -25,6 +25,46 @@ doctest = []              # Extra rustdoc flags for doctests.
 rustc = ["-Copt-level=3"] # Extra rustc flags for release compilation.
 test = []                 # Extra rustc flags for test compilation.
 
+[flakes.axum-workspace]
+checks = "aggregate"
+path = "tests/axum-workspace"
+
+[flakes.basic-workspace]
+checks = "aggregate"
+path = "tests/basic-workspace"
+
+[flakes.edge-cases-workspace]
+checks = "aggregate"
+path = "tests/edge-cases-workspace"
+
+[flakes.flake-parts-workspace]
+checks = "aggregate"
+path = "tests/flake-parts-workspace"
+
+[flakes.library-only-workspace]
+checks = "aggregate"
+path = "tests/library-only-workspace"
+
+[flakes.manifest-policy-workspace]
+checks = "aggregate"
+path = "tests/manifest-policy-workspace"
+
+[flakes.nixlib-workspace]
+checks = "aggregate"
+path = "tests/nixlib-workspace"
+
+[flakes.overrides-workspace]
+checks = "aggregate"
+path = "tests/overrides-workspace"
+
+[flakes.single-crate-workspace]
+checks = "aggregate"
+path = "tests/single-crate-workspace"
+
+[flakes.source-isolation-workspace]
+checks = "aggregate"
+path = "tests/source-isolation-workspace"
+
 [profile.release]
 codegenUnits = 1 # release profile: number of codegen units
 lto = "fat"      # release profile: link-time optimization mode

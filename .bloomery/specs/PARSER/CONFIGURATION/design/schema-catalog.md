@@ -144,14 +144,33 @@ total order and rejects cycles, self-references, and names that are neither
 built in nor flake-supplied. Referencing a known formatter that is disabled is
 allowed and the edge is ignored.
 
+### `[flakes]`
+
+Owned by [NIXLIB/FLAKE](../../../NIXLIB/FLAKE/design/composition.md) and
+catalogued for CLI editing and validation. `[flakes]` is a parameterized name
+family: the sub-flake names are repository-defined, so their keys carry no
+recommendation. Every name has the same sub-table shape:
+
+| Key | Type | Recommended default |
+| --- | --- | --- |
+| `flakes.<name>.path` | repository-relative path | none |
+| `flakes.<name>.packages` | boolean | none |
+| `flakes.<name>.apps` | boolean | none |
+| `flakes.<name>.checks` | `"none"`, `"individual"`, or `"aggregate"` | none |
+
+`path` is required when a sub-flake entry is present. No key for any other
+output family is catalogued, so a request to elevate one is an unknown-key
+error.
+
 ## Validation
 
 The CLI validates every catalogued key's TOML type, including the union and
-enum value sets, and rejects unknown keys in a build table. Validation happens
-before any consuming command runs, so a build-table typo fails without Nix
-evaluation. Nix remains authoritative for package-attribute resolution and for
-the evaluation-time semantics of each option; a string that is well-typed but
-does not resolve in nixpkgs still fails at evaluation.
+enum value sets, and rejects unknown keys in a build table or a parameterized
+family. Validation happens before any consuming command runs, so a build-table
+typo fails without Nix evaluation. Nix remains authoritative for
+package-attribute resolution and for the evaluation-time semantics of each
+option; a string that is well-typed but does not resolve in nixpkgs still fails
+at evaluation.
 
 ## Versioning
 

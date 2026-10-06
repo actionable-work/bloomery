@@ -87,3 +87,25 @@ design = "design/repository-layout.md"
 type = "ubiquitous"
 system = "each Rust library crate"
 action = "reside under the shared, cli, or docs category"
+
+[[requirements]]
+id = "REPOSITORY-LAYOUT-STRUCTURE-009"
+title = "Test workspaces are declared as configured sub-flakes"
+manual = false
+design = "design/repository-layout.md#repository-self-composition"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the repository root configuration"
+action = "declare each isolated consumer workspace under tests as a named flakes entry"
+
+[[requirements]]
+id = "REPOSITORY-LAYOUT-STRUCTURE-010"
+title = "Test workspace checks come from sub-flake composition"
+manual = false
+design = "design/repository-layout.md#repository-self-composition"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the repository root flake"
+action = "expose the test workspace checks through mkFlake sub-flake expansion"

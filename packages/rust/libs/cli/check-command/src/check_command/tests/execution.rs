@@ -124,6 +124,31 @@ fn aliased_check_build_requests_rely_on_native_store_deduplication() {
 }
 
 #[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-029"))]
+fn aggregate_sub_flake_check_is_realized_as_one_check() {
+    let (root, cache) = fixture(true);
+    let backend = FakeNix {
+        names: vec!["aggregate:checks".to_owned()],
+        ..FakeNix::default()
+    };
+    let mut args = request();
+    args.selectors = vec!["nix:*".to_owned()];
+    let (status, _stdout, _) = invoke(args, &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::SUCCESS);
+    assert_eq!(backend.realizations.load(Ordering::SeqCst), 1);
+    let store = RunStore::open(&root, Some(&cache)).expect("retained store");
+    let retained = store.latest().expect("latest run").0;
+    let aggregate = retained
+        .outcomes
+        .iter()
+        .find(|outcome| outcome.id == "nix:x86_64-linux:aggregate:checks")
+        .expect("aggregate outcome");
+    assert_eq!(aggregate.outcome, Outcome::Passed);
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
 #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-007"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-008"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-009"))]

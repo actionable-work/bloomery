@@ -36,6 +36,8 @@ substitute for executing the selected Nix checks.
 - Run `nix fmt` before selected checks and stop on formatting failure.
 - Run independent static and Nix work concurrently with bounded scheduling,
   realizing the selected Nix derivations in one batched invocation.
+- Discover and realize checks elevated from configured sub-flakes as ordinary
+  check attributes of the main flake.
 - Complete selected checks unless fail-fast, interruption, or a formatting
   failure prevents execution.
 - Display check completion and deduplicated Nix work metrics only on user

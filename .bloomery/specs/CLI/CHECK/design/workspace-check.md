@@ -63,6 +63,12 @@ dependency metadata in a single structured query, so substitution and build
 activity can be attributed to canonical derivation paths without a query per
 check.
 
+Checks elevated from configured sub-flakes are ordinary attributes under
+`checks.<system>`, so catalog evaluation discovers them with every other
+visible check. An aggregate sub-flake check is one derivation that depends on
+every sub-flake check for its system, so batched realization builds it as one
+selected check and a failing sub-check fails the aggregate.
+
 ## Batched realization
 
 Realize the selected derivation plan with one `nix build --no-link` invocation
