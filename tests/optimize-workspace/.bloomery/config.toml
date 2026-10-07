@@ -1,0 +1,11 @@
+[build]
+devPackages = true
+libPackages = false
+
+[checks]
+noDefaultFeatures = false
+workspaceDependencies = false
+
+[optimize.opt-app]
+enable = true
+script = "scripts/train.sh"

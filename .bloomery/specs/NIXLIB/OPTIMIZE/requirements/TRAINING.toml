@@ -1,0 +1,126 @@
+group = "TRAINING"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-TRAINING-001"
+title = "Training script is a repository-relative path"
+manual = false
+design = "design/optimization.md#training-script"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the optimization option module"
+action = "accept a repository-relative script path for an enabled entry"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-TRAINING-002"
+title = "Training script is an isolated input"
+manual = false
+design = "design/optimization.md#training-script"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the optimized binary builder"
+action = "materialize the training script as an isolated source input of its training derivations"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-TRAINING-003"
+title = "Instrumented binary is on the training PATH"
+manual = false
+design = "design/optimization.md#training-script"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "a training derivation"
+action = "prepend the instrumented binary's directory to the training script's PATH"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-TRAINING-004"
+title = "Training exposes the instrumented binary path"
+manual = false
+design = "design/optimization.md#training-script"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "a training derivation"
+action = "expose the instrumented executable through BLOOMERY_TRAIN_BINARY"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-TRAINING-005"
+title = "Training exposes a profile output directory"
+manual = false
+design = "design/optimization.md#training-script"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "a training derivation"
+action = "expose a build-local profile directory through BLOOMERY_PROFILE_DIR"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-TRAINING-006"
+title = "Training script drives and terminates the workload"
+manual = false
+design = "design/optimization.md#training-script"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the training script"
+action = "exercise the desired code paths and terminate the workload it starts"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-TRAINING-007"
+title = "Per-crate training overrides are configurable"
+manual = false
+design = "design/optimization.md#training-environment"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace option module"
+action = "accept nativeBuildInputs, buildInputs, env, and an additive fixture fileset under a per-crate optimize namespace"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-TRAINING-008"
+title = "Training tools are available on PATH"
+manual = false
+design = "design/optimization.md#training-environment"
+
+[requirements.ears]
+type = "event"
+trigger = "a crate declares training nativeBuildInputs or buildInputs"
+system = "a training derivation"
+action = "expose those packages to the training script"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-TRAINING-009"
+title = "Training fixtures join the training inputs"
+manual = false
+design = "design/optimization.md#training-environment"
+
+[requirements.ears]
+type = "event"
+trigger = "a crate declares an optimize fileset"
+system = "the optimized binary builder"
+action = "union it with the training inputs without replacing the compilation selection"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-TRAINING-010"
+title = "Training environment variables are applied"
+manual = false
+design = "design/optimization.md#training-environment"
+
+[requirements.ears]
+type = "event"
+trigger = "a crate declares optimize env"
+system = "a training derivation"
+action = "set those variables while the training script runs"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-TRAINING-011"
+title = "Runtime dependencies stay on the training PATH"
+manual = false
+design = "design/optimization.md#training-environment"
+
+[requirements.ears]
+type = "event"
+trigger = "the release binary declares runtime tool dependencies"
+system = "a training derivation"
+action = "expose those tools on the training PATH"

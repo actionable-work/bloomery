@@ -190,6 +190,53 @@
   supportBaseConsumer = supportConsumer "base";
   supportUnselectedConsumer = supportConsumer "unselected";
   supportEditedConsumer = supportConsumer "support-edit";
+
+  # Optimization training isolation. Only the training script, fixtures, or
+  # tools change; the release build and its checks must stay put.
+  optimizeRoot = ../tests/optimize-workspace;
+  optimizeBaseArgs = (import ./build-config.nix {inherit pkgs lib;}).load {root = optimizeRoot;};
+  mkOptimize = extra: (import ./mk-workspace.nix {inherit pkgs lib;}) (optimizeBaseArgs // extra);
+  optimizeBase = (import ./mk-workspace.nix {inherit pkgs lib;}) optimizeBaseArgs;
+  optimizeScriptChange = mkOptimize {
+    optimize =
+      optimizeBaseArgs.optimize
+      // {
+        "opt-app" = optimizeBaseArgs.optimize."opt-app" // {script = optimizeRoot + "/scripts/train-alt.sh";};
+      };
+  };
+  optimizeFixtureChange = mkOptimize {
+    overrides =
+      (optimizeBaseArgs.overrides or {})
+      // {
+        "opt-app" =
+          (optimizeBaseArgs.overrides."opt-app" or {})
+          // {
+            optimize = {fileset = optimizeRoot + "/crates/opt-app/training-alt";};
+          };
+      };
+  };
+  optimizeToolChange = mkOptimize {
+    overrides =
+      (optimizeBaseArgs.overrides or {})
+      // {
+        "opt-app" =
+          (optimizeBaseArgs.overrides."opt-app" or {})
+          // {
+            optimize = {nativeBuildInputs = [pkgs.cowsay];};
+          };
+      };
+  };
+  optimizeSourceChange = mkOptimize {
+    overrides =
+      (optimizeBaseArgs.overrides or {})
+      // {
+        "opt-app" =
+          (optimizeBaseArgs.overrides."opt-app" or {})
+          // {
+            src = optimizeRoot + "/alt-src";
+          };
+      };
+  };
 in {
   # NIX-SOURCES-IDENTITY-001 / 002 / 003 / 010
   testUnrelatedContentPreservesRustDerivationIdentity = {
@@ -614,6 +661,54 @@ in {
       crateStableAcrossSupportEdit = true;
       devCrateStableAcrossSupportEdit = true;
       packageStableAcrossSupportEdit = true;
+    };
+  };
+
+  # NIX-SOURCES-FILESETS-012 / 013 / NIX-SOURCES-IDENTITY-011
+  testTrainingOnlyChangesInvalidateOptimized = {
+    expr = {
+      scriptChangesOptimized =
+        optimizeBase.packages."opt-app".drvPath
+        != optimizeScriptChange.packages."opt-app".drvPath;
+      scriptKeepsRelease =
+        optimizeBase.checks."opt-app:bin".drvPath
+        == optimizeScriptChange.checks."opt-app:bin".drvPath;
+      fixtureChangesOptimized =
+        optimizeBase.packages."opt-app".drvPath
+        != optimizeFixtureChange.packages."opt-app".drvPath;
+      fixtureKeepsRelease =
+        optimizeBase.checks."opt-app:bin".drvPath
+        == optimizeFixtureChange.checks."opt-app:bin".drvPath;
+      toolChangesOptimized =
+        optimizeBase.packages."opt-app".drvPath
+        != optimizeToolChange.packages."opt-app".drvPath;
+      toolKeepsRelease =
+        optimizeBase.checks."opt-app:bin".drvPath
+        == optimizeToolChange.checks."opt-app:bin".drvPath;
+    };
+    expected = {
+      scriptChangesOptimized = true;
+      scriptKeepsRelease = true;
+      fixtureChangesOptimized = true;
+      fixtureKeepsRelease = true;
+      toolChangesOptimized = true;
+      toolKeepsRelease = true;
+    };
+  };
+
+  # NIX-SOURCES-IDENTITY-012
+  testCompilationSourceChangesMoveBothIdentities = {
+    expr = {
+      optimizedChanges =
+        optimizeBase.packages."opt-app".drvPath
+        != optimizeSourceChange.packages."opt-app".drvPath;
+      releaseChanges =
+        optimizeBase.checks."opt-app:bin".drvPath
+        != optimizeSourceChange.checks."opt-app:bin".drvPath;
+    };
+    expected = {
+      optimizedChanges = true;
+      releaseChanges = true;
     };
   };
 }

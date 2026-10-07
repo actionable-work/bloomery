@@ -15,6 +15,7 @@
   repositoryLayoutTests = import ./repository-layout.test.nix {inherit lib;};
   templatesSourceTests = import ./templates-source.test.nix {inherit pkgs lib;};
   sourceIsolationTests = import ./source-isolation.test.nix {inherit pkgs lib;};
+  optimizeTests = import ./optimize.test.nix {inherit pkgs lib;};
   graphTests = import ./graph.test.nix {inherit pkgs lib;};
 
   # Aggregate all colocated unit tests
@@ -30,6 +31,7 @@
     // repositoryLayoutTests
     // templatesSourceTests
     // sourceIsolationTests
+    // optimizeTests
     // graphTests;
 
   failedTests = lib.runTests testCases;
@@ -220,6 +222,59 @@ in {
           "NIXLIB-FLAKE-COMPOSITION-018"
           "NIXLIB-FLAKE-COMPOSITION-019"
           "NIXLIB-FLAKE-COMPOSITION-020"
+          "NIX-SOURCES-FILESETS-012"
+          "NIX-SOURCES-FILESETS-013"
+          "NIX-SOURCES-IDENTITY-011"
+          "NIX-SOURCES-IDENTITY-012"
+          "NIXLIB-FLAKE-OPTIONS-020"
+          "NIXLIB-FLAKE-OPTIONS-021"
+          "NIXLIB-FLAKE-OUTPUTS-023"
+          "NIXLIB-FLAKE-OUTPUTS-024"
+          "NIXLIB-FLAKE-OUTPUTS-025"
+          "NIXLIB-OPTIMIZE-PIPELINE-001"
+          "NIXLIB-OPTIMIZE-PIPELINE-002"
+          "NIXLIB-OPTIMIZE-PIPELINE-003"
+          "NIXLIB-OPTIMIZE-PIPELINE-004"
+          "NIXLIB-OPTIMIZE-PIPELINE-005"
+          "NIXLIB-OPTIMIZE-PIPELINE-006"
+          "NIXLIB-OPTIMIZE-PIPELINE-007"
+          "NIXLIB-OPTIMIZE-PIPELINE-008"
+          "NIXLIB-OPTIMIZE-PIPELINE-009"
+          "NIXLIB-OPTIMIZE-PIPELINE-010"
+          "NIXLIB-OPTIMIZE-PIPELINE-011"
+          "NIXLIB-OPTIMIZE-PIPELINE-012"
+          "NIXLIB-OPTIMIZE-PIPELINE-013"
+          "NIXLIB-OPTIMIZE-PIPELINE-014"
+          "NIXLIB-OPTIMIZE-PIPELINE-015"
+          "NIXLIB-OPTIMIZE-PIPELINE-016"
+          "NIXLIB-OPTIMIZE-PIPELINE-017"
+          "NIXLIB-OPTIMIZE-PIPELINE-018"
+          "NIXLIB-OPTIMIZE-PIPELINE-019"
+          "NIXLIB-OPTIMIZE-PIPELINE-020"
+          "NIXLIB-OPTIMIZE-PIPELINE-021"
+          "NIXLIB-OPTIMIZE-PIPELINE-022"
+          "NIXLIB-OPTIMIZE-PIPELINE-023"
+          "NIXLIB-OPTIMIZE-PIPELINE-024"
+          "NIXLIB-OPTIMIZE-PIPELINE-025"
+          "NIXLIB-OPTIMIZE-PIPELINE-026"
+          "NIXLIB-OPTIMIZE-PIPELINE-027"
+          "NIXLIB-OPTIMIZE-PIPELINE-028"
+          "NIXLIB-OPTIMIZE-PIPELINE-029"
+          "NIXLIB-OPTIMIZE-PIPELINE-030"
+          "NIXLIB-OPTIMIZE-PIPELINE-031"
+          "NIXLIB-OPTIMIZE-PIPELINE-032"
+          "NIXLIB-OPTIMIZE-PIPELINE-033"
+          "NIXLIB-OPTIMIZE-TRAINING-001"
+          "NIXLIB-OPTIMIZE-TRAINING-002"
+          "NIXLIB-OPTIMIZE-TRAINING-003"
+          "NIXLIB-OPTIMIZE-TRAINING-004"
+          "NIXLIB-OPTIMIZE-TRAINING-005"
+          "NIXLIB-OPTIMIZE-TRAINING-006"
+          "NIXLIB-OPTIMIZE-TRAINING-007"
+          "NIXLIB-OPTIMIZE-TRAINING-008"
+          "NIXLIB-OPTIMIZE-TRAINING-009"
+          "NIXLIB-OPTIMIZE-TRAINING-010"
+          "NIXLIB-OPTIMIZE-TRAINING-011"
           "CLI-SYNC-LOCKS-045"
         ];
       };

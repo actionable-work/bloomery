@@ -1,0 +1,7 @@
+[dependencies]
+opt-lib = { path = "../opt-lib" }
+
+[package]
+edition = "2021"
+name = "opt-app"
+version = "0.1.0"

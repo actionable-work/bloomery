@@ -1,0 +1,18 @@
+[optimize.disabled-server]
+enable = false
+
+[optimize.my-server]
+enable = true
+script = "scripts/train-my-server.sh"
+
+[optimize.my-server.bolt]
+blocks = true
+enable = true
+functions = false
+
+[optimize.my-server.pgo]
+enable = true
+scope = "all"
+
+[optimize.my-server.systems.x86_64-linux]
+targetCpu = "x86-64-v4"

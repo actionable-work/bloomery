@@ -19,6 +19,10 @@ produces.
 The [Derivation graph](GRAPH/README.md) feature defines how lock data, feature
 resolution, and crate sources become crate, binary, and check derivations.
 
+The [Optimized binary generation](OPTIMIZE/README.md) feature defines how a
+binary is optionally built with profile-guided and BOLT optimization driven by
+a user-provided training script.
+
 ## Boundaries
 
 Source selection and rebuild isolation for those derivations are owned by

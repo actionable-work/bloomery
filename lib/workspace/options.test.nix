@@ -373,4 +373,82 @@ in {
       defaultEnabled = true;
     };
   };
+
+  testOptimizeOptions = {
+    expr = let
+      cfg = options.evalWorkspaceOptions {
+        root = ./.;
+        optimize = {
+          opt-app = {
+            enable = true;
+            script = ./options.test.nix;
+            systems.x86_64-linux.targetCpu = "x86-64-v3";
+            pgo = {
+              enable = true;
+              scope = "all";
+            };
+            bolt = {
+              enable = true;
+              functions = false;
+              blocks = true;
+            };
+          };
+          disabled = {enable = false;};
+        };
+      };
+    in {
+      enable = cfg.optimize.opt-app.enable;
+      script = cfg.optimize.opt-app.script == ./options.test.nix;
+      systemTargetCpu = cfg.optimize.opt-app.systems.x86_64-linux.targetCpu;
+      pgoScope = cfg.optimize.opt-app.pgo.scope;
+      boltFunctions = cfg.optimize.opt-app.bolt.functions;
+      boltBlocks = cfg.optimize.opt-app.bolt.blocks;
+      disabledEnable = cfg.optimize.disabled.enable;
+      disabledScript = cfg.optimize.disabled.script;
+      entryCount = builtins.length (builtins.attrNames cfg.optimize);
+    };
+    expected = {
+      enable = true;
+      script = true;
+      systemTargetCpu = "x86-64-v3";
+      pgoScope = "all";
+      boltFunctions = false;
+      boltBlocks = true;
+      disabledEnable = false;
+      disabledScript = null;
+      entryCount = 2;
+    };
+  };
+
+  testOptimizeOverrideSubmoduleIsSeparateFromCommonInputs = {
+    expr = let
+      cfg = options.evalWorkspaceOptions {
+        root = ./.;
+        overrides = {
+          foo-sys = {
+            nativeBuildInputs = [pkgs.hello];
+            optimize = {
+              nativeBuildInputs = [pkgs.hello];
+              buildInputs = [pkgs.zlib];
+              env = {FOO_OPTIMIZE = "1";};
+              fileset = ./options.test.nix;
+            };
+          };
+        };
+      };
+    in {
+      commonNativeDeps = builtins.length cfg.overrides.foo-sys.nativeBuildInputs;
+      optimizeNativeDeps = builtins.length cfg.overrides.foo-sys.optimize.nativeBuildInputs;
+      optimizeBuildDeps = builtins.length cfg.overrides.foo-sys.optimize.buildInputs;
+      optimizeEnv = cfg.overrides.foo-sys.optimize.env.FOO_OPTIMIZE;
+      hasOptimizeFileset = cfg.overrides.foo-sys.optimize.fileset != null;
+    };
+    expected = {
+      commonNativeDeps = 1;
+      optimizeNativeDeps = 1;
+      optimizeBuildDeps = 1;
+      optimizeEnv = "1";
+      hasOptimizeFileset = true;
+    };
+  };
 }

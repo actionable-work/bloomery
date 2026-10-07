@@ -123,3 +123,25 @@ design = "design/filesets.md#assets-and-auxiliary-trees"
 type = "ubiquitous"
 system = "the Bloomery repository's Nix builders"
 action = "materialize the templates directory as an explicit fileset input of the crate that bundles it"
+
+[[requirements]]
+id = "NIX-SOURCES-FILESETS-012"
+title = "Training inputs are isolated"
+manual = false
+design = "design/filesets.md#training-inputs"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Nix workspace builder"
+action = "materialize a binary's training script and additive optimize fileset as isolated inputs of its optimized derivations"
+
+[[requirements]]
+id = "NIX-SOURCES-FILESETS-013"
+title = "Training inputs stay out of release builds"
+manual = false
+design = "design/filesets.md#training-inputs"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Nix workspace builder"
+action = "keep training scripts, fixtures, and tools confined to the optimized derivations"

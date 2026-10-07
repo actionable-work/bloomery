@@ -82,3 +82,27 @@ type = "unwanted_behavior"
 trigger = "a flakes entry contains a key absent from the schema catalog"
 system = "the configuration loader"
 action = "report a ConfigurationError without evaluating the main or sub-flakes"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-VALIDATION-008"
+title = "Optimization entry keys are type-validated"
+manual = false
+design = "design/schema-catalog.md#validation"
+
+[requirements.ears]
+type = "event"
+trigger = "config.toml contains an optimize entry key"
+system = "the configuration loader"
+action = "validate the enable boolean, the script string, the per-system systems table with its target CPU strings, and the pgo and bolt stage tables before any consuming command runs"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-VALIDATION-009"
+title = "Unsupported optimization entry keys are rejected"
+manual = false
+design = "design/schema-catalog.md#validation"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "an optimize entry contains a key absent from the schema catalog"
+system = "the configuration loader"
+action = "report a ConfigurationError without evaluating the workspace"

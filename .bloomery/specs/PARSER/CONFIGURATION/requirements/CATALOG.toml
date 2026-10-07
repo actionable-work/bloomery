@@ -175,3 +175,25 @@ design = "design/schema-catalog.md#spec-and-scanner-tables"
 type = "ubiquitous"
 system = "the schema catalog"
 action = "catalogue scanners.nix.testPaths with a recommended default of [\"**/*.test.nix\"]"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-017"
+title = "Catalog covers the parameterized optimization table"
+manual = false
+design = "design/schema-catalog.md#optimize"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "include the enable, script, systems, pgo, and bolt keys, and the per-system targetCpu key, for any named entry under the optimize table"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-018"
+title = "Optimization keys carry no recommendation"
+manual = false
+design = "design/schema-catalog.md#optimize"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "omit a recommended default for every optimize key because the binary names are repository-defined"

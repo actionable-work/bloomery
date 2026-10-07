@@ -56,8 +56,8 @@ still supplies `passthru.bloomery` references.
 
 The same file carries the Nix build tables `[build]`, `[toolchain]`,
 `[profile.release]`, `[profile.dev]`, `[flags]`, `[devShell]`, `[checks]`,
-`[features]`, and `[formatters]`. Their semantics and evaluation-time
-resolution are owned by
+`[features]`, and `[formatters]`, plus the parameterized `[optimize]` family.
+Their semantics and evaluation-time resolution are owned by
 [NIXLIB/FLAKE](../../../NIXLIB/FLAKE/design/configuration.md). The CLI catalogs
 the same keys and validates their types and enum value sets during
 configuration loading, so a malformed build key fails before Nix evaluation;

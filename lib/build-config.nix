@@ -100,6 +100,101 @@
       )
       value;
 
+  # Optimization entries are keyed by discovered binary name, so validate each
+  # entry's shape, require a non-empty repository-relative script while a
+  # training stage is enabled, and resolve that script against the workspace
+  # root. The optional `systems`, `pgo`, and `bolt` tables gate the build and
+  # select the optimization stages.
+  checkOptimize = root: value:
+    if !(isAttrs value)
+    then throw "bloomery: [optimize] must be a table in .bloomery/config.toml"
+    else
+      lib.mapAttrs (
+        name: sub: let
+          unknown = filter (key: !(elem key ["enable" "script" "systems" "pgo" "bolt"])) (attrNames sub);
+          enable = sub.enable or true;
+          script = sub.script or null;
+          systems = checkOptimizeSystems name (sub.systems or {});
+          pgo = checkOptimizePgo name (sub.pgo or {});
+          bolt = checkOptimizeBolt name (sub.bolt or {});
+          needsScript = enable && (pgo.enable || bolt.enable);
+        in
+          if !(isAttrs sub)
+          then throw "bloomery: [optimize.${name}] must be a table in .bloomery/config.toml"
+          else if unknown != []
+          then throw "bloomery: unknown key(s) in [optimize.${name}]: ${lib.concatStringsSep ", " unknown}"
+          else if !(builtins.isBool enable)
+          then throw "bloomery: [optimize.${name}].enable must be a boolean"
+          else if needsScript && (!(isString script) || script == "")
+          then throw "bloomery: [optimize.${name}].script must be a non-empty repository-relative path while a training stage is enabled"
+          else if needsScript && (lib.hasPrefix "/" script || elem ".." (lib.splitString "/" script))
+          then throw "bloomery: [optimize.${name}].script must stay inside the workspace root"
+          else {
+            inherit enable systems pgo bolt;
+            script =
+              if needsScript
+              then root + "/${script}"
+              else null;
+          }
+      )
+      value;
+
+  checkOptimizePgo = name: pgo:
+    if !(isAttrs pgo)
+    then throw "bloomery: [optimize.${name}.pgo] must be a table in .bloomery/config.toml"
+    else let
+      unknown = filter (key: !(elem key ["enable" "scope"])) (attrNames pgo);
+      enable = pgo.enable or true;
+      scope = pgo.scope or "workspace";
+    in
+      if unknown != []
+      then throw "bloomery: unknown key(s) in [optimize.${name}.pgo]: ${lib.concatStringsSep ", " unknown}"
+      else if !(builtins.isBool enable)
+      then throw "bloomery: [optimize.${name}.pgo].enable must be a boolean"
+      else if !(elem scope ["workspace" "all"])
+      then throw "bloomery: [optimize.${name}.pgo].scope must be workspace or all"
+      else {inherit enable scope;};
+
+  checkOptimizeBolt = name: bolt:
+    if !(isAttrs bolt)
+    then throw "bloomery: [optimize.${name}.bolt] must be a table in .bloomery/config.toml"
+    else let
+      unknown = filter (key: !(elem key ["enable" "functions" "blocks"])) (attrNames bolt);
+      enable = bolt.enable or true;
+      functions = bolt.functions or true;
+      blocks = bolt.blocks or true;
+    in
+      if unknown != []
+      then throw "bloomery: unknown key(s) in [optimize.${name}.bolt]: ${lib.concatStringsSep ", " unknown}"
+      else if !(builtins.isBool enable)
+      then throw "bloomery: [optimize.${name}.bolt].enable must be a boolean"
+      else if !(builtins.isBool functions)
+      then throw "bloomery: [optimize.${name}.bolt].functions must be a boolean"
+      else if !(builtins.isBool blocks)
+      then throw "bloomery: [optimize.${name}.bolt].blocks must be a boolean"
+      else if enable && !functions && !blocks
+      then throw "bloomery: [optimize.${name}.bolt] must enable functions or blocks"
+      else {inherit enable functions blocks;};
+
+  checkOptimizeSystems = name: systems:
+    if !(isAttrs systems)
+    then throw "bloomery: [optimize.${name}].systems must be a table keyed by system name"
+    else
+      lib.mapAttrs (
+        system: entry: let
+          unknown = filter (key: !(elem key ["targetCpu"])) (attrNames entry);
+          targetCpu = entry.targetCpu or null;
+        in
+          if !(isAttrs entry)
+          then throw "bloomery: [optimize.${name}.systems.${system}] must be a table"
+          else if unknown != []
+          then throw "bloomery: unknown key(s) in [optimize.${name}.systems.${system}]: ${lib.concatStringsSep ", " unknown}"
+          else if targetCpu != null && (!(isString targetCpu) || targetCpu == "")
+          then throw "bloomery: [optimize.${name}.systems.${system}].targetCpu must be a non-empty string"
+          else {inherit targetCpu;}
+      )
+      systems;
+
   resolvePackage = name:
     if !(isString name)
     then throw "bloomery: package values must be strings naming nixpkgs attributes"
@@ -149,6 +244,7 @@
     checks = checkTable "checks" allowedKeys.checks (config.checks or {});
     features = checkTable "features" allowedKeys.features (config.features or {});
     formatters = checkFormatters (config.formatters or {});
+    optimize = checkOptimize root (config.optimize or {});
 
     source =
       (lib.optionalAttrs (build ? cargoToml) {cargoToml = resolvePath root build.cargoToml;})
@@ -189,12 +285,13 @@
       build = buildArgs;
       features = featuresArgs;
       formatters = formatters;
+      inherit optimize;
     }
     // (lib.optionalAttrs (build ? profileName) {profileName = build.profileName;})
     // (lib.optionalAttrs (build ? libPackages) {createLibPackages = build.libPackages;})
     // (lib.optionalAttrs (build ? devPackages) {createDevPackages = build.devPackages;});
 in rec {
-  inherit readConfig resolvePackage resolvePath checkTable checkFormatters checkFlakes;
+  inherit readConfig resolvePackage resolvePath checkTable checkFormatters checkFlakes checkOptimize checkOptimizePgo checkOptimizeBolt checkOptimizeSystems;
   load = toWorkspaceArgs;
   inherit toWorkspaceArgs;
 

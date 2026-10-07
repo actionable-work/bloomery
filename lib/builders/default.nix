@@ -130,4 +130,36 @@
     ),
   }:
     import ./doctest.nix {inherit pkgs lib rustc stdenv mold lld useMold useLld defaultLinker;};
+
+  optimizeToolsWith = {rustc ? pkgs.rustc}:
+    (import ./optimize.nix {inherit pkgs lib;}).resolveTools {inherit rustc;};
+
+  optimizeBinWith = {
+    rustc ? pkgs.rustc,
+    stdenv ? pkgs.stdenv,
+    mold ? pkgs.mold,
+    lld ? pkgs.lld,
+    useMold ? null,
+    useLld ? null,
+    defaultLinker ? (
+      if useLld != null
+      then
+        (
+          if useLld
+          then "lld"
+          else null
+        )
+      else if useMold != null
+      then
+        (
+          if useMold
+          then "mold"
+          else null
+        )
+      else if stdenv.hostPlatform.isLinux
+      then "lld"
+      else null
+    ),
+  }:
+    import ./optimize.nix {inherit pkgs lib rustc stdenv mold lld useMold useLld defaultLinker;};
 }

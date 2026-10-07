@@ -28,6 +28,11 @@ pub struct Config {
     pub features: Option<toml::Value>,
     #[serde(default)]
     pub formatters: Option<toml::Value>,
+    // Per-binary optimized build entries. Owned and evaluated by the flake
+    // interface; kept opaque to the CLI apart from schema cataloguing and type
+    // validation.
+    #[serde(default)]
+    pub optimize: Option<toml::Value>,
     // Sub-flake composition. Owned and evaluated by the flake interface; kept
     // opaque to the CLI apart from schema cataloguing and type validation.
     #[serde(default)]
@@ -650,6 +655,48 @@ mod tests {
             "[flakes.x]\npath = \"tests/x\"\npackages = \"yes\"\n",
             "[flakes.x]\npath = \"tests/x\"\napps = [1]\n",
             "[flakes.x]\npath = \"tests/x\"\nchecks = \"always\"\n",
+        ] {
+            let root = write_config(contents);
+            assert_configuration_error(&root);
+            let _ = fs::remove_dir_all(root);
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-VALIDATION-008"))]
+    fn optimization_entry_keys_are_type_validated() {
+        let root = write_config(
+            "[optimize.my-server]\nenable = true\nscript = \"scripts/train.sh\"\n\n[optimize.my-server.pgo]\nenable = true\nscope = \"all\"\n\n[optimize.my-server.bolt]\nenable = true\nfunctions = false\nblocks = true\n\n[optimize.my-server.systems.x86_64-linux]\ntargetCpu = \"x86-64-v4\"\n",
+        );
+        let config = load(&root).expect("valid optimize table");
+        assert!(config.optimize.is_some());
+        let _ = fs::remove_dir_all(root);
+
+        for contents in [
+            "[optimize.my-server]\nenable = \"yes\"\n",
+            "[optimize.my-server]\nscript = 5\n",
+            "[optimize.my-server]\nsystems = \"x86_64-linux\"\n",
+            "[optimize.my-server.systems.x86_64-linux]\ntargetCpu = 5\n",
+            "[optimize.my-server.pgo]\nscope = \"everything\"\n",
+            "[optimize.my-server.pgo]\nenable = \"yes\"\n",
+            "[optimize.my-server.bolt]\nfunctions = \"yes\"\n",
+        ] {
+            let root = write_config(contents);
+            assert_configuration_error(&root);
+            let _ = fs::remove_dir_all(root);
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-VALIDATION-009"))]
+    fn unsupported_optimization_entry_keys_are_rejected() {
+        for contents in [
+            "[optimize.my-server]\nenable = true\nbogus = true\n",
+            "[optimize.my-server]\nprofile = \"release\"\n",
+            "[optimize.my-server]\ntargetCpu = \"x86-64-v3\"\n",
+            "[optimize.my-server.systems.x86_64-linux]\nenable = true\n",
+            "[optimize.my-server.pgo]\nbogus = true\n",
+            "[optimize.my-server.bolt]\nruns = 2\n",
         ] {
             let root = write_config(contents);
             assert_configuration_error(&root);

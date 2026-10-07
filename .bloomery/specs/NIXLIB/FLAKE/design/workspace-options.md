@@ -41,10 +41,29 @@ lists applied per build phase.
 `overrides` maps crate names or package IDs to per-crate settings: native
 build inputs, build inputs, runtime tool dependencies, rustc and rustdoc flags,
 environment, explicit features, fileset or src, release and dev profile
-fragments, assets, asset directories, and additive test-only inputs. Built-in
+fragments, assets, asset directories, additive test-only inputs, and additive
+training inputs under the `optimize` namespace. Built-in
 sys-crate overrides, colocated `overrides.nix` files, and the `overrides`
 constructor argument merge in that order with explicit values winning. Override
 keys match package IDs, hyphenated names, and underscored names.
+
+## Optimization
+
+`optimize` opts a discovered binary into an optimized build. Each entry is
+keyed by binary name and carries `enable` and a repository-relative `script`
+required while a training stage is enabled. The `pgo` and `bolt` sub-tables
+select the stages independently and `pgo.scope` chooses between workspace-only
+and whole-closure instrumentation. An optional `systems` table keyed by system
+name gates the
+optimized build to listed systems and is the only place to set `targetCpu`,
+which also tunes the final binary when both stages are disabled. The
+stages run in the fixed PGO then BOLT order and the result of the last enabled
+stage replaces the binary's exported package and release app, while
+package checks keep the release build. The per-crate
+override `optimize` namespace carries `nativeBuildInputs`, `buildInputs`, `env`,
+and an additive training fixture `fileset`; these Nix values stay in Nix rather
+than `config.toml`. The pipeline is owned by
+[Optimized binary generation](../../OPTIMIZE/design/optimization.md).
 
 ## Feature resolution
 

@@ -1,0 +1,387 @@
+group = "PIPELINE"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-001"
+title = "Absent optimization configuration builds no optimized binaries"
+manual = false
+design = "design/optimization.md#opt-in-configuration"
+
+[requirements.ears]
+type = "event"
+trigger = "config.toml omits the optimize table"
+system = "the workspace builder"
+action = "build no optimized binary packages"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-002"
+title = "Enabled optimization exports the optimized binary"
+manual = false
+design = "design/optimization.md#outputs"
+
+[requirements.ears]
+type = "event"
+trigger = "an optimize entry is enabled"
+system = "the workspace builder"
+action = "expose the optimized derivation as packages.<system>.<bin> for the named binary"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-003"
+title = "Disabled optimization exports the release binary"
+manual = false
+design = "design/optimization.md#opt-in-configuration"
+
+[requirements.ears]
+type = "event"
+trigger = "an optimize entry sets enable to false"
+system = "the workspace builder"
+action = "expose the release binary as packages.<system>.<bin> for that binary"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-004"
+title = "PGO and BOLT stages are independently selectable"
+manual = false
+design = "design/optimization.md#opt-in-configuration"
+
+[requirements.ears]
+type = "event"
+trigger = "an optimize entry disables PGO or BOLT"
+system = "the workspace builder"
+action = "run only the enabled stages in the fixed PGO then BOLT order and export the result of the last enabled stage"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-005"
+title = "Optimization applies to the whole binary"
+manual = false
+design = "design/optimization.md#outputs"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "apply the optimized build to the binary's release package and release app together"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-006"
+title = "Optimization runs PGO before BOLT"
+manual = false
+design = "design/optimization.md#optimization-pipeline"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the optimized binary builder"
+action = "run PGO before BOLT in the optimization pipeline"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-007"
+title = "PGO builds an instrumented binary"
+manual = false
+design = "design/optimization.md#pgo"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the optimized binary builder"
+action = "compile an instrumented binary with compiler profile generation enabled"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-008"
+title = "PGO merges raw profiles"
+manual = false
+design = "design/optimization.md#pgo"
+
+[requirements.ears]
+type = "event"
+trigger = "the PGO training run completes"
+system = "the optimized binary builder"
+action = "merge the raw profile data into one profile data file"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-009"
+title = "PGO recompiles with the merged profile"
+manual = false
+design = "design/optimization.md#pgo"
+
+[requirements.ears]
+type = "event"
+trigger = "the merged PGO profile exists"
+system = "the optimized binary builder"
+action = "recompile the binary with profile use against the merged profile"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-010"
+title = "BOLT profiles the PGO-optimized binary"
+manual = false
+design = "design/optimization.md#bolt"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the optimized binary builder"
+action = "produce a BOLT-instrumented copy of the PGO-optimized binary"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-011"
+title = "BOLT merges layout profiles"
+manual = false
+design = "design/optimization.md#bolt"
+
+[requirements.ears]
+type = "event"
+trigger = "the BOLT training run completes"
+system = "the optimized binary builder"
+action = "merge the layout profile data"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-012"
+title = "BOLT rewrites the binary from merged profiles"
+manual = false
+design = "design/optimization.md#bolt"
+
+[requirements.ears]
+type = "event"
+trigger = "the merged BOLT profile exists"
+system = "the optimized binary builder"
+action = "rewrite the profiled binary with BOLT using the merged layout profile"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-013"
+title = "BOLT collects profiles without perf"
+manual = false
+design = "design/optimization.md#bolt"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the BOLT pipeline"
+action = "collect layout profiles with BOLT instrumentation instead of perf or kernel profiling access"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-014"
+title = "BOLT function reordering preserves relocations"
+manual = false
+design = "design/optimization.md#bolt"
+
+[requirements.ears]
+type = "event"
+trigger = "an optimize entry enables BOLT function reordering"
+system = "a BOLT-enabled binary build"
+action = "link with relocations preserved and without stripping the binary"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-015"
+title = "Optimized builds share the release inputs"
+manual = false
+design = "design/optimization.md#optimization-pipeline"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the optimized binary builder"
+action = "compile from the release binary's selected sources, resolved features, toolchain, and active profile"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-016"
+title = "Optimized packages keep the default selection"
+manual = false
+design = "design/optimization.md#outputs"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "point packages.default at the optimized derivation when its binary is the preferred default binary"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-017"
+title = "Dev apps remain dev builds"
+manual = false
+design = "design/optimization.md#outputs"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "keep dev apps on the dev profile while release apps use the optimized binary"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-018"
+title = "Optimized binaries are not checks"
+manual = false
+design = "design/optimization.md#outputs"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "keep optimized binaries and their training runs out of checks and bloomery check"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-019"
+title = "Optimized binaries keep runtime dependencies"
+manual = false
+design = "design/optimization.md#outputs"
+
+[requirements.ears]
+type = "event"
+trigger = "the release binary declares runtime tool dependencies"
+system = "the optimized binary builder"
+action = "wrap the optimized executable with the same runtime tool dependencies"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-020"
+title = "Unknown optimization binary names fail evaluation"
+manual = false
+design = "design/optimization.md#validation"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "an optimize entry names a binary that is not a discovered workspace binary"
+system = "the workspace builder"
+action = "fail evaluation with a bloomery-prefixed error"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-021"
+title = "Enabled optimization entries require a script"
+manual = false
+design = "design/optimization.md#validation"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "an enabled optimize entry omits its script or sets it to an empty path"
+system = "the workspace builder"
+action = "fail evaluation with a bloomery-prefixed error"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-022"
+title = "Optimization scripts must exist inside the workspace"
+manual = false
+design = "design/optimization.md#validation"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "an optimize entry names a script outside the workspace root or absent from the repository"
+system = "the workspace builder"
+action = "fail evaluation with a bloomery-prefixed error"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-023"
+title = "Release apps use the optimized binary"
+manual = false
+design = "design/optimization.md#outputs"
+
+[requirements.ears]
+type = "event"
+trigger = "an optimize entry is enabled"
+system = "the workspace builder"
+action = "point apps.<system>.<bin>, and apps.default when that binary is the preferred default, at the optimized derivation"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-024"
+title = "Optimization accepts per-system target CPUs"
+manual = false
+design = "design/optimization.md#opt-in-configuration"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the optimization option module"
+action = "accept an optional non-empty targetCpu string per system that overrides the active profile's target CPU for that system's builds"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-025"
+title = "Target CPU applies to both compilations"
+manual = false
+design = "design/optimization.md#optimization-pipeline"
+
+[requirements.ears]
+type = "event"
+trigger = "an optimize entry sets targetCpu"
+system = "the optimized binary builder"
+action = "apply the target CPU to both the instrumented and optimized compilations"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-026"
+title = "Optimization requires matching build and target platforms"
+manual = false
+design = "design/optimization.md#validation"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "an optimize entry is enabled on a selected system whose build platform differs from its target platform"
+system = "the workspace builder"
+action = "fail evaluation with a bloomery-prefixed error before any derivation is realized"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-027"
+title = "Unresolvable optimization tools fail evaluation"
+manual = false
+design = "design/optimization.md#validation"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "an enabled optimize entry's profiling or BOLT tools do not resolve for the selected toolchain"
+system = "the workspace builder"
+action = "fail evaluation with a bloomery-prefixed error before any derivation is realized"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-028"
+title = "Optimization can be restricted to selected systems"
+manual = false
+design = "design/optimization.md#opt-in-configuration"
+
+[requirements.ears]
+type = "event"
+trigger = "an optimize entry lists a non-empty systems table"
+system = "the workspace builder"
+action = "optimize the binary only on listed systems and expose the release binary on other systems"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-029"
+title = "Per-system target CPU overrides the active profile"
+manual = false
+design = "design/optimization.md#opt-in-configuration"
+
+[requirements.ears]
+type = "event"
+trigger = "a system entry under optimize systems sets targetCpu"
+system = "the optimized binary builder"
+action = "apply that target CPU to that system's tuned, instrumented, and optimized compilations"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-030"
+title = "PGO scope can cover the whole dependency closure"
+manual = false
+design = "design/optimization.md#pgo"
+
+[requirements.ears]
+type = "event"
+trigger = "an optimize entry sets the PGO scope to all"
+system = "the optimized binary builder"
+action = "rebuild every crate in the binary's dependency closure with profile generation and profile use"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-031"
+title = "BOLT function reordering is optional"
+manual = false
+design = "design/optimization.md#bolt"
+
+[requirements.ears]
+type = "event"
+trigger = "an optimize entry disables BOLT function reordering"
+system = "the optimized binary builder"
+action = "rewrite the binary with block reordering only and without relocation-preserving links"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-032"
+title = "Disabling every optimization stage exports the untuned release binary"
+manual = false
+design = "design/optimization.md#opt-in-configuration"
+
+[requirements.ears]
+type = "event"
+trigger = "an optimize entry disables both PGO and BOLT without a per-system target CPU"
+system = "the workspace builder"
+action = "expose the release binary and require no training script or optimization tools"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-033"
+title = "Target CPU tuning applies without PGO or BOLT"
+manual = false
+design = "design/optimization.md#opt-in-configuration"
+
+[requirements.ears]
+type = "event"
+trigger = "a system entry sets targetCpu while both PGO and BOLT are disabled"
+system = "the workspace builder"
+action = "build and export a target-CPU-tuned binary instead of the untuned release binary"

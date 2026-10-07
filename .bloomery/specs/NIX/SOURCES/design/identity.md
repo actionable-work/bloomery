@@ -27,6 +27,7 @@ crate derivations do not depend on unrelated local workspace content.
 | Unselected README, standalone prose, or `.bloomery/specs` content | No generated Rust package or Rust check changes identity. |
 | Selected Rust source or embedded Markdown | Owning member's consuming derivations and active transitive dependents; unrelated members remain stable. |
 | Test-only fixture or test-support file | Consuming tests; production packages remain stable. |
+| Training script, training fixtures, or training tools | Optimized package and app derivations; the release build and its checks remain stable. |
 | Bundled asset | Derivations consuming or installing that asset and their dependents; unrelated crate compilation remains stable. |
 | Manifest, lock metadata, profile, feature, or toolchain | Derivations whose effective build inputs change. |
 

@@ -7,16 +7,20 @@ system.
 
 `packages` contains one derivation per discovered binary named `<bin>`,
 `<crate>:lib` for libraries when library packages are enabled, and `default`
-pointing at the preferred binary. Dev-profile binaries are never packages.
+pointing at the preferred binary. For a binary enabled in `[optimize]`, `<bin>`
+is the optimized derivation. Dev-profile binaries are never packages.
 `default` prefers a binary named `default` and otherwise uses the first
-discovered binary.
+discovered binary. Package checks for an optimized binary continue to use the
+release build.
 
 ## Apps
 
 `apps` contains runnable release binaries named `<bin>`, dev-profile binaries
 named `<bin>:dev` when dev packages are enabled, documentation servers named
-`<crate>:doc`, and `default` for the preferred binary. Each app is an attribute
-set with `type = "app"` and a `program` path.
+`<crate>:doc`, and `default` for the preferred binary. For a binary enabled in
+`[optimize]`, the `<bin>` app is the optimized derivation; dev apps remain
+dev-profile builds. Each app is an attribute set with `type = "app"` and a
+`program` path.
 
 ## Checks
 

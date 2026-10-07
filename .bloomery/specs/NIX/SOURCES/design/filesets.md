@@ -91,3 +91,14 @@ that ships `bloomery init`. It lives outside that crate's directory, so an
 explicit fileset selects it and materializes it at a stable path. Template edits
 change only derivations that bundle the catalog. Templates are scaffolding
 inputs, not workspace member sources, and remain outside scanner targets.
+
+## Training inputs
+
+An optimized binary's training inputs are selected independently of the
+compilation fileset. The training script named in `[optimize.<bin>].script` is
+materialized as an isolated tree, and a crate override's additive
+`optimize.fileset` is unioned with the training inputs without replacing the
+compilation selection. Training tool packages come from the crate's
+`optimize.nativeBuildInputs` and `optimize.buildInputs`. Training inputs are
+confined to the optimized derivations and never enter the release or dev
+compilation used by dev apps and checks.

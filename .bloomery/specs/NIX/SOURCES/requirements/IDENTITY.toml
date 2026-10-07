@@ -117,3 +117,27 @@ design = "design/identity.md#automated-verification"
 type = "ubiquitous"
 system = "the mkFlake workspace integration"
 action = "preserve source and Rust derivation identity across equivalent workspace snapshots that differ only in unselected content"
+
+[[requirements]]
+id = "NIX-SOURCES-IDENTITY-011"
+title = "Training-only changes preserve release identities"
+manual = false
+design = "design/identity.md#invalidation-boundaries"
+
+[requirements.ears]
+type = "event"
+trigger = "only the training script, training fixtures, or training tools change"
+system = "the Nix workspace builder"
+action = "change the optimized package and app identities while preserving the release build and its checks"
+
+[[requirements]]
+id = "NIX-SOURCES-IDENTITY-012"
+title = "Compilation source changes invalidate optimized binaries"
+manual = false
+design = "design/identity.md#invalidation-boundaries"
+
+[requirements.ears]
+type = "event"
+trigger = "a member's selected compilation source changes"
+system = "the Nix workspace builder"
+action = "change both the release and optimized binary identities"

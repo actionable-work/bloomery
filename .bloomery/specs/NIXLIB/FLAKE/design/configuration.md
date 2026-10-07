@@ -8,8 +8,8 @@ constructor or in `overrides.nix`.
 
 Build settings live in top-level tables: `[build]`, `[toolchain]`,
 `[profile.release]`, `[profile.dev]`, `[flags]`, `[devShell]`, `[checks]`,
-`[features]`, and `[formatters]`. The `[specs]` and `[scanners.*]` tables
-belong to the CLI; the flake interface ignores them.
+`[features]`, `[formatters]`, and `[optimize]`. The `[specs]` and `[scanners.*]`
+tables belong to the CLI; the flake interface ignores them.
 
 The CLI catalogs and type-validates the build keys before evaluation, using the
 [schema catalog](../../../PARSER/CONFIGURATION/design/schema-catalog.md). The
@@ -138,6 +138,42 @@ noDefaultFeatures = true
 cratesIoIndex = "crates-io-index"
 ```
 
+## Optimization
+
+`[optimize]` is a parameterized build table keyed by discovered binary name.
+Each `[optimize.<bin>]` entry carries an `enable` boolean and a
+repository-relative `script` required while a training stage is enabled. The
+`pgo` and `bolt` sub-tables select the PGO and BOLT stages
+independently, and `pgo.scope` chooses whether PGO rebuilds the workspace crates
+or the whole dependency closure. The table is
+absent by default and builds no optimized binaries; an enabled entry replaces
+the binary's exported package and
+release app. An optional `[optimize.<bin>.systems.<system>]` table gates the
+optimized build to listed systems and is the only place to set `targetCpu`; a
+per-system `targetCpu` also tunes the final binary when both stages are
+disabled. The
+pipeline, training contract, output replacement, and
+validation semantics are owned
+by [Optimized binary generation](../../OPTIMIZE/design/optimization.md).
+
+```toml
+[optimize.my-server]
+enable = true
+script = "scripts/train-my-server.sh"
+
+[optimize.my-server.pgo]
+enable = true
+scope = "workspace"
+
+[optimize.my-server.bolt]
+enable = true
+functions = false
+blocks = true
+
+[optimize.my-server.systems.x86_64-linux]
+targetCpu = "x86-64-v3"
+```
+
 ## Formatters
 
 `[formatters]` tunes the formatter set and its ordering graph. Each known
@@ -169,6 +205,9 @@ arbitrary Nix values and are not represented in `config.toml`.
 An absent configuration file, a syntactically invalid file, an option value of
 the wrong type, an unknown key in a build table, a formatter ordering cycle, a
 formatter self-reference, an ordering edge naming a formatter that is neither
-built in nor supplied by the flake, and a package reference that does not
-resolve in nixpkgs all fail evaluation with a `bloomery:`-prefixed message.
+built in nor supplied by the flake, an enabled optimize entry that names an
+unknown binary, lacks a script, or targets a platform
+that differs from its build platform, and a package
+reference that does not resolve in nixpkgs all fail evaluation with a
+`bloomery:`-prefixed message.
 Bloomery never substitutes defaults for a broken configuration file.

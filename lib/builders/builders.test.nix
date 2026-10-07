@@ -123,6 +123,22 @@
     defaultRustcFlags = [];
     override.runtimeDependencies = [pkgs.hello];
   };
+  prebuiltBin = pkgs.runCommand "prebuilt-bin-fixture" {} ''
+    mkdir -p "$out/bin"
+    printf 'prebuilt' > "$out/bin/bin-fixture"
+  '';
+  prebuiltBinDrv = (builderExports.buildBinWith {defaultLinker = null;}) {
+    binName = "bin-fixture";
+    pkg = {
+      name = "bin-fixture";
+      version = "0.1.0";
+      crateName = "bin_fixture";
+    };
+    src = source;
+    entry = "src/main.rs";
+    defaultRustcFlags = [];
+    prebuilt = prebuiltBin;
+  };
 in {
   testProcMacroBuildersHandleMissingMetadata = {
     expr = let
@@ -291,6 +307,23 @@ in {
       wraps = true;
       carriesWrapperInput = true;
       plainBinaryNotWrapped = true;
+    };
+  };
+
+  testBinaryBuilderInstallsPrebuiltWithoutCompiling = {
+    expr = {
+      copiesPrebuilt = lib.hasInfix "prebuilt-bin-fixture" prebuiltBinDrv.buildPhase;
+      skipsRustc = !(lib.hasInfix "$RUSTC" prebuiltBinDrv.buildPhase);
+      skipsUnpack = !(lib.hasInfix "tar -xzf" prebuiltBinDrv.unpackPhase);
+      skipsConfigure = !(lib.hasInfix "--extern" prebuiltBinDrv.configurePhase);
+      keepsInstall = lib.hasInfix "$out/bin" prebuiltBinDrv.installPhase;
+    };
+    expected = {
+      copiesPrebuilt = true;
+      skipsRustc = true;
+      skipsUnpack = true;
+      skipsConfigure = true;
+      keepsInstall = true;
     };
   };
 }

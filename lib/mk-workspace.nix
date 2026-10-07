@@ -124,6 +124,16 @@ in
         else a.fileset or null;
     };
 
+    mergeOptimizeOverrides = a: b: {
+      nativeBuildInputs = (a.nativeBuildInputs or []) ++ (b.nativeBuildInputs or []);
+      buildInputs = (a.buildInputs or []) ++ (b.buildInputs or []);
+      env = (a.env or {}) // (b.env or {});
+      fileset =
+        if b ? fileset && b.fileset != null
+        then b.fileset
+        else a.fileset or null;
+    };
+
     mergeOverrides = a: b: let
       mergedFeats =
         if b ? features && b.features != null
@@ -153,6 +163,7 @@ in
             then b.fileset
             else a.fileset or null;
           test = mergeTestOverrides (a.test or {}) (b.test or {});
+          optimize = mergeOptimizeOverrides (a.optimize or {}) (b.optimize or {});
         })
       ["features"]
       // lib.optionalAttrs (mergedFeats != null) {
@@ -235,6 +246,7 @@ in
     builderCrate = builders.buildCrateWith {inherit rustc stdenv mold lld defaultLinker;};
     builderBin = builders.buildBinWith {inherit rustc stdenv mold lld defaultLinker;};
     builderTest = builders.testCrateWith {inherit rustc stdenv mold lld defaultLinker;};
+    builderOptimize = builders.optimizeBinWith {inherit rustc stdenv mold lld defaultLinker;};
     builderClippy = builders.clippyCrateWith {inherit rustc clippy stdenv;};
     builderDoc = builders.docCrateWith {inherit rustc stdenv;};
     builderDocTest = builders.doctestCrateWith {inherit rustc stdenv mold lld defaultLinker;};
@@ -518,6 +530,56 @@ in
       context)
     lockContexts;
 
+    # Profile variants of the crate graph. Workspace crates are rebuilt with the
+    # extra PGO flags so profile data covers the CLI logic; registry crates reuse
+    # the release build because we cannot recompile third-party codegen anyway.
+    mkGlobalProfileCrates = {
+      extraFlags,
+      variantName,
+      scope ? "workspace",
+    }: let
+      graph = lib.mapAttrs (pkgKey: _: let
+        pkg = parsed.byId.${pkgKey};
+      in
+        if scope == "all" || pkg.isWorkspace
+        then
+          mkCrateNode {
+            key = pkgKey;
+            package = pkgKey;
+            rustFlags = defaultRustcFlags ++ extraFlags;
+            resolveDep = dep: graph.${dep};
+            inherit variantName;
+          }
+        else globalCrates.${pkgKey})
+      parsed.byId;
+    in
+      graph;
+
+    mkContextProfileCrates = {
+      extraFlags,
+      variantName,
+      root,
+      scope ? "workspace",
+    }: let
+      context = lockContexts.${root};
+      graph = lib.mapAttrs (pkgKey: entry: let
+        pkg = parsed.byId.${pkgKey};
+      in
+        if scope == "all" || pkg.isWorkspace
+        then
+          mkCrateNode {
+            key = pkgKey;
+            package = pkgKey;
+            inherit (entry) features dependencies;
+            rustFlags = defaultRustcFlags ++ extraFlags;
+            resolveDep = dep: graph.${dep};
+            variantName = "${root}-${variantName}";
+          }
+        else contextCrates.${root}.${pkgKey})
+      context;
+    in
+      graph;
+
     contextDevCrates =
       if createDevPackages
       then
@@ -555,6 +617,16 @@ in
       if unifyFeatures || !(lockContexts ? ${root})
       then getDepIds id defaultDepIds
       else lockContexts.${root}.${id}.dependencies or [];
+
+    profileCratesFor = {
+      extraFlags,
+      variantName,
+      root,
+      scope ? "workspace",
+    }:
+      if unifyFeatures || !(lockContexts ? ${root})
+      then mkGlobalProfileCrates {inherit extraFlags variantName scope;}
+      else mkContextProfileCrates {inherit extraFlags variantName root scope;};
 
     # Public crates expose the global unified view.
     crates = globalCrates;
@@ -610,8 +682,67 @@ in
           buildBinary = {
             binName,
             entry,
-          }: {
-            name = binName;
+          }: let
+            optimizeEntry = cfg.optimize.${binName} or null;
+            optimizeSystems =
+              if optimizeEntry == null
+              then {}
+              else optimizeEntry.systems;
+            optimizeSystemConfig = optimizeSystems.${stdenv.hostPlatform.system} or null;
+            optimizeSystemEnabled = optimizeSystems == {} || optimizeSystemConfig != null;
+            optimizePgo =
+              if optimizeEntry == null
+              then {}
+              else optimizeEntry.pgo;
+            optimizeBolt =
+              if optimizeEntry == null
+              then {}
+              else optimizeEntry.bolt;
+            pgoSelected = optimizePgo.enable or true;
+            boltSelected = optimizeBolt.enable or true;
+            stagesSelected = pgoSelected || boltSelected;
+            optimizeTargetCpu =
+              if optimizeSystemConfig != null && optimizeSystemConfig.targetCpu != null
+              then optimizeSystemConfig.targetCpu
+              else null;
+            tuningSelected = optimizeTargetCpu != null;
+            optimizeEnabled =
+              optimizeEntry
+              != null
+              && optimizeEntry.enable
+              && optimizeSystemEnabled
+              && (stagesSelected || tuningSelected);
+            pgoEnabled = optimizeEnabled && pgoSelected;
+            boltEnabled = optimizeEnabled && boltSelected;
+            needsScript = pgoEnabled || boltEnabled;
+            pgoScope = optimizePgo.scope or "workspace";
+            optimizeOverride = cOverride.optimize or {};
+            optimizedProfile =
+              if optimizeTargetCpu != null
+              then effectiveBinaryProfile // {targetCpu = optimizeTargetCpu;}
+              else effectiveBinaryProfile;
+            # Workspace dependency closure recompiled with PGO flags. Registry
+            # crates stay on the release build unless the scope is `all`.
+            profileVariantArgs = extraFlags: variantName: let
+              variantCrates = profileCratesFor {
+                inherit extraFlags variantName;
+                root = wpkg.id;
+                scope = pgoScope;
+              };
+              variantDeps = map (depId: variantCrates.${depId}) (getDepIds wpkg.id wpkg.depIds);
+              variantCrateDrv =
+                if hasLib
+                then (variantCrates.${wpkg.id} or null)
+                else null;
+            in {
+              crateDrv = variantCrateDrv;
+              dependencies = variantDeps;
+            };
+            instrumentedVariant = profileVariantArgs ["-Cprofile-generate"] "pgo-generate";
+            mkProfileUseVariant = merged:
+              profileVariantArgs
+              ["-Cprofile-use=${merged}" "-Cllvm-args=-pgo-warn-missing-function"]
+              "pgo-use";
             drv = builderBin {
               inherit binName entry;
               pkg = wpkg;
@@ -623,6 +754,50 @@ in
               profile = effectiveBinaryProfile;
               inherit defaultRustcFlags;
             };
+            optimized =
+              if !optimizeEnabled
+              then null
+              else if needsScript && optimizeEntry.script == null
+              then throw "bloomery: [optimize.${binName}].script is required while a training stage is enabled"
+              else if needsScript && !(builtins.pathExists optimizeEntry.script)
+              then throw "bloomery: [optimize.${binName}].script does not exist: ${toString optimizeEntry.script}"
+              else if stdenv.buildPlatform.system != stdenv.hostPlatform.system
+              then throw "bloomery: [optimize.${binName}] requires matching build and target platforms"
+              else
+                builderOptimize.build {
+                  inherit binName;
+                  pkg = wpkg;
+                  src = buildPath;
+                  inherit entry crateDrv edition;
+                  inherit workspaceAssets workspaceStatic workspacePublic;
+                  dependencies = depDrvs;
+                  override = materializedOverride;
+                  profile = optimizedProfile;
+                  inherit defaultRustcFlags;
+                  inherit root;
+                  script = optimizeEntry.script;
+                  pgo = optimizePgo;
+                  bolt = optimizeBolt;
+                  crateDir = cratePath;
+                  fixtureFileset = optimizeOverride.fileset or null;
+                  trainingNativeBuildInputs = optimizeOverride.nativeBuildInputs or [];
+                  trainingBuildInputs = optimizeOverride.buildInputs or [];
+                  trainingEnv = optimizeOverride.env or {};
+                  instrumentedCrateDrv = instrumentedVariant.crateDrv;
+                  instrumentedDependencies = instrumentedVariant.dependencies;
+                  mkProfileUseDeps = mkProfileUseVariant;
+                };
+            optimizedDrv =
+              if optimized != null
+              then optimized.package
+              else null;
+            packageDrv =
+              if optimizedDrv != null
+              then optimizedDrv
+              else drv;
+          in {
+            name = binName;
+            inherit drv optimized optimizedDrv packageDrv;
             devDrv =
               if createDevPackages
               then
@@ -721,16 +896,35 @@ in
       )
       selectedWorkspacePackages;
 
-    # Binary package outputs (release only; dev variants are apps).
-    binPackages =
-      lib.foldl' (
-        acc: b:
-          acc
-          // {
-            "${b.name}" = b.drv;
-          }
-      ) {}
-      workspaceBinaries;
+    # Per-binary optimization pipeline stages, keyed by binary name. Empty
+    # when no binary is enabled for optimization.
+    optimizedBinaries = lib.listToAttrs (
+      map (b: {
+        name = b.name;
+        value = b.optimized;
+      })
+      (builtins.filter (b: b.optimized != null) workspaceBinaries)
+    );
+
+    # Binary package outputs (release only; dev variants are apps). An enabled
+    # `[optimize]` entry replaces its release package with the optimized
+    # derivation. Unknown optimization binary names fail evaluation here.
+    binPackages = let
+      unknownOptimizeNames = builtins.filter (name: !(builtins.elem name (map (b: b.name) workspaceBinaries))) (
+        builtins.attrNames cfg.optimize
+      );
+    in
+      if unknownOptimizeNames != []
+      then throw "bloomery: [optimize] names unknown binaries: ${lib.concatStringsSep ", " unknownOptimizeNames}"
+      else
+        lib.foldl' (
+          acc: b:
+            acc
+            // {
+              "${b.name}" = b.packageDrv;
+            }
+        ) {}
+        workspaceBinaries;
 
     # Library package outputs for workspace libraries.
     # These are kept separately from the public package set so library checks and
@@ -911,7 +1105,7 @@ in
           // {
             "${b.name}" = {
               type = "app";
-              program = "${b.drv}/bin/${b.name}";
+              program = "${b.packageDrv}/bin/${b.name}";
             };
           }
           // lib.optionalAttrs createDevPackages {
@@ -944,7 +1138,7 @@ in
         headBin = builtins.head workspaceBinaries;
       in {
         type = "app";
-        program = "${headBin.drv}/bin/${headBin.name}";
+        program = "${headBin.packageDrv}/bin/${headBin.name}";
       }
       else null;
 
@@ -1036,7 +1230,7 @@ in
       if binPackages ? default
       then binPackages.default
       else if workspaceBinaries != []
-      then (builtins.head workspaceBinaries).drv
+      then (builtins.head workspaceBinaries).packageDrv
       else null;
   in {
     # All compiled rlibs (DAG) - release and dev variants
@@ -1079,6 +1273,9 @@ in
 
     # Parsed lockfile representation
     lock = parsed;
+
+    # Optimization pipeline stage derivations keyed by binary name.
+    inherit optimizedBinaries;
 
     # Evaluated and typed workspace options
     config = cfg;

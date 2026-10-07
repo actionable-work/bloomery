@@ -282,6 +282,182 @@ in {
     expected = true;
   };
 
+  testOptimizeTableIsMapped = {
+    expr = let
+      config = loader.readConfig ../tests/config-fixtures/optimize;
+      cfg = options.evalWorkspaceOptions (loader.toWorkspaceArgs {
+        root = ../tests/config-fixtures/optimize;
+        inherit config;
+      });
+    in {
+      enabled = cfg.optimize.my-server.enable;
+      script = cfg.optimize.my-server.script == ../tests/config-fixtures/optimize + "/scripts/train-my-server.sh";
+      systemTargetCpu = cfg.optimize.my-server.systems.x86_64-linux.targetCpu;
+      pgoEnable = cfg.optimize.my-server.pgo.enable;
+      pgoScope = cfg.optimize.my-server.pgo.scope;
+      boltEnable = cfg.optimize.my-server.bolt.enable;
+      boltFunctions = cfg.optimize.my-server.bolt.functions;
+      boltBlocks = cfg.optimize.my-server.bolt.blocks;
+      disabledScript = cfg.optimize.disabled-server.script;
+      entryCount = builtins.length (builtins.attrNames cfg.optimize);
+    };
+    expected = {
+      enabled = true;
+      script = true;
+      systemTargetCpu = "x86-64-v4";
+      pgoEnable = true;
+      pgoScope = "all";
+      boltEnable = true;
+      boltFunctions = false;
+      boltBlocks = true;
+      disabledScript = null;
+      entryCount = 2;
+    };
+  };
+
+  testOptimizeInvalidShapesFail = {
+    expr = map fails [
+      (loader.toWorkspaceArgs {
+        root = ./.;
+        config.optimize = "not-a-table";
+      })
+      (loader.toWorkspaceArgs {
+        root = ./.;
+        config.optimize.my-server = "not-a-table";
+      })
+      (loader.toWorkspaceArgs {
+        root = ./.;
+        config.optimize.my-server = {
+          enable = "yes";
+          script = "train.sh";
+        };
+      })
+      (loader.toWorkspaceArgs {
+        root = ./.;
+        config.optimize.my-server = {
+          enable = true;
+          script = "train.sh";
+          bogus = true;
+        };
+      })
+      (loader.toWorkspaceArgs {
+        root = ./.;
+        config.optimize.my-server = {
+          enable = true;
+          targetCpu = "";
+        };
+      })
+      (loader.toWorkspaceArgs {
+        root = ./.;
+        config.optimize.my-server = {
+          enable = true;
+          script = "train.sh";
+          systems = "x86_64-linux";
+        };
+      })
+      (loader.toWorkspaceArgs {
+        root = ./.;
+        config.optimize.my-server = {
+          enable = true;
+          script = "train.sh";
+          systems.x86_64-linux.targetCpu = 5;
+        };
+      })
+      (loader.toWorkspaceArgs {
+        root = ./.;
+        config.optimize.my-server = {
+          enable = true;
+          script = "train.sh";
+          systems.x86_64-linux.bogus = true;
+        };
+      })
+      (loader.toWorkspaceArgs {
+        root = ./.;
+        config.optimize.my-server = {
+          enable = true;
+          script = "train.sh";
+          pgo = {scope = "everything";};
+        };
+      })
+      (loader.toWorkspaceArgs {
+        root = ./.;
+        config.optimize.my-server = {
+          enable = true;
+          script = "train.sh";
+          bolt = {
+            functions = false;
+            blocks = false;
+          };
+        };
+      })
+    ];
+    expected = [true true true true true true true true true true];
+  };
+
+  testOptimizeScriptValidation = {
+    expr = let
+      disabledCfg = options.evalWorkspaceOptions (loader.toWorkspaceArgs {
+        root = ./.;
+        config.optimize.my-server = {enable = false;};
+      });
+      stagesDisabledCfg = options.evalWorkspaceOptions (loader.toWorkspaceArgs {
+        root = ./.;
+        config.optimize.my-server = {
+          enable = true;
+          pgo = {enable = false;};
+          bolt = {enable = false;};
+        };
+      });
+    in {
+      # Enabled entries with a training stage require a non-empty script.
+      enabledWithoutScript = fails (loader.toWorkspaceArgs {
+        root = ./.;
+        config.optimize.my-server = {enable = true;};
+      });
+      emptyScript = fails (loader.toWorkspaceArgs {
+        root = ./.;
+        config.optimize.my-server = {
+          enable = true;
+          script = "";
+        };
+      });
+      # Scripts must stay inside the workspace root.
+      escapingScript = fails (loader.toWorkspaceArgs {
+        root = ./.;
+        config.optimize.my-server = {
+          enable = true;
+          script = "../escape.sh";
+        };
+      });
+      absoluteScript = fails (loader.toWorkspaceArgs {
+        root = ./.;
+        config.optimize.my-server = {
+          enable = true;
+          script = "/absolute.sh";
+        };
+      });
+      # A disabled entry does not require a script.
+      disabledIsAccepted =
+        disabledCfg.optimize.my-server.enable
+        == false
+        && disabledCfg.optimize.my-server.script == null;
+      # An entry with every stage disabled needs no script either.
+      stagesDisabledAccept =
+        stagesDisabledCfg.optimize.my-server.script
+        == null
+        && stagesDisabledCfg.optimize.my-server.pgo.enable == false
+        && stagesDisabledCfg.optimize.my-server.bolt.enable == false;
+    };
+    expected = {
+      enabledWithoutScript = true;
+      emptyScript = true;
+      escapingScript = true;
+      absoluteScript = true;
+      disabledIsAccepted = true;
+      stagesDisabledAccept = true;
+    };
+  };
+
   testFlakeElevationDefaults = {
     expr = let
       flakes = loader.checkFlakes {

@@ -120,6 +120,40 @@ default because omission delegates to `Cargo.toml` and rustc defaults.
 | --- | --- | --- |
 | `features.cratesIoIndex` | repository-relative path, absent means none | none |
 
+### `[optimize]`
+
+Owned by
+[NIXLIB/OPTIMIZE](../../../NIXLIB/OPTIMIZE/design/optimization.md#opt-in-configuration)
+and catalogued for CLI editing and validation. `[optimize]` is a parameterized
+name family: the binary names are repository-defined, so their keys carry no
+recommendation. Every name has the same sub-table shape:
+
+| Key | Type | Recommended default |
+| --- | --- | --- |
+| `optimize.<name>.enable` | boolean | none |
+| `optimize.<name>.script` | repository-relative path | none |
+| `optimize.<name>.systems` | table keyed by system name | none |
+| `optimize.<name>.systems.<system>.targetCpu` | string | none |
+| `optimize.<name>.pgo` | table | none |
+| `optimize.<name>.pgo.enable` | boolean | none |
+| `optimize.<name>.pgo.scope` | `workspace` or `all` | none |
+| `optimize.<name>.bolt` | table | none |
+| `optimize.<name>.bolt.enable` | boolean | none |
+| `optimize.<name>.bolt.functions` | boolean | none |
+| `optimize.<name>.bolt.blocks` | boolean | none |
+
+`script` is required for an enabled entry when a training stage is enabled and
+stays inside the repository root.
+The per-system `targetCpu` defaults to the active profile's target CPU. A
+non-empty `systems` table restricts the optimized build to the listed systems. The
+`pgo` and `bolt` tables select the PGO and
+BOLT stages independently, and `pgo.scope` chooses whether PGO rebuilds the
+workspace crates or the whole dependency closure. Setting a per-system
+`targetCpu` tunes the final binary even when both stages are disabled. The
+table is absent by default and builds no optimized binaries. An enabled entry
+replaces the named binary's exported package and release app. Pipeline and
+validation semantics are owned by the linked design.
+
 ### `[formatters]`
 
 Owned by [NIXLIB/FLAKE](../../../NIXLIB/FLAKE/README.md) and catalogued for CLI

@@ -256,3 +256,38 @@ type = "event"
 trigger = "checks are enabled and checks.noDefaultFeatures is enabled"
 system = "the workspace builder"
 action = "expose a workspace:default-features check"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-023"
+title = "Enabled optimization replaces the exported package"
+manual = false
+design = "design/output-contract.md#packages"
+
+[requirements.ears]
+type = "event"
+trigger = "an optimize entry is enabled"
+system = "the workspace builder"
+action = "expose the optimized derivation as <bin> in packages"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-024"
+title = "Optimized binaries keep package checks on release"
+manual = false
+design = "design/output-contract.md#packages"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "keep package checks on the release build for an optimized binary"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-025"
+title = "Enabled optimization updates the release app"
+manual = false
+design = "design/output-contract.md#apps"
+
+[requirements.ears]
+type = "event"
+trigger = "an optimize entry is enabled"
+system = "the workspace builder"
+action = "expose the optimized derivation as the binary's release app while dev apps stay on the dev profile"

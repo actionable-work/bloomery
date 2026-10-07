@@ -51,6 +51,12 @@ binaries share discovery but use their respective profile flags and crate
 variants. The platform default linker is used unless the toolchain or profile
 selects one.
 
+Optimized binary variants enabled through `[optimize]` reuse the same binary
+discovery, resolved dependency closure, selected sources, toolchain, and
+profile. The [optimization pipeline](../../OPTIMIZE/design/optimization.md)
+adds training and profiling stages around that compilation and exports the
+result in place of the release package.
+
 ## Runtime dependencies
 
 A binary override may declare runtime tool dependencies that the executable

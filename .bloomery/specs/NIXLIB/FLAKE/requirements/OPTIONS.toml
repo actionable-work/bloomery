@@ -213,3 +213,25 @@ design = "design/workspace-options.md#formatter-ordering"
 type = "ubiquitous"
 system = "the workspace option module"
 action = "accept per-formatter enablement and before and after ordering lists"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-020"
+title = "Optimization options are configurable"
+manual = false
+design = "design/workspace-options.md#optimization"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace option module"
+action = "accept per-binary enablement, a repository-relative training script, per-system gates with per-system target CPUs, and independent PGO and BOLT stage tables"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-021"
+title = "Per-crate training overrides are configurable"
+manual = false
+design = "design/workspace-options.md#optimization"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace option module"
+action = "accept training native build inputs, build inputs, environment, and an additive fixture fileset under a per-crate optimize namespace"

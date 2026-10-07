@@ -85,7 +85,7 @@ impl KeySpec {
 }
 
 /// Increment when the catalog changes.
-pub const CATALOG_VERSION: u32 = 3;
+pub const CATALOG_VERSION: u32 = 7;
 
 const OPT_LEVEL: &[ValueType] = &[
     ValueType::UnsignedUpTo(3),
@@ -674,7 +674,9 @@ pub fn resolve(path: &[&str]) -> Option<KeySpec> {
     if let Some(entry) = lookup(path) {
         return Some(KeySpec::from_entry(entry));
     }
-    formatter_key(path).or_else(|| flake_key(path))
+    formatter_key(path)
+        .or_else(|| flake_key(path))
+        .or_else(|| optimize_key(path))
 }
 
 fn formatter_key(path: &[&str]) -> Option<KeySpec> {
@@ -693,6 +695,52 @@ fn formatter_key(path: &[&str]) -> Option<KeySpec> {
         "after" => (
             ValueType::StringList,
             "Formatters that must run before this formatter.",
+        ),
+        _ => return None,
+    };
+    Some(KeySpec {
+        path: path.iter().map(|segment| (*segment).to_owned()).collect(),
+        value_type,
+        recommended: None,
+        documentation,
+    })
+}
+
+/// Parameterized `[optimize.<bin>]` keys. Binary names are repository-defined,
+/// so these keys carry no recommended default. Each named entry may also carry
+/// `pgo` and `bolt` stage tables and a `systems` table keyed by system name.
+fn optimize_key(path: &[&str]) -> Option<KeySpec> {
+    let (value_type, documentation) = match path {
+        ["optimize", _name, "enable"] => (
+            ValueType::Bool,
+            "Enable the optimized build for this binary.",
+        ),
+        ["optimize", _name, "script"] => (
+            ValueType::Path,
+            "Repository-relative training script for the optimized build.",
+        ),
+        ["optimize", _name, "pgo", "enable"] => (
+            ValueType::Bool,
+            "Enable profile-guided optimization for this binary.",
+        ),
+        ["optimize", _name, "pgo", "scope"] => (
+            ValueType::StringEnum(&["workspace", "all"]),
+            "PGO instrumentation scope: workspace or all.",
+        ),
+        ["optimize", _name, "bolt", "enable"] => (
+            ValueType::Bool,
+            "Enable BOLT layout optimization for this binary.",
+        ),
+        ["optimize", _name, "bolt", "functions"] => (
+            ValueType::Bool,
+            "Reorder functions with BOLT; requires relocations.",
+        ),
+        ["optimize", _name, "bolt", "blocks"] => {
+            (ValueType::Bool, "Reorder basic blocks with BOLT.")
+        }
+        ["optimize", _name, "systems", _system, "targetCpu"] => (
+            ValueType::String,
+            "Target CPU override for this system's optimized build.",
         ),
         _ => return None,
     };
@@ -744,6 +792,18 @@ fn is_known_table(path: &[&str]) -> bool {
         return true;
     }
     if path == ["flakes"] || (path.len() == 2 && path[0] == "flakes") {
+        return true;
+    }
+    if path == ["optimize"] || (path.len() == 2 && path[0] == "optimize") {
+        return true;
+    }
+    if path.len() == 3
+        && path[0] == "optimize"
+        && (path[2] == "systems" || path[2] == "pgo" || path[2] == "bolt")
+    {
+        return true;
+    }
+    if path.len() == 4 && path[0] == "optimize" && path[2] == "systems" {
         return true;
     }
     CATALOG
@@ -1062,7 +1122,7 @@ mod tests {
     #[test]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-005"))]
     fn catalog_version_tracks_the_binary() {
-        assert_eq!(CATALOG_VERSION, 3);
+        assert_eq!(CATALOG_VERSION, 7);
         assert!(!CATALOG.is_empty());
     }
 
@@ -1169,6 +1229,71 @@ mod tests {
             ValueType::StringEnum(&["none", "individual", "aggregate"])
         );
         assert!(resolve(&["flakes", "tests-basic"]).is_none());
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-017"))]
+    fn catalog_covers_the_parameterized_optimization_table() {
+        for (field, expected) in [("enable", ValueType::Bool), ("script", ValueType::Path)] {
+            let entry = resolve(&["optimize", "my-server", field])
+                .unwrap_or_else(|| panic!("optimize.{field} must be catalogued"));
+            assert_eq!(entry.value_type, expected, "optimize.{field}");
+        }
+        assert!(resolve(&["optimize", "my-server", "targetCpu"]).is_none());
+        let system = resolve(&[
+            "optimize",
+            "my-server",
+            "systems",
+            "x86_64-linux",
+            "targetCpu",
+        ])
+        .expect("optimize.<name>.systems.<system>.targetCpu must be catalogued");
+        assert_eq!(system.value_type, ValueType::String);
+        for (path, expected) in [
+            (["optimize", "my-server", "pgo", "enable"], ValueType::Bool),
+            (
+                ["optimize", "my-server", "pgo", "scope"],
+                ValueType::StringEnum(&["workspace", "all"]),
+            ),
+            (["optimize", "my-server", "bolt", "enable"], ValueType::Bool),
+            (
+                ["optimize", "my-server", "bolt", "functions"],
+                ValueType::Bool,
+            ),
+            (["optimize", "my-server", "bolt", "blocks"], ValueType::Bool),
+        ] {
+            let entry = resolve(&path).unwrap_or_else(|| panic!("{path:?} must be catalogued"));
+            assert_eq!(entry.value_type, expected, "{path:?}");
+        }
+        assert!(resolve(&["optimize", "my-server", "systems", "x86_64-linux", "enable"]).is_none());
+        assert!(resolve(&["optimize", "my-server", "profile"]).is_none());
+        assert!(resolve(&["optimize", "my-server"]).is_none());
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-018"))]
+    fn optimization_keys_carry_no_recommendation() {
+        for path in [
+            vec!["optimize", "my-server", "enable"],
+            vec!["optimize", "my-server", "script"],
+            vec!["optimize", "my-server", "pgo", "enable"],
+            vec!["optimize", "my-server", "pgo", "scope"],
+            vec!["optimize", "my-server", "bolt", "enable"],
+            vec!["optimize", "my-server", "bolt", "functions"],
+            vec!["optimize", "my-server", "bolt", "blocks"],
+        ] {
+            let entry = resolve(&path).unwrap_or_else(|| panic!("{path:?}"));
+            assert!(entry.recommended.is_none(), "{path:?}");
+        }
+        let system = resolve(&[
+            "optimize",
+            "my-server",
+            "systems",
+            "x86_64-linux",
+            "targetCpu",
+        ])
+        .expect("optimize system key");
+        assert!(system.recommended.is_none());
     }
 
     #[test]

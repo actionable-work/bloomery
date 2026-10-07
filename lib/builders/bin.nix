@@ -43,6 +43,10 @@ in
     workspaceAssets ? null,
     workspaceStatic ? null,
     workspacePublic ? null,
+    # When set, skip compilation and install this prebuilt executable instead.
+    # Used by the optimization pipeline to reuse the asset and runtime-wrapper
+    # install phases for an already-optimized binary.
+    prebuilt ? null,
   }: let
     pname = binName;
     version = pkg.version;
@@ -105,252 +109,273 @@ in
         CARGO_PKG_VERSION_PRE = "";
         CARGO_CRATE_NAME = crateName;
 
-        unpackPhase = ''
-          runHook preUnpack
-          mkdir -p src
-          if [ -f "$src" ]; then
-            tar -xzf "$src" --strip-components=1 -C src
-            cd src
-          else
-            cp -r "$src"/* ./src/ 2>/dev/null || cp -r "$src"/. ./src/
-            cd src
-            chmod -R u+w .
-          fi
-          runHook postUnpack
-        '';
-
-        configurePhase = ''
-          runHook preConfigure
-
-          export CARGO_MANIFEST_DIR="$PWD"
-
-          # Determine Edition
-          EDITION="${
-            if edition != null
-            then edition
-            else "2021"
-          }"
-          if [ "${
-            if edition != null
-            then "1"
-            else "0"
-          }" = "0" ] && [ -f Cargo.toml ]; then
-            DETECTED_EDITION=$(sed -n -E 's/^[[:space:]]*edition[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' Cargo.toml | head -n 1)
-            if [ -n "$DETECTED_EDITION" ]; then
-              EDITION="$DETECTED_EDITION"
+        unpackPhase =
+          if prebuilt != null
+          then ''
+            runHook preUnpack
+            runHook postUnpack
+          ''
+          else ''
+            runHook preUnpack
+            mkdir -p src
+            if [ -f "$src" ]; then
+              tar -xzf "$src" --strip-components=1 -C src
+              cd src
+            else
+              cp -r "$src"/* ./src/ 2>/dev/null || cp -r "$src"/. ./src/
+              cd src
+              chmod -R u+w .
             fi
-          fi
-          EDITION_FLAG="--edition=$EDITION"
+            runHook postUnpack
+          '';
 
-          # Find binary entrypoint
-          ENTRY="${
-            if entry != null
-            then entry
-            else ""
-          }"
-          if [ -z "$ENTRY" ]; then
-            if [ -f "src/bin/$BIN_NAME.rs" ]; then
-              ENTRY="src/bin/$BIN_NAME.rs"
-            elif [ -f "src/main.rs" ]; then
-              ENTRY="src/main.rs"
-            elif [ -f "main.rs" ]; then
-              ENTRY="main.rs"
-            fi
-          fi
+        configurePhase =
+          if prebuilt != null
+          then ''
+            runHook preConfigure
+            runHook postConfigure
+          ''
+          else ''
+            runHook preConfigure
 
-          if [ -z "$ENTRY" ] || [ ! -f "$ENTRY" ]; then
-            echo "Error: Binary entrypoint for '$BIN_NAME' not found"
-            exit 1
-          fi
+            export CARGO_MANIFEST_DIR="$PWD"
 
-          # Assemble dependencies
-          mkdir -p _deps
-          declare -A SEEN_EXTERNS=()
-          EXTERN_FLAGS=()
-          EXTRA_LINK_FLAGS=()
-
-          for dep in $dependencies; do
-            DEP_LIB_PATH=""
-            if [ -f "$dep/nix-support/meta.sh" ]; then
-              source "$dep/nix-support/meta.sh"
-              if [ -n "$DEP_LIB_ARCHIVE" ] && [ -f "$DEP_LIB_ARCHIVE" ]; then
-                tar --zstd -xf "$DEP_LIB_ARCHIVE" -C _deps
-                DEP_LIB_PATH="_deps/$DEP_LIB_NAME"
+            # Determine Edition
+            EDITION="${
+              if edition != null
+              then edition
+              else "2021"
+            }"
+            if [ "${
+              if edition != null
+              then "1"
+              else "0"
+            }" = "0" ] && [ -f Cargo.toml ]; then
+              DETECTED_EDITION=$(sed -n -E 's/^[[:space:]]*edition[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' Cargo.toml | head -n 1)
+              if [ -n "$DETECTED_EDITION" ]; then
+                EDITION="$DETECTED_EDITION"
               fi
-              if [ -n "$DEP_CRATE_NAME" ] && [ -n "$DEP_LIB_PATH" ] && [ -f "$DEP_LIB_PATH" ]; then
-                if [ -z "''${SEEN_EXTERNS[$DEP_CRATE_NAME]:-}" ]; then
-                  EXTERN_FLAGS+=("--extern" "$DEP_CRATE_NAME=$DEP_LIB_PATH")
-                  SEEN_EXTERNS["$DEP_CRATE_NAME"]=1
+            fi
+            EDITION_FLAG="--edition=$EDITION"
+
+            # Find binary entrypoint
+            ENTRY="${
+              if entry != null
+              then entry
+              else ""
+            }"
+            if [ -z "$ENTRY" ]; then
+              if [ -f "src/bin/$BIN_NAME.rs" ]; then
+                ENTRY="src/bin/$BIN_NAME.rs"
+              elif [ -f "src/main.rs" ]; then
+                ENTRY="src/main.rs"
+              elif [ -f "main.rs" ]; then
+                ENTRY="main.rs"
+              fi
+            fi
+
+            if [ -z "$ENTRY" ] || [ ! -f "$ENTRY" ]; then
+              echo "Error: Binary entrypoint for '$BIN_NAME' not found"
+              exit 1
+            fi
+
+            # Assemble dependencies
+            mkdir -p _deps
+            declare -A SEEN_EXTERNS=()
+            EXTERN_FLAGS=()
+            EXTRA_LINK_FLAGS=()
+
+            for dep in $dependencies; do
+              DEP_LIB_PATH=""
+              if [ -f "$dep/nix-support/meta.sh" ]; then
+                source "$dep/nix-support/meta.sh"
+                if [ -n "$DEP_LIB_ARCHIVE" ] && [ -f "$DEP_LIB_ARCHIVE" ]; then
+                  tar --zstd -xf "$DEP_LIB_ARCHIVE" -C _deps
+                  DEP_LIB_PATH="_deps/$DEP_LIB_NAME"
                 fi
-              fi
-              if [ -n "$DEP_RUSTC_LINK_FLAGS" ]; then
-                EXTRA_LINK_FLAGS+=($DEP_RUSTC_LINK_FLAGS)
-              fi
-            elif [ -d "$dep/lib" ]; then
-              for f in "$dep/lib"/*; do
-                if [ -f "$f" ]; then
-                  fname=$(basename "$f")
-                  cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
-                  if [ -z "''${SEEN_EXTERNS[$cname]:-}" ]; then
-                    EXTERN_FLAGS+=("--extern" "$cname=$f")
-                    SEEN_EXTERNS["$cname"]=1
+                if [ -n "$DEP_CRATE_NAME" ] && [ -n "$DEP_LIB_PATH" ] && [ -f "$DEP_LIB_PATH" ]; then
+                  if [ -z "''${SEEN_EXTERNS[$DEP_CRATE_NAME]:-}" ]; then
+                    EXTERN_FLAGS+=("--extern" "$DEP_CRATE_NAME=$DEP_LIB_PATH")
+                    SEEN_EXTERNS["$DEP_CRATE_NAME"]=1
                   fi
                 fi
-              done
-            fi
+                if [ -n "$DEP_RUSTC_LINK_FLAGS" ]; then
+                  EXTRA_LINK_FLAGS+=($DEP_RUSTC_LINK_FLAGS)
+                fi
+              elif [ -d "$dep/lib" ]; then
+                for f in "$dep/lib"/*; do
+                  if [ -f "$f" ]; then
+                    fname=$(basename "$f")
+                    cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
+                    if [ -z "''${SEEN_EXTERNS[$cname]:-}" ]; then
+                      EXTERN_FLAGS+=("--extern" "$cname=$f")
+                      SEEN_EXTERNS["$cname"]=1
+                    fi
+                  fi
+                done
+              fi
 
-            if [ -d "$dep/nix-support/deps-closure" ]; then
-              for f in "$dep/nix-support/deps-closure"/*; do
-                if [ -e "$f" ]; then
-                  case "$f" in
-                    *.tar.zst) tar --zstd -xf "$f" -C _deps ;;
-                    *) ln -sf "$(readlink -f "$f")" "_deps/$(basename "$f")" ;;
-                  esac
-                fi
-              done
-            fi
-            if [ -d "$dep/lib" ]; then
-              for f in "$dep/lib"/*; do
-                if [ -e "$f" ]; then
-                  target=$(readlink -f "$f")
-                  ln -sf "$target" "_deps/$(basename "$f")"
-                fi
-              done
-            fi
-          done
+              if [ -d "$dep/nix-support/deps-closure" ]; then
+                for f in "$dep/nix-support/deps-closure"/*; do
+                  if [ -e "$f" ]; then
+                    case "$f" in
+                      *.tar.zst) tar --zstd -xf "$f" -C _deps ;;
+                      *) ln -sf "$(readlink -f "$f")" "_deps/$(basename "$f")" ;;
+                    esac
+                  fi
+                done
+              fi
+              if [ -d "$dep/lib" ]; then
+                for f in "$dep/lib"/*; do
+                  if [ -e "$f" ]; then
+                    target=$(readlink -f "$f")
+                    ln -sf "$target" "_deps/$(basename "$f")"
+                  fi
+                done
+              fi
+            done
 
-          # If crateDrv is provided, link the crate's own .rlib
-          if [ -n "$crateDrv" ] && [ -d "$crateDrv" ]; then
-            DEP_LIB_PATH=""
-            if [ -f "$crateDrv/nix-support/meta.sh" ]; then
-              source "$crateDrv/nix-support/meta.sh"
-              if [ -n "$DEP_LIB_ARCHIVE" ] && [ -f "$DEP_LIB_ARCHIVE" ]; then
-                tar --zstd -xf "$DEP_LIB_ARCHIVE" -C _deps
-                DEP_LIB_PATH="_deps/$DEP_LIB_NAME"
-              fi
-              if [ -n "$DEP_CRATE_NAME" ] && [ -n "$DEP_LIB_PATH" ] && [ -f "$DEP_LIB_PATH" ]; then
-                if [ -z "''${SEEN_EXTERNS[$DEP_CRATE_NAME]:-}" ]; then
-                  EXTERN_FLAGS+=("--extern" "$DEP_CRATE_NAME=$DEP_LIB_PATH")
-                  SEEN_EXTERNS["$DEP_CRATE_NAME"]=1
+            # If crateDrv is provided, link the crate's own .rlib
+            if [ -n "$crateDrv" ] && [ -d "$crateDrv" ]; then
+              DEP_LIB_PATH=""
+              if [ -f "$crateDrv/nix-support/meta.sh" ]; then
+                source "$crateDrv/nix-support/meta.sh"
+                if [ -n "$DEP_LIB_ARCHIVE" ] && [ -f "$DEP_LIB_ARCHIVE" ]; then
+                  tar --zstd -xf "$DEP_LIB_ARCHIVE" -C _deps
+                  DEP_LIB_PATH="_deps/$DEP_LIB_NAME"
                 fi
-              fi
-              if [ -n "$DEP_RUSTC_LINK_FLAGS" ]; then
-                EXTRA_LINK_FLAGS+=($DEP_RUSTC_LINK_FLAGS)
-              fi
-            elif [ -d "$crateDrv/lib" ]; then
-              for f in "$crateDrv/lib"/*; do
-                if [ -f "$f" ]; then
-                  fname=$(basename "$f")
-                  cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
-                  if [ -z "''${SEEN_EXTERNS[$cname]:-}" ]; then
-                    EXTERN_FLAGS+=("--extern" "$cname=$f")
-                    SEEN_EXTERNS["$cname"]=1
+                if [ -n "$DEP_CRATE_NAME" ] && [ -n "$DEP_LIB_PATH" ] && [ -f "$DEP_LIB_PATH" ]; then
+                  if [ -z "''${SEEN_EXTERNS[$DEP_CRATE_NAME]:-}" ]; then
+                    EXTERN_FLAGS+=("--extern" "$DEP_CRATE_NAME=$DEP_LIB_PATH")
+                    SEEN_EXTERNS["$DEP_CRATE_NAME"]=1
                   fi
                 fi
-              done
-            fi
-
-            if [ -d "$crateDrv/lib" ]; then
-              for f in "$crateDrv/lib"/*; do
-                if [ -e "$f" ]; then
-                  target=$(readlink -f "$f")
-                  ln -sf "$target" "_deps/$(basename "$f")"
+                if [ -n "$DEP_RUSTC_LINK_FLAGS" ]; then
+                  EXTRA_LINK_FLAGS+=($DEP_RUSTC_LINK_FLAGS)
                 fi
-              done
-            fi
-          fi
+              elif [ -d "$crateDrv/lib" ]; then
+                for f in "$crateDrv/lib"/*; do
+                  if [ -f "$f" ]; then
+                    fname=$(basename "$f")
+                    cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
+                    if [ -z "''${SEEN_EXTERNS[$cname]:-}" ]; then
+                      EXTERN_FLAGS+=("--extern" "$cname=$f")
+                      SEEN_EXTERNS["$cname"]=1
+                    fi
+                  fi
+                done
+              fi
 
-          # Make transitive dependencies in _deps available as extern crates (e.g. for proc-macro code generation)
-          # without overriding direct dependencies or repeating crate names
-          for f in _deps/lib*.rlib _deps/lib*.so _deps/lib*.dylib; do
-            if [ -f "$f" ]; then
-              fname=$(basename "$f")
-              cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
-              if [ -z "''${SEEN_EXTERNS[$cname]:-}" ]; then
-                EXTERN_FLAGS+=("--extern" "$cname=$f")
-                SEEN_EXTERNS["$cname"]=1
+              if [ -d "$crateDrv/lib" ]; then
+                for f in "$crateDrv/lib"/*; do
+                  if [ -e "$f" ]; then
+                    target=$(readlink -f "$f")
+                    ln -sf "$target" "_deps/$(basename "$f")"
+                  fi
+                done
               fi
             fi
-          done
 
-          runHook postConfigure
-        '';
+            # Make transitive dependencies in _deps available as extern crates (e.g. for proc-macro code generation)
+            # without overriding direct dependencies or repeating crate names
+            for f in _deps/lib*.rlib _deps/lib*.so _deps/lib*.dylib; do
+              if [ -f "$f" ]; then
+                fname=$(basename "$f")
+                cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
+                if [ -z "''${SEEN_EXTERNS[$cname]:-}" ]; then
+                  EXTERN_FLAGS+=("--extern" "$cname=$f")
+                  SEEN_EXTERNS["$cname"]=1
+                fi
+              fi
+            done
 
-        buildPhase = ''
-          runHook preBuild
+            runHook postConfigure
+          '';
 
-          # Handle build script (build.rs)
-          BUILD_SCRIPT_FLAGS=()
-          BUILD_SCRIPT_LINK_FLAGS=()
-          if [ -f build.rs ]; then
-            echo "Compiling build script for $PKG_NAME..."
-            mkdir -p _build_script
-            $RUSTC build.rs \
-              --crate-name build_script_build \
+        buildPhase =
+          if prebuilt != null
+          then ''
+            runHook preBuild
+            mkdir -p "$out/bin"
+            cp "${prebuilt}/bin/$BIN_NAME" "$out/bin/$BIN_NAME"
+            chmod +x "$out/bin/$BIN_NAME"
+            runHook postBuild
+          ''
+          else ''
+            runHook preBuild
+
+            # Handle build script (build.rs)
+            BUILD_SCRIPT_FLAGS=()
+            BUILD_SCRIPT_LINK_FLAGS=()
+            if [ -f build.rs ]; then
+              echo "Compiling build script for $PKG_NAME..."
+              mkdir -p _build_script
+              $RUSTC build.rs \
+                --crate-name build_script_build \
+                --crate-type bin \
+                $EDITION_FLAG \
+                -L dependency=_deps \
+                "''${EXTERN_FLAGS[@]}" \
+                -o _build_script/build_script_build
+
+              export OUT_DIR="$PWD/_build_script/out"
+              mkdir -p "$OUT_DIR"
+              export TARGET="$($RUSTC -vV | sed -n 's/host: //p')"
+              export HOST="$TARGET"
+              export NUM_JOBS="$NIX_BUILD_CORES"
+              export OPT_LEVEL="3"
+              export PROFILE="release"
+              export CARGO_PKG_NAME="$PKG_NAME"
+              export CARGO_PKG_VERSION="$PKG_VERSION"
+              export CARGO_MANIFEST_DIR="$PWD"
+
+              echo "Executing build script for $PKG_NAME..."
+              ./_build_script/build_script_build > _build_script/stdout.txt || true
+
+              while IFS= read -r line; do
+                case "$line" in
+                  cargo:rustc-cfg=*|cargo::rustc-cfg=*)
+                    BUILD_SCRIPT_FLAGS+=("--cfg" "''${line#*rustc-cfg=}")
+                    ;;
+                  cargo:rustc-link-lib=*|cargo::rustc-link-lib=*)
+                    lib_val="''${line#*rustc-link-lib=}"
+                    BUILD_SCRIPT_FLAGS+=("-l" "''$lib_val")
+                    BUILD_SCRIPT_LINK_FLAGS+=("-l" "''$lib_val")
+                    ;;
+                  cargo:rustc-link-search=*|cargo::rustc-link-search=*)
+                    search_val="''${line#*rustc-link-search=}"
+                    BUILD_SCRIPT_FLAGS+=("-L" "''$search_val")
+                    BUILD_SCRIPT_LINK_FLAGS+=("-L" "''$search_val")
+                    ;;
+                  cargo:rustc-env=*|cargo::rustc-env=*)
+                    env_val="''${line#*rustc-env=}"
+                    export "''$env_val"
+                    ;;
+                  cargo:rustc-flags=*|cargo::rustc-flags=*)
+                    flags_val="''${line#*rustc-flags=}"
+                    BUILD_SCRIPT_FLAGS+=(''${flags_val})
+                    BUILD_SCRIPT_LINK_FLAGS+=(''${flags_val})
+                    ;;
+                esac
+              done < _build_script/stdout.txt
+            fi
+
+            mkdir -p $out/bin
+            echo "Compiling binary $BIN_NAME from $ENTRY..."
+
+            $RUSTC "$ENTRY" \
+              --crate-name "$CRATE_NAME" \
               --crate-type bin \
               $EDITION_FLAG \
               -L dependency=_deps \
               "''${EXTERN_FLAGS[@]}" \
-              -o _build_script/build_script_build
+              "''${BUILD_SCRIPT_FLAGS[@]}" \
+              "''${EXTRA_LINK_FLAGS[@]}" \
+              ${lib.escapeShellArgs extraRustcFlags} \
+              -o "$out/bin/$BIN_NAME"
 
-            export OUT_DIR="$PWD/_build_script/out"
-            mkdir -p "$OUT_DIR"
-            export TARGET="$($RUSTC -vV | sed -n 's/host: //p')"
-            export HOST="$TARGET"
-            export NUM_JOBS="$NIX_BUILD_CORES"
-            export OPT_LEVEL="3"
-            export PROFILE="release"
-            export CARGO_PKG_NAME="$PKG_NAME"
-            export CARGO_PKG_VERSION="$PKG_VERSION"
-            export CARGO_MANIFEST_DIR="$PWD"
-
-            echo "Executing build script for $PKG_NAME..."
-            ./_build_script/build_script_build > _build_script/stdout.txt || true
-
-            while IFS= read -r line; do
-              case "$line" in
-                cargo:rustc-cfg=*|cargo::rustc-cfg=*)
-                  BUILD_SCRIPT_FLAGS+=("--cfg" "''${line#*rustc-cfg=}")
-                  ;;
-                cargo:rustc-link-lib=*|cargo::rustc-link-lib=*)
-                  lib_val="''${line#*rustc-link-lib=}"
-                  BUILD_SCRIPT_FLAGS+=("-l" "''$lib_val")
-                  BUILD_SCRIPT_LINK_FLAGS+=("-l" "''$lib_val")
-                  ;;
-                cargo:rustc-link-search=*|cargo::rustc-link-search=*)
-                  search_val="''${line#*rustc-link-search=}"
-                  BUILD_SCRIPT_FLAGS+=("-L" "''$search_val")
-                  BUILD_SCRIPT_LINK_FLAGS+=("-L" "''$search_val")
-                  ;;
-                cargo:rustc-env=*|cargo::rustc-env=*)
-                  env_val="''${line#*rustc-env=}"
-                  export "''$env_val"
-                  ;;
-                cargo:rustc-flags=*|cargo::rustc-flags=*)
-                  flags_val="''${line#*rustc-flags=}"
-                  BUILD_SCRIPT_FLAGS+=(''${flags_val})
-                  BUILD_SCRIPT_LINK_FLAGS+=(''${flags_val})
-                  ;;
-              esac
-            done < _build_script/stdout.txt
-          fi
-
-          mkdir -p $out/bin
-          echo "Compiling binary $BIN_NAME from $ENTRY..."
-
-          $RUSTC "$ENTRY" \
-            --crate-name "$CRATE_NAME" \
-            --crate-type bin \
-            $EDITION_FLAG \
-            -L dependency=_deps \
-            "''${EXTERN_FLAGS[@]}" \
-            "''${BUILD_SCRIPT_FLAGS[@]}" \
-            "''${EXTRA_LINK_FLAGS[@]}" \
-            ${lib.escapeShellArgs extraRustcFlags} \
-            -o "$out/bin/$BIN_NAME"
-
-          runHook postBuild
-        '';
+            runHook postBuild
+          '';
 
         installPhase = ''
           runHook preInstall

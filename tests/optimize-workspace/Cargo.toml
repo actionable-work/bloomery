@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/opt-app", "crates/opt-lib"]
+resolver = "2"

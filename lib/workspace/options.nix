@@ -33,6 +33,34 @@
     };
   };
 
+  # Submodule for per-crate training overrides. These inputs are overlaid on
+  # the optimized binary's training derivations only; they never participate
+  # in production compilation or packaging.
+  optimizeOverrideOptionModule = {
+    options = {
+      nativeBuildInputs = lib.mkOption {
+        type = types.listOf types.package;
+        default = [];
+        description = "Build-time native tools available to training only.";
+      };
+      buildInputs = lib.mkOption {
+        type = types.listOf types.package;
+        default = [];
+        description = "Target native libraries available to training only.";
+      };
+      env = lib.mkOption {
+        type = types.attrsOf types.str;
+        default = {};
+        description = "Environment variables set while the training script runs.";
+      };
+      fileset = lib.mkOption {
+        type = types.nullOr types.raw;
+        default = null;
+        description = "Additive training fixture fileset included in training inputs only.";
+      };
+    };
+  };
+
   # Submodule for individual crate overrides
   overrideOptionModule = {
     options = {
@@ -105,6 +133,11 @@
         type = types.submodule testOverrideOptionModule;
         default = {};
         description = "Test-only overrides (native inputs, environment, additive fixture fileset).";
+      };
+      optimize = lib.mkOption {
+        type = types.submodule optimizeOverrideOptionModule;
+        default = {};
+        description = "Training-only overrides (native inputs, environment, additive fixture fileset).";
       };
     };
   };
@@ -293,6 +326,78 @@
         type = types.attrsOf (types.submodule overrideOptionModule);
         default = {};
         description = "Per-crate build overrides for native C dependencies, extra flags, and environment variables.";
+      };
+
+      # ── Optimized Binary Builds ─────────────────────────────────────────────
+      optimize = lib.mkOption {
+        type = types.attrsOf (types.submodule {
+          options = {
+            enable = lib.mkOption {
+              type = types.bool;
+              default = true;
+              description = "Run the full PGO then BOLT pipeline for this binary.";
+            };
+            script = lib.mkOption {
+              type = types.nullOr types.path;
+              default = null;
+              description = "Repository-relative training script, required when enabled.";
+            };
+            systems = lib.mkOption {
+              type = types.attrsOf (types.submodule {
+                options.targetCpu = lib.mkOption {
+                  type = types.nullOr types.str;
+                  default = null;
+                  description = "Target CPU override for this system's optimized compilations.";
+                };
+              });
+              default = {};
+              description = "Systems on which the optimized build runs, keyed by system name. Empty optimizes every selected system.";
+            };
+            pgo = lib.mkOption {
+              type = types.submodule {
+                options = {
+                  enable = lib.mkOption {
+                    type = types.bool;
+                    default = true;
+                    description = "Run the profile-guided optimization stage.";
+                  };
+                  scope = lib.mkOption {
+                    type = types.enum ["workspace" "all"];
+                    default = "workspace";
+                    description = "Instrument only workspace crates or every crate in the dependency closure.";
+                  };
+                };
+              };
+              default = {};
+              description = "Profile-guided optimization stage selection.";
+            };
+            bolt = lib.mkOption {
+              type = types.submodule {
+                options = {
+                  enable = lib.mkOption {
+                    type = types.bool;
+                    default = true;
+                    description = "Run the BOLT layout optimization stage.";
+                  };
+                  functions = lib.mkOption {
+                    type = types.bool;
+                    default = true;
+                    description = "Reorder functions with BOLT; requires a relocation-preserving link.";
+                  };
+                  blocks = lib.mkOption {
+                    type = types.bool;
+                    default = true;
+                    description = "Reorder basic blocks with BOLT.";
+                  };
+                };
+              };
+              default = {};
+              description = "BOLT layout optimization stage selection.";
+            };
+          };
+        });
+        default = {};
+        description = "Per-binary optimized build configuration keyed by discovered binary name.";
       };
 
       # ── Development Shell (Direnv / nix develop) ─────────────────────────────
