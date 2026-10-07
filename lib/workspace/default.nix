@@ -15,6 +15,10 @@
   featuresTests = import ./features.test.nix {inherit lib;};
   parseLockTests = import ./parse-lock.test.nix {inherit lib;};
   manifestPolicyTests = import ./manifest-policy.test.nix {inherit lib;};
+  lockCheckTests =
+    if pkgs != null
+    then import ./lock-check.test.nix {inherit pkgs lib;}
+    else {};
   optionsTests =
     if pkgs != null
     then import ./options.test.nix {inherit pkgs lib;}
@@ -26,5 +30,5 @@ in {
   inherit manifestPolicy;
   inherit sources;
   inherit options;
-  tests = discoverTests // featuresTests // parseLockTests // manifestPolicyTests // optionsTests;
+  tests = discoverTests // featuresTests // parseLockTests // manifestPolicyTests // lockCheckTests // optionsTests;
 }

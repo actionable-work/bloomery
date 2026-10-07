@@ -228,6 +228,26 @@ in {
     };
   };
 
+  testCrateBuilderNativeArtifactPropagation = {
+    expr = {
+      rewritesOutDirSearch =
+        lib.hasInfix "prop_search" crateDrv.buildPhase
+        && lib.hasInfix "search_val//$OUT_DIR/_deps" crateDrv.buildPhase;
+      keepsOwnSearch = lib.hasInfix "rustc-link-search" crateDrv.buildPhase;
+      installsNativeLibraries =
+        lib.hasInfix "-name '*.a'" crateDrv.installPhase
+        && lib.hasInfix "-name '*.so'" crateDrv.installPhase
+        && lib.hasInfix "-name '*.dylib'" crateDrv.installPhase;
+      archivesNativeLibraries = lib.hasInfix "lib.tar.zst" crateDrv.installPhase;
+    };
+    expected = {
+      rewritesOutDirSearch = true;
+      keepsOwnSearch = true;
+      installsNativeLibraries = true;
+      archivesNativeLibraries = true;
+    };
+  };
+
   testCrateBuilderFeatureFlags = {
     expr = {
       emitsFeatureCfgs = lib.hasInfix "--cfg=feature=" crateDrv.configurePhase;

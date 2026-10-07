@@ -343,3 +343,129 @@ design = "design/derivations.md#compressed-crate-artifacts"
 type = "ubiquitous"
 system = "the Rust builders"
 action = "produce the same crate, binary, test, documentation, and clippy outcomes from extracted archives as from uncompressed libraries"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-032"
+title = "Inherited member package fields resolve before lock validation"
+manual = false
+design = "design/derivations.md#lock-validation"
+
+[requirements.ears]
+type = "event"
+trigger = "a workspace member sets a [package] field to workspace = true"
+system = "the workspace:lock check"
+action = "resolve the effective field value from the root [workspace.package] table before validating the member"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-033"
+title = "Inherited member versions compare without coercion errors"
+manual = false
+design = "design/derivations.md#lock-validation"
+
+[requirements.ears]
+type = "event"
+trigger = "a workspace member inherits its package.version"
+system = "the workspace:lock check"
+action = "compare the resolved version string with the member's Cargo.lock entry and use it in any mismatch report"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-034"
+title = "Build-script native libraries install into the crate output"
+manual = false
+design = "design/native-artifacts.md#installation"
+
+[requirements.ears]
+type = "event"
+trigger = "a build script writes native static or shared libraries under OUT_DIR"
+system = "the crate builder"
+action = "install those libraries under the crate's library directory while preserving their path relative to OUT_DIR"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-035"
+title = "Propagated link search resolves extracted native libraries"
+manual = false
+design = "design/native-artifacts.md#propagation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "rewrite build-script link-search directives whose path is under OUT_DIR to the corresponding path under the dependent's build-local dependency directory"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-036"
+title = "Native artifacts travel in the crate archive"
+manual = false
+design = "design/native-artifacts.md#archive-and-closure"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "include installed native libraries in the single compressed crate archive and the published dependency closure"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-037"
+title = "Dependents link build-script native libraries"
+manual = false
+design = "design/native-artifacts.md#propagation"
+
+[requirements.ears]
+type = "event"
+trigger = "a crate depends on a crate whose build script produced native libraries"
+system = "the crate builder"
+action = "link those libraries from the extracted dependency archives without user-provided link flags"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-038"
+title = "Links declarations propagate native libraries by default"
+manual = false
+design = "design/native-artifacts.md#links-awareness"
+
+[requirements.ears]
+type = "event"
+trigger = "a crate declares links and its build script produces native libraries"
+system = "the crate builder"
+action = "propagate the installed libraries and DEP_<LINKS>_<KEY> metadata to dependents without per-crate override configuration"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-039"
+title = "Native artifacts are archive-only"
+manual = false
+design = "design/native-artifacts.md#installation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "expose build-script native artifacts only through the compressed crate archive and leave no uncompressed library directory in the crate output"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-040"
+title = "Static native propagation is covered by builder tests"
+manual = false
+design = "design/native-artifacts.md#builder-tests"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder test suite"
+action = "compile a build-script fixture that emits a static native library together with a dependent that links it"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-041"
+title = "Shared native propagation is covered by builder tests"
+manual = false
+design = "design/native-artifacts.md#builder-tests"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder test suite"
+action = "compile a build-script fixture that emits a shared native library together with a dependent that links it"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-042"
+title = "Native archive propagation is covered by builder tests"
+manual = false
+design = "design/native-artifacts.md#builder-tests"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder test suite"
+action = "assert that native libraries are members of the crate archive and dependency closure and that the crate output has no uncompressed library directory"

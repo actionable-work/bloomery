@@ -483,8 +483,12 @@ in
                 ;;
               cargo:rustc-link-search=*|cargo::rustc-link-search=*)
                 search_val="''${line#*rustc-link-search=}"
+                prop_search="$search_val"
+                if [ -n "''${OUT_DIR:-}" ] && [[ "$search_val" == *"$OUT_DIR"* ]]; then
+                  prop_search="''${search_val//$OUT_DIR/_deps}"
+                fi
                 BUILD_SCRIPT_FLAGS+=("-L" "''$search_val")
-                BUILD_SCRIPT_LINK_FLAGS+=("-L" "''$search_val")
+                BUILD_SCRIPT_LINK_FLAGS+=("-L" "''$prop_search")
                 ;;
               cargo:rustc-env=*|cargo::rustc-env=*)
                 env_val="''${line#*rustc-env=}"
@@ -535,10 +539,20 @@ in
       installPhase = ''
         runHook preInstall
 
+        OUT_LIB=""
         if [ "$IS_PROC_MACRO" = "1" ] || [ "$CRATE_TYPE" = "proc-macro" ]; then
-          OUT_LIB=$(ls $out/lib/*.so $out/lib/*.dylib 2>/dev/null | head -n 1)
+          OUT_LIB=$(ls $out/lib/lib${crateName}*.so $out/lib/lib${crateName}*.dylib 2>/dev/null | head -n 1)
+          if [ -z "$OUT_LIB" ]; then
+            OUT_LIB=$(ls $out/lib/*.so $out/lib/*.dylib 2>/dev/null | head -n 1)
+          fi
         else
-          OUT_LIB=$(ls $out/lib/*.rlib $out/lib/*.so $out/lib/*.dylib $out/lib/*.a 2>/dev/null | head -n 1)
+          OUT_LIB=$(ls $out/lib/lib${crateName}*.rlib 2>/dev/null | head -n 1)
+          if [ -z "$OUT_LIB" ]; then
+            OUT_LIB=$(ls $out/lib/*.rlib 2>/dev/null | head -n 1)
+          fi
+          if [ -z "$OUT_LIB" ]; then
+            OUT_LIB=$(ls $out/lib/lib${crateName}*.a $out/lib/lib${crateName}*.so $out/lib/lib${crateName}*.dylib 2>/dev/null | head -n 1)
+          fi
         fi
         if [ -z "$OUT_LIB" ]; then
           OUT_LIB=$(ls $out/lib/lib* 2>/dev/null | head -n 1)
@@ -546,6 +560,17 @@ in
         if [ -z "$OUT_LIB" ]; then
           echo "Error: rustc did not produce any library in $out/lib"
           exit 1
+        fi
+
+        # Install build-script native libraries so they travel with the crate archive.
+        if [ -n "''${OUT_DIR:-}" ] && [ -d "$OUT_DIR" ]; then
+          (
+            cd "$OUT_DIR"
+            find . -type f \( -name '*.a' -o -name '*.so' -o -name '*.dylib' \) | while IFS= read -r native_lib; do
+              mkdir -p "$out/lib/$(dirname "$native_lib")"
+              cp -p "$native_lib" "$out/lib/$native_lib"
+            done
+          )
         fi
 
         DEP_LIB_NAME="$(basename "$OUT_LIB")"

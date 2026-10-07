@@ -5,6 +5,7 @@
 }: {
   root,
   cargoLock ? root + "/Cargo.lock",
+  cargoToml ? root + "/Cargo.toml",
   bloomeryLock ? (
     if builtins.pathExists (root + "/bloomery.lock")
     then root + "/bloomery.lock"
@@ -16,6 +17,22 @@
 }: let
   # 1. Validate bloomery.lock existence and hash
   cargoLockExists = builtins.pathExists cargoLock;
+
+  # Root manifest supplies [workspace.package] values inherited by members.
+  rootToml =
+    if builtins.pathExists cargoToml
+    then builtins.fromTOML (builtins.readFile cargoToml)
+    else {};
+  workspacePackage = rootToml.workspace.package or {};
+
+  # Cargo package fields may be inherited with `field.workspace = true`.
+  resolveWorkspaceField = pkgInfo: field: let
+    value = pkgInfo.${field} or null;
+  in
+    if builtins.isAttrs value && (value.workspace or false) == true
+    then workspacePackage.${field} or null
+    else value;
+
   bloomeryLockExists = bloomeryLock != null && builtins.pathExists bloomeryLock;
 
   cargoLockHash =
@@ -50,7 +67,11 @@
           else {};
         pkgInfo = toml.package or {};
         pkgName = pkgInfo.name or cname;
-        pkgVersion = pkgInfo.version or null;
+        resolvedVersion = resolveWorkspaceField pkgInfo "version";
+        pkgVersion =
+          if builtins.isString resolvedVersion
+          then resolvedVersion
+          else null;
 
         # Find matching package in Cargo.lock
         lockedPkgs = parsed.byName.${pkgName} or [];
@@ -146,6 +167,10 @@
 in
   pkgs.runCommand "lock-check" {
     nativeBuildInputs = [pkgs.coreutils];
+    passthru = {
+      bloomeryLockErrors = errors;
+      bloomeryLockMemberChecks = memberChecks;
+    };
   } ''
     ${
       if hasErrors

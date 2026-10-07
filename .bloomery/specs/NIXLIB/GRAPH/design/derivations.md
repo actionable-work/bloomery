@@ -26,7 +26,9 @@ target. The script receives the `OUT_DIR`, `TARGET`, `HOST`, `NUM_JOBS`,
 Cargo exposes. Both legacy `cargo:` and modern `cargo::` directives are parsed;
 cfg, link-lib, link-search, rustc-env, and rustc-flags directives are applied
 to the target compilation. A `links` crate publishes its metadata keys as
-`DEP_<LINKS>_<KEY>` for dependent build scripts.
+`DEP_<LINKS>_<KEY>` for dependent build scripts. Native link inputs produced by
+build scripts are installed and propagated as described in
+[Build-script native artifacts](native-artifacts.md).
 
 ## Feature compilation
 
@@ -68,12 +70,13 @@ assets.
 
 ## Compressed crate artifacts
 
-A crate derivation installs its compiled libraries, compiler metadata, and
-proc-macro dynamic libraries as a single zstd-compressed archive named
-`lib.tar.zst` instead of an uncompressed `lib/` directory. The archive is built
-from the flat library directory so extraction restores the original filenames.
-The crate metadata script publishes the archive path and the primary library's
-filename in place of an absolute library path.
+A crate derivation installs its compiled libraries, compiler metadata,
+proc-macro dynamic libraries, and any build-script native libraries as a single
+zstd-compressed archive named `lib.tar.zst` instead of an uncompressed `lib/`
+directory. The archive is built from the crate's library directory so
+extraction restores the installed layout. The crate metadata script publishes
+the archive path and the primary library's filename in place of an absolute
+library path.
 
 Every Rust builder extracts each direct dependency's archive into its
 build-local dependency directory before invoking `rustc`, then links the
@@ -95,3 +98,12 @@ the release crate and binary derivations. `workspace:lock` is a read-only
 derivation that validates `Cargo.lock` and `bloomery.lock` consistency, member
 presence, versions, and dependency completeness, and reports `bloomery sync`
 as the repair.
+
+## Lock validation
+
+Member metadata used by `workspace:lock` is resolved through Cargo's package
+field inheritance: when a member sets a `[package]` field such as `version` to
+`{ workspace = true }`, the check uses the value from the root
+`[workspace.package]` table. The resolved version is compared with the member's
+`Cargo.lock` entry and appears in any mismatch report, so an inherited version
+that matches passes and a mismatch reports readable versions.
