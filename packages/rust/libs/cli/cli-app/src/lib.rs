@@ -85,6 +85,7 @@ fn command_name(command: &CliCommand) -> Option<&'static str> {
     match command {
         CliCommand::Init(_) => Some("init"),
         CliCommand::Check(_) => Some("check"),
+        CliCommand::Disk(_) => Some("disk"),
         CliCommand::Review => Some("review"),
         CliCommand::Sync { .. } => Some("sync"),
         CliCommand::Config(_) => Some("config"),
@@ -614,11 +615,82 @@ fn run_workspace_command_at(
     }
     match command {
         CliCommand::Check(args) => check_command::run_at(args, json_mode, root, stdout, stderr),
+        CliCommand::Disk(args) => run_disk_at(args, json_mode, root, stdout, stderr),
         CliCommand::Review => run_review_at(root, json_mode, stdout, stderr),
         CliCommand::Spec(args) => run_spec_at(args, json_mode, root, stdout, stderr),
         CliCommand::Init(_) => unreachable!("init is dispatched before workspace loading"),
         CliCommand::Sync { .. } => unreachable!("sync is dispatched before workspace loading"),
         CliCommand::Config(_) => unreachable!("config is dispatched before workspace loading"),
+    }
+}
+
+fn run_disk_at(
+    args: bloomery_cli_types::DiskArgs,
+    json_mode: bool,
+    root: &Path,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
+    let backend = bloomery_disk::NixCli::default();
+    run_disk_with_backend(args, json_mode, root, &backend, stdout, stderr)
+}
+
+fn run_disk_with_backend(
+    args: bloomery_cli_types::DiskArgs,
+    json_mode: bool,
+    root: &Path,
+    backend: &impl bloomery_disk::NixQuery,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
+    let tree = args.tree;
+    match bloomery_disk::run(root, &args, backend) {
+        Ok(report) => {
+            if json_mode {
+                if write_json(stdout, &output::disk_success_json(&report)).is_err() {
+                    let _ = writeln!(stderr, "bloomery: unable to render JSON disk result");
+                    return ExitCode::from(1);
+                }
+            } else {
+                let rendered = if tree {
+                    bloomery_disk::render_text(&report)
+                } else {
+                    bloomery_disk::render_summary(&report)
+                };
+                let rendered = output::colorize_check(
+                    &rendered,
+                    output::color_enabled(output::Stream::Stdout, false),
+                );
+                let _ = stdout.write_all(rendered.as_bytes());
+            }
+            ExitCode::from(bloomery_disk::exit_code(&report))
+        }
+        Err(error) => {
+            if json_mode {
+                let document = match error.kind() {
+                    bloomery_disk::DiskErrorKind::Usage => {
+                        output::usage_error_json(Some("disk"), error.message())
+                    }
+                    bloomery_disk::DiskErrorKind::Operational => {
+                        output::disk_failure_json(error.message())
+                    }
+                };
+                if write_json(stdout, &document).is_err() {
+                    let _ = writeln!(stderr, "bloomery: unable to render JSON disk error");
+                    return ExitCode::from(1);
+                }
+            } else {
+                let _ = writeln!(
+                    stderr,
+                    "{}",
+                    output::colorize_error(
+                        &format!("error: {error}"),
+                        output::color_enabled(output::Stream::Stderr, false)
+                    )
+                );
+            }
+            ExitCode::from(error.exit_code())
+        }
     }
 }
 
@@ -880,7 +952,10 @@ fn report_runtime_error(
 
 #[cfg(test)]
 mod tests {
-    use super::{run_args_at, run_workspace_command_at, run_workspace_command_from_current_dir};
+    use super::{
+        run_args_at, run_disk_with_backend, run_workspace_command_at,
+        run_workspace_command_from_current_dir,
+    };
     use bloomery_cli_parser::{ParseError, ParseErrorKind as ErrorKind, parse_from};
     use bloomery_cli_types::CliCommand as Command;
     use serde_json::Value;
@@ -1165,6 +1240,7 @@ mod tests {
             &["bloomery", "check", "list"],
             &["bloomery", "check", "failures"],
             &["bloomery", "check", "details", "f1"],
+            &["bloomery", "disk"],
             &["bloomery", "review"],
             &["bloomery", "sync"],
             &["bloomery", "spec", "list"],
@@ -1198,6 +1274,7 @@ mod tests {
         let commands: &[&[&str]] = &[
             &["bloomery", "check", "--json"],
             &["bloomery", "check", "list", "--json"],
+            &["bloomery", "disk", "--json"],
             &["bloomery", "review", "--json"],
             &["bloomery", "sync", "--json"],
         ];
@@ -1290,6 +1367,7 @@ mod tests {
         for arguments in [
             &["bloomery", "check"][..],
             &["bloomery", "check", "list"][..],
+            &["bloomery", "disk"][..],
             &["bloomery", "review"][..],
             &["bloomery", "sync"][..],
             &["bloomery", "spec", "list"][..],
@@ -1464,9 +1542,202 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-029"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-030"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-021"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-022"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-023"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-024"))]
+    #[cfg_attr(any(), bloomery("CLI-DISK-COMMAND-008"))]
+    #[cfg_attr(any(), bloomery("CLI-DISK-COMMAND-011"))]
+    fn the_cli_exposes_disk_with_derivation_and_system_options() {
+        let parse = |args: &[&str]| match Cli::try_parse_from(args).expect("disk command").command {
+            Command::Disk(args) => args,
+            other => panic!("expected disk, got {other:?}"),
+        };
+
+        let default = parse(&["bloomery", "disk"]);
+        assert!(!default.tree);
+        assert_eq!(default.derivation, None);
+        assert!(default.systems.is_empty());
+
+        let addressed = parse(&["bloomery", "disk", "packages.x86_64-linux.default"]);
+        assert!(!addressed.tree);
+        assert_eq!(
+            addressed.derivation.as_deref(),
+            Some("packages.x86_64-linux.default")
+        );
+        assert!(addressed.systems.is_empty());
+
+        let tree = parse(&["bloomery", "disk", "tree"]);
+        assert!(tree.tree);
+        assert_eq!(tree.derivation, None);
+
+        let tree_addressed = parse(&["bloomery", "disk", "tree", "packages.x86_64-linux.default"]);
+        assert!(tree_addressed.tree);
+        assert_eq!(
+            tree_addressed.derivation.as_deref(),
+            Some("packages.x86_64-linux.default")
+        );
+
+        let tree_systems = parse(&[
+            "bloomery",
+            "disk",
+            "tree",
+            "--system",
+            "x86_64-linux",
+            "--system",
+            "aarch64-linux",
+        ]);
+        assert!(tree_systems.tree);
+        assert_eq!(
+            tree_systems.systems,
+            vec!["x86_64-linux".to_owned(), "aarch64-linux".to_owned()]
+        );
+
+        let systems = parse(&[
+            "bloomery",
+            "disk",
+            "--system",
+            "x86_64-linux",
+            "--system",
+            "aarch64-linux",
+            "--system",
+            "x86_64-linux",
+        ]);
+        assert_eq!(
+            systems.systems,
+            vec!["x86_64-linux".to_owned(), "aarch64-linux".to_owned()]
+        );
+
+        assert!(
+            Cli::try_parse_from([
+                "bloomery",
+                "disk",
+                "--system",
+                "x86_64-linux",
+                "packages.x86_64-linux.default",
+            ])
+            .is_err()
+        );
+        assert!(
+            Cli::try_parse_from([
+                "bloomery",
+                "disk",
+                "tree",
+                "--system",
+                "x86_64-linux",
+                "packages.x86_64-linux.default",
+            ])
+            .is_err()
+        );
+
+        assert_eq!(default.scope, bloomery_cli_types::DiskScope::All);
+        assert_eq!(tree.scope, bloomery_cli_types::DiskScope::All);
+        let runtime = parse(&["bloomery", "disk", "--scope", "runtime"]);
+        assert_eq!(runtime.scope, bloomery_cli_types::DiskScope::Runtime);
+        let build_tree = parse(&["bloomery", "disk", "tree", "--scope", "build"]);
+        assert_eq!(build_tree.scope, bloomery_cli_types::DiskScope::Build);
+        assert!(
+            Cli::try_parse_from([
+                "bloomery",
+                "disk",
+                "--scope",
+                "runtime",
+                "packages.x86_64-linux.default",
+            ])
+            .is_err()
+        );
+        assert!(Cli::try_parse_from(["bloomery", "disk", "--scope", "nonsense"]).is_err());
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-029"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-013"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-014"))]
+    fn disk_json_reports_measurement_through_the_cli() {
+        struct Fake;
+
+        fn target(category: &str, name: &str, path: &str) -> bloomery_disk::DiskTarget {
+            bloomery_disk::DiskTarget {
+                category: category.to_owned(),
+                name: name.to_owned(),
+                path: path.to_owned(),
+            }
+        }
+
+        impl bloomery_disk::NixQuery for Fake {
+            fn is_available(&self) -> bool {
+                true
+            }
+
+            fn host_system(&self, _root: &Path) -> Result<String, String> {
+                Ok("x86_64-linux".to_owned())
+            }
+
+            fn resolve_tree(
+                &self,
+                _root: &Path,
+                _systems: &[String],
+                _scope: bloomery_disk::DiskScope,
+            ) -> Result<Vec<bloomery_disk::DiskTarget>, String> {
+                Ok(vec![target("runtime", "default", "/nix/store/aaa-app")])
+            }
+
+            fn resolve_derivation(
+                &self,
+                _root: &Path,
+                address: &str,
+            ) -> Result<Vec<bloomery_disk::DiskTarget>, String> {
+                Ok(vec![target("derivation", address, address)])
+            }
+
+            fn closure_sizes(
+                &self,
+                _root: &Path,
+                targets: &[bloomery_disk::DiskTarget],
+            ) -> Result<Vec<bloomery_disk::TargetClosure>, String> {
+                Ok(targets
+                    .iter()
+                    .map(|target| bloomery_disk::TargetClosure {
+                        target: target.clone(),
+                        realized: true,
+                        entries: vec![bloomery_disk::PathSize {
+                            path: target.path.clone(),
+                            nar_size: 2048,
+                        }],
+                    })
+                    .collect())
+            }
+        }
+
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_disk_with_backend(
+            bloomery_cli_types::DiskArgs::default(),
+            true,
+            Path::new("/repo"),
+            &Fake,
+            &mut stdout,
+            &mut stderr,
+        );
+
+        assert_eq!(status, ExitCode::SUCCESS);
+        assert!(stderr.is_empty());
+        let document: Value = serde_json::from_slice(&stdout).expect("disk JSON");
+        assert_eq!(document["command"], "disk");
+        assert_eq!(document["status"], "succeeded");
+        assert_eq!(document["bytes"], 2048);
+        assert_eq!(document["systems"][0], "x86_64-linux");
+        assert_eq!(document["categories"][0]["name"], "runtime");
+        assert_eq!(document["categories"][0]["entries"][0]["name"], "default");
+        assert_eq!(document["categories"][0]["entries"][0]["bytes"], 2048);
+    }
+
+    #[test]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-005"))]
     fn every_application_command_accepts_short_and_long_help_flags() {
-        for command in ["check", "init", "review", "sync", "config"] {
+        for command in ["check", "disk", "init", "review", "sync", "config"] {
             for flag in ["-h", "--help"] {
                 let error = Cli::try_parse_from(["bloomery", command, flag])
                     .expect_err("help flag should short-circuit parsing");
@@ -1480,7 +1751,7 @@ mod tests {
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-003"))]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-006"))]
     fn every_application_command_accepts_the_shared_json_flag_before_or_after_its_name() {
-        for command in ["check", "init", "review", "sync"] {
+        for command in ["check", "disk", "init", "review", "sync"] {
             assert!(parse_json(&["bloomery", command, "--json"]).expect("trailing --json"));
             assert!(parse_json(&["bloomery", "--json", command]).expect("leading --json"));
         }

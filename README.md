@@ -80,7 +80,7 @@ built-in formatters (including `toml-sort`) and any formatters supplied through
 `extraFormatters`.
 
 Synchronize locks from a workspace with the Bloomery CLI package, for example
-`nix run github:actionable-work/bloomery#bloomery -- sync`. `bloomery sync`
+`nix run github:actionable-work/bloomery#bloomery-wrapped -- sync`. `bloomery sync`
 reconciles `Cargo.lock` and writes `bloomery.lock`; use `--update=rust`,
 `--update=nix`, or bare `--update` to request ecosystem updates. Sync requires
 `.bloomery/config.toml` and does not create or edit it. The `check`, `review`,

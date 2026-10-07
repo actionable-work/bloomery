@@ -1,7 +1,7 @@
 # Human and machine-readable output
 
-Every application command (`init`, `check`, `review`, `sync`, `spec`, and
-`config`)
+Every application command (`init`, `check`, `disk`, `review`, `sync`, `spec`,
+and `config`)
 accepts the same global `--json` flag, before or after the subcommand. No
 command has a
 separate JSON flag or format selector. It emits one JSON document on stdout, with no ANSI
@@ -52,6 +52,15 @@ same command identity and an error description.
   and [retrieval contract](../../CHECK/design/details.md).
 - `review --json` emits the existing stable array of manual review items with
   `area`, `feature`, `group`, `id`, `title`, `statement`, and `design_ref`.
+- `disk --json` emits one object with `command: "disk"`, `status`, and the
+  measured total as an integer `bytes` field, plus the `categories` tree where
+  each category has a `name` and `entries`, and each entry has a `name`,
+  `bytes`, and `unmeasured` flag. A full-tree measurement includes the measured
+  `systems`; an addressed measurement includes the `derivation`. Unmeasured
+  derivations are listed with their addresses. Failure carries the same command
+  identity and an error description. See the
+  [measurement contract](../../DISK/design/measurement.md#output) and
+  [category report](../../DISK/design/report.md).
 - `sync --json` emits an object with `command: "sync"` and `status`. Success
   includes a `result` containing reconciled locks, updated ecosystems, skipped
   updates, completed stages, warnings, recommendations, and tool stderr.

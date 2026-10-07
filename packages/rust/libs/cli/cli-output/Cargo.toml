@@ -1,5 +1,6 @@
 [dependencies]
 bloomery-config = { workspace = true }
+bloomery-disk = { workspace = true }
 bloomery-init = { workspace = true }
 bloomery-model = { workspace = true }
 bloomery-review = { workspace = true }

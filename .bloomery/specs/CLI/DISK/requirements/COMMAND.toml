@@ -1,0 +1,128 @@
+group = "COMMAND"
+
+[[requirements]]
+id = "CLI-DISK-COMMAND-001"
+title = "Disk is read-only"
+manual = false
+design = "design/usage.md#read-only-measurement"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery disk"
+action = "report disk usage without building, substituting, or mutating workspace files, configuration, or lockfiles"
+
+[[requirements]]
+id = "CLI-DISK-COMMAND-002"
+title = "Disk defaults to the full tree"
+manual = false
+design = "design/usage.md#measurement-modes"
+
+[requirements.ears]
+type = "event"
+trigger = "no derivation argument is supplied"
+system = "bloomery disk"
+action = "measure the full Bloomery Nix tree"
+
+[[requirements]]
+id = "CLI-DISK-COMMAND-003"
+title = "Disk measures one addressed derivation"
+manual = false
+design = "design/usage.md#measurement-modes"
+
+[requirements.ears]
+type = "event"
+trigger = "a derivation argument is supplied"
+system = "bloomery disk"
+action = "measure only the addressed derivation's closure"
+
+[[requirements]]
+id = "CLI-DISK-COMMAND-004"
+title = "Derivations are addressed by flake output path"
+manual = false
+design = "design/usage.md#derivation-addressing"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery disk"
+action = "accept a system-qualified flake output attribute path under packages, checks, devShell, or formatter as its derivation argument"
+
+[[requirements]]
+id = "CLI-DISK-COMMAND-005"
+title = "Derivations are addressed by store path"
+manual = false
+design = "design/usage.md#derivation-addressing"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery disk"
+action = "accept a Nix store path or derivation path as its derivation argument"
+
+[[requirements]]
+id = "CLI-DISK-COMMAND-006"
+title = "Default system is the host"
+manual = false
+design = "design/usage.md#system-scope"
+
+[requirements.ears]
+type = "event"
+trigger = "no --system option is supplied for a full-tree measurement"
+system = "bloomery disk"
+action = "measure the host Nix system"
+
+[[requirements]]
+id = "CLI-DISK-COMMAND-007"
+title = "Explicit systems are repeatable"
+manual = false
+design = "design/usage.md#system-scope"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery disk"
+action = "accept repeatable --system values as a deduplicated full-tree system selection"
+
+[[requirements]]
+id = "CLI-DISK-COMMAND-008"
+title = "System scope conflicts with an addressed derivation"
+manual = false
+design = "design/usage.md#system-scope"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a derivation argument is supplied together with --system"
+system = "bloomery disk"
+action = "return a usage error"
+
+[[requirements]]
+id = "CLI-DISK-COMMAND-009"
+title = "Unresolvable derivations are usage errors"
+manual = false
+design = "design/usage.md#derivation-addressing"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "the derivation argument does not name a resolvable Bloomery output or store path"
+system = "bloomery disk"
+action = "return a usage error naming the argument before measuring"
+
+[[requirements]]
+id = "CLI-DISK-COMMAND-010"
+title = "Disk scopes the full tree"
+manual = false
+design = "design/usage.md#scope"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery disk"
+action = "measure the runtime packages, the build checks, or both according to the selected scope"
+
+[[requirements]]
+id = "CLI-DISK-COMMAND-011"
+title = "Scope rejects an addressed derivation"
+manual = false
+design = "design/usage.md#scope"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a scope other than the default is supplied with a derivation argument"
+system = "bloomery disk"
+action = "return a usage error"

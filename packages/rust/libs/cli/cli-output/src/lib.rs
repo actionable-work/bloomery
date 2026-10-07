@@ -3,6 +3,7 @@ mod terminal;
 pub use terminal::{TerminalFacts, TransientLine};
 
 use bloomery_config::ConfigReport;
+use bloomery_disk::DiskReport;
 use bloomery_init::{InitError, InitErrorKind, InitReport};
 use bloomery_model::{Diagnostic, diagnostics::SourceLocation};
 use bloomery_spec::SpecReport;
@@ -228,6 +229,29 @@ pub fn spec_failure_json(command: &str, message: &str) -> Value {
     })
 }
 
+pub fn disk_success_json(report: &DiskReport) -> Value {
+    json!({
+        "command": "disk",
+        "status": "succeeded",
+        "bytes": report.bytes,
+        "systems": report.systems,
+        "derivation": report.derivation,
+        "unmeasured": report.unmeasured,
+        "categories": report.categories,
+    })
+}
+
+pub fn disk_failure_json(message: &str) -> Value {
+    json!({
+        "command": "disk",
+        "status": "failed",
+        "error": {
+            "kind": "disk",
+            "message": message,
+        },
+    })
+}
+
 pub fn usage_error_json(command: Option<&str>, message: &str) -> Value {
     json!({
         "command": command,
@@ -401,8 +425,10 @@ impl<W: Write> Write for ColorWriter<W> {
 mod tests {
     use super::{
         ColorWriter, Stream, color_enabled, color_policy, colorize_check, colorize_review,
-        diagnostics_json, sync_failure_json, sync_success_json, usage_error_json,
+        diagnostics_json, disk_success_json, sync_failure_json, sync_success_json,
+        usage_error_json,
     };
+    use bloomery_disk::{DiskCategory, DiskEntry, DiskReport};
     use bloomery_model::Diagnostic;
     use bloomery_review::ReviewItem;
     use bloomery_sync::SyncReport;
@@ -479,6 +505,64 @@ mod tests {
         assert_eq!(document[0]["id"], "CLI-INTERFACE-OUTPUT-001");
         assert_eq!(document[0]["design_ref"], "design/output.md");
         assert_eq!(document[0].as_object().expect("review item").len(), 7);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-013"))]
+    fn disk_json_reports_integer_bytes_and_unmeasured_targets() {
+        let report = DiskReport {
+            bytes: 4096,
+            systems: vec!["x86_64-linux".to_owned()],
+            derivation: None,
+            unmeasured: vec!["/nix/store/aaa-check".to_owned()],
+            categories: Vec::new(),
+        };
+        let document = disk_success_json(&report);
+        assert_eq!(document["command"], "disk");
+        assert_eq!(document["status"], "succeeded");
+        assert_eq!(document["bytes"], 4096);
+        assert_eq!(document["systems"][0], "x86_64-linux");
+        assert_eq!(document["unmeasured"][0], "/nix/store/aaa-check");
+        assert!(document["bytes"].is_u64());
+        let serialized = serde_json::to_string(&document).expect("JSON");
+        assert!(!serialized.contains("\\u001b"));
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-014"))]
+    fn disk_json_reports_the_category_tree() {
+        let report = DiskReport {
+            bytes: 300,
+            systems: vec!["x86_64-linux".to_owned()],
+            derivation: None,
+            unmeasured: Vec::new(),
+            categories: vec![
+                DiskCategory {
+                    name: "packages".to_owned(),
+                    bytes: 100,
+                    entries: vec![DiskEntry {
+                        name: "default".to_owned(),
+                        bytes: 100,
+                        unmeasured: false,
+                    }],
+                },
+                DiskCategory {
+                    name: "checks".to_owned(),
+                    bytes: 200,
+                    entries: vec![DiskEntry {
+                        name: "app:test".to_owned(),
+                        bytes: 200,
+                        unmeasured: false,
+                    }],
+                },
+            ],
+        };
+        let document = disk_success_json(&report);
+        assert_eq!(document["categories"][0]["name"], "packages");
+        assert_eq!(document["categories"][0]["entries"][0]["name"], "default");
+        assert_eq!(document["categories"][0]["entries"][0]["bytes"], 100);
+        assert_eq!(document["categories"][0]["entries"][0]["unmeasured"], false);
+        assert_eq!(document["categories"][1]["name"], "checks");
     }
 
     #[test]

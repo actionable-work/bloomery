@@ -53,7 +53,7 @@ design = "design/flags.md#shared-purpose-options"
 [requirements.ears]
 type = "ubiquitous"
 system = "the bloomery CLI"
-action = "expose the same --json option for init, check, review, sync, and spec"
+action = "expose the same --json option for init, check, disk, review, sync, and spec"
 
 [[requirements]]
 id = "CLI-INTERFACE-FLAGS-007"
@@ -212,3 +212,49 @@ design = "design/flags.md#shared-purpose-options"
 type = "ubiquitous"
 system = "the bloomery CLI"
 action = "accept a field name and value as positional arguments on spec set"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-021"
+title = "Disk accepts an explicit system scope"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "accept repeatable --system values on disk for full-tree measurements"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-022"
+title = "Disk system scope rejects an addressed derivation"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "disk is invoked with both --system and a derivation argument"
+system = "the bloomery CLI"
+action = "return a usage error"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-023"
+title = "Disk accepts a measurement scope"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "accept --scope with all, runtime, or build on disk, defaulting to all"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-024"
+title = "Disk measurement scope rejects an addressed derivation"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "disk is invoked with a non-default --scope and a derivation argument"
+system = "the bloomery CLI"
+action = "return a usage error"

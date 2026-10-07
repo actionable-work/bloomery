@@ -80,7 +80,7 @@ crate's `Cargo.toml`.
 Bloomery resolves crate features and dependency edges without Import-From-Derivation (IFD). Use the Bloomery CLI package to reconcile Cargo manifests and generate `bloomery.lock`:
 
 ```bash
-nix run github:actionable-work/bloomery#bloomery -- sync
+nix run github:actionable-work/bloomery#bloomery-wrapped -- sync
 ```
 
 This runs Cargo's normal workspace resolution, preserving compatible locked versions where possible. Request upgrades explicitly with `--update=rust`, `--update=nix`, or bare `--update` to update all applicable ecosystems. Sync requires `cargo`; it requires `nix` only when updating a flake. It requires `.bloomery/config.toml` and does not create or edit it.

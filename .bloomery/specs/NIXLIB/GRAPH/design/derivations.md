@@ -66,6 +66,25 @@ derivations bundle dependency, workspace, and crate-local assets into
 bundled under `assets/`. Crate-local assets take precedence over dependency
 assets.
 
+## Compressed crate artifacts
+
+A crate derivation installs its compiled libraries, compiler metadata, and
+proc-macro dynamic libraries as a single zstd-compressed archive named
+`lib.tar.zst` instead of an uncompressed `lib/` directory. The archive is built
+from the flat library directory so extraction restores the original filenames.
+The crate metadata script publishes the archive path and the primary library's
+filename in place of an absolute library path.
+
+Every Rust builder extracts each direct dependency's archive into its
+build-local dependency directory before invoking `rustc`, then links the
+extracted primary library with `--extern`. A crate publishes its own archive
+together with the archives inherited from its dependencies in `deps-closure`,
+so a consumer can restore the transitive dependency set. Ordinary library
+directories remain supported for externally supplied dependencies.
+
+Archiving is an installation detail: crate, binary, test, documentation, and
+clippy outcomes are unchanged.
+
 ## Checks
 
 `<crate>:test` compiles and runs unit tests and integration tests with

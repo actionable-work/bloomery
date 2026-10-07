@@ -185,7 +185,10 @@ in {
       wiresExterns = lib.hasInfix "--extern" crateDrv.configurePhase;
       handlesRenamedDependencies = lib.hasInfix "package" crateDrv.configurePhase;
       writesMeta = lib.hasInfix "nix-support/meta.sh" crateDrv.installPhase;
-      propagatesLibraryPath = lib.hasInfix "DEP_LIB_PATH" crateDrv.installPhase;
+      propagatesLibraryArchive = lib.hasInfix "DEP_LIB_ARCHIVE" crateDrv.installPhase;
+      propagatesLibraryName = lib.hasInfix "DEP_LIB_NAME" crateDrv.installPhase;
+      compressesLibrary = lib.hasInfix "lib.tar.zst" crateDrv.installPhase;
+      extractsDependencyArchives = lib.hasInfix "tar --zstd" crateDrv.configurePhase;
       propagatesLinkFlags = lib.hasInfix "DEP_RUSTC_LINK_FLAGS" crateDrv.installPhase;
       publishesClosure = lib.hasInfix "deps-closure" crateDrv.installPhase;
     };
@@ -193,7 +196,10 @@ in {
       wiresExterns = true;
       handlesRenamedDependencies = true;
       writesMeta = true;
-      propagatesLibraryPath = true;
+      propagatesLibraryArchive = true;
+      propagatesLibraryName = true;
+      compressesLibrary = true;
+      extractsDependencyArchives = true;
       propagatesLinkFlags = true;
       publishesClosure = true;
     };

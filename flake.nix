@@ -83,6 +83,23 @@
               inherit lib nixpkgs self bloomeryFor perSystemWorkspace system;
             }
         );
+        packages = eachSystem (
+          system: let
+            pkgs = nixpkgs.legacyPackages.${system};
+            bloomery = perSystemWorkspace.${system}.packages.bloomery;
+            wrapped =
+              pkgs.runCommand "bloomery-wrapped" {
+                nativeBuildInputs = [pkgs.makeWrapper];
+                meta = (bloomery.meta or {}) // {mainProgram = "bloomery";};
+                passthru = {inherit bloomery;};
+              } ''
+                mkdir -p "$out/bin"
+                makeWrapper "${bloomery}/bin/bloomery" "$out/bin/bloomery" \
+                  --prefix PATH : "${lib.makeBinPath [pkgs.cargo]}"
+              '';
+          in
+            perSystemWorkspace.${system}.packages // {bloomery-wrapped = wrapped;}
+        );
         apps = eachSystem (
           system: let
             pkgs = nixpkgs.legacyPackages.${system};

@@ -16,6 +16,7 @@ bloomery-cli-parser = { default-features = false, path = "packages/rust/libs/cli
 bloomery-cli-types = { default-features = false, path = "packages/rust/libs/cli/cli-types" }
 bloomery-config = { default-features = false, path = "packages/rust/libs/cli/config" }
 bloomery-content = { default-features = false, path = "packages/rust/libs/docs/content" }
+bloomery-disk = { default-features = false, path = "packages/rust/libs/cli/disk" }
 bloomery-docs-server = { default-features = false, path = "packages/rust/libs/docs/docs-server" }
 bloomery-init = { default-features = false, path = "packages/rust/libs/cli/init" }
 bloomery-model = { default-features = false, path = "packages/rust/libs/shared/model" }

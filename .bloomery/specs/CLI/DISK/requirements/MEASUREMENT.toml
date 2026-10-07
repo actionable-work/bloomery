@@ -1,0 +1,125 @@
+group = "MEASUREMENT"
+
+[[requirements]]
+id = "CLI-DISK-MEASUREMENT-001"
+title = "Disk reports closure size"
+manual = false
+design = "design/measurement.md#closure-size"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery disk"
+action = "report the total Nix store size of the transitive closure of the measured derivations"
+
+[[requirements]]
+id = "CLI-DISK-MEASUREMENT-002"
+title = "Shared store paths count once"
+manual = false
+design = "design/measurement.md#closure-size"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery disk"
+action = "count each store path once regardless of how many measured derivations reach it"
+
+[[requirements]]
+id = "CLI-DISK-MEASUREMENT-003"
+title = "The full tree covers packages and checks"
+manual = false
+design = "design/measurement.md#full-tree"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery disk"
+action = "measure the union of the packages and checks outputs for each selected system"
+
+[[requirements]]
+id = "CLI-DISK-MEASUREMENT-004"
+title = "The recursive check output is excluded"
+manual = false
+design = "design/measurement.md#full-tree"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery disk"
+action = "exclude any legacy bloomery:check attribute from the full tree measurement"
+
+[[requirements]]
+id = "CLI-DISK-MEASUREMENT-005"
+title = "Disk does not realize derivations"
+manual = false
+design = "design/measurement.md#realization"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery disk"
+action = "measure only store paths already realized without building or substituting"
+
+[[requirements]]
+id = "CLI-DISK-MEASUREMENT-006"
+title = "Unrealized derivations are reported"
+manual = false
+design = "design/measurement.md#realization"
+
+[requirements.ears]
+type = "event"
+trigger = "a measured derivation has no realized output path in the store"
+system = "bloomery disk"
+action = "report the derivation as unmeasured and exclude it from the total"
+
+[[requirements]]
+id = "CLI-DISK-MEASUREMENT-007"
+title = "Unmeasured derivations fail the invocation"
+manual = false
+design = "design/measurement.md#exit-codes"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "one or more measured derivations cannot be resolved to a realized store path"
+system = "bloomery disk"
+action = "return a nonzero exit code rather than claim a complete measurement"
+
+[[requirements]]
+id = "CLI-DISK-MEASUREMENT-008"
+title = "Unavailable Nix is an operational error"
+manual = false
+design = "design/measurement.md#exit-codes"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "the Nix CLI is unavailable when disk measurement is requested"
+system = "bloomery disk"
+action = "report an operational error instead of an empty measurement"
+
+[[requirements]]
+id = "CLI-DISK-MEASUREMENT-009"
+title = "Human output renders byte quantities"
+manual = false
+design = "design/measurement.md#output"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery disk"
+action = "render totals in human-readable binary byte units"
+
+[[requirements]]
+id = "CLI-DISK-MEASUREMENT-010"
+title = "JSON output reports integer bytes"
+manual = false
+design = "design/measurement.md#output"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery disk"
+action = "report totals as integer bytes in JSON mode"
+
+[[requirements]]
+id = "CLI-DISK-MEASUREMENT-011"
+title = "Disk measures uncompressed NAR size"
+manual = false
+design = "design/measurement.md#closure-size"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery disk"
+action = "measure each store path by its uncompressed NAR size"

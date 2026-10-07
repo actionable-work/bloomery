@@ -5,8 +5,8 @@ tagline: Define the user-visible command syntax and options for the bloomery exe
 description: |
   The interface feature specifies the command tree, invocation root, shared
   flake-presence preflight, flags, and output modes exposed by `bloomery`.
-  Command behavior is specified separately by the CHECK, REVIEW, SYNC, SPEC, and
-  CONFIG features.
+  Command behavior is specified separately by the CHECK, DISK, REVIEW, SYNC,
+  SPEC, and CONFIG features.
 ---
 
 # CLI Interface
@@ -23,8 +23,9 @@ and how the target repository root is selected.
 
 ## Responsibilities
 
-- Expose `init`, `check`, its `list`/`failures`/`details` commands, `review`,
-  `sync`, `spec` with its `list`/`show`/`add`/`set`/`remove`/`trace`/`candidates`
+- Expose `init`, `check`, its `list`/`failures`/`details` commands, `disk` with
+  its `tree` command, `review`, `sync`, `spec` with its
+  `list`/`show`/`add`/`set`/`remove`/`trace`/`candidates`
   commands, `config` with its `get`/`set`/`unset`/`list`/`upgrade`/`document`
   commands, and parser-generated help.
 - Resolve the repository root from the process's current working directory.
@@ -35,9 +36,10 @@ and how the target repository root is selected.
   help, `init`, and flake-exempt `config`, whose mutating commands create a
   missing file with a warning.
 - Specify shared `--json`, check selection/execution/retrieval options, command-specific
-  `sync --update`, `spec list` filters, `config --prefix`/`config --dry-run`/`config
+  `sync --update`, `disk --system`, `spec list` filters, `config --prefix`/`config
+  --dry-run`/`config
   --diff`, and `init
   --template`/`init --force` values.
 - Define human-readable terminal coloring and stable JSON output contracts.
-- Keep command syntax distinct from init, check, review, sync, spec, and config
-  semantics.
+- Keep command syntax distinct from init, check, disk, review, sync, spec, and
+  config semantics.

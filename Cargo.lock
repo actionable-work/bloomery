@@ -222,6 +222,7 @@ dependencies = [
  "bloomery-cli-parser",
  "bloomery-cli-types",
  "bloomery-config",
+ "bloomery-disk",
  "bloomery-init",
  "bloomery-model",
  "bloomery-review",
@@ -237,6 +238,7 @@ name = "bloomery-cli-output"
 version = "0.1.0"
 dependencies = [
  "bloomery-config",
+ "bloomery-disk",
  "bloomery-init",
  "bloomery-model",
  "bloomery-review",
@@ -271,6 +273,15 @@ dependencies = [
 [[package]]
 name = "bloomery-content"
 version = "0.1.0"
+
+[[package]]
+name = "bloomery-disk"
+version = "0.1.0"
+dependencies = [
+ "bloomery-cli-types",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "bloomery-docs"

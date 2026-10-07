@@ -33,10 +33,13 @@ commands:
 | `config upgrade` | `--dry-run` | flag | write the upgraded file |
 | `config upgrade` | `--diff` | flag | do not compare recommendations |
 | `sync` | `--update[=LIST]` | optional comma-separated `nix`, `rust` list | no upgrades; reconcile Cargo and Bloomery locks |
+| `disk` | `--json` | flag | human-readable text |
+| `disk` | `--system` | repeatable system name | host Nix system |
+| `disk` | `--scope` | `all`, `runtime`, or `build` | `all` |
 | all commands | `-h`, `--help` | — | — |
 
 `--json` is a shared global option, accepted before or after the subcommand. It
-selects machine-readable output for check, review, sync, and init; no
+selects machine-readable output for check, disk, review, sync, and init; no
 command-specific `--format` or alternate JSON spelling is exposed. Human-readable
 output is the default. Terminal color behavior is automatic and consistent
 across commands; non-empty `NO_COLOR`, redirected streams, and JSON mode
@@ -51,7 +54,8 @@ non-empty target unless `--force` is supplied. Every recognized
 application command request, including nested check retrieval, requires the
 shared root `flake.nix` preflight; the workspace-bootstrap `init` command is
 exempt, and parser help and version output is served without a preflight.
-Check, review, and sync additionally require `.bloomery/config.toml`; parser help
+Check, disk, review, sync, and spec additionally require `.bloomery/config.toml`;
+parser help
 and `init` are exempt from the configuration requirement. The CLI parser also
 supplies the `help` subcommand for displaying command help.
 
@@ -90,3 +94,11 @@ and `spec candidates` take only positional arguments. Filter flags are usage
 errors on every spec subcommand except `spec list`. See the
 [spec editing contract](../../SPEC/design/editing.md) and
 [traceability contract](../../SPEC/design/trace.md).
+
+For disk, `--system` is accepted only for a full-tree measurement and selects
+the systems whose Bloomery outputs are measured; it is repeatable and defaults
+to the host Nix system. Supplying `--system` with a `DERIVATION` argument is a
+usage error because `--system` only scopes full-tree measurements. `--scope`
+selects the `runtime` packages, the `build` checks, or `all`; it defaults to
+`all`, and a non-default scope with a `DERIVATION` is a usage error. See the
+[disk usage contract](../../DISK/design/usage.md#system-scope).

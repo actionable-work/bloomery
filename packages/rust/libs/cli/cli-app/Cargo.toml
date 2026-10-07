@@ -4,6 +4,7 @@ bloomery-cli-output = { workspace = true }
 bloomery-cli-parser = { workspace = true }
 bloomery-cli-types = { workspace = true }
 bloomery-config = { workspace = true }
+bloomery-disk = { workspace = true }
 bloomery-init = { workspace = true }
 bloomery-model = { workspace = true }
 bloomery-review = { workspace = true }

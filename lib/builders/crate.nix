@@ -48,7 +48,7 @@
     then lld
     else null;
 
-  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc] ++ lib.optional (linkerPackage != null) linkerPackage;
+  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc pkgs.zstd] ++ lib.optional (linkerPackage != null) linkerPackage;
   buildInputs = override.buildInputs or [];
   featureList =
     if override ? features && override.features != null
@@ -217,10 +217,15 @@ in
         EXTRA_LINK_FLAGS=()
 
         for dep in $dependencies; do
+          DEP_LIB_PATH=""
           if [ -f "$dep/nix-support/meta.sh" ]; then
             # Load structured metadata
             source "$dep/nix-support/meta.sh"
-            if [ -n "$DEP_CRATE_NAME" ] && [ -f "$DEP_LIB_PATH" ]; then
+            if [ -n "$DEP_LIB_ARCHIVE" ] && [ -f "$DEP_LIB_ARCHIVE" ]; then
+              tar --zstd -xf "$DEP_LIB_ARCHIVE" -C _deps
+              DEP_LIB_PATH="_deps/$DEP_LIB_NAME"
+            fi
+            if [ -n "$DEP_CRATE_NAME" ] && [ -n "$DEP_LIB_PATH" ] && [ -f "$DEP_LIB_PATH" ]; then
               EXTERN_FLAGS+=("--extern" "$DEP_CRATE_NAME=$DEP_LIB_PATH")
               if [ -f Cargo.toml ]; then
                 PKG_SEARCH="''${DEP_PKG_NAME:-$DEP_CRATE_NAME}"
@@ -265,8 +270,10 @@ in
           if [ -d "$dep/nix-support/deps-closure" ]; then
             for f in "$dep/nix-support/deps-closure"/*; do
               if [ -e "$f" ]; then
-                target=$(readlink -f "$f")
-                ln -sf "$target" "_deps/$(basename "$f")"
+                case "$f" in
+                  *.tar.zst) tar --zstd -xf "$f" -C _deps ;;
+                  *) ln -sf "$(readlink -f "$f")" "_deps/$(basename "$f")" ;;
+                esac
               fi
             done
           fi
@@ -541,11 +548,12 @@ in
           exit 1
         fi
 
+        DEP_LIB_NAME="$(basename "$OUT_LIB")"
+        tar --zstd -cf "$out/lib.tar.zst" -C "$out/lib" .
+        rm -rf "$out/lib"
+
         mkdir -p "$out/nix-support/deps-closure"
-        for f in "$out/lib"/*; do
-          target=$(readlink -f "$f")
-          ln -sf "$target" "$out/nix-support/deps-closure/$(basename "$f")"
-        done
+        ln -sf "$out/lib.tar.zst" "$out/nix-support/deps-closure/$(basename "$out")-lib.tar.zst"
         for dep in $dependencies; do
           if [ -d "$dep/nix-support/deps-closure" ]; then
             for f in "$dep/nix-support/deps-closure"/*; do
@@ -588,7 +596,8 @@ in
         cat << EOF > "$out/nix-support/meta.sh"
         export DEP_PKG_NAME="$PKG_NAME"
         export DEP_CRATE_NAME="$CRATE_NAME"
-        export DEP_LIB_PATH="$OUT_LIB"
+        export DEP_LIB_ARCHIVE="$out/lib.tar.zst"
+        export DEP_LIB_NAME="$DEP_LIB_NAME"
         export DEP_IS_PROC_MACRO="$IS_PROC_MACRO"
         export DEP_RUSTC_LINK_FLAGS="''${BUILD_SCRIPT_LINK_FLAGS[*]}"
         EOF

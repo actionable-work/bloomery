@@ -1,9 +1,9 @@
 use bloomery_cli_types::{
     CheckArgs, CheckOperation, CliCommand, CliInvocation, ConfigArgs, ConfigOperation,
-    DEFAULT_PAGE_LIMIT, DETAIL_PAGE_LIMIT, DetailsArgs, FailureArgs, InitArgs, ListArgs, SpecArgs,
-    SpecOperation,
+    DEFAULT_PAGE_LIMIT, DETAIL_PAGE_LIMIT, DetailsArgs, DiskArgs, DiskScope, FailureArgs, InitArgs,
+    ListArgs, SpecArgs, SpecOperation,
 };
-use clap::{ArgAction, Args, Parser, Subcommand, error::ErrorKind};
+use clap::{ArgAction, Args, Parser, Subcommand, ValueEnum, error::ErrorKind};
 use std::ffi::OsString;
 use std::fmt;
 use std::path::PathBuf;
@@ -96,6 +96,7 @@ fn command_from_arguments(arguments: &[OsString]) -> Option<&'static str> {
         .iter()
         .find_map(|argument| match argument.to_str()? {
             "check" => Some("check"),
+            "disk" => Some("disk"),
             "review" => Some("review"),
             "sync" => Some("sync"),
             "init" => Some("init"),
@@ -124,6 +125,8 @@ enum RawCommand {
     Init(RawInitArgs),
     /// Run static validation and selected Nix checks, or retrieve retained results.
     Check(RawCheckArgs),
+    /// Report the Nix store size of the Bloomery tree or one derivation.
+    Disk(RawDiskArgs),
     /// Print requirements that require human review.
     Review,
     /// Reconcile Cargo and Bloomery locks, optionally updating dependencies.
@@ -149,6 +152,7 @@ impl From<RawCommand> for CliCommand {
         match command {
             RawCommand::Init(args) => Self::Init(args.into()),
             RawCommand::Check(args) => Self::Check(args.into()),
+            RawCommand::Disk(args) => Self::Disk(args.into()),
             RawCommand::Review => Self::Review,
             RawCommand::Sync { update } => Self::Sync { update },
             RawCommand::Config(args) => Self::Config(args.into()),
@@ -327,6 +331,107 @@ impl From<RawSpecOperation> for SpecOperation {
             RawSpecOperation::Candidates => Self::Candidates,
         }
     }
+}
+
+#[derive(Debug, Args)]
+#[command(args_conflicts_with_subcommands = true)]
+struct RawDiskArgs {
+    /// Derivation to measure: a flake output attribute path or a Nix store path.
+    derivation: Option<String>,
+    /// Select the runtime packages, the build checks, or both.
+    #[arg(
+        long = "scope",
+        value_name = "SCOPE",
+        value_enum,
+        default_value = "all",
+        conflicts_with = "derivation"
+    )]
+    scope: RawDiskScope,
+    /// Select a Nix system for a full-tree measurement; may be repeated.
+    #[arg(
+        long = "system",
+        value_name = "SYSTEM",
+        action = ArgAction::Append,
+        conflicts_with = "derivation"
+    )]
+    systems: Vec<String>,
+    #[command(subcommand)]
+    operation: Option<RawDiskOperation>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum RawDiskScope {
+    All,
+    Runtime,
+    Build,
+}
+
+impl From<RawDiskScope> for DiskScope {
+    fn from(scope: RawDiskScope) -> Self {
+        match scope {
+            RawDiskScope::All => Self::All,
+            RawDiskScope::Runtime => Self::Runtime,
+            RawDiskScope::Build => Self::Build,
+        }
+    }
+}
+
+#[derive(Debug, Subcommand)]
+enum RawDiskOperation {
+    /// Render the category tree instead of the size summary.
+    Tree(RawDiskTreeArgs),
+}
+
+#[derive(Debug, Args)]
+struct RawDiskTreeArgs {
+    /// Derivation to measure: a flake output attribute path or a Nix store path.
+    derivation: Option<String>,
+    /// Select the runtime packages, the build checks, or both.
+    #[arg(
+        long = "scope",
+        value_name = "SCOPE",
+        value_enum,
+        default_value = "all",
+        conflicts_with = "derivation"
+    )]
+    scope: RawDiskScope,
+    /// Select a Nix system for a full-tree measurement; may be repeated.
+    #[arg(
+        long = "system",
+        value_name = "SYSTEM",
+        action = ArgAction::Append,
+        conflicts_with = "derivation"
+    )]
+    systems: Vec<String>,
+}
+
+impl From<RawDiskArgs> for DiskArgs {
+    fn from(args: RawDiskArgs) -> Self {
+        match args.operation {
+            Some(RawDiskOperation::Tree(tree)) => Self {
+                tree: true,
+                scope: tree.scope.into(),
+                derivation: tree.derivation,
+                systems: deduplicate_systems(tree.systems),
+            },
+            None => Self {
+                tree: false,
+                scope: args.scope.into(),
+                derivation: args.derivation,
+                systems: deduplicate_systems(args.systems),
+            },
+        }
+    }
+}
+
+fn deduplicate_systems(systems: Vec<String>) -> Vec<String> {
+    let mut deduplicated = Vec::new();
+    for system in systems {
+        if !deduplicated.contains(&system) {
+            deduplicated.push(system);
+        }
+    }
+    deduplicated
 }
 
 #[derive(Debug, Args)]

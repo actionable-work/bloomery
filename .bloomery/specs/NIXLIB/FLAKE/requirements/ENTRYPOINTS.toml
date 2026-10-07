@@ -238,14 +238,14 @@ action = "accept an optional main-flake self and use it to resolve configured su
 
 [[requirements]]
 id = "NIXLIB-FLAKE-ENTRYPOINTS-022"
-title = "Bloomery CLI wraps its hard runtime dependencies"
+title = "The default Bloomery CLI package is unwrapped"
 manual = false
 design = "design/entry-points.md#bloomery-cli-injection"
 
 [requirements.ears]
 type = "ubiquitous"
-system = "the Bloomery CLI derivation"
-action = "make its hard runtime tool dependencies, currently cargo, available on the executable's runtime PATH"
+system = "the Bloomery CLI package"
+action = "install the executable without wrapping runtime tools onto its runtime PATH"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-ENTRYPOINTS-023"
@@ -255,7 +255,7 @@ design = "design/entry-points.md#bloomery-cli-injection"
 
 [requirements.ears]
 type = "ubiquitous"
-system = "the Bloomery CLI derivation"
+system = "the wrapped Bloomery CLI package"
 action = "treat nix as a host-provided global dependency and omit it from declared runtime dependencies"
 
 [[requirements]]
@@ -266,5 +266,16 @@ design = "design/entry-points.md#bloomery-cli-injection"
 
 [requirements.ears]
 type = "ubiquitous"
-system = "the Bloomery CLI derivation"
+system = "the wrapped Bloomery CLI package"
 action = "omit optional metadata tools such as git from declared runtime dependencies"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-025"
+title = "The flake exports a wrapped Bloomery CLI package"
+manual = false
+design = "design/entry-points.md#bloomery-cli-injection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery flake"
+action = "export a bloomery-wrapped package that makes the CLI's hard runtime tool dependencies, currently cargo, available on the executable's runtime PATH"

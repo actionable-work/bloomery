@@ -33,7 +33,7 @@ design = "design/output.md"
 [requirements.ears]
 type = "ubiquitous"
 system = "the bloomery CLI"
-action = "accept --json for init, check, review, sync, and spec"
+action = "accept --json for init, check, disk, review, sync, and spec"
 
 [[requirements]]
 id = "CLI-INTERFACE-OUTPUT-004"
@@ -142,3 +142,27 @@ type = "event"
 trigger = "spec candidates is invoked with --json"
 system = "bloomery spec"
 action = "emit an array of untied test sites with scanner, name, path, and line"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-013"
+title = "Disk JSON reports byte quantities"
+manual = false
+design = "design/output.md#json-contracts"
+
+[requirements.ears]
+type = "event"
+trigger = "disk is invoked with --json"
+system = "bloomery disk"
+action = "emit one object with the measured byte total, the measured systems, the addressed derivation, and any unmeasured derivations"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-014"
+title = "Disk JSON reports the category tree"
+manual = false
+design = "design/output.md#json-contracts"
+
+[requirements.ears]
+type = "event"
+trigger = "disk is invoked with --json"
+system = "bloomery disk"
+action = "emit the category tree with each entry's name, bytes, and unmeasured status"

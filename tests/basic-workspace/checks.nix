@@ -75,7 +75,7 @@
             test -d "${workspace.crates."lib-core-0.1.0"}/nix-support/deps-closure" || { echo "Missing dependency closure"; exit 1; }
             ls "${workspace.crates."lib-core-0.1.0"}/nix-support/deps-closure" >/dev/null || { echo "Empty dependency closure"; exit 1; }
             test -n "${injectedCli}" || { echo "Missing injected bloomery CLI"; exit 1; }
-            grep -q "${pkgs.cargo}/bin" "${injectedCli}/bin/bloomery" || { echo "Injected bloomery CLI does not wrap cargo"; exit 1; }
+            if grep -q "${pkgs.cargo}/bin" "${injectedCli}/bin/bloomery"; then echo "Injected bloomery CLI must not wrap cargo"; exit 1; fi
             mkdir $out
             echo "OK" > $out/success
           '';

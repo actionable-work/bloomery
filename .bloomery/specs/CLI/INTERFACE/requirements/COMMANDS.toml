@@ -108,7 +108,7 @@ design = "design/commands.md#configuration-presence"
 
 [requirements.ears]
 type = "unwanted_behavior"
-trigger = "check, review, sync, or spec is requested without .bloomery/config.toml"
+trigger = "check, disk, review, sync, or spec is requested without .bloomery/config.toml"
 system = "the bloomery CLI"
 action = "stop before command-specific work with a nonzero ConfigurationError naming the missing path"
 
@@ -316,3 +316,25 @@ type = "event"
 trigger = "help or version output is requested from a current directory without flake.nix"
 system = "the bloomery CLI"
 action = "return the help or version output without the shared flake setup error"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-029"
+title = "The CLI exposes disk"
+manual = false
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery"
+action = "expose the disk subcommand"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-030"
+title = "Disk exposes tree"
+manual = false
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery disk"
+action = "expose the tree subcommand"

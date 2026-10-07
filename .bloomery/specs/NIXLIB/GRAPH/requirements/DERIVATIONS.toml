@@ -288,3 +288,58 @@ design = "design/derivations.md#runtime-dependencies"
 type = "ubiquitous"
 system = "the binary builder"
 action = "reference every declared runtime tool dependency from the wrapped binary derivation"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-027"
+title = "Crate outputs are compressed"
+manual = false
+design = "design/derivations.md#compressed-crate-artifacts"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "install a crate's compiled libraries as a single zstd-compressed archive instead of an uncompressed library directory"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-028"
+title = "Crate metadata advertises the archive"
+manual = false
+design = "design/derivations.md#compressed-crate-artifacts"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "publish the archive path and the archive member filename through the crate's metadata script"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-029"
+title = "Dependency archives are extracted before compilation"
+manual = false
+design = "design/derivations.md#compressed-crate-artifacts"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Rust builders"
+action = "extract every dependency archive into the build-local dependency directory before invoking rustc"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-030"
+title = "Transitive dependency archives propagate"
+manual = false
+design = "design/derivations.md#compressed-crate-artifacts"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "publish its archive together with the transitive dependency archives in its dependency closure"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-031"
+title = "Compression preserves build behavior"
+manual = false
+design = "design/derivations.md#compressed-crate-artifacts"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Rust builders"
+action = "produce the same crate, binary, test, documentation, and clippy outcomes from extracted archives as from uncompressed libraries"

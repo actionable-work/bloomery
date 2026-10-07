@@ -1,0 +1,79 @@
+group = "REPORT"
+
+[[requirements]]
+id = "CLI-DISK-REPORT-001"
+title = "Disk reports a category tree"
+manual = false
+design = "design/report.md#categories"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery disk"
+action = "group the measured targets into named runtime and build categories"
+
+[[requirements]]
+id = "CLI-DISK-REPORT-002"
+title = "Shared store paths are attributed once"
+manual = false
+design = "design/report.md#exclusive-attribution"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery disk"
+action = "attribute each measured store path to exactly one category"
+
+[[requirements]]
+id = "CLI-DISK-REPORT-003"
+title = "Category sizes sum to the total"
+manual = false
+design = "design/report.md#exclusive-attribution"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery disk"
+action = "report category byte totals whose sum equals the report's total bytes"
+
+[[requirements]]
+id = "CLI-DISK-REPORT-004"
+title = "Tree output renders an indented tree"
+manual = false
+design = "design/report.md#rendering"
+
+[requirements.ears]
+type = "event"
+trigger = "the disk tree command is selected"
+system = "bloomery disk"
+action = "render each category and its derivations as an indented tree"
+
+[[requirements]]
+id = "CLI-DISK-REPORT-005"
+title = "Category ordering is deterministic"
+manual = false
+design = "design/report.md#ordering"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery disk"
+action = "order categories and their derivations deterministically"
+
+[[requirements]]
+id = "CLI-DISK-REPORT-006"
+title = "Plain disk renders a size summary"
+manual = false
+design = "design/report.md#rendering"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery disk"
+action = "render the measured total without the category tree"
+
+[[requirements]]
+id = "CLI-DISK-REPORT-007"
+title = "The report separates runtime and build sizes"
+manual = false
+design = "design/report.md#rendering"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery disk"
+action = "report the runtime and build byte totals distinctly in both summary and tree output"

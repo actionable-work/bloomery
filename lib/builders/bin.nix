@@ -64,7 +64,7 @@ in
       then ["-Clink-arg=-fuse-ld=${defaultLinker}"]
       else [];
     runtimeDependencies = override.runtimeDependencies or [];
-    nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc] ++ lib.optional (linkerPackage != null) linkerPackage ++ lib.optional (runtimeDependencies != []) pkgs.makeWrapper;
+    nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc pkgs.zstd] ++ lib.optional (linkerPackage != null) linkerPackage ++ lib.optional (runtimeDependencies != []) pkgs.makeWrapper;
     buildInputs = override.buildInputs or [];
     cleanDefaultFlags =
       if evaluatedProfile.optLevel != null
@@ -170,9 +170,14 @@ in
           EXTRA_LINK_FLAGS=()
 
           for dep in $dependencies; do
+            DEP_LIB_PATH=""
             if [ -f "$dep/nix-support/meta.sh" ]; then
               source "$dep/nix-support/meta.sh"
-              if [ -n "$DEP_CRATE_NAME" ] && [ -f "$DEP_LIB_PATH" ]; then
+              if [ -n "$DEP_LIB_ARCHIVE" ] && [ -f "$DEP_LIB_ARCHIVE" ]; then
+                tar --zstd -xf "$DEP_LIB_ARCHIVE" -C _deps
+                DEP_LIB_PATH="_deps/$DEP_LIB_NAME"
+              fi
+              if [ -n "$DEP_CRATE_NAME" ] && [ -n "$DEP_LIB_PATH" ] && [ -f "$DEP_LIB_PATH" ]; then
                 if [ -z "''${SEEN_EXTERNS[$DEP_CRATE_NAME]:-}" ]; then
                   EXTERN_FLAGS+=("--extern" "$DEP_CRATE_NAME=$DEP_LIB_PATH")
                   SEEN_EXTERNS["$DEP_CRATE_NAME"]=1
@@ -197,8 +202,10 @@ in
             if [ -d "$dep/nix-support/deps-closure" ]; then
               for f in "$dep/nix-support/deps-closure"/*; do
                 if [ -e "$f" ]; then
-                  target=$(readlink -f "$f")
-                  ln -sf "$target" "_deps/$(basename "$f")"
+                  case "$f" in
+                    *.tar.zst) tar --zstd -xf "$f" -C _deps ;;
+                    *) ln -sf "$(readlink -f "$f")" "_deps/$(basename "$f")" ;;
+                  esac
                 fi
               done
             fi
@@ -214,9 +221,14 @@ in
 
           # If crateDrv is provided, link the crate's own .rlib
           if [ -n "$crateDrv" ] && [ -d "$crateDrv" ]; then
+            DEP_LIB_PATH=""
             if [ -f "$crateDrv/nix-support/meta.sh" ]; then
               source "$crateDrv/nix-support/meta.sh"
-              if [ -n "$DEP_CRATE_NAME" ] && [ -f "$DEP_LIB_PATH" ]; then
+              if [ -n "$DEP_LIB_ARCHIVE" ] && [ -f "$DEP_LIB_ARCHIVE" ]; then
+                tar --zstd -xf "$DEP_LIB_ARCHIVE" -C _deps
+                DEP_LIB_PATH="_deps/$DEP_LIB_NAME"
+              fi
+              if [ -n "$DEP_CRATE_NAME" ] && [ -n "$DEP_LIB_PATH" ] && [ -f "$DEP_LIB_PATH" ]; then
                 if [ -z "''${SEEN_EXTERNS[$DEP_CRATE_NAME]:-}" ]; then
                   EXTERN_FLAGS+=("--extern" "$DEP_CRATE_NAME=$DEP_LIB_PATH")
                   SEEN_EXTERNS["$DEP_CRATE_NAME"]=1

@@ -13,6 +13,7 @@ pub struct CliInvocation {
 pub enum CliCommand {
     Init(InitArgs),
     Check(CheckArgs),
+    Disk(DiskArgs),
     Review,
     Sync { update: Option<String> },
     Config(ConfigArgs),
@@ -68,6 +69,22 @@ pub enum ConfigOperation {
     List { prefix: Option<String> },
     Upgrade { dry_run: bool, diff: bool },
     Document,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DiskArgs {
+    pub tree: bool,
+    pub scope: DiskScope,
+    pub derivation: Option<String>,
+    pub systems: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum DiskScope {
+    #[default]
+    All,
+    Runtime,
+    Build,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
