@@ -39,12 +39,12 @@ lists applied per build phase.
 ## Overrides
 
 `overrides` maps crate names or package IDs to per-crate settings: native
-build inputs, build inputs, rustc and rustdoc flags, environment, explicit
-features, fileset or src, release and dev profile fragments, assets, asset
-directories, and additive test-only inputs. Built-in sys-crate overrides,
-colocated `overrides.nix` files, and the `overrides` constructor argument merge
-in that order with explicit values winning. Override keys match package IDs,
-hyphenated names, and underscored names.
+build inputs, build inputs, runtime tool dependencies, rustc and rustdoc flags,
+environment, explicit features, fileset or src, release and dev profile
+fragments, assets, asset directories, and additive test-only inputs. Built-in
+sys-crate overrides, colocated `overrides.nix` files, and the `overrides`
+constructor argument merge in that order with explicit values winning. Override
+keys match package IDs, hyphenated names, and underscored names.
 
 ## Feature resolution
 

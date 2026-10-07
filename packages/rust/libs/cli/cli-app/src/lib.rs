@@ -45,7 +45,7 @@ where
 {
     match parse_from(arguments) {
         Ok(invocation) => run_invocation_at(invocation, root, stdout, stderr),
-        Err(error) => report_parse_error_at(error, root, stdout, stderr),
+        Err(error) => report_parse_error_at(error, stdout, stderr),
     }
 }
 
@@ -172,7 +172,6 @@ fn load_configuration_preflight(
 
 fn report_parse_error_at(
     error: ParseError,
-    root: &Path,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> ExitCode {
@@ -181,9 +180,6 @@ fn report_parse_error_at(
         error.kind(),
         ParseErrorKind::DisplayHelp | ParseErrorKind::DisplayVersion
     ) {
-        if !flake_present(root) && error.command() != Some("config") {
-            return report_missing_flake(error.command(), error.json_mode(), stdout, stderr);
-        }
         let _ = stdout.write_all(error.message().as_bytes());
         return ExitCode::from(exit_code);
     }
@@ -1163,7 +1159,7 @@ mod tests {
 
     #[test]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-009"))]
-    fn every_command_and_help_requires_a_root_flake_before_working() {
+    fn every_application_command_requires_a_root_flake_before_working() {
         let command_argvs: &[&[&str]] = &[
             &["bloomery", "check"],
             &["bloomery", "check", "list"],
@@ -1174,9 +1170,6 @@ mod tests {
             &["bloomery", "spec", "list"],
             &["bloomery", "spec", "candidates"],
             &["bloomery", "spec", "trace", "CLI-INTERFACE-COMMANDS-001"],
-            &["bloomery", "help"],
-            &["bloomery", "help", "check"],
-            &["bloomery", "--help"],
         ];
         for arguments in command_argvs {
             let root = fixture_root("preflight");
@@ -1207,7 +1200,6 @@ mod tests {
             &["bloomery", "check", "list", "--json"],
             &["bloomery", "review", "--json"],
             &["bloomery", "sync", "--json"],
-            &["bloomery", "--help", "--json"],
         ];
         for arguments in commands {
             let root = fixture_root("preflight-json");
@@ -1226,6 +1218,36 @@ mod tests {
                     .unwrap()
                     .contains("flake.nix")
             );
+            let _ = fs::remove_dir_all(root);
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-028"))]
+    fn help_and_version_do_not_require_a_root_flake() {
+        let command_argvs: &[&[&str]] = &[
+            &["bloomery", "help"],
+            &["bloomery", "help", "check"],
+            &["bloomery", "--help"],
+            &["bloomery", "init", "--help"],
+            &["bloomery", "check", "--help"],
+        ];
+        for arguments in command_argvs {
+            let root = fixture_root("help-no-flake");
+            fs::create_dir_all(&root).expect("workspace root");
+            let mut stdout = Vec::new();
+            let mut stderr = Vec::new();
+            let status = run_args_at(arguments.iter().copied(), &root, &mut stdout, &mut stderr);
+            assert_eq!(status, ExitCode::SUCCESS, "arguments: {arguments:?}");
+            assert!(!stdout.is_empty(), "arguments: {arguments:?}");
+            assert!(
+                stderr.is_empty(),
+                "arguments: {arguments:?}, stderr: {}",
+                String::from_utf8_lossy(&stderr)
+            );
+            // Help output must not create any cache, spec, or lock side effect.
+            assert!(!root.join(".bloomery").exists());
+            assert!(!root.join("Cargo.lock").exists());
             let _ = fs::remove_dir_all(root);
         }
     }

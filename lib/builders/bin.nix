@@ -63,7 +63,8 @@ in
       if defaultLinker != null && evaluatedProfile.linker == null
       then ["-Clink-arg=-fuse-ld=${defaultLinker}"]
       else [];
-    nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc] ++ lib.optional (linkerPackage != null) linkerPackage;
+    runtimeDependencies = override.runtimeDependencies or [];
+    nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc] ++ lib.optional (linkerPackage != null) linkerPackage ++ lib.optional (runtimeDependencies != []) pkgs.makeWrapper;
     buildInputs = override.buildInputs or [];
     cleanDefaultFlags =
       if evaluatedProfile.optLevel != null
@@ -423,6 +424,14 @@ in
 
           # Ensure copied assets have standard write permissions in derivation
           chmod -R u+w "$out/bin/assets" "$out/bin/static" "$out/bin/public" "$out/share" 2>/dev/null || true
+
+          ${lib.optionalString (runtimeDependencies != []) ''
+            # Wrap the executable so declared runtime tools are on PATH. Wrapping
+            # runs after asset bundling so the bundler still sees the real ELF.
+            mv "$out/bin/$BIN_NAME" "$out/bin/.$BIN_NAME-wrapped"
+            makeWrapper "$out/bin/.$BIN_NAME-wrapped" "$out/bin/$BIN_NAME" \
+              --prefix PATH : "${lib.makeBinPath runtimeDependencies}"
+          ''}
 
           runHook postInstall
         '';

@@ -48,8 +48,9 @@ review use the current working directory, as does sync. Init instead accepts an
 optional positional target directory that defaults to the current working
 directory, and its `--template` value names a bundled template. Init refuses a
 non-empty target unless `--force` is supplied. Every recognized
-command request, including help and nested check retrieval, requires the shared
-root `flake.nix` preflight; the workspace-bootstrap `init` command is exempt.
+application command request, including nested check retrieval, requires the
+shared root `flake.nix` preflight; the workspace-bootstrap `init` command is
+exempt, and parser help and version output is served without a preflight.
 Check, review, and sync additionally require `.bloomery/config.toml`; parser help
 and `init` are exempt from the configuration requirement. The CLI parser also
 supplies the `help` subcommand for displaying command help.

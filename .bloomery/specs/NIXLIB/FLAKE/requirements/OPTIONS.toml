@@ -134,7 +134,7 @@ design = "design/workspace-options.md#overrides"
 [requirements.ears]
 type = "ubiquitous"
 system = "the workspace option module"
-action = "accept per-crate native build inputs, build inputs, rustc and rustdoc flags, environment, features, fileset, src, release and dev profile fragments, assets, asset directories, and additive test settings"
+action = "accept per-crate native build inputs, build inputs, runtime tool dependencies, rustc and rustdoc flags, environment, features, fileset, src, release and dev profile fragments, assets, asset directories, and additive test settings"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-OPTIONS-013"

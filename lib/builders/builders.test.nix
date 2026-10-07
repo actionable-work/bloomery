@@ -111,6 +111,18 @@
     entry = "src/main.rs";
     defaultRustcFlags = [];
   };
+  runtimeDepsBinDrv = (builderExports.buildBinWith {defaultLinker = null;}) {
+    binName = "bin-fixture";
+    pkg = {
+      name = "bin-fixture";
+      version = "0.1.0";
+      crateName = "bin_fixture";
+    };
+    src = source;
+    entry = "src/main.rs";
+    defaultRustcFlags = [];
+    override.runtimeDependencies = [pkgs.hello];
+  };
 in {
   testProcMacroBuildersHandleMissingMetadata = {
     expr = let
@@ -237,6 +249,22 @@ in {
       parsesDirectives = true;
       invokesRustc = true;
       setsCrateName = true;
+    };
+  };
+
+  testBinaryBuilderWrapsRuntimeDependencies = {
+    expr = {
+      wraps =
+        lib.hasInfix "makeWrapper" runtimeDepsBinDrv.installPhase
+        && lib.hasInfix pkgs.hello.name runtimeDepsBinDrv.installPhase
+        && lib.hasInfix "-wrapped" runtimeDepsBinDrv.installPhase;
+      carriesWrapperInput = lib.elem pkgs.makeWrapper runtimeDepsBinDrv.nativeBuildInputs;
+      plainBinaryNotWrapped = !(lib.hasInfix "makeWrapper" binDrv.installPhase);
+    };
+    expected = {
+      wraps = true;
+      carriesWrapperInput = true;
+      plainBinaryNotWrapped = true;
     };
   };
 }

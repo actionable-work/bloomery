@@ -26,8 +26,8 @@ skeleton, and then locks the generated workspace so it is immediately usable.
 
 - Expose the `init` subcommand with an optional target directory.
 - Accept `--template` selection, defaulting to the basic workspace template.
-- Accept `--force` to scaffold over a non-empty target, and otherwise warn and
-  exit before writing.
+- Accept `--force` to overwrite colliding template paths, and otherwise warn
+  and exit before writing when a template path or an ancestor path conflicts.
 - Resolve a template from Bloomery's bundled catalog named after each
   immediate child of the repository's `templates/` directory.
 - Derive and validate the project name used by the `{{project}}` placeholder.
@@ -44,7 +44,7 @@ skeleton, and then locks the generated workspace so it is immediately usable.
 ## Boundaries
 
 Init owns filesystem scaffolding and the initial lock pass. It never builds
-crates and does not overwrite an existing non-empty tree without `--force`.
+crates and does not overwrite an existing template path without `--force`.
 Lock reconciliation reuses the [`bloomery sync`](../SYNC/README.md) workflow.
 Seeded specification requirements are automated and backed by tagged unit tests
 in the generated libraries. Dependency updates, spec authoring beyond the seed

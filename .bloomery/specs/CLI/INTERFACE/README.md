@@ -28,8 +28,9 @@ and how the target repository root is selected.
   commands, `config` with its `get`/`set`/`unset`/`list`/`upgrade`/`document`
   commands, and parser-generated help.
 - Resolve the repository root from the process's current working directory.
-- Require a root `flake.nix` before every command except the workspace-bootstrap
-  `init` command and the flake-exempt, warning `config` command.
+- Require a root `flake.nix` before every application command except the
+  workspace-bootstrap `init` command and the flake-exempt, warning `config`
+  command; parser help and version output is exempt from the preflight.
 - Require `.bloomery/config.toml` for repository commands while exempting parser
   help, `init`, and flake-exempt `config`, whose mutating commands create a
   missing file with a warning.

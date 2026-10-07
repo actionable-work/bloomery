@@ -7,6 +7,7 @@
       pkgs = nixpkgs.legacyPackages.${system};
       lib = nixpkgs.lib;
       workspace = perSystemWorkspace.${system};
+      injectedCli = lib.findFirst (p: (p.pname or "") == "bloomery") null workspace.devShell.nativeBuildInputs;
     in
       workspace.checks
       // {
@@ -73,6 +74,8 @@
             test -f "${workspace.crates."lib-core-0.1.0"}/nix-support/meta.sh" || { echo "Missing crate metadata"; exit 1; }
             test -d "${workspace.crates."lib-core-0.1.0"}/nix-support/deps-closure" || { echo "Missing dependency closure"; exit 1; }
             ls "${workspace.crates."lib-core-0.1.0"}/nix-support/deps-closure" >/dev/null || { echo "Empty dependency closure"; exit 1; }
+            test -n "${injectedCli}" || { echo "Missing injected bloomery CLI"; exit 1; }
+            grep -q "${pkgs.cargo}/bin" "${injectedCli}/bin/bloomery" || { echo "Injected bloomery CLI does not wrap cargo"; exit 1; }
             mkdir $out
             echo "OK" > $out/success
           '';

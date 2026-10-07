@@ -101,6 +101,7 @@ in {
         overrides = {
           foo-sys = {
             nativeBuildInputs = [pkgs.hello];
+            runtimeDependencies = [pkgs.zlib];
             rustcFlags = ["-Cprefer-dynamic"];
             env = {FOO = "bar";};
             profile = {optLevel = 1;};
@@ -110,6 +111,7 @@ in {
       };
     in {
       fooNativeDeps = builtins.length cfg.overrides.foo-sys.nativeBuildInputs;
+      fooRuntimeDeps = builtins.length cfg.overrides.foo-sys.runtimeDependencies;
       fooFlags = cfg.overrides.foo-sys.rustcFlags;
       fooEnv = cfg.overrides.foo-sys.env.FOO;
       fooProfileOptLevel = cfg.overrides.foo-sys.profile.optLevel;
@@ -117,6 +119,7 @@ in {
     };
     expected = {
       fooNativeDeps = 1;
+      fooRuntimeDeps = 1;
       fooFlags = ["-Cprefer-dynamic"];
       fooEnv = "bar";
       fooProfileOptLevel = 1;

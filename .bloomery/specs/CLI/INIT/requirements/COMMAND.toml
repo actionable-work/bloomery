@@ -48,13 +48,13 @@ action = "create it before writing template files"
 
 [[requirements]]
 id = "CLI-INIT-COMMAND-005"
-title = "Init warns and exits on a non-empty target"
+title = "Init refuses an existing template path"
 manual = false
 design = "design/init.md#target-directory"
 
 [requirements.ears]
 type = "unwanted_behavior"
-trigger = "the target directory contains entries and --force is not supplied"
+trigger = "a path that the selected template will write already exists and --force is not supplied"
 system = "bloomery init"
 action = "print a warning naming the target and exit nonzero before writing any file"
 
@@ -107,7 +107,7 @@ action = "overwrite the existing path with the template content"
 
 [[requirements]]
 id = "CLI-INIT-COMMAND-010"
-title = "Force preserves unrelated entries"
+title = "Init preserves unrelated entries"
 manual = false
 design = "design/init.md#target-directory"
 
@@ -115,3 +115,27 @@ design = "design/init.md#target-directory"
 type = "ubiquitous"
 system = "bloomery init"
 action = "leave target entries that the template does not provide in place"
+
+[[requirements]]
+id = "CLI-INIT-COMMAND-011"
+title = "Unrelated entries do not block init"
+manual = false
+design = "design/init.md#target-directory"
+
+[requirements.ears]
+type = "event"
+trigger = "the target directory contains entries that the selected template does not provide and --force is not supplied"
+system = "bloomery init"
+action = "scaffold the template files and leave those entries in place"
+
+[[requirements]]
+id = "CLI-INIT-COMMAND-012"
+title = "Init detects conflicting ancestor paths"
+manual = false
+design = "design/init.md#target-directory"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a non-directory exists at an ancestor of a template path and --force is not supplied"
+system = "bloomery init"
+action = "print a warning naming the target and exit nonzero before writing any file"

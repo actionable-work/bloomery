@@ -28,10 +28,14 @@ preflight failure leaves the target unchanged.
 ## Target directory
 
 The target defaults to the process's current working directory. A target that
-does not exist is created. An existing target that contains entries is refused
-without `--force`: init prints a warning naming the target and exits nonzero
-before writing. With `--force`, init writes the template files over any
-colliding paths and leaves unrelated entries in place. Paths are resolved
+does not exist is created. Collisions are resolved against the rendered
+template paths: a collision is an existing path equal to a template path, or an
+existing non-directory at an ancestor of a template path. Existing directories
+along a template path are not collisions, and unrelated entries never block
+init. Without `--force`, an existing target is refused when any collision
+exists: init prints a warning naming the target and exits nonzero before
+writing. With `--force`, init writes the template files over colliding paths.
+In both cases init leaves unrelated entries in place. Paths are resolved
 relative to the process's current working directory.
 
 ## Project name
@@ -69,7 +73,8 @@ created paths, reports the generated lockfiles, and suggests next commands such
 as `nix develop`. With `--json`, init emits one document with the command name,
 outcome status, target directory, template name, created paths, and lockfile
 status. An unknown template name is a usage error before any write. Refusing a
-non-empty target without `--force` prints a warning before exiting nonzero.
+target with an existing template path without `--force` prints a warning before
+exiting nonzero.
 
 ## Boundaries
 

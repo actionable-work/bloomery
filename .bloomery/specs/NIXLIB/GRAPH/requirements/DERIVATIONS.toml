@@ -265,3 +265,26 @@ type = "event"
 trigger = "a package is reachable from more than one resolution context"
 system = "the crate builder"
 action = "give each context variant a distinct deterministic identifier derived from the context and the package ID"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-025"
+title = "Binary runtime dependencies are on PATH"
+manual = false
+design = "design/derivations.md#runtime-dependencies"
+
+[requirements.ears]
+type = "event"
+trigger = "a binary override declares runtime tool dependencies"
+system = "the binary builder"
+action = "wrap the installed executable so the declared tools are available on its runtime PATH"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-026"
+title = "Runtime tool dependencies join the closure"
+manual = false
+design = "design/derivations.md#runtime-dependencies"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the binary builder"
+action = "reference every declared runtime tool dependency from the wrapped binary derivation"

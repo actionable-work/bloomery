@@ -235,3 +235,36 @@ design = "design/entry-points.md#mkflake"
 type = "ubiquitous"
 system = "the mkFlake constructor"
 action = "accept an optional main-flake self and use it to resolve configured sub-flake inputs"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-022"
+title = "Bloomery CLI wraps its hard runtime dependencies"
+manual = false
+design = "design/entry-points.md#bloomery-cli-injection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery CLI derivation"
+action = "make its hard runtime tool dependencies, currently cargo, available on the executable's runtime PATH"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-023"
+title = "Nix is the only global runtime exception"
+manual = false
+design = "design/entry-points.md#bloomery-cli-injection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery CLI derivation"
+action = "treat nix as a host-provided global dependency and omit it from declared runtime dependencies"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-024"
+title = "Optional metadata tools are not wrapped"
+manual = false
+design = "design/entry-points.md#bloomery-cli-injection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery CLI derivation"
+action = "omit optional metadata tools such as git from declared runtime dependencies"

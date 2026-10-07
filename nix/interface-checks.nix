@@ -35,4 +35,29 @@
       mkdir "$out"
       echo "passed" > "$out/success"
     '';
+
+  "interface:cli-runtime-deps" = let
+    cli = bloomery.packages.${system}.bloomery;
+  in
+    pkgs.runCommand "bloomery-cli-runtime-deps" {
+      passthru.bloomery = [
+        "NIXLIB-FLAKE-ENTRYPOINTS-022"
+        "NIXLIB-FLAKE-ENTRYPOINTS-023"
+        "NIXLIB-FLAKE-ENTRYPOINTS-024"
+      ];
+    } ''
+      wrapper="${cli}/bin/bloomery"
+      test -x "$wrapper" || { echo "missing bloomery executable"; exit 1; }
+      grep -q ${lib.escapeShellArg "${pkgs.cargo}/bin"} "$wrapper" || {
+        echo "cargo is not on the wrapped runtime PATH"; exit 1;
+      }
+      if grep -q ${lib.escapeShellArg "${pkgs.git}/bin"} "$wrapper"; then
+        echo "git must not be a declared runtime dependency"; exit 1;
+      fi
+      if grep -q ${lib.escapeShellArg "${pkgs.nix}/bin"} "$wrapper"; then
+        echo "nix must be a host-provided global exception, not wrapped"; exit 1;
+      fi
+      mkdir "$out"
+      echo "passed" > "$out/success"
+    '';
 }

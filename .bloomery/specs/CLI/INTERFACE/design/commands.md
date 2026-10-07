@@ -33,16 +33,17 @@ and the application library dispatches those requests to command libraries.
 
 ## Flake presence preflight
 
-Before command handling or parser-generated help is returned, resolve the root
-from the process's current working directory and require a `flake.nix` file
-there. This applies to `check` and its nested commands, `review`, `sync`, and
-help requests. There are two exceptions. The workspace-bootstrap `init` command
-creates the flake and may run in a directory without one. The `config` command
-edits `.bloomery/config.toml` without a flake and emits an advisory warning
-naming the missing Bloomery flake instead of failing.
+Before command handling, resolve the root from the process's current working
+directory and require a `flake.nix` file there. This applies to `check` and its
+nested commands, `review`, `sync`, and `spec`. There are three exemptions. The
+workspace-bootstrap `init` command creates the flake and may run in a directory
+without one. Parser-generated help and version output is returned without the
+preflight. The `config` command edits `.bloomery/config.toml` without a flake
+and emits an advisory warning naming the missing Bloomery flake instead of
+failing.
 
-If `flake.nix` is absent, stop before command-specific work and emit a nonzero
-error with this message:
+If `flake.nix` is absent for a non-exempt command, stop before command-specific
+work and emit a nonzero error with this message:
 
 ```text
 A Bloomery flake.nix is required; set up a Bloomery flake.nix in the current directory before running this command.
@@ -52,7 +53,9 @@ With `--json`, emit one structured JSON setup error with the same message. The
 preflight checks file presence only; a present flake is handled by each
 command's own behavior. No upward workspace search is performed. For `config`,
 the missing flake produces a structured warning rather than a setup error, and
-the command proceeds.
+the command proceeds. Help and version output is written without inspecting the
+flake, so `bloomery --help`, `bloomery help COMMAND`, and `bloomery COMMAND
+--help` all succeed where no flake is present.
 
 ## Configuration presence
 

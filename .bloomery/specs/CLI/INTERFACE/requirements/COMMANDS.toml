@@ -96,7 +96,7 @@ design = "design/commands.md#flake-presence-preflight"
 
 [requirements.ears]
 type = "unwanted_behavior"
-trigger = "a command other than init and config, including parser help, is requested from a current directory without flake.nix"
+trigger = "an application command other than init and config is requested from a current directory without flake.nix"
 system = "the bloomery CLI"
 action = "stop before command handling with a nonzero error instructing the user to set up a Bloomery flake.nix"
 
@@ -304,3 +304,15 @@ design = "design/commands.md"
 type = "ubiquitous"
 system = "bloomery spec"
 action = "expose the candidates subcommand"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-028"
+title = "Help output is exempt from the flake preflight"
+manual = false
+design = "design/commands.md#flake-presence-preflight"
+
+[requirements.ears]
+type = "event"
+trigger = "help or version output is requested from a current directory without flake.nix"
+system = "the bloomery CLI"
+action = "return the help or version output without the shared flake setup error"

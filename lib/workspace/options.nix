@@ -46,6 +46,11 @@
         default = [];
         description = "Target native libraries (added to buildInputs / C link paths).";
       };
+      runtimeDependencies = lib.mkOption {
+        type = types.listOf types.package;
+        default = [];
+        description = "Runtime tools the produced binary invokes as subprocesses; prepended to the executable's PATH.";
+      };
       rustcFlags = lib.mkOption {
         type = types.listOf types.str;
         default = [];

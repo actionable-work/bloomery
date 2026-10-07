@@ -4,7 +4,7 @@ mod template;
 
 use bloomery_sync::{CommandRunner, SystemCommandRunner, UpdateSelection};
 use std::fmt;
-use std::io::{self, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 pub use template::TEMPLATE_NAMES;
@@ -145,7 +145,13 @@ pub fn run<L: LockStage, O: Write, E: Write>(
 ) -> Result<InitReport, InitError> {
     let template = template::resolve(request.template.as_deref())?;
     let project = project_name(&request.directory)?;
-    guard_target(&request.directory, request.force, stderr)?;
+    guard_target(
+        &request.directory,
+        request.force,
+        template,
+        &project,
+        stderr,
+    )?;
     let missing = lock.missing_tools();
     if !missing.is_empty() {
         return Err(InitError::operational(format!(
@@ -195,32 +201,72 @@ fn project_name(target: &Path) -> Result<String, InitError> {
     Ok(normalized)
 }
 
-fn guard_target<W: Write>(target: &Path, force: bool, stderr: &mut W) -> Result<(), InitError> {
+fn guard_target<W: Write>(
+    target: &Path,
+    force: bool,
+    template: &'static str,
+    project: &str,
+    stderr: &mut W,
+) -> Result<(), InitError> {
     if force {
         return Ok(());
     }
-    match std::fs::read_dir(target) {
-        Ok(mut entries) => {
-            if entries.next().is_some() {
-                writeln!(
-                    stderr,
-                    "warning: target directory '{}' is not empty; use --force to overwrite",
-                    target.display()
-                )
-                .map_err(|error| InitError::operational(error.to_string()))?;
-                return Err(InitError::operational(format!(
-                    "refusing to scaffold into non-empty directory '{}'",
-                    target.display()
-                )));
-            }
-            Ok(())
-        }
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(InitError::operational(format!(
-            "unable to read target directory '{}': {error}",
-            target.display()
-        ))),
+    if path_exists(target) && !is_directory(target) {
+        return refuse_template_collision(target, stderr);
     }
+    for (relative, _) in template::files(template) {
+        let relative = relative.replace("{{project}}", project);
+        if template_path_collides(target, &relative) {
+            return refuse_template_collision(target, stderr);
+        }
+    }
+    Ok(())
+}
+
+/// A template path collides when the path itself already exists or when an
+/// ancestor below the target exists as something other than a directory.
+fn template_path_collides(target: &Path, relative: &str) -> bool {
+    if path_exists(&target.join(relative)) {
+        return true;
+    }
+    let relative = Path::new(relative);
+    let mut ancestor = relative.parent();
+    while let Some(component) = ancestor {
+        if component.as_os_str().is_empty() {
+            break;
+        }
+        let path = target.join(component);
+        if path_exists(&path) && !is_directory(&path) {
+            return true;
+        }
+        ancestor = component.parent();
+    }
+    false
+}
+
+/// `symlink_metadata` so a broken symlink still counts as an existing path.
+fn path_exists(path: &Path) -> bool {
+    std::fs::symlink_metadata(path).is_ok()
+}
+
+/// `metadata` follows symlinks, so a symlink to a directory is a directory.
+fn is_directory(path: &Path) -> bool {
+    std::fs::metadata(path)
+        .map(|metadata| metadata.is_dir())
+        .unwrap_or(false)
+}
+
+fn refuse_template_collision<W: Write>(target: &Path, stderr: &mut W) -> Result<(), InitError> {
+    writeln!(
+        stderr,
+        "warning: target '{}' already contains a path the template will write; use --force to overwrite",
+        target.display()
+    )
+    .map_err(|error| InitError::operational(error.to_string()))?;
+    Err(InitError::operational(format!(
+        "refusing to scaffold over existing template paths in '{}'",
+        target.display()
+    )))
 }
 
 fn scaffold(root: &Path, template: &'static str, project: &str) -> Result<Vec<PathBuf>, InitError> {
@@ -437,10 +483,10 @@ mod tests {
     #[test]
     #[cfg_attr(any(), bloomery("CLI-INIT-COMMAND-005"))]
     #[cfg_attr(any(), bloomery("CLI-INIT-OUTPUT-006"))]
-    fn non_empty_target_warns_and_refuses_without_force() {
-        let root = temp_root("non-empty");
+    fn existing_template_path_warns_and_refuses_without_force() {
+        let root = temp_root("collision");
         std::fs::create_dir_all(&root).expect("target");
-        std::fs::write(root.join("existing.txt"), "keep").expect("existing file");
+        std::fs::write(root.join("flake.nix"), "stale").expect("existing template path");
         let mut lock = FakeLock::default();
         let mut stderr = Vec::new();
         let error = run(
@@ -454,13 +500,67 @@ mod tests {
         assert!(!lock.locked);
         let warning = String::from_utf8(stderr).expect("stderr");
         assert!(warning.contains("warning"));
-        assert!(warning.contains("non-empty"));
-        assert!(root.join("existing.txt").is_file());
+        assert!(warning.contains("--force"));
+        // The guard stops before any other template path is written.
+        assert!(!root.join("Cargo.toml").exists());
+        assert_eq!(
+            std::fs::read_to_string(root.join("flake.nix")).expect("stale"),
+            "stale"
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INIT-COMMAND-011"))]
+    #[cfg_attr(any(), bloomery("CLI-INIT-COMMAND-010"))]
+    fn unrelated_entries_do_not_block_init() {
+        let root = temp_root("unrelated");
+        std::fs::create_dir_all(root.join(".git")).expect("git directory");
+        std::fs::write(root.join("keep.txt"), "keep").expect("unrelated file");
+        let mut lock = FakeLock::default();
+        let report = run(
+            &request(&root, None, false),
+            &mut lock,
+            &mut Vec::new(),
+            &mut Vec::new(),
+        )
+        .expect("unrelated entries scaffold");
+        assert_eq!(report.template, "basic");
+        assert!(root.join("flake.nix").is_file());
+        assert!(root.join("Cargo.toml").is_file());
+        assert!(root.join(".git").is_dir());
+        assert!(root.join("keep.txt").is_file());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INIT-COMMAND-012"))]
+    fn ancestor_file_conflict_is_refused() {
+        let root = temp_root("ancestor");
+        std::fs::create_dir_all(&root).expect("target");
+        std::fs::write(root.join(".bloomery"), "not a directory").expect("ancestor file");
+        let mut lock = FakeLock::default();
+        let mut stderr = Vec::new();
+        let error = run(
+            &request(&root, None, false),
+            &mut lock,
+            &mut Vec::new(),
+            &mut stderr,
+        )
+        .expect_err("refuses ancestor conflict");
+        assert_eq!(error.exit_code(), 1);
+        assert!(!lock.locked);
+        let warning = String::from_utf8(stderr).expect("stderr");
+        assert!(warning.contains("warning"));
+        assert!(warning.contains("--force"));
+        assert!(!root.join("flake.nix").exists());
+        assert!(!root.join(".bloomery/config.toml").exists());
         let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
     #[cfg_attr(any(), bloomery("CLI-INIT-COMMAND-008"))]
+    #[cfg_attr(any(), bloomery("CLI-INIT-COMMAND-010"))]
     fn force_overwrites_colliding_files_and_preserves_unrelated_entries() {
         let root = temp_root("force");
         std::fs::create_dir_all(&root).expect("target");

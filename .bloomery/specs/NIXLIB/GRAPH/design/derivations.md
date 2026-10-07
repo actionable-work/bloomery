@@ -49,6 +49,14 @@ binaries share discovery but use their respective profile flags and crate
 variants. The platform default linker is used unless the toolchain or profile
 selects one.
 
+## Runtime dependencies
+
+A binary override may declare runtime tool dependencies that the executable
+invokes as subprocesses. The installed executable is wrapped so the declared
+tools are prepended to its runtime `PATH`, and the wrapped derivation references
+those tools in its runtime closure. Runtime dependencies do not change the
+binary's compilation inputs.
+
 ## Assets
 
 Crate derivations install local `assets`, `static`, and `public` directories

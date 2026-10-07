@@ -48,9 +48,10 @@ output, test/build orchestration, explicit lockfile maintenance, and schema-type
 configuration and requirement editing. Sync and config change locks and
 configuration respectively; spec mutations change requirement records. Mutating
 `config` commands create a missing configuration file with a warning. Every
-command, including check retrieval, review, sync, spec, and help, requires a
-root `flake.nix`. `init` is the bootstrap exception, and `config` is exempt but
-warns when the flake is absent. Check execution
+application command, including check retrieval, review, sync, and spec,
+requires a root `flake.nix`. `init` is the bootstrap exception, `config` is
+exempt but warns when the flake is absent, and parser help and version output is
+served without a preflight. Check execution
 runs the formatter before checks and may modify workspace source; lockfiles
 remain unchanged. Config edits `.bloomery/config.toml` and leaves lockfiles and
 source unchanged. Config documentation edits only the comment layer of the
