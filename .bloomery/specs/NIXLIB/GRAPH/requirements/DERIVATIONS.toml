@@ -469,3 +469,49 @@ design = "design/native-artifacts.md#builder-tests"
 type = "ubiquitous"
 system = "the crate builder test suite"
 action = "assert that native libraries are members of the crate archive and dependency closure and that the crate output has no uncompressed library directory"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-043"
+title = "Links crates expose CARGO_MANIFEST_LINKS to their build script"
+manual = false
+design = "design/derivations.md#build-scripts"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "set CARGO_MANIFEST_LINKS to the manifest links value for the build script of a package that declares links"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-044"
+title = "Failing build scripts abort the crate build"
+manual = false
+design = "design/derivations.md#build-scripts"
+
+[requirements.ears]
+type = "event"
+trigger = "a crate build script exits unsuccessfully"
+system = "the crate builder"
+action = "fail the crate derivation without compiling the target"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-045"
+title = "Failing build scripts report their output"
+manual = false
+design = "design/derivations.md#build-scripts"
+
+[requirements.ears]
+type = "event"
+trigger = "a crate build script exits unsuccessfully"
+system = "the crate builder"
+action = "report the build script's captured stdout and stderr in the build log"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-046"
+title = "Links build-script environment is covered by builder tests"
+manual = false
+design = "design/derivations.md#build-scripts"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder test suite"
+action = "compile a links-declaring fixture whose build script reads CARGO_MANIFEST_LINKS"

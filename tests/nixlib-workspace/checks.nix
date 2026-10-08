@@ -29,6 +29,8 @@
               "NIXLIB-GRAPH-DERIVATIONS-040"
               "NIXLIB-GRAPH-DERIVATIONS-041"
               "NIXLIB-GRAPH-DERIVATIONS-042"
+              "NIXLIB-GRAPH-DERIVATIONS-043"
+              "NIXLIB-GRAPH-DERIVATIONS-046"
             ];
           } ''
             echo "Validating links metadata, native propagation, and crate types..."

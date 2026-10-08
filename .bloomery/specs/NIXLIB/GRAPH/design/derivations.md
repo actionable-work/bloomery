@@ -23,12 +23,15 @@ sys-crate `DEP_<LINKS>_<KEY>` values in that metadata, and publishes a
 A crate or binary with a build script compiles and executes it before the
 target. The script receives the `OUT_DIR`, `TARGET`, `HOST`, `NUM_JOBS`,
 `OPT_LEVEL`, `PROFILE`, `CARGO_CFG_*`, and `CARGO_FEATURE_*` environment that
-Cargo exposes. Both legacy `cargo:` and modern `cargo::` directives are parsed;
-cfg, link-lib, link-search, rustc-env, and rustc-flags directives are applied
-to the target compilation. A `links` crate publishes its metadata keys as
-`DEP_<LINKS>_<KEY>` for dependent build scripts. Native link inputs produced by
-build scripts are installed and propagated as described in
-[Build-script native artifacts](native-artifacts.md).
+Cargo exposes. The crate builder also sets `CARGO_MANIFEST_LINKS` to the
+manifest's `links` value when that key is present. A build script that exits
+unsuccessfully fails the derivation and does not fall through to compilation,
+and the script's captured output is reported in the build log. Both legacy
+`cargo:` and modern `cargo::` directives are parsed; cfg, link-lib, link-search,
+rustc-env, and rustc-flags directives are applied to the target compilation. A
+`links` crate publishes its metadata keys as `DEP_<LINKS>_<KEY>` for dependent
+build scripts. Native link inputs produced by build scripts are installed and
+propagated as described in [Build-script native artifacts](native-artifacts.md).
 
 ## Feature compilation
 

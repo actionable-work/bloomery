@@ -9,6 +9,12 @@ fn run(command: &mut Command) {
 }
 
 fn main() {
+    assert_eq!(
+        env::var("CARGO_MANIFEST_LINKS").as_deref(),
+        Ok("lnk"),
+        "CARGO_MANIFEST_LINKS must carry the manifest links value"
+    );
+
     println!("cargo:key=value");
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR is set by the builder"));

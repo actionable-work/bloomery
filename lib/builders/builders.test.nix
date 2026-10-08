@@ -231,6 +231,7 @@ in {
       parsesLegacyDirectives = lib.hasInfix "cargo:rustc-cfg=" crateDrv.buildPhase;
       parsesModernDirectives = lib.hasInfix "cargo::rustc-cfg=" crateDrv.buildPhase;
       propagatesLinksMetadata = lib.hasInfix "DEP_" crateDrv.buildPhase;
+      setsManifestLinks = lib.hasInfix "CARGO_MANIFEST_LINKS" crateDrv.buildPhase;
     };
     expected = {
       setsOutDir = true;
@@ -241,6 +242,24 @@ in {
       parsesLegacyDirectives = true;
       parsesModernDirectives = true;
       propagatesLinksMetadata = true;
+      setsManifestLinks = true;
+    };
+  };
+
+  testCrateBuilderBuildScriptFailureIsNotSwallowed = {
+    expr = {
+      doesNotSwallowFailure = !(lib.hasInfix "stdout.txt || true" crateDrv.buildPhase);
+      guardsExecution = lib.hasInfix "if ! ./_build_script/build_script_build > _build_script/stdout.txt" crateDrv.buildPhase;
+      reportsCapturedOutput =
+        lib.hasInfix "Build script for $PKG_NAME failed" crateDrv.buildPhase
+        && lib.hasInfix "cat _build_script/stdout.txt" crateDrv.buildPhase;
+      abortsDerivation = lib.hasInfix "exit 1" crateDrv.buildPhase;
+    };
+    expected = {
+      doesNotSwallowFailure = true;
+      guardsExecution = true;
+      reportsCapturedOutput = true;
+      abortsDerivation = true;
     };
   };
 

@@ -404,6 +404,11 @@ in
           BUILD_SCRIPT="build.rs"
         fi
 
+        LINKS_NAME=""
+        if [ -f Cargo.toml ]; then
+          LINKS_NAME=$(sed -n -E 's/^[[:space:]]*links[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' Cargo.toml | head -n 1)
+        fi
+
         mkdir -p _build_script/out
         export OUT_DIR="$PWD/_build_script/out"
         export TARGET="$($RUSTC -vV | sed -n 's/host: //p')"
@@ -456,18 +461,21 @@ in
           export CARGO_PKG_VERSION="$PKG_VERSION"
           export CARGO_MANIFEST_DIR="$PWD"
           export RUSTC="$RUSTC"
+          if [ -n "$LINKS_NAME" ]; then
+            export CARGO_MANIFEST_LINKS="$LINKS_NAME"
+          fi
           for feat in "''${ACTIVE_FEATURES[@]}"; do
             feat_upper=$(echo "$feat" | tr '[:lower:]-' '[:upper:]_')
             export "CARGO_FEATURE_$feat_upper=1"
           done
 
           echo "Executing build script for $PKG_NAME..."
-          ./_build_script/build_script_build > _build_script/stdout.txt || true
-
-          LINKS_NAME=""
-          if [ -f Cargo.toml ]; then
-            LINKS_NAME=$(sed -n -E 's/^[[:space:]]*links[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' Cargo.toml | head -n 1)
+          if ! ./_build_script/build_script_build > _build_script/stdout.txt; then
+            echo "Build script for $PKG_NAME failed; captured stdout follows:" >&2
+            cat _build_script/stdout.txt >&2
+            exit 1
           fi
+
           BUILD_SCRIPT_METADATA=()
 
           while IFS= read -r line; do
