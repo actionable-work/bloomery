@@ -1,0 +1,12 @@
+[dependencies]
+bloomery-cli-types = { workspace = true }
+bloomery-model = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
+
+[dev-dependencies]
+
+[package]
+edition = "2024"
+name = "bloomery-docs-consistency"
+version = "0.1.0"

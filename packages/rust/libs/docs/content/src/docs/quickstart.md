@@ -79,7 +79,7 @@ crate's `Cargo.toml`.
 
 Bloomery resolves crate features and dependency edges without Import-From-Derivation (IFD). Use the Bloomery CLI package to reconcile Cargo manifests and generate `bloomery.lock`:
 
-```bash
+```bash bloomery-cli
 nix run github:actionable-work/bloomery#bloomery-wrapped -- sync
 ```
 

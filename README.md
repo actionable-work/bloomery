@@ -41,7 +41,7 @@ setting from a required `.bloomery/config.toml` at the workspace root.
 callback, and an optional `self`. It does not accept workspace options as
 arguments.
 
-```toml
+```toml bloomery-config
 # .bloomery/config.toml (required)
 [build]
 libPackages = false

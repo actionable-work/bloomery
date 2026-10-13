@@ -23,7 +23,7 @@ Bloomery features a strongly-typed profile evaluation system. Compiler optimizat
 
 You can configure release (`[profile.release]`) and dev (`[profile.dev]`) profile settings in `.bloomery/config.toml`:
 
-```toml
+```toml bloomery-config
 [profile.release]
 optLevel = 3
 lto = "thin"

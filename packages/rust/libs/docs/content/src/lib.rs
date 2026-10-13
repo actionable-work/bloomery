@@ -159,10 +159,14 @@ pub fn render_markdown(input: &str) -> String {
                     in_blockquote = false;
                 }
 
-                let lang = trimmed.trim_start_matches('`').trim();
-                let lang_label = if lang.is_empty() { "code" } else { lang };
+                // Only the first info-string token is the language; any
+                // trailing Bloomery role token is consumed by DOCS/CONSISTENCY
+                // and must not change how the block is labeled.
+                let info = trimmed.trim_start_matches('`').trim();
+                let lang = info.split_whitespace().next().unwrap_or("");
+                let lang = if lang.is_empty() { "code" } else { lang };
                 out.push_str(&format!(
-                    "<div class=\"code-block-wrapper\"><div class=\"code-header\"><span class=\"code-lang\">{lang_label}</span><button class=\"copy-btn\" onclick=\"navigator.clipboard.writeText(this.closest('.code-block-wrapper').querySelector('code').innerText);this.innerText='Copied!';setTimeout(()=>this.innerText='Copy',2000)\">Copy</button></div><pre><code class=\"language-{lang}\">"
+                    "<div class=\"code-block-wrapper\"><div class=\"code-header\"><span class=\"code-lang\">{lang}</span><button class=\"copy-btn\" onclick=\"navigator.clipboard.writeText(this.closest('.code-block-wrapper').querySelector('code').innerText);this.innerText='Copied!';setTimeout(()=>this.innerText='Copy',2000)\">Copy</button></div><pre><code class=\"language-{lang}\">"
                 ));
                 in_code_block = true;
             }
@@ -558,5 +562,18 @@ mod tests {
         assert!(html.contains("<strong>bold</strong>"));
         assert!(html.contains("<code class=\"inline-code\">inline_code</code>"));
         assert!(html.contains("<li>item 1</li>"));
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("DOCS-CONTENT-CATALOG-007"))]
+    fn code_fence_role_tokens_are_not_displayed() {
+        let html =
+            render_markdown("```toml bloomery-config\n[build]\nprofileName = \"release\"\n```\n");
+        assert!(html.contains("class=\"language-toml\""), "{html}");
+        assert!(
+            html.contains("<span class=\"code-lang\">toml</span>"),
+            "{html}"
+        );
+        assert!(!html.contains("bloomery-config"), "{html}");
     }
 }

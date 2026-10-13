@@ -1,0 +1,36 @@
+group = "LINKS"
+
+[[requirements]]
+id = "DOCS-CONSISTENCY-LINKS-001"
+title = "Documentation link targets resolve"
+manual = false
+design = "design/consistency.md#links"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a surface link targets a repository-relative path that does not exist"
+system = "the documentation consistency check"
+action = "report a dangling documentation link diagnostic"
+
+[[requirements]]
+id = "DOCS-CONSISTENCY-LINKS-002"
+title = "Documentation link anchors resolve"
+manual = false
+design = "design/consistency.md#links"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a surface link fragment names no heading in its target"
+system = "the documentation consistency check"
+action = "report a dangling documentation anchor diagnostic"
+
+[[requirements]]
+id = "DOCS-CONSISTENCY-LINKS-003"
+title = "External links are not fetched"
+manual = false
+design = "design/consistency.md#links"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "documentation link validation"
+action = "resolve only repository-relative targets and never fetch external URLs"

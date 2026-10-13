@@ -1,0 +1,56 @@
+roots = ["README.md", "packages/rust/libs/docs/content/src/docs/*.md"]
+
+[[surfaces]]
+features = ["CLI/INTERFACE", "NIX/SOURCES", "NIXLIB/FLAKE", "NIXLIB/GRAPH"]
+path = "README.md"
+
+[[surfaces]]
+features = ["CLI/CONFIG", "NIXLIB/FLAKE"]
+path = "packages/rust/libs/docs/content/src/docs/api.md"
+
+[[surfaces]]
+features = [
+  "CLI/BUILD",
+  "CLI/CHECK",
+  "CLI/CONFIG",
+  "CLI/DISK",
+  "CLI/REVIEW",
+  "CLI/SPEC",
+  "DOCS/CONSISTENCY",
+  "DOCS/CONTENT",
+  "DOCS/SERVER",
+  "DOCS/UI",
+  "NIXLIB/GRAPH",
+  "NIXLIB/OPTIMIZE",
+  "PARSER/CONFIGURATION",
+  "PARSER/REQUIREMENTS",
+  "PARSER/SCANNING",
+  "PARSER/WORKSPACE",
+  "REPOSITORY/BENCHMARKS",
+  "REPOSITORY/LAYOUT",
+]
+path = "packages/rust/libs/docs/content/src/docs/architecture.md"
+
+[[surfaces]]
+features = ["REPOSITORY/BENCHMARKS"]
+path = "packages/rust/libs/docs/content/src/docs/benchmarks.md"
+
+[[surfaces]]
+features = ["CLI/CHECK", "REPOSITORY/BENCHMARKS"]
+path = "packages/rust/libs/docs/content/src/docs/matrix.md"
+
+[[surfaces]]
+features = ["NIX/SOURCES", "NIXLIB/GRAPH"]
+path = "packages/rust/libs/docs/content/src/docs/overrides.md"
+
+[[surfaces]]
+features = ["NIXLIB/FLAKE", "NIXLIB/GRAPH"]
+path = "packages/rust/libs/docs/content/src/docs/overview.md"
+
+[[surfaces]]
+features = ["NIXLIB/FLAKE"]
+path = "packages/rust/libs/docs/content/src/docs/profiles.md"
+
+[[surfaces]]
+features = ["CLI/CHECK", "CLI/INIT", "CLI/SYNC", "NIXLIB/FLAKE"]
+path = "packages/rust/libs/docs/content/src/docs/quickstart.md"

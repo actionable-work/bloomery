@@ -1,0 +1,45 @@
+group = "CHECK"
+
+[[requirements]]
+id = "DOCS-CONSISTENCY-CHECK-001"
+title = "Documentation consistency is a repository check"
+manual = false
+design = "design/consistency.md#check-integration"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery repository check suite"
+action = "include a documentation consistency check that validates the manifest, coverage, links, and excerpts"
+
+[[requirements]]
+id = "DOCS-CONSISTENCY-CHECK-002"
+title = "Documentation violations fail the check"
+manual = false
+design = "design/consistency.md#check-integration"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the documentation consistency check"
+action = "fail when a manifest, coverage, link, or excerpt violation is present"
+
+[[requirements]]
+id = "DOCS-CONSISTENCY-CHECK-003"
+title = "Documentation validation is static and read-only"
+manual = false
+design = "design/consistency.md#check-integration"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the documentation consistency check"
+action = "read the manifest, documentation, specification tree, and catalogs without rendering, evaluating, or executing documentation and without modifying the workspace"
+
+[[requirements]]
+id = "DOCS-CONSISTENCY-CHECK-004"
+title = "Documentation validation stays repository local"
+manual = false
+design = "design/consistency.md#check-integration"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the documentation consistency check"
+action = "remain a repository-local check that is not part of the shared Bloomery CLI or static specification pipeline"

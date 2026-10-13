@@ -33,7 +33,7 @@ bloomery.mkFlake {
 
 Package-valued settings are written as nixpkgs attribute paths. Path-valued settings are relative to the workspace root.
 
-```toml
+```toml bloomery-config
 [build]
 cargoToml = "Cargo.toml"        # defaults to root + "/Cargo.toml"
 cargoLock = "Cargo.lock"        # defaults to root + "/Cargo.lock"
@@ -118,7 +118,7 @@ bloomery.mkFlake {
 }
 ```
 
-```toml
+```toml bloomery-config
 [formatters.prettier]
 enable = true
 before = ["rustfmt"]

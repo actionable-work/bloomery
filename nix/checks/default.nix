@@ -18,6 +18,9 @@
   "core:validate-docs-assets" = import ./validate-docs-assets.nix {
     inherit pkgs docsPackage;
   };
+  "core:validate-docs-consistency" = import ./validate-docs-consistency.nix {
+    inherit pkgs workspace root;
+  };
   "core:benchmarks" = import ./benchmarks.nix {
     inherit lib pkgs nixpkgs bloomery system root;
   };

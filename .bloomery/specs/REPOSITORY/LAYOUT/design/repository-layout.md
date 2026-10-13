@@ -19,6 +19,7 @@ workspaces, and repository-local Bloomery metadata.
 | `benchmarks/` | Benchmark subflake: fixture groups, per-builder subflakes, and the hyperfine harness; outside root flake composition. |
 | `.bloomery/config.toml` | Required Bloomery configuration: scanner and spec targets plus the Nix build tables consumed by the flake interface. |
 | `.bloomery/specs/` | Bloomery area and feature specifications for this repository. |
+| `docs.manifest.toml` | Repository-local documentation coverage manifest read by the repository's documentation consistency check, mapping authored documentation surfaces to specification features. |
 
 The Rust workspace contains these binaries and libraries:
 
@@ -41,6 +42,8 @@ The Rust workspace contains these binaries and libraries:
 | `packages/rust/libs/docs/docs-server` | `bloomery-docs-server` | `DOCS/SERVER` |
 | `packages/rust/libs/docs/content` | `bloomery-content` | `DOCS/CONTENT` |
 | `packages/rust/libs/docs/ui` | `bloomery-ui` | `DOCS/UI` |
+| `packages/rust/bins/docs-check` | `bloomery-docs-check` | `DOCS/CONSISTENCY` |
+| `packages/rust/libs/docs/consistency` | `bloomery-docs-consistency` | `DOCS/CONSISTENCY` |
 
 The Nix workspace-check integration is described with
 [CLI/CHECK](../../../CLI/CHECK/design/workspace-check.md). This layout map

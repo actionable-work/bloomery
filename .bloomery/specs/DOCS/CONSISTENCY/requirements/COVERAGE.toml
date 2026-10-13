@@ -1,0 +1,70 @@
+group = "COVERAGE"
+
+[[requirements]]
+id = "DOCS-CONSISTENCY-COVERAGE-001"
+title = "The manifest declares documentation roots"
+manual = false
+design = "design/consistency.md#documentation-manifest"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the documentation coverage manifest"
+action = "declare the documentation root globs that enumerate candidate surfaces"
+
+[[requirements]]
+id = "DOCS-CONSISTENCY-COVERAGE-002"
+title = "The manifest declares documentation surfaces"
+manual = false
+design = "design/consistency.md#documentation-manifest"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the documentation coverage manifest"
+action = "declare each documentation surface with its path and the features it documents"
+
+[[requirements]]
+id = "DOCS-CONSISTENCY-COVERAGE-003"
+title = "Unregistered surfaces are rejected"
+manual = false
+design = "design/consistency.md#coverage"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a documentation root matches a Markdown file with no manifest entry"
+system = "the documentation consistency check"
+action = "report an unregistered documentation surface diagnostic"
+
+[[requirements]]
+id = "DOCS-CONSISTENCY-COVERAGE-004"
+title = "Registered surface files must exist"
+manual = false
+design = "design/consistency.md#coverage"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a manifest surface names a path that does not exist"
+system = "the documentation consistency check"
+action = "report a missing documentation surface diagnostic"
+
+[[requirements]]
+id = "DOCS-CONSISTENCY-COVERAGE-005"
+title = "Documented features must exist"
+manual = false
+design = "design/consistency.md#coverage"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a manifest surface names a feature absent from the specification tree"
+system = "the documentation consistency check"
+action = "report an unknown documented feature diagnostic"
+
+[[requirements]]
+id = "DOCS-CONSISTENCY-COVERAGE-006"
+title = "Every feature is documented"
+manual = false
+design = "design/consistency.md#coverage"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the documentation consistency check"
+action = "require every specification feature to be named by at least one documentation surface"

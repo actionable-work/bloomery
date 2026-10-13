@@ -10,6 +10,9 @@ The current pages are `overview`, `quickstart`, `architecture`, `profiles`,
 `packages/rust/libs/docs/content/src/docs/` and are included at compile time.
 
 The same library provides Markdown-to-HTML rendering for the documentation UI.
-Content data and rendering do not own HTTP routes or server startup; those
-responsibilities belong to [DOCS/UI](../../UI/README.md) and
-[DOCS/SERVER](../../SERVER/README.md).
+A fenced code block may carry a Bloomery role token after its language token,
+such as `toml bloomery-config`. Rendering uses only the first info-string token
+as the displayed language label and ignores trailing role tokens, which are
+consumed by [DOCS/CONSISTENCY](../../CONSISTENCY/README.md). Content data and
+rendering do not own HTTP routes or server startup; those responsibilities
+belong to [DOCS/UI](../../UI/README.md) and [DOCS/SERVER](../../SERVER/README.md).

@@ -1,0 +1,8 @@
+[dependencies]
+bloomery-docs-consistency = { workspace = true }
+bloomery-model = { workspace = true }
+
+[package]
+edition = "2024"
+name = "bloomery-docs-check"
+version = "0.1.0"

@@ -1,0 +1,48 @@
+group = "EXCERPTS"
+
+[[requirements]]
+id = "DOCS-CONSISTENCY-EXCERPTS-001"
+title = "Configuration excerpts use catalog keys"
+manual = false
+design = "design/consistency.md#excerpts"
+
+[requirements.ears]
+type = "event"
+trigger = "a documentation code block is tagged as a bloomery-config excerpt"
+system = "the documentation consistency check"
+action = "report every leaf key outside the configuration schema catalog"
+
+[[requirements]]
+id = "DOCS-CONSISTENCY-EXCERPTS-002"
+title = "Tagged configuration excerpts parse as TOML"
+manual = false
+design = "design/consistency.md#excerpts"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a tagged configuration excerpt is not valid TOML"
+system = "the documentation consistency check"
+action = "report a malformed configuration excerpt diagnostic"
+
+[[requirements]]
+id = "DOCS-CONSISTENCY-EXCERPTS-003"
+title = "CLI excerpts use catalogued commands"
+manual = false
+design = "design/consistency.md#excerpts"
+
+[requirements.ears]
+type = "event"
+trigger = "a documentation code block is tagged as a bloomery-cli excerpt"
+system = "the documentation consistency check"
+action = "report every command path outside the CLI command catalog"
+
+[[requirements]]
+id = "DOCS-CONSISTENCY-EXCERPTS-004"
+title = "Untagged excerpts are ignored"
+manual = false
+design = "design/consistency.md#excerpts"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "documentation excerpt validation"
+action = "skip fenced code blocks that carry no Bloomery role token"

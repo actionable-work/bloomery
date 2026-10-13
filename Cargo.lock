@@ -302,6 +302,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "bloomery-docs-check"
+version = "0.1.0"
+dependencies = [
+ "bloomery-docs-consistency",
+ "bloomery-model",
+]
+
+[[package]]
+name = "bloomery-docs-consistency"
+version = "0.1.0"
+dependencies = [
+ "bloomery-cli-types",
+ "bloomery-model",
+ "serde",
+ "toml",
+]
+
+[[package]]
 name = "bloomery-docs-server"
 version = "0.1.0"
 dependencies = [

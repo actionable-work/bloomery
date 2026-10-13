@@ -59,3 +59,35 @@ Bloomery solves this natively inside `builderCrate` and `builderBin`:
 2. **Binary Aggregation**: When compiling a binary, `builderBin` automatically scans its direct and transitive dependency closure. Any assets discovered in upstream libraries are copied into `$out/bin/assets/` and `$out/share/<binName>/assets/`.
 3. **Workspace & Custom Overrides**: Workspace-level assets and crate-specific directories (`assetDirs = [ "templates" ];` or `assets = [ ./data.txt ];`) are seamlessly bundled into the final executable package.
 4. **Zero-Configuration Serving**: Binary executables can find their bundled assets alongside their executable path (`std::env::current_exe().parent().join("assets")`) in development and production alike.
+
+---
+
+## Repository Internals
+
+The Bloomery repository is itself a Rust workspace, a reusable Nix library, and a repository-local specification tree. Each specification feature maps to the code that implements it:
+
+| Spec feature | Implementation |
+| --- | --- |
+| `CLI/INTERFACE` | `packages/rust/bins/cli`, `packages/rust/libs/cli/cli-app`, `cli-parser`, `cli-types`, `cli-output` |
+| `CLI/INIT` | `packages/rust/libs/cli/init` |
+| `CLI/BUILD` | `packages/rust/libs/cli/build-command` |
+| `CLI/CHECK` | `packages/rust/libs/cli/check-command`, `packages/rust/libs/shared/check` |
+| `CLI/DISK` | `packages/rust/libs/cli/disk` |
+| `CLI/REVIEW` | `packages/rust/libs/cli/review` |
+| `CLI/SPEC` | `packages/rust/libs/cli/spec` |
+| `CLI/CONFIG` | `packages/rust/libs/cli/config` |
+| `CLI/SYNC` | `packages/rust/libs/cli/sync` |
+| `PARSER/CONFIGURATION` | `packages/rust/libs/shared/model` configuration and schema catalog |
+| `PARSER/REQUIREMENTS` | `packages/rust/libs/shared/model` requirement records and identifiers |
+| `PARSER/SCANNING` | `packages/rust/libs/shared/scanning` |
+| `PARSER/WORKSPACE` | `packages/rust/libs/shared/workspace` |
+| `NIX/SOURCES` | `lib/workspace/sources.nix` and the builder filesets |
+| `NIXLIB/FLAKE` | `lib/mk-flake.nix` and `lib/modules/` |
+| `NIXLIB/GRAPH` | `lib/builders/` and `lib/workspace/` |
+| `NIXLIB/OPTIMIZE` | `lib/builders/optimize.nix` |
+| `DOCS/CONTENT` | `packages/rust/libs/docs/content` |
+| `DOCS/UI` | `packages/rust/libs/docs/ui` |
+| `DOCS/SERVER` | `packages/rust/bins/docs` and `packages/rust/libs/docs/docs-server` |
+| `DOCS/CONSISTENCY` | `packages/rust/libs/docs/consistency` and `nix/checks/validate-docs-consistency.nix` |
+| `REPOSITORY/LAYOUT` | `.bloomery/specs/`, `docs.manifest.toml`, and `lib/repository-layout.test.nix` |
+| `REPOSITORY/BENCHMARKS` | `benchmarks/` |

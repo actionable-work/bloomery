@@ -65,3 +65,14 @@ design = "design/catalog.md"
 type = "ubiquitous"
 system = "the Bloomery documentation content catalog"
 action = "provide display-order metadata for each published page"
+
+[[requirements]]
+id = "DOCS-CONTENT-CATALOG-007"
+title = "Code-fence role tokens are not displayed"
+manual = false
+design = "design/catalog.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the documentation content renderer"
+action = "use only the first fenced-code info-string token as the displayed language label"
