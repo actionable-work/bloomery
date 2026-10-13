@@ -453,7 +453,7 @@ pub const CATALOG: &[CatalogEntry] = &[
     CatalogEntry {
         path: &["checks", "includePackageChecks"],
         value_type: ValueType::Bool,
-        recommended: Some(DefaultValue::Bool(true)),
+        recommended: Some(DefaultValue::Bool(false)),
         documentation: "Include binary and library build checks.",
     },
     CatalogEntry {
@@ -1014,6 +1014,7 @@ mod tests {
 
     #[test]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-003"))]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-019"))]
     fn recommended_defaults_match_applied_defaults() {
         assert_eq!(
             effective_default(&["specs", "dir"]),
@@ -1035,7 +1036,7 @@ mod tests {
         );
         assert_eq!(
             effective_default(&["checks", "includePackageChecks"]),
-            Some(Value::Boolean(true))
+            Some(Value::Boolean(false))
         );
         assert_eq!(
             effective_default(&["checks", "workspaceDependencies"]),

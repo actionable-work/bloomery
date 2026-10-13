@@ -214,3 +214,14 @@ design = "design/configuration.md#formatters"
 type = "ubiquitous"
 system = "the build configuration"
 action = "accept enable, before, and after for every known formatter under the formatters table"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-020"
+title = "Package checks are disabled by default"
+manual = false
+design = "design/configuration.md#checks"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the build configuration"
+action = "default checks.includePackageChecks to false when the key is omitted"

@@ -53,7 +53,7 @@ design = "design/flags.md#shared-purpose-options"
 [requirements.ears]
 type = "ubiquitous"
 system = "the bloomery CLI"
-action = "expose the same --json option for init, check, disk, review, sync, and spec"
+action = "expose the same --json option for init, check, build, disk, review, sync, and spec"
 
 [[requirements]]
 id = "CLI-INTERFACE-FLAGS-007"
@@ -258,3 +258,36 @@ type = "unwanted_behavior"
 trigger = "disk is invoked with a non-default --scope and a derivation argument"
 system = "the bloomery CLI"
 action = "return a usage error"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-025"
+title = "Build accepts package selectors"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "accept repeatable --package exact-name and anchored glob selectors on build"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-026"
+title = "Build accepts an explicit system scope"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "accept repeatable --system values on build, defaulting to the host Nix system"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-027"
+title = "Build accepts an optional check gate"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "accept a --check flag on build that runs the default check suite before realizing packages"

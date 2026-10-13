@@ -3,6 +3,7 @@ devPackages = true
 libPackages = false
 
 [checks]
+includePackageChecks = true
 noDefaultFeatures = false
 workspaceDependencies = false
 

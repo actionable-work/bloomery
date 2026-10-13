@@ -10,8 +10,10 @@ system.
 pointing at the preferred binary. For a binary enabled in `[optimize]`, `<bin>`
 is the optimized derivation. Dev-profile binaries are never packages.
 `default` prefers a binary named `default` and otherwise uses the first
-discovered binary. Package checks for an optimized binary continue to use the
-release build.
+discovered binary. These are the production derivations the
+[CLI build command](../../../CLI/BUILD/design/execution.md#catalog-evaluation)
+materializes. Package checks, when enabled, continue to use the release build,
+so no check realizes a training run.
 
 ## Apps
 
@@ -27,7 +29,8 @@ dev-profile builds. Each app is an attribute set with `type = "app"` and a
 When checks are enabled, `checks` contains `<crate>:test`, `<crate>:clippy`,
 `<crate>:doc`, and `<crate>:doctest` for workspace crates; `<crate>:doctest`
 exists only for crates with a library entrypoint. Package checks `<bin>:bin`
-and `<crate>:lib` are included when package checks are enabled.
+and `<crate>:lib` are included when package checks are enabled, which is off by
+default; enabling them reuses the release crate and binary derivations.
 `workspace:lock` validates lock consistency, `workspace:dependencies`
 validates dependency inheritance, and `workspace:default-features` validates
 disabled default features; each manifest check is omitted when its `[checks]`

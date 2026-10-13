@@ -168,7 +168,9 @@ invokes them.
 An enabled binary replaces its exported release targets: `packages.<system>.<bin>`
 and the release `apps.<system>.<bin>` are the optimized derivation, and
 `packages.default` and `apps.default` point at it when that binary is the
-preferred default. Dev apps and package checks keep the release and dev builds,
+preferred default. The [CLI build command](../../../CLI/BUILD/README.md)
+materializes that optimized package. Dev apps keep the dev build, and package
+checks, when `checks.includePackageChecks` enables them, keep the release build,
 so no check realizes a training run. When the release binary declares runtime
 tool dependencies, the optimized executable is wrapped with the same
 dependencies. No separate optimized attribute is exposed.

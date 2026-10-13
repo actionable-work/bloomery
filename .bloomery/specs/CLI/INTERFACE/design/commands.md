@@ -9,6 +9,7 @@ bloomery check [--check ID_OR_GLOB]... [--system SYSTEM]... [--jobs N] [--fail-f
 bloomery check list [--check ID_OR_GLOB]... [--system SYSTEM]... [--offset N] [--limit N] [--json]
 bloomery check failures [--run RUN] [--offset N] [--limit N] [--json]
 bloomery check details FAILURE [--run RUN] [--offset N] [--limit N] [--json]
+bloomery build [--package ID_OR_GLOB]... [--system SYSTEM]... [--check] [--json]
 bloomery disk [DERIVATION] [--scope SCOPE] [--system SYSTEM]... [--json]
 bloomery disk tree [DERIVATION] [--scope SCOPE] [--system SYSTEM]... [--json]
 bloomery review [--json]
@@ -37,7 +38,8 @@ and the application library dispatches those requests to command libraries.
 
 Before command handling, resolve the root from the process's current working
 directory and require a `flake.nix` file there. This applies to `check` and its
-nested commands, `disk`, `review`, `sync`, and `spec`. There are three exemptions. The
+nested commands, `build`, `disk`, `review`, `sync`, and `spec`. There are three
+exemptions. The
 workspace-bootstrap `init` command creates the flake and may run in a directory
 without one. Parser-generated help and version output is returned without the
 preflight. The `config` command edits `.bloomery/config.toml` without a flake
@@ -62,7 +64,8 @@ flake, so `bloomery --help`, `bloomery help COMMAND`, and `bloomery COMMAND
 ## Configuration presence
 
 After the flake preflight, require `.bloomery/config.toml` before command
-handling for `check`, its nested commands, `disk`, `review`, `sync`, and `spec`. Parser
+handling for `check`, its nested commands, `build`, `disk`, `review`, `sync`,
+and `spec`. Parser
 help,
  the `init` command, and every `config` command are exempt. If the file is
  absent, non-config commands stop before command-specific work and emit a
@@ -75,8 +78,8 @@ help,
  scanner tables are then loaded as described in
  [PARSER/CONFIGURATION](../../../PARSER/CONFIGURATION/design/config-file.md).
 
-The `check`, `disk`, `review`, `sync`, and `spec` commands operate on the
-validated root. The
+The `check`, `build`, `disk`, `review`, `sync`, and `spec` commands operate on
+the validated root. The
 `init` command operates on its target directory instead and requires no
 existing configuration. `config` creates configuration on demand and then
 edits it, and its `document` subcommand annotates configured keys with the
@@ -84,11 +87,14 @@ schema-catalog documentation without changing values. Sync maintains lockfiles
 without loading specifications or scanning evidence; config edits the
 configuration without loading specifications or scanning evidence; spec applies
 read-only record edits without scanning source, while its trace and candidate
-commands scan configured source without writing. Disk evaluates the workspace
+commands scan configured source without writing. Build evaluates the workspace flake and
+realizes production package derivations without formatting, validating
+specifications, or creating result links. Disk evaluates the workspace
 flake and queries realized store closures without building, substituting, or
 writing. Command
 semantics are specified by
 [INIT](../../INIT/README.md), [CHECK](../../CHECK/README.md),
+[BUILD](../../BUILD/README.md),
 [DISK](../../DISK/README.md), [REVIEW](../../REVIEW/README.md),
 [SYNC](../../SYNC/README.md),
 [SPEC](../../SPEC/README.md), and
@@ -97,5 +103,6 @@ lock app, not a new Nix app. The global `--json` flag is available after any
 application subcommand and their nested commands; see the
 [output contract](output.md). Check without a nested command executes the
 selected suite; list discovers checks, failures pages retained failures, and
-details seeks within retained failure output. Retrieval never executes tests or
+details seeks within retained failure output. Build realizes the selected
+production packages and reports their output store paths. Retrieval never executes tests or
 builds. Config commands are specified separately by [CONFIG](../../CONFIG/README.md).

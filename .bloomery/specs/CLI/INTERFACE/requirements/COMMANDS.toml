@@ -108,7 +108,7 @@ design = "design/commands.md#configuration-presence"
 
 [requirements.ears]
 type = "unwanted_behavior"
-trigger = "check, disk, review, sync, or spec is requested without .bloomery/config.toml"
+trigger = "check, build, disk, review, sync, or spec is requested without .bloomery/config.toml"
 system = "the bloomery CLI"
 action = "stop before command-specific work with a nonzero ConfigurationError naming the missing path"
 
@@ -338,3 +338,14 @@ design = "design/commands.md"
 type = "ubiquitous"
 system = "bloomery disk"
 action = "expose the tree subcommand"
+
+[[requirements]]
+id = "CLI-INTERFACE-COMMANDS-031"
+title = "The CLI exposes build"
+manual = false
+design = "design/commands.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery"
+action = "expose the build subcommand"

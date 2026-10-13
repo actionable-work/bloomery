@@ -9,6 +9,10 @@
   workspaceSource = builtins.readFile ./mk-workspace.nix;
   metadataWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
+    checks.includePackageChecks = true;
+  };
+  defaultPackageChecksWorkspace = mkWorkspace {
+    root = ../tests/basic-workspace;
   };
   workspaceWithoutMetadata = mkWorkspace {
     root = ../tests/single-crate-workspace;
@@ -164,6 +168,21 @@ in {
       omitsPackageChecksWhenDisabled = true;
       keepsLockCheckWhenPackageChecksAreDisabled = true;
       disablesAllChecks = true;
+    };
+  };
+
+  testPackageChecksAreOmittedByDefault = {
+    expr = {
+      omitsBin = !(builtins.hasAttr "bin-calc:bin" defaultPackageChecksWorkspace.checks);
+      omitsLib = !(builtins.hasAttr "lib-calc:lib" defaultPackageChecksWorkspace.checks);
+      keepsTest = builtins.hasAttr "bin-calc:test" defaultPackageChecksWorkspace.checks;
+      keepsLock = builtins.hasAttr "workspace:lock" defaultPackageChecksWorkspace.checks;
+    };
+    expected = {
+      omitsBin = true;
+      omitsLib = true;
+      keepsTest = true;
+      keepsLock = true;
     };
   };
 

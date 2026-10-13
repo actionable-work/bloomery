@@ -855,7 +855,7 @@ fn format_args() -> Vec<OsString> {
         .collect()
 }
 
-fn host_nix_system() -> Result<String, String> {
+pub fn host_nix_system() -> Result<String, String> {
     if let Some(configured) = configured_nix_system() {
         if valid_system_name(&configured) {
             return Ok(configured);

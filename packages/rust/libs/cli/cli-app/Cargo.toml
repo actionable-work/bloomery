@@ -1,4 +1,5 @@
 [dependencies]
+bloomery-build-command = { workspace = true }
 bloomery-check-command = { workspace = true }
 bloomery-cli-output = { workspace = true }
 bloomery-cli-parser = { workspace = true }

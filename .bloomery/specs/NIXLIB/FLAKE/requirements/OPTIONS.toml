@@ -235,3 +235,14 @@ design = "design/workspace-options.md#optimization"
 type = "ubiquitous"
 system = "the workspace option module"
 action = "accept training native build inputs, build inputs, environment, and an additive fixture fileset under a per-crate optimize namespace"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-022"
+title = "Package check inclusion defaults to off"
+manual = false
+design = "design/workspace-options.md#development-shell-and-checks"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace option module"
+action = "default checks.includePackageChecks to false"

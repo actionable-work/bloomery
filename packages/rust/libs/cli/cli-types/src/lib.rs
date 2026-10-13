@@ -13,6 +13,7 @@ pub struct CliInvocation {
 pub enum CliCommand {
     Init(InitArgs),
     Check(CheckArgs),
+    Build(BuildArgs),
     Disk(DiskArgs),
     Review,
     Sync { update: Option<String> },
@@ -79,19 +80,26 @@ pub struct DiskArgs {
     pub systems: Vec<String>,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct InitArgs {
+    pub directory: Option<PathBuf>,
+    pub template: Option<String>,
+    pub force: bool,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct BuildArgs {
+    pub packages: Vec<String>,
+    pub systems: Vec<String>,
+    pub check: bool,
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum DiskScope {
     #[default]
     All,
     Runtime,
     Build,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct InitArgs {
-    pub directory: Option<PathBuf>,
-    pub template: Option<String>,
-    pub force: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

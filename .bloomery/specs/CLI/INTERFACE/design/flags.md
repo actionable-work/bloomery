@@ -15,6 +15,10 @@ commands:
 | `check`, `check list` | `--system` | repeatable system name | host Nix system |
 | `check` | `--jobs` | positive integer | logical CPU count, minimum 1 |
 | `check` | `--fail-fast` | flag | finish all selected checks |
+| `build` | `--package` | repeatable exact name or quoted glob | all host packages |
+| `build` | `--system` | repeatable system name | host Nix system |
+| `build` | `--check` | flag | realize without running the check suite |
+| `build` | `--json` | flag | human-readable text |
 | `check failures`, `check details` | `--run` | retained run ID | latest completed workspace run |
 | `check list`, `check failures` | `--offset`, `--limit` | nonnegative offset, positive limit | offset 0, limit 20 |
 | `check details` | `--offset`, `--limit` | nonnegative offset, positive limit | failure-focused offset, limit 40 |
@@ -39,7 +43,7 @@ commands:
 | all commands | `-h`, `--help` | — | — |
 
 `--json` is a shared global option, accepted before or after the subcommand. It
-selects machine-readable output for check, disk, review, sync, and init; no
+selects machine-readable output for check, build, disk, review, sync, and init; no
 command-specific `--format` or alternate JSON spelling is exposed. Human-readable
 output is the default. Terminal color behavior is automatic and consistent
 across commands; non-empty `NO_COLOR`, redirected streams, and JSON mode
@@ -54,7 +58,7 @@ non-empty target unless `--force` is supplied. Every recognized
 application command request, including nested check retrieval, requires the
 shared root `flake.nix` preflight; the workspace-bootstrap `init` command is
 exempt, and parser help and version output is served without a preflight.
-Check, disk, review, sync, and spec additionally require `.bloomery/config.toml`;
+Check, build, disk, review, sync, and spec additionally require `.bloomery/config.toml`;
 parser help
 and `init` are exempt from the configuration requirement. The CLI parser also
 supplies the `help` subcommand for displaying command help.
@@ -94,6 +98,15 @@ and `spec candidates` take only positional arguments. Filter flags are usage
 errors on every spec subcommand except `spec list`. See the
 [spec editing contract](../../SPEC/design/editing.md) and
 [traceability contract](../../SPEC/design/trace.md).
+
+For build, `--package` is repeatable and selects exact package names or
+case-sensitive anchored globs; selections form a deduplicated union and every
+selector must match. `--system` selects the systems whose packages are
+realized, is repeatable, and defaults to the host Nix system. An explicit
+missing system is an error. `--check` gates package realization on the default
+check suite having passed; without it build realizes packages directly. See the
+[build selection contract](../../BUILD/design/command.md#selection) and
+[check gate](../../BUILD/design/command.md#check-gate).
 
 For disk, `--system` is accepted only for a full-tree measurement and selects
 the systems whose Bloomery outputs are measured; it is repeatable and defaults

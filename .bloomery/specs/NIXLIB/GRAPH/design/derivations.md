@@ -103,7 +103,12 @@ clippy outcomes are unchanged.
 `rustc --test` and test overrides. `<crate>:clippy` runs `clippy-driver` with
 warnings denied by default. `<crate>:doc` builds rustdoc output.
 `<crate>:doctest` runs rustdoc tests for library crates. Package checks reuse
-the release crate and binary derivations. `workspace:lock` is a read-only
+the release crate and binary derivations and are generated only when
+`checks.includePackageChecks` enables them. The exported package derivations
+are the production build targets that the
+[CLI build command](../../../CLI/BUILD/design/execution.md) materializes; an
+optimized binary's package is its optimized derivation while its package check
+stays on the release build. `workspace:lock` is a read-only
 derivation that validates `Cargo.lock` and `bloomery.lock` consistency, member
 presence, versions, and dependency completeness, and reports `bloomery sync`
 as the repair.

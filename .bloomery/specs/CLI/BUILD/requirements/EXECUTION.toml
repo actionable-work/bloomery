@@ -1,0 +1,290 @@
+group = "EXECUTION"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-001"
+title = "Catalog evaluation is batched per system"
+manual = false
+design = "design/execution.md#catalog-evaluation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery build"
+action = "evaluate every selected system's package catalog and production derivation paths in one Nix evaluation per system"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-002"
+title = "The exported production derivation is realized"
+manual = false
+design = "design/execution.md#catalog-evaluation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery build"
+action = "realize the exported packages.<system> derivation for each selected package, including its optimized variant when optimize enables one"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-003"
+title = "Library packages are built when visible"
+manual = false
+design = "design/execution.md#catalog-evaluation"
+
+[requirements.ears]
+type = "event"
+trigger = "library package visibility is enabled"
+system = "bloomery build"
+action = "evaluate and realize the selected <crate>:lib package derivations together with binary packages"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-004"
+title = "Dev derivations are never built"
+manual = false
+design = "design/execution.md#catalog-evaluation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery build"
+action = "exclude dev-profile derivations from evaluation and realization"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-005"
+title = "Selected attribute evaluation failures are package failures"
+manual = false
+design = "design/execution.md#catalog-evaluation"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a selected package attribute cannot evaluate to a production derivation"
+system = "bloomery build"
+action = "record a package failure for that attribute while other packages continue"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-006"
+title = "Evaluation is pure and lockfile-safe"
+manual = false
+design = "design/execution.md#catalog-evaluation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery build"
+action = "run Nix operations without impure evaluation and with lockfile writes and updates disabled"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-007"
+title = "Selected derivations realize in one batch"
+manual = false
+design = "design/execution.md#batched-realization"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery build"
+action = "realize the selected derivation plan in one nix build invocation"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-008"
+title = "Realization does not re-evaluate the flake"
+manual = false
+design = "design/execution.md#batched-realization"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery build"
+action = "pass evaluated derivation store paths so batched realization performs no flake evaluation"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-009"
+title = "Default realization keeps going"
+manual = false
+design = "design/execution.md#batched-realization"
+
+[requirements.ears]
+type = "event"
+trigger = "a selected derivation fails"
+system = "bloomery build"
+action = "continue realizing independent derivations whose prerequisites permit execution"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-010"
+title = "Outcomes do not depend on invocation exit status"
+manual = false
+design = "design/execution.md#batched-realization"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery build"
+action = "resolve each package outcome from per-derivation realization evidence and output validity rather than the aggregate invocation exit status"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-011"
+title = "Substituted packages pass"
+manual = false
+design = "design/execution.md#batched-realization"
+
+[requirements.ears]
+type = "event"
+trigger = "a selected derivation is substituted from a cache"
+system = "bloomery build"
+action = "record the package as passed without rebuilding it"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-012"
+title = "Package output paths are reported"
+manual = false
+design = "design/execution.md#batched-realization"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery build"
+action = "resolve and report each realized package's output store path"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-013"
+title = "Failed packages expose their derivation"
+manual = false
+design = "design/execution.md#batched-realization"
+
+[requirements.ears]
+type = "event"
+trigger = "a selected package fails during realization"
+system = "bloomery build"
+action = "retain its derivation path so its log can be retrieved with nix log"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-014"
+title = "Build creates no result links"
+manual = false
+design = "design/execution.md#batched-realization"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery build"
+action = "avoid creating repository result links during realization"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-015"
+title = "Missing Nix is explicit"
+manual = false
+design = "design/execution.md#batched-realization"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "build requires the Nix CLI but it is unavailable"
+system = "bloomery build"
+action = "report an operational error rather than silently skip realization"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-016"
+title = "Interruption cancels realization"
+manual = false
+design = "design/execution.md#interruption"
+
+[requirements.ears]
+type = "event"
+trigger = "execution is interrupted by the user"
+system = "bloomery build"
+action = "cancel the batched realization and retain completed package outcomes"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-017"
+title = "Cancellation differs from never-started work"
+manual = false
+design = "design/execution.md#interruption"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery build"
+action = "distinguish canceled started packages from not_run packages"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-018"
+title = "Build does not format by default"
+manual = false
+design = "design/execution.md"
+
+[requirements.ears]
+type = "event"
+trigger = "build is invoked without --check"
+system = "bloomery build"
+action = "skip the nix fmt preflight and leave workspace source unformatted"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-019"
+title = "Build does not run static validation by default"
+manual = false
+design = "design/execution.md"
+
+[requirements.ears]
+type = "event"
+trigger = "build is invoked without --check"
+system = "bloomery build"
+action = "skip specification, scanner, and traceability validation"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-020"
+title = "Build leaves source and configuration unchanged"
+manual = false
+design = "design/execution.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery build"
+action = "avoid mutating workspace source, configuration, and lockfiles"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-021"
+title = "The check gate is the default check suite"
+manual = false
+design = "design/execution.md#check-gate"
+
+[requirements.ears]
+type = "event"
+trigger = "--check is selected"
+system = "bloomery build"
+action = "run the no-selector default check suite, including its formatter preflight, for the selected systems before realizing any package"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-022"
+title = "A passed gate allows realization"
+manual = false
+design = "design/execution.md#check-gate"
+
+[requirements.ears]
+type = "event"
+trigger = "the selected check gate passes"
+system = "bloomery build"
+action = "proceed to realize the selected packages"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-023"
+title = "A failed gate blocks realization"
+manual = false
+design = "design/execution.md#check-gate"
+
+[requirements.ears]
+type = "event"
+trigger = "the selected check gate does not pass"
+system = "bloomery build"
+action = "realize no selected package and return exit code 1"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-024"
+title = "The check gate retains its run"
+manual = false
+design = "design/execution.md#check-gate"
+
+[requirements.ears]
+type = "event"
+trigger = "--check is selected"
+system = "bloomery build"
+action = "retain the check run so its failures remain retrievable through the check retrieval commands"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-025"
+title = "Gate operational failures are explicit"
+manual = false
+design = "design/execution.md#check-gate"
+
+[requirements.ears]
+type = "event"
+trigger = "the selected check gate fails operationally"
+system = "bloomery build"
+action = "return exit code 2 and realize no selected package"

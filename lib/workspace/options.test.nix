@@ -15,6 +15,7 @@ in {
       hasCargoLock = cfg.source.cargoLock == ./. + "/Cargo.lock";
       devShellEnabled = cfg.devShell.enable;
       checksEnabled = cfg.checks.enable;
+      includePackageChecks = cfg.checks.includePackageChecks;
       unifyFeatures = cfg.build.unify;
       linker = cfg.toolchain.linker;
       libPackages = cfg.createLibPackages;
@@ -28,6 +29,7 @@ in {
       hasCargoLock = true;
       devShellEnabled = true;
       checksEnabled = true;
+      includePackageChecks = false;
       unifyFeatures = true;
       linker =
         if pkgs.stdenv.hostPlatform.isLinux

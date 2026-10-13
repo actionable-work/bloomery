@@ -8,6 +8,7 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
+bloomery-build-command = { default-features = false, path = "packages/rust/libs/cli/build-command" }
 bloomery-check = { default-features = false, path = "packages/rust/libs/shared/check" }
 bloomery-check-command = { default-features = false, path = "packages/rust/libs/cli/check-command" }
 bloomery-cli-app = { default-features = false, path = "packages/rust/libs/cli/cli-app" }

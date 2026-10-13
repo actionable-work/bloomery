@@ -8,7 +8,6 @@ unify = false            # Unify workspace features like Cargo's resolver.
 
 [checks]
 enable = true                # Generate workspace checks.
-includePackageChecks = true  # Include binary and library build checks.
 noDefaultFeatures = true     # Require default features to be disabled on workspace dependencies.
 throwOnOutOfDate = true      # Fail evaluation when bloomery.lock is out of date.
 workspaceDependencies = true # Validate workspace dependency declarations.

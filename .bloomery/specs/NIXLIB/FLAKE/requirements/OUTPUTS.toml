@@ -291,3 +291,26 @@ type = "event"
 trigger = "an optimize entry is enabled"
 system = "the workspace builder"
 action = "expose the optimized derivation as the binary's release app while dev apps stay on the dev profile"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-026"
+title = "Package checks are omitted by default"
+manual = false
+design = "design/output-contract.md#checks"
+
+[requirements.ears]
+type = "event"
+trigger = "checks are enabled and checks.includePackageChecks is omitted"
+system = "the workspace builder"
+action = "omit <bin>:bin and <crate>:lib checks while retaining the remaining checks"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-027"
+title = "Packages are the production build targets"
+manual = false
+design = "design/output-contract.md#packages"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "expose the exact production derivation, including an optimized variant, as each package target"

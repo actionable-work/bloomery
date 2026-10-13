@@ -1,3 +1,4 @@
+use bloomery_build_command as build_command;
 use bloomery_check_command as check_command;
 use bloomery_cli_output as output;
 use bloomery_cli_parser::{ParseError, ParseErrorKind, parse_from};
@@ -85,6 +86,7 @@ fn command_name(command: &CliCommand) -> Option<&'static str> {
     match command {
         CliCommand::Init(_) => Some("init"),
         CliCommand::Check(_) => Some("check"),
+        CliCommand::Build(_) => Some("build"),
         CliCommand::Disk(_) => Some("disk"),
         CliCommand::Review => Some("review"),
         CliCommand::Sync { .. } => Some("sync"),
@@ -615,6 +617,7 @@ fn run_workspace_command_at(
     }
     match command {
         CliCommand::Check(args) => check_command::run_at(args, json_mode, root, stdout, stderr),
+        CliCommand::Build(args) => build_command::run_at(args, json_mode, root, stdout, stderr),
         CliCommand::Disk(args) => run_disk_at(args, json_mode, root, stdout, stderr),
         CliCommand::Review => run_review_at(root, json_mode, stdout, stderr),
         CliCommand::Spec(args) => run_spec_at(args, json_mode, root, stdout, stderr),
@@ -1189,6 +1192,52 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-031"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-025"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-026"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-027"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-015"))]
+    #[cfg_attr(any(), bloomery("CLI-BUILD-COMMAND-001"))]
+    fn the_cli_exposes_build_with_package_system_and_check_options() {
+        let parse = |args: &[&str]| match Cli::try_parse_from(args).expect("build command").command
+        {
+            Command::Build(args) => args,
+            other => panic!("expected build, got {other:?}"),
+        };
+
+        let default = parse(&["bloomery", "build"]);
+        assert!(default.packages.is_empty());
+        assert!(default.systems.is_empty());
+        assert!(!default.check);
+
+        let configured = parse(&[
+            "bloomery",
+            "build",
+            "--package",
+            "app",
+            "--package",
+            "lib*",
+            "--system",
+            "x86_64-linux",
+            "--system",
+            "aarch64-linux",
+            "--check",
+        ]);
+        assert_eq!(
+            configured.packages,
+            vec!["app".to_owned(), "lib*".to_owned()]
+        );
+        assert_eq!(
+            configured.systems,
+            vec!["x86_64-linux".to_owned(), "aarch64-linux".to_owned()]
+        );
+        assert!(configured.check);
+
+        let json = parse(&["bloomery", "build", "--json"]);
+        assert!(json.packages.is_empty());
+    }
+
+    #[test]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-004"))]
     fn clap_provides_its_help_subcommand() {
         for args in [vec!["bloomery", "help"], vec!["bloomery", "help", "check"]] {
@@ -1234,12 +1283,14 @@ mod tests {
 
     #[test]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-009"))]
+    #[cfg_attr(any(), bloomery("CLI-BUILD-COMMAND-002"))]
     fn every_application_command_requires_a_root_flake_before_working() {
         let command_argvs: &[&[&str]] = &[
             &["bloomery", "check"],
             &["bloomery", "check", "list"],
             &["bloomery", "check", "failures"],
             &["bloomery", "check", "details", "f1"],
+            &["bloomery", "build"],
             &["bloomery", "disk"],
             &["bloomery", "review"],
             &["bloomery", "sync"],
@@ -1274,6 +1325,7 @@ mod tests {
         let commands: &[&[&str]] = &[
             &["bloomery", "check", "--json"],
             &["bloomery", "check", "list", "--json"],
+            &["bloomery", "build", "--json"],
             &["bloomery", "disk", "--json"],
             &["bloomery", "review", "--json"],
             &["bloomery", "sync", "--json"],
@@ -1363,10 +1415,12 @@ mod tests {
 
     #[test]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-010"))]
+    #[cfg_attr(any(), bloomery("CLI-BUILD-COMMAND-003"))]
     fn repository_commands_require_configuration() {
         for arguments in [
             &["bloomery", "check"][..],
             &["bloomery", "check", "list"][..],
+            &["bloomery", "build"][..],
             &["bloomery", "disk"][..],
             &["bloomery", "review"][..],
             &["bloomery", "sync"][..],

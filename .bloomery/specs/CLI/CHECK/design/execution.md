@@ -18,8 +18,11 @@ failures in either pipeline do not suppress the other in default mode.
 
 With no selectors, run both static checks and every check attribute for the
 host Nix system. Include generated Rust tests, clippy, documentation, doctests,
-package builds, lock validation, formatter checks, and integration-flake checks
-when present in that output. Do not implicitly build packages outside checks
+lock validation, formatter checks, and integration-flake checks when present in
+that output. Package checks are included only when
+`checks.includePackageChecks` enables them; the default suite omits them and
+[build](../../BUILD/README.md) materializes production packages instead. Do not
+implicitly build packages outside checks
 or select other architectures. Every check command requires the shared flake
 preflight, including static-only and read-only selections.
 

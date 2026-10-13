@@ -16,7 +16,10 @@ bloomery check
 
 The `mkFlake` integration does not generate a `bloomery:check` output,
 irrespective of `.bloomery/` presence. Other generated checks retain their
-enable/include-package gates. Nix check generation does not
+enable/include-package gates. Package checks are omitted unless
+`checks.includePackageChecks` enables them, so the default generated check set
+contains no release package build; [build](../../BUILD/README.md) realizes the
+production package derivations. Nix check generation does not
 depend on the input Bloomery CLI package for specification validation and has no
 builder for the recursive check.
 

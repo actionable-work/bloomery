@@ -1,0 +1,104 @@
+group = "OUTPUT"
+
+[[requirements]]
+id = "CLI-BUILD-OUTPUT-001"
+title = "Human output lists package output paths"
+manual = false
+design = "design/execution.md#output"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery build"
+action = "print each selected package with its system, status, and realized output store path"
+
+[[requirements]]
+id = "CLI-BUILD-OUTPUT-002"
+title = "Human output summarizes outcomes"
+manual = false
+design = "design/execution.md#output"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery build"
+action = "report a summary count of passed and failed packages"
+
+[[requirements]]
+id = "CLI-BUILD-OUTPUT-003"
+title = "JSON output is structured"
+manual = false
+design = "design/execution.md#output"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery build"
+action = "emit one JSON object with the command identity, status, selected systems, and a package array carrying name, system, status, and realized path"
+
+[[requirements]]
+id = "CLI-BUILD-OUTPUT-004"
+title = "JSON failures are structured"
+manual = false
+design = "design/execution.md#output"
+
+[requirements.ears]
+type = "event"
+trigger = "a usage or operational failure is requested with --json"
+system = "bloomery build"
+action = "emit one structured error document while retaining the normal exit code"
+
+[[requirements]]
+id = "CLI-BUILD-OUTPUT-005"
+title = "Failed packages name their log retrieval"
+manual = false
+design = "design/execution.md#output"
+
+[requirements.ears]
+type = "event"
+trigger = "a package fails to realize"
+system = "bloomery build"
+action = "report its derivation path and the nix log command that retrieves its build log"
+
+[[requirements]]
+id = "CLI-BUILD-OUTPUT-006"
+title = "Progress is terminal-only"
+manual = false
+design = "design/execution.md#output"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery build"
+action = "show per-package completion and Nix work metrics only on eligible user terminals and never in CI or JSON mode"
+
+[[requirements]]
+id = "CLI-BUILD-OUTPUT-007"
+title = "Raw build logs are not streamed"
+manual = false
+design = "design/execution.md#output"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery build"
+action = "avoid streaming raw Nix build logs to normal output"
+
+[[requirements]]
+id = "CLI-BUILD-OUTPUT-008"
+title = "Check gate status is reported"
+manual = false
+design = "design/execution.md#output"
+
+[requirements.ears]
+type = "event"
+trigger = "--check is selected"
+system = "bloomery build"
+action = "report the gate status and, on failure, the failing check IDs"
+
+[[requirements]]
+id = "CLI-BUILD-OUTPUT-009"
+title = "JSON carries the check gate outcome"
+manual = false
+design = "design/execution.md#output"
+
+[requirements.ears]
+type = "event"
+trigger = "build is invoked with --json and --check"
+system = "bloomery build"
+action = "include the gate status and any failing check IDs in the emitted object"

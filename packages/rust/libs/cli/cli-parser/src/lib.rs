@@ -1,5 +1,5 @@
 use bloomery_cli_types::{
-    CheckArgs, CheckOperation, CliCommand, CliInvocation, ConfigArgs, ConfigOperation,
+    BuildArgs, CheckArgs, CheckOperation, CliCommand, CliInvocation, ConfigArgs, ConfigOperation,
     DEFAULT_PAGE_LIMIT, DETAIL_PAGE_LIMIT, DetailsArgs, DiskArgs, DiskScope, FailureArgs, InitArgs,
     ListArgs, SpecArgs, SpecOperation,
 };
@@ -96,6 +96,7 @@ fn command_from_arguments(arguments: &[OsString]) -> Option<&'static str> {
         .iter()
         .find_map(|argument| match argument.to_str()? {
             "check" => Some("check"),
+            "build" => Some("build"),
             "disk" => Some("disk"),
             "review" => Some("review"),
             "sync" => Some("sync"),
@@ -125,6 +126,8 @@ enum RawCommand {
     Init(RawInitArgs),
     /// Run static validation and selected Nix checks, or retrieve retained results.
     Check(RawCheckArgs),
+    /// Materialize the workspace production package derivations.
+    Build(RawBuildArgs),
     /// Report the Nix store size of the Bloomery tree or one derivation.
     Disk(RawDiskArgs),
     /// Print requirements that require human review.
@@ -152,6 +155,7 @@ impl From<RawCommand> for CliCommand {
         match command {
             RawCommand::Init(args) => Self::Init(args.into()),
             RawCommand::Check(args) => Self::Check(args.into()),
+            RawCommand::Build(args) => Self::Build(args.into()),
             RawCommand::Disk(args) => Self::Disk(args.into()),
             RawCommand::Review => Self::Review,
             RawCommand::Sync { update } => Self::Sync { update },
@@ -452,6 +456,31 @@ impl From<RawInitArgs> for InitArgs {
             directory: args.directory,
             template: args.template,
             force: args.force,
+        }
+    }
+}
+
+#[derive(Debug, Args)]
+struct RawBuildArgs {
+    /// Select packages by exact name or case-sensitive * and ? glob.
+    #[arg(long = "package", value_name = "ID_OR_GLOB", action = ArgAction::Append)]
+    packages: Vec<String>,
+
+    /// Select a Nix system; may be repeated.
+    #[arg(long = "system", value_name = "SYSTEM", action = ArgAction::Append)]
+    systems: Vec<String>,
+
+    /// Run the default check suite before realizing packages.
+    #[arg(long)]
+    check: bool,
+}
+
+impl From<RawBuildArgs> for BuildArgs {
+    fn from(args: RawBuildArgs) -> Self {
+        Self {
+            packages: args.packages,
+            systems: args.systems,
+            check: args.check,
         }
     }
 }

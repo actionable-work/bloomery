@@ -5,8 +5,8 @@ tagline: Define the user-visible command syntax and options for the bloomery exe
 description: |
   The interface feature specifies the command tree, invocation root, shared
   flake-presence preflight, flags, and output modes exposed by `bloomery`.
-  Command behavior is specified separately by the CHECK, DISK, REVIEW, SYNC,
-  SPEC, and CONFIG features.
+  Command behavior is specified separately by the CHECK, BUILD, DISK, REVIEW,
+  SYNC, SPEC, and CONFIG features.
 ---
 
 # CLI Interface
@@ -23,7 +23,8 @@ and how the target repository root is selected.
 
 ## Responsibilities
 
-- Expose `init`, `check`, its `list`/`failures`/`details` commands, `disk` with
+- Expose `init`, `check`, its `list`/`failures`/`details` commands, `build`,
+  `disk` with
   its `tree` command, `review`, `sync`, `spec` with its
   `list`/`show`/`add`/`set`/`remove`/`trace`/`candidates`
   commands, `config` with its `get`/`set`/`unset`/`list`/`upgrade`/`document`
@@ -35,11 +36,12 @@ and how the target repository root is selected.
 - Require `.bloomery/config.toml` for repository commands while exempting parser
   help, `init`, and flake-exempt `config`, whose mutating commands create a
   missing file with a warning.
-- Specify shared `--json`, check selection/execution/retrieval options, command-specific
+- Specify shared `--json`, check selection/execution/retrieval options,
+  build package/system selection, command-specific
   `sync --update`, `disk --system`, `spec list` filters, `config --prefix`/`config
   --dry-run`/`config
   --diff`, and `init
   --template`/`init --force` values.
 - Define human-readable terminal coloring and stable JSON output contracts.
-- Keep command syntax distinct from init, check, disk, review, sync, spec, and
-  config semantics.
+- Keep command syntax distinct from init, check, build, disk, review, sync,
+  spec, and config semantics.

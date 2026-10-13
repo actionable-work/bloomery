@@ -1,9 +1,10 @@
 use super::catalog::{CheckPlan, NixBackend, NixCli, discover_catalog};
 use super::execution::run_checks;
 use super::interrupt::InterruptFlag;
-use super::model::{Notice, selector_may_match_prefix, valid_system_name};
+use super::model::{Notice, Outcome, RunStatus, selector_may_match_prefix, valid_system_name};
 use super::output;
 use super::retrieval::{run_details, run_failures, run_list};
+use super::store;
 use crate::output::TerminalFacts;
 pub use bloomery_cli_types::{CheckArgs, CheckOperation, DetailsArgs, FailureArgs, ListArgs};
 use std::collections::{BTreeMap, BTreeSet};
@@ -129,6 +130,65 @@ pub fn run_at_with_cache(
         stdout,
         stderr,
     )
+}
+
+/// Outcome of running the default check suite as a prerequisite gate.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GateOutcome {
+    pub status: RunStatus,
+    pub failed_checks: Vec<String>,
+    pub exit_code: u8,
+}
+
+/// Run the default `bloomery check` suite for `args.systems` and return a
+/// structured outcome. The run is retained through the ordinary check store so
+/// its failures remain retrievable with `check failures` and `check details`.
+pub fn run_gate_at(
+    args: CheckArgs,
+    root: &Path,
+    cache_base: Option<&Path>,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> GateOutcome {
+    let backend = NixCli::default();
+    run_at_with(
+        args,
+        CheckContext {
+            root,
+            json_mode: false,
+            backend: &backend,
+            interrupt: InterruptFlag::install(),
+            cache_base,
+            terminal: TerminalFacts::from_environment(),
+        },
+        stdout,
+        stderr,
+    );
+    let (status, failed_checks) =
+        match store::RunStore::open(root, cache_base).and_then(|store| store.latest()) {
+            Ok((record, _)) => (
+                record.status,
+                record
+                    .outcomes
+                    .iter()
+                    .filter(|outcome| {
+                        outcome.outcome == Outcome::Failed || outcome.outcome == Outcome::Blocked
+                    })
+                    .map(|outcome| outcome.id.clone())
+                    .collect(),
+            ),
+            Err(_) => (RunStatus::Error, Vec::new()),
+        };
+    GateOutcome {
+        exit_code: match status {
+            RunStatus::Passed => 0,
+            RunStatus::Failed => 1,
+            RunStatus::Interrupted => 130,
+            RunStatus::Error => 2,
+        },
+        status,
+        failed_checks,
+    }
 }
 
 pub(super) fn run_at_with(

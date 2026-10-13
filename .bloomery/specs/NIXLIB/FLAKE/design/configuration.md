@@ -118,12 +118,15 @@ shellHook = "echo ready"
 ## Checks
 
 `[checks]` carries `enable`, `includePackageChecks`, `throwOnOutOfDate`,
-`workspaceDependencies`, and `noDefaultFeatures`.
+`workspaceDependencies`, and `noDefaultFeatures`. `includePackageChecks`
+defaults to `false`, so generated checks omit package build checks and the
+[CLI build command](../../../CLI/BUILD/README.md) is the production package
+path by default.
 
 ```toml
 [checks]
 enable = true
-includePackageChecks = true
+includePackageChecks = false
 throwOnOutOfDate = false
 workspaceDependencies = true
 noDefaultFeatures = true

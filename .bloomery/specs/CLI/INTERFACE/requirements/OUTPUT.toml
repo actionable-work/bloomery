@@ -33,7 +33,7 @@ design = "design/output.md"
 [requirements.ears]
 type = "ubiquitous"
 system = "the bloomery CLI"
-action = "accept --json for init, check, disk, review, sync, and spec"
+action = "accept --json for init, check, build, disk, review, sync, and spec"
 
 [[requirements]]
 id = "CLI-INTERFACE-OUTPUT-004"
@@ -166,3 +166,15 @@ type = "event"
 trigger = "disk is invoked with --json"
 system = "bloomery disk"
 action = "emit the category tree with each entry's name, bytes, and unmeasured status"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-015"
+title = "Build JSON reports package outcomes"
+manual = false
+design = "design/output.md#json-contracts"
+
+[requirements.ears]
+type = "event"
+trigger = "build is invoked with --json"
+system = "bloomery build"
+action = "emit one object with the command identity, status, selected systems, and a package array carrying name, system, status, and realized path, plus the check-gate status when --check is selected"

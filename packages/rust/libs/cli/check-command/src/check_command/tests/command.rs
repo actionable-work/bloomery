@@ -292,3 +292,18 @@ fn check_fails_when_automated_traceability_is_invalid() {
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
 }
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-BUILD-EXECUTION-024"))]
+fn completed_check_runs_are_retained_for_retrieval() {
+    let (root, cache) = fixture(true);
+    let backend = FakeNix::default();
+    let (status, _, _) = invoke(request(), &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::SUCCESS);
+    let store =
+        crate::check_command::store::RunStore::open(&root, Some(&cache)).expect("run store");
+    let (record, _) = store.latest().expect("retained run");
+    assert!(!record.id.is_empty());
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}

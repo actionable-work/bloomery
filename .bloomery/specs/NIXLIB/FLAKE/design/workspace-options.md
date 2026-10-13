@@ -59,7 +59,7 @@ optimized build to listed systems and is the only place to set `targetCpu`,
 which also tunes the final binary when both stages are disabled. The
 stages run in the fixed PGO then BOLT order and the result of the last enabled
 stage replaces the binary's exported package and release app, while
-package checks keep the release build. The per-crate
+package checks, when enabled, keep the release build. The per-crate
 override `optimize` namespace carries `nativeBuildInputs`, `buildInputs`, `env`,
 and an additive training fixture `fileset`; these Nix values stay in Nix rather
 than `config.toml`. The pipeline is owned by
@@ -76,9 +76,13 @@ supplies a local crates.io index for the no-lock fallback.
 ## Development shell and checks
 
 `devShell` controls shell generation, extra packages, and the shell hook.
-`checks` enables or disables generated checks, includes or omits package build
-checks, optionally fails evaluation on an out-of-date lock, and independently
-enables the workspace dependency and no default features manifest checks.
+`checks` enables or disables generated checks. `checks.includePackageChecks`
+defaults to off, so generated checks omit package build checks unless enabled;
+when enabled, package checks reuse the release crate and binary derivations
+while [build](../../../CLI/BUILD/README.md) realizes the exported production
+packages. `checks` also optionally fails evaluation on an out-of-date lock, and
+independently enables the workspace dependency and no default features
+manifest checks.
 
 ## Formatter ordering
 

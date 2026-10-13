@@ -1,0 +1,200 @@
+group = "COMMAND"
+
+[[requirements]]
+id = "CLI-BUILD-COMMAND-001"
+title = "The CLI exposes build"
+manual = false
+design = "design/command.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery"
+action = "expose the build subcommand"
+
+[[requirements]]
+id = "CLI-BUILD-COMMAND-002"
+title = "Build requires a Bloomery flake"
+manual = false
+design = "design/command.md"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "build is requested from a current directory without flake.nix"
+system = "the bloomery CLI"
+action = "stop before command handling with the shared nonzero flake setup error"
+
+[[requirements]]
+id = "CLI-BUILD-COMMAND-003"
+title = "Build requires configuration"
+manual = false
+design = "design/command.md"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "build is requested without .bloomery/config.toml"
+system = "the bloomery CLI"
+action = "stop before command-specific work with a nonzero ConfigurationError naming the missing path"
+
+[[requirements]]
+id = "CLI-BUILD-COMMAND-004"
+title = "Build default selection includes all host packages"
+manual = false
+design = "design/command.md#selection"
+
+[requirements.ears]
+type = "event"
+trigger = "no --package selector is supplied"
+system = "bloomery build"
+action = "select every package under packages for the host Nix system"
+
+[[requirements]]
+id = "CLI-BUILD-COMMAND-005"
+title = "Package selectors are repeatable"
+manual = false
+design = "design/command.md#selection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery build"
+action = "accept repeatable --package exact-name and anchored glob selectors"
+
+[[requirements]]
+id = "CLI-BUILD-COMMAND-006"
+title = "Package selectors form a deduplicated union"
+manual = false
+design = "design/command.md#selection"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery build"
+action = "combine package selector matches by union without duplicate realization"
+
+[[requirements]]
+id = "CLI-BUILD-COMMAND-007"
+title = "Unmatched package selectors are rejected"
+manual = false
+design = "design/command.md#selection"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "any supplied package selector matches no catalog entry"
+system = "bloomery build"
+action = "report a usage error before realizing packages"
+
+[[requirements]]
+id = "CLI-BUILD-COMMAND-008"
+title = "Default system is the host"
+manual = false
+design = "design/command.md#system-scope"
+
+[requirements.ears]
+type = "event"
+trigger = "no --system option is supplied"
+system = "bloomery build"
+action = "limit package discovery to the host Nix system"
+
+[[requirements]]
+id = "CLI-BUILD-COMMAND-009"
+title = "Explicit systems are repeatable"
+manual = false
+design = "design/command.md#system-scope"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery build"
+action = "accept repeatable --system values as a deduplicated system selection"
+
+[[requirements]]
+id = "CLI-BUILD-COMMAND-010"
+title = "An unavailable explicit system is an error"
+manual = false
+design = "design/command.md#system-scope"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "an explicitly selected system has no evaluable packages output"
+system = "bloomery build"
+action = "report an error rather than silently skipping that system"
+
+[[requirements]]
+id = "CLI-BUILD-COMMAND-011"
+title = "Empty package catalogs are valid"
+manual = false
+design = "design/command.md#system-scope"
+
+[requirements.ears]
+type = "event"
+trigger = "an explicitly selected system exposes an empty packages set"
+system = "bloomery build"
+action = "accept the empty catalog rather than report the system output as missing"
+
+[[requirements]]
+id = "CLI-BUILD-COMMAND-012"
+title = "Empty build selection is rejected"
+manual = false
+design = "design/command.md#exit-codes"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "the build selection contains zero packages"
+system = "bloomery build"
+action = "return a usage error rather than report success"
+
+[[requirements]]
+id = "CLI-BUILD-COMMAND-013"
+title = "Successful build returns zero"
+manual = false
+design = "design/command.md#exit-codes"
+
+[requirements.ears]
+type = "event"
+trigger = "every selected package realizes successfully"
+system = "bloomery build"
+action = "return exit code 0"
+
+[[requirements]]
+id = "CLI-BUILD-COMMAND-014"
+title = "Failed packages return failure"
+manual = false
+design = "design/command.md#exit-codes"
+
+[requirements.ears]
+type = "event"
+trigger = "a selected package fails to realize"
+system = "bloomery build"
+action = "return exit code 1"
+
+[[requirements]]
+id = "CLI-BUILD-COMMAND-015"
+title = "Build setup failures are operational"
+manual = false
+design = "design/command.md#exit-codes"
+
+[requirements.ears]
+type = "event"
+trigger = "invocation, tool discovery, or setup fails"
+system = "bloomery build"
+action = "return exit code 2 with an operational error"
+
+[[requirements]]
+id = "CLI-BUILD-COMMAND-016"
+title = "Interruption has a distinct exit code"
+manual = false
+design = "design/command.md#exit-codes"
+
+[requirements.ears]
+type = "event"
+trigger = "execution is interrupted by the user"
+system = "bloomery build"
+action = "return exit code 130"
+
+[[requirements]]
+id = "CLI-BUILD-COMMAND-017"
+title = "Build accepts an optional check gate"
+manual = false
+design = "design/command.md#check-gate"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery build"
+action = "accept a --check flag that gates package realization on the default check suite"

@@ -23,6 +23,7 @@ in {
       devPackages = cfg.createDevPackages;
       devShellEnabled = cfg.devShell.enable;
       checksEnabled = cfg.checks.enable;
+      includePackageChecks = cfg.checks.includePackageChecks;
       unify = cfg.build.unify;
       profileOptLevel = cfg.profile.optLevel;
     };
@@ -33,6 +34,7 @@ in {
       devPackages = false;
       devShellEnabled = true;
       checksEnabled = true;
+      includePackageChecks = false;
       unify = true;
       profileOptLevel = null;
     };

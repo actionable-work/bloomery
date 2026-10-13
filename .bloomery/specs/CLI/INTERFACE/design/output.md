@@ -1,7 +1,7 @@
 # Human and machine-readable output
 
-Every application command (`init`, `check`, `disk`, `review`, `sync`, `spec`,
-and `config`)
+Every application command (`init`, `check`, `build`, `disk`, `review`, `sync`,
+`spec`, and `config`)
 accepts the same global `--json` flag, before or after the subcommand. No
 command has a
 separate JSON flag or format selector. It emits one JSON document on stdout, with no ANSI
@@ -24,7 +24,9 @@ is plain text by default. Users can always disable colors by setting a non-empty
 The check command emits aggregate counts and a bounded failure page, highlighting
 status, failure IDs, check IDs, and source locations. Expanded messages, notes,
 and logs are retrieved separately. It does not stream build logs or successful
-check records by default. Live check metrics use one transient stderr line only
+check records by default. The build command prints each realized package with
+its output store path and a pass/fail summary; it likewise does not stream raw
+build logs. Live check metrics use one transient stderr line only
 on eligible user terminals, never in CI or JSON mode, and redraw only when metrics
 change. Redirecting stdout alone does not suppress terminal stderr progress;
 `NO_COLOR` disables its styling, not the updates. See
@@ -50,6 +52,12 @@ same command identity and an error description.
   `check list`, `check failures`, and `check details` emit bounded pages with
   continuation metadata. See the [check schema](../../CHECK/design/diagnostics.md)
   and [retrieval contract](../../CHECK/design/details.md).
+- `build --json` emits one object with the command identity, status, selected
+  systems, and a package array whose entries carry name, system, status, and
+  realized store path, plus a derivation path when the package failed. When
+  `--check` is selected the object also carries the gate status and, on
+  failure, the failing check IDs. See the
+  [build output contract](../../BUILD/design/execution.md#output).
 - `review --json` emits the existing stable array of manual review items with
   `area`, `feature`, `group`, `id`, `title`, `statement`, and `design_ref`.
 - `disk --json` emits one object with `command: "disk"`, `status`, and the

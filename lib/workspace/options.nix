@@ -434,7 +434,7 @@
         };
         includePackageChecks = lib.mkOption {
           type = types.bool;
-          default = true;
+          default = false;
           description = "Include package binary/library build checks in the checks output.";
         };
         throwOnOutOfDate = lib.mkOption {

@@ -187,6 +187,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "bloomery-build-command"
+version = "0.1.0"
+dependencies = [
+ "bloomery-check-command",
+ "bloomery-cli-output",
+ "bloomery-cli-types",
+ "serde_json",
+]
+
+[[package]]
 name = "bloomery-check"
 version = "0.1.0"
 dependencies = [
@@ -217,6 +227,7 @@ dependencies = [
 name = "bloomery-cli-app"
 version = "0.1.0"
 dependencies = [
+ "bloomery-build-command",
  "bloomery-check-command",
  "bloomery-cli-output",
  "bloomery-cli-parser",

@@ -1,0 +1,12 @@
+[dependencies]
+bloomery-check-command = { workspace = true }
+bloomery-cli-output = { workspace = true }
+bloomery-cli-types = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+
+[package]
+edition = "2024"
+name = "bloomery-build-command"
+version = "0.1.0"

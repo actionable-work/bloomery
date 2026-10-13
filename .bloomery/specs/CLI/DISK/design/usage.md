@@ -26,7 +26,8 @@ configuration, source, or lockfiles, and it creates no result links.
 | `runtime` | `packages.<system>.*` |
 | `build` | `checks.<system>.*` |
 
-`runtime` outputs are the deployable packages. `build` outputs are the check,
+`runtime` outputs are the deployable packages that
+[`bloomery build`](../../BUILD/README.md) materializes. `build` outputs are the check,
 test, documentation, and clippy artifacts. Supplying a non-default scope with a
 `DERIVATION` is a usage error.
 

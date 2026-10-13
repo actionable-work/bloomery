@@ -197,3 +197,14 @@ design = "design/schema-catalog.md#optimize"
 type = "ubiquitous"
 system = "the schema catalog"
 action = "omit a recommended default for every optimize key because the binary names are repository-defined"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-019"
+title = "Package check inclusion recommends false"
+manual = false
+design = "design/schema-catalog.md#checks"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "recommend false for checks.includePackageChecks"

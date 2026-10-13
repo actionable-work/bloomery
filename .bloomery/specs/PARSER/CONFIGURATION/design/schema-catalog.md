@@ -109,10 +109,17 @@ default because omission delegates to `Cargo.toml` and rustc defaults.
 | Key | Type | Recommended default |
 | --- | --- | --- |
 | `checks.enable` | boolean | `true` |
-| `checks.includePackageChecks` | boolean | `true` |
+| `checks.includePackageChecks` | boolean | `false` |
 | `checks.throwOnOutOfDate` | boolean | `false` |
 | `checks.workspaceDependencies` | boolean | `true` |
 | `checks.noDefaultFeatures` | boolean | `true` |
+
+`checks.includePackageChecks` is off by default, so the default generated check
+set omits package build checks; the
+[CLI build command](../../../CLI/BUILD/README.md) materializes production
+packages instead. Enabling it adds the release `<bin>:bin` and `<crate>:lib`
+checks back to the check set. See the
+[flake check output](../../../NIXLIB/FLAKE/design/output-contract.md#checks).
 
 ### `[features]`
 
