@@ -478,6 +478,7 @@ pub(super) fn invoke_with_terminal(
         CheckContext {
             root,
             json_mode: json,
+            color: crate::output::ColorMode::Auto,
             backend,
             interrupt,
             cache_base: Some(cache),

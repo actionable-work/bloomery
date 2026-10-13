@@ -16,6 +16,7 @@ pub(super) fn run_list(
     root: &Path,
     args: ListArgs,
     json_mode: bool,
+    color: crate::output::ColorMode,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
     backend: &dyn NixBackend,
@@ -53,13 +54,14 @@ pub(super) fn run_list(
     } else {
         output::list_text(&ids, &catalog.systems, &page).into_bytes()
     };
-    write_page(json_mode, bytes, stdout, stderr)
+    write_page(json_mode, color, bytes, stdout, stderr)
 }
 
 pub(super) fn run_failures(
     root: &Path,
     args: FailureArgs,
     json_mode: bool,
+    color: crate::output::ColorMode,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
     cache_base: Option<&Path>,
@@ -86,13 +88,15 @@ pub(super) fn run_failures(
     } else {
         output::failures_text(&record, &page).into_bytes()
     };
-    write_page(json_mode, bytes, stdout, stderr)
+    write_page(json_mode, color, bytes, stdout, stderr)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn run_details(
     root: &Path,
     args: DetailsArgs,
     json_mode: bool,
+    color: crate::output::ColorMode,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
     cache_base: Option<&Path>,
@@ -174,7 +178,7 @@ pub(super) fn run_details(
     } else {
         output::details_text(&detail_page, &page).into_bytes()
     };
-    write_page(json_mode, bytes, stdout, stderr)
+    write_page(json_mode, color, bytes, stdout, stderr)
 }
 
 fn load_run(

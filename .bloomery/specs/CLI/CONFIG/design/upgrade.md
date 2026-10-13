@@ -65,11 +65,14 @@ file and atomic rename, so a failure leaves the original file intact.
 
 ## Output
 
-Human output reports the added key paths, or states that the configuration is
-already current. `--diff` prints the recommendation differences sorted by key
-path. `config upgrade --json` emits one document identifying the command,
-status, and either the added key paths or the recommendation differences; a dry
-run marks the reported paths as not yet written.
+Human output follows the shared
+[presentation grammar](../../INTERFACE/design/presentation.md) and reports the
+added key paths, or states that the configuration is already current. `--diff`
+prints the recommendation differences sorted by key path.
+`config upgrade --json` carries the added key paths or the recommendation
+differences as the `result` of the shared
+[JSON envelope](../../INTERFACE/design/output.md#json-envelope); a dry run marks
+the reported paths as not yet written.
 
 Materializing or explicitly setting a key always takes precedence and suppresses
 the corresponding [sync recommendation](../../SYNC/design/sync.md#recommendations);

@@ -12,16 +12,38 @@ pub struct BoundedPage {
     pub next: Option<usize>,
 }
 
-pub fn error_document(code: &str, message: &str) -> Value {
+pub fn error_document(code: &str, message: &str, run: Option<&str>) -> Value {
     let (message, _) = truncate_utf8(message, 2048);
-    json!({
-        "command": "check",
-        "status": "error",
-        "error": {
-            "code": code,
-            "message": message,
-        },
-    })
+    let details = run.map(|run| json!({ "run": run }));
+    crate::output::error_envelope(
+        Some("check"),
+        None,
+        crate::output::Status::Error,
+        code,
+        "check",
+        &message,
+        details,
+    )
+}
+
+fn check_status(status: RunStatus) -> crate::output::Status {
+    match status {
+        RunStatus::Passed => crate::output::Status::Succeeded,
+        RunStatus::Failed => crate::output::Status::Failed,
+        RunStatus::Error => crate::output::Status::Error,
+        RunStatus::Interrupted => crate::output::Status::Interrupted,
+    }
+}
+
+fn envelope_bytes(operation: &str, status: crate::output::Status, payload: &Value) -> Vec<u8> {
+    let envelope = crate::output::success_envelope(
+        "check",
+        Some(operation),
+        status,
+        payload.clone(),
+        Vec::new(),
+    );
+    compact_json(&envelope).unwrap_or_default()
 }
 
 pub fn compact_json(value: &Value) -> Result<Vec<u8>, String> {
@@ -36,24 +58,21 @@ pub fn failure_page(record: &RunRecord, requested_offset: usize, limit: usize) -
     let desired_count = window.end.saturating_sub(window.offset);
     let mut count = 0;
     let mut value = failure_page_document(record, window.offset, count);
-    let mut bytes = compact_json(&value).unwrap_or_default();
 
     while count < desired_count {
         let candidate = failure_page_document(record, window.offset, count + 1);
-        let Ok(candidate_bytes) = compact_json(&candidate) else {
-            break;
-        };
+        let candidate_bytes =
+            envelope_bytes("failures", crate::output::Status::Succeeded, &candidate);
         if candidate_bytes.len() > OUTPUT_BYTE_LIMIT {
             break;
         }
         count += 1;
         value = candidate;
-        bytes = candidate_bytes;
     }
 
     let next = (window.offset + count < record.failures.len()).then_some(window.offset + count);
     value["next"] = next.map_or(Value::Null, |offset| json!(offset));
-    bytes = compact_json(&value).unwrap_or(bytes);
+    let bytes = envelope_bytes("failures", crate::output::Status::Succeeded, &value);
     BoundedPage {
         value,
         bytes,
@@ -69,8 +88,6 @@ fn failure_page_document(record: &RunRecord, offset: usize, count: usize) -> Val
         .map(failure_summary_json)
         .collect::<Vec<_>>();
     json!({
-        "command": "check",
-        "operation": "failures",
         "run": record.id,
         "total": record.failures.len(),
         "offset": offset,
@@ -121,7 +138,7 @@ pub fn list_page(
     let desired_count = window.end.saturating_sub(window.offset);
     let mut count = 0;
     let mut value = list_page_document(ids, systems, notices, window.offset, count);
-    let mut bytes = compact_json(&value)?;
+    let bytes = envelope_bytes("list", crate::output::Status::Succeeded, &value);
     if bytes.len() > OUTPUT_BYTE_LIMIT {
         return Err("catalog metadata exceeds the 8 KiB response ceiling".to_owned());
     }
@@ -133,15 +150,12 @@ pub fn list_page(
             break;
         }
         let candidate = list_page_document(ids, systems, notices, window.offset, count + 1);
-        let Ok(candidate_bytes) = compact_json(&candidate) else {
-            break;
-        };
+        let candidate_bytes = envelope_bytes("list", crate::output::Status::Succeeded, &candidate);
         if candidate_bytes.len() > OUTPUT_BYTE_LIMIT {
             break;
         }
         count += 1;
         value = candidate;
-        bytes = candidate_bytes;
     }
 
     if desired_count > 0 && count == 0 {
@@ -152,7 +166,7 @@ pub fn list_page(
     }
     let next = (window.offset + count < ids.len()).then_some(window.offset + count);
     value["next"] = next.map_or(Value::Null, |offset| json!(offset));
-    bytes = compact_json(&value).unwrap_or(bytes);
+    let bytes = envelope_bytes("list", crate::output::Status::Succeeded, &value);
     Ok(BoundedPage {
         value,
         bytes,
@@ -187,8 +201,6 @@ fn list_page_document(
         .map(|system| truncate_utf8(system, 128).0)
         .collect::<Vec<_>>();
     let mut document = json!({
-        "command": "check",
-        "operation": "list",
         "systems": systems,
         "total": ids.len(),
         "offset": offset,
@@ -209,24 +221,20 @@ pub fn run_summary_json(record: &RunRecord) -> BoundedPage {
     let desired_count = record.failures.len().min(super::model::FAILURE_PAGE_LIMIT);
     let mut count = 0;
     let mut value = run_summary_document(record, count);
-    let mut bytes = compact_json(&value).unwrap_or_default();
 
     while count < desired_count {
         let candidate = run_summary_document(record, count + 1);
-        let Ok(candidate_bytes) = compact_json(&candidate) else {
-            break;
-        };
+        let candidate_bytes = envelope_bytes("run", check_status(record.status), &candidate);
         if candidate_bytes.len() > OUTPUT_BYTE_LIMIT {
             break;
         }
         count += 1;
         value = candidate;
-        bytes = candidate_bytes;
     }
 
     let next = (count < record.failures.len()).then_some(count);
     value["next"] = next.map_or(Value::Null, |offset| json!(offset));
-    bytes = compact_json(&value).unwrap_or(bytes);
+    let bytes = envelope_bytes("run", check_status(record.status), &value);
     BoundedPage {
         value,
         bytes,
@@ -249,7 +257,6 @@ fn run_summary_document(record: &RunRecord, failure_count: usize) -> Value {
         .map(failure_summary_json)
         .collect::<Vec<_>>();
     let mut value = json!({
-        "command": "check",
         "run": record.id,
         "status": record.status.as_str(),
         "counts": Value::Object(counts),
@@ -341,13 +348,13 @@ pub fn run_summary_text(record: &RunRecord, metrics: Option<&str>) -> String {
 
 fn run_summary_text_with_count(record: &RunRecord, shown: usize, metrics: Option<&str>) -> String {
     let counts = record.counts();
-    let mut output = format!(
-        "{}  {} · {} failure record{}",
-        status_label(record.status),
+    let detail = format!(
+        "{} · {} failure record{}",
         count_summary(&counts),
         record.failures.len(),
         if record.failures.len() == 1 { "" } else { "s" }
     );
+    let mut output = run_outcome(record.status).render(&detail, false);
     if record.selection.partial {
         output.push_str("\npartial selection");
         if !record.selection.selectors.is_empty() {
@@ -445,12 +452,12 @@ fn count_summary(counts: &std::collections::BTreeMap<&'static str, usize>) -> St
         .join(" · ")
 }
 
-fn status_label(status: RunStatus) -> &'static str {
+fn run_outcome(status: RunStatus) -> crate::output::OutcomeStatus {
     match status {
-        RunStatus::Passed => "PASS",
-        RunStatus::Failed => "FAIL",
-        RunStatus::Error => "ERROR",
-        RunStatus::Interrupted => "INTERRUPTED",
+        RunStatus::Passed => crate::output::OutcomeStatus::Passed,
+        RunStatus::Failed => crate::output::OutcomeStatus::Failed,
+        RunStatus::Error => crate::output::OutcomeStatus::Failed,
+        RunStatus::Interrupted => crate::output::OutcomeStatus::Skipped,
     }
 }
 
@@ -476,22 +483,19 @@ pub fn details_page(page: DetailPage<'_>) -> BoundedPage {
     let desired_count = window.end.saturating_sub(window.offset);
     let mut count = 0;
     let mut value = details_document(&page, window.offset, count);
-    let mut bytes = compact_json(&value).unwrap_or_default();
     while count < desired_count {
         let candidate = details_document(&page, window.offset, count + 1);
-        let Ok(candidate_bytes) = compact_json(&candidate) else {
-            break;
-        };
+        let candidate_bytes =
+            envelope_bytes("details", crate::output::Status::Succeeded, &candidate);
         if candidate_bytes.len() > OUTPUT_BYTE_LIMIT {
             break;
         }
         count += 1;
         value = candidate;
-        bytes = candidate_bytes;
     }
     let next = (window.offset + count < page.records.len()).then_some(window.offset + count);
     value["next"] = next.map_or(Value::Null, |offset| json!(offset));
-    bytes = compact_json(&value).unwrap_or(bytes);
+    let bytes = envelope_bytes("details", crate::output::Status::Succeeded, &value);
     BoundedPage {
         value,
         bytes,
@@ -544,8 +548,6 @@ fn details_document(page: &DetailPage<'_>, offset: usize, count: usize) -> Value
         .map(|record| record.as_str())
         .collect::<Vec<_>>();
     let mut document = json!({
-        "command": "check",
-        "operation": "details",
         "run": page.run.id,
         "failure": page.failure.id,
         "check": check,
@@ -812,6 +814,7 @@ mod tests {
     #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-004"))]
     #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-005"))]
     #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-006"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-010"))]
     fn initial_summary_page_is_bounded_and_failures_have_run_local_ids() {
         let large = record(80);
         let summary = run_summary_json(&large);

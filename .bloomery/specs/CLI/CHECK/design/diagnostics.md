@@ -29,15 +29,19 @@ not the complete compiler-style rendering.
 
 ## Bounded summary
 
-Print one aggregate outcome line, a failure page, and one retrieval hint. On
-eligible user terminals, close the summary with the final derivation work metrics
-from [terminal progress](progress.md#final-metrics). Do not
-print individual successes, build logs, durations, repeated headings, or expanded
-diagnostic notes by default. Successful full runs need only counts and run ID.
-Subset runs identify partial scope. Eligible user terminals display one transient
-stderr line for changing check and derivation metrics; CI, non-TTY, and JSON output
-have no progress stream. See [terminal progress](progress.md). Transient updates
-are separate from the bounded final summary and do not retain a line per task.
+Print one aggregate outcome line, a failure page, and one retrieval hint. The
+summary uses the shared
+[presentation grammar](../../INTERFACE/design/presentation.md): the shared status
+glyph and label, the semantic color roles for failure IDs and source locations,
+and a closing summary. On eligible user terminals, close the summary with the
+final derivation work metrics from
+[terminal progress](progress.md#final-metrics). Do not print individual
+successes, build logs, durations, repeated headings, or expanded diagnostic notes
+by default. Successful full runs need only counts and run ID. Subset runs
+identify partial scope. Eligible user terminals display one transient stderr
+line for changing check and derivation metrics; CI, non-TTY, and JSON output have
+no progress stream. See [terminal progress](progress.md). Transient updates are
+separate from the bounded final summary and do not retain a line per task.
 
 Default failure page is at most 20 records and 8 KiB for the whole serialized
 response. Bound UTF-8 bytes and records, not model-dependent token counts. The
@@ -46,7 +50,7 @@ hints. Bound individual summary fields so at least one failure fits. Truncation
 must be explicit; the full retained diagnostic remains available through details.
 
 ```text
-FAIL  28 passed · 2 failed · 1 blocked
+✗ failed · 28 passed · 2 failed · 1 blocked
 f1 static:traceability MissingAutomatedTest CLI-CHECK-RUN-001
 f2 nix:x86_64-linux:core:unit-tests BuildFailed
 run r42 · details: bloomery check details f2 --run r42
@@ -62,8 +66,11 @@ consume the failure page. Details are described in [retained runs](details.md).
 
 ## JSON
 
-One compact document on stdout; readable keys, absent optional fields omitted,
-no duplicated human prose, no successful-check array, no tool output. Outcome
+One compact document on stdout under the shared
+[JSON envelope](../../INTERFACE/design/output.md#json-envelope); the fields below
+are the envelope's `result` payload. Readable keys, absent optional fields
+omitted, no duplicated human prose, no successful-check array, no tool output.
+Outcome
 counts include passed, failed, blocked, canceled, and not_run, omitting zeros.
 Run status is passed, failed, error, or interrupted. Run identity is absent only
 when failure occurs before creating a run. A scope object is present for partial
@@ -71,7 +78,7 @@ selection. Failure records have id, check, code, and optional subject/location.
 Paging includes total failure records, offset, and nullable next.
 
 ```json
-{"run":"r42","status":"failed","counts":{"passed":28,"failed":2,"blocked":1},"total":2,"offset":0,"failures":[{"id":"f1","check":"static:traceability","code":"MissingAutomatedTest","subject":"CLI-CHECK-RUN-001"},{"id":"f2","check":"nix:x86_64-linux:core:unit-tests","code":"BuildFailed"}],"next":null}
+{"command":"check","operation":"run","status":"failed","result":{"run":"r42","status":"failed","counts":{"passed":28,"failed":2,"blocked":1},"total":2,"offset":0,"failures":[{"id":"f1","check":"static:traceability","code":"MissingAutomatedTest","subject":"CLI-CHECK-RUN-001"},{"id":"f2","check":"nix:x86_64-linux:core:unit-tests","code":"BuildFailed"}],"next":null}}
 ```
 
 Usage/setup errors use a bounded error object with code and message and retain

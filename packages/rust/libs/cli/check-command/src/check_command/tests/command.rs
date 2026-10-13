@@ -23,7 +23,7 @@ fn default_and_explicit_selection_choose_static_and_requested_system_catalogs() 
     let result: Value = serde_json::from_slice(&stdout).expect("summary JSON");
     // Two static checks plus the implicit format:workspace gate; one catalog
     // evaluation resolves the (empty) Nix plan.
-    assert_eq!(result["counts"]["passed"], 3);
+    assert_eq!(result["result"]["counts"]["passed"], 3);
     assert_eq!(static_backend.evaluations.load(Ordering::SeqCst), 1);
     assert_eq!(static_backend.formatter_runs.load(Ordering::SeqCst), 1);
 
@@ -46,7 +46,7 @@ fn default_and_explicit_selection_choose_static_and_requested_system_catalogs() 
     // One catalog evaluation per selected system resolves both IDs and plans.
     assert_eq!(backend.evaluations.load(Ordering::SeqCst), 2);
     let result: Value = serde_json::from_slice(&stdout).expect("partial run JSON");
-    assert_eq!(result["scope"]["checks"][0], "nix:*:core:test");
+    assert_eq!(result["result"]["scope"]["checks"][0], "nix:*:core:test");
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
     let _ = fs::remove_dir_all(cache2);
@@ -137,8 +137,8 @@ fn explicitly_selected_system_with_empty_checks_is_a_valid_static_only_run() {
     );
     assert_eq!(backend.evaluations.load(Ordering::SeqCst), 1);
     let result: Value = serde_json::from_slice(&stdout).expect("summary JSON");
-    assert_eq!(result["counts"]["passed"], 3);
-    assert_eq!(result["scope"]["systems"][0], "aarch64-linux");
+    assert_eq!(result["result"]["counts"]["passed"], 3);
+    assert_eq!(result["result"]["scope"]["systems"][0], "aarch64-linux");
 
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
@@ -188,8 +188,8 @@ fn real_nix_distinguishes_missing_system_outputs_from_empty_check_sets() {
     let (status, stdout, _) = invoke(empty, &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::SUCCESS);
     let result: Value = serde_json::from_slice(&stdout).expect("empty-system summary");
-    assert_eq!(result["counts"]["passed"], 3);
-    assert_eq!(result["scope"]["systems"][0], "aarch64-linux");
+    assert_eq!(result["result"]["counts"]["passed"], 3);
+    assert_eq!(result["result"]["scope"]["systems"][0], "aarch64-linux");
 
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);

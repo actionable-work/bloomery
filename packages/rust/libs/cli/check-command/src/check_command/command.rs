@@ -22,6 +22,7 @@ pub(super) struct CheckError {
 pub(super) struct CheckContext<'a> {
     pub(super) root: &'a Path,
     pub(super) json_mode: bool,
+    pub(super) color: crate::output::ColorMode,
     pub(super) backend: &'a dyn NixBackend,
     pub(super) interrupt: InterruptFlag,
     pub(super) cache_base: Option<&'a Path>,
@@ -75,6 +76,7 @@ pub fn run(args: CheckArgs, json_mode: bool) -> ExitCode {
         CheckContext {
             root: &root,
             json_mode,
+            color: crate::output::ColorMode::Auto,
             backend: &backend,
             interrupt,
             cache_base: None,
@@ -92,12 +94,32 @@ pub fn run_at(
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> ExitCode {
+    run_at_with_color(
+        args,
+        json_mode,
+        crate::output::ColorMode::Auto,
+        root,
+        stdout,
+        stderr,
+    )
+}
+
+/// Execute `bloomery check` with an explicit human-output color selection.
+pub fn run_at_with_color(
+    args: CheckArgs,
+    json_mode: bool,
+    color: crate::output::ColorMode,
+    root: &Path,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
     let backend = NixCli::default();
     run_at_with(
         args,
         CheckContext {
             root,
             json_mode,
+            color,
             backend: &backend,
             interrupt: InterruptFlag::install(),
             cache_base: None,
@@ -122,6 +144,7 @@ pub fn run_at_with_cache(
         CheckContext {
             root,
             json_mode,
+            color: crate::output::ColorMode::Auto,
             backend: &backend,
             interrupt: InterruptFlag::install(),
             cache_base: Some(cache_base),
@@ -156,6 +179,7 @@ pub fn run_gate_at(
         CheckContext {
             root,
             json_mode: false,
+            color: crate::output::ColorMode::Auto,
             backend: &backend,
             interrupt: InterruptFlag::install(),
             cache_base,
@@ -217,6 +241,7 @@ pub(super) fn run_at_with(
     let CheckContext {
         root: requested_root,
         json_mode,
+        color,
         backend,
         interrupt,
         cache_base,
@@ -238,6 +263,7 @@ pub(super) fn run_at_with(
     let context = CheckContext {
         root: &root,
         json_mode,
+        color,
         backend,
         interrupt,
         cache_base,
@@ -255,6 +281,7 @@ pub(super) fn run_at_with(
             context.root,
             list,
             json_mode,
+            color,
             stdout,
             stderr,
             context.backend,
@@ -263,6 +290,7 @@ pub(super) fn run_at_with(
             context.root,
             failures,
             json_mode,
+            color,
             stdout,
             stderr,
             context.cache_base,
@@ -271,6 +299,7 @@ pub(super) fn run_at_with(
             context.root,
             details,
             json_mode,
+            color,
             stdout,
             stderr,
             context.cache_base,
@@ -505,6 +534,7 @@ pub(super) fn effective_systems(
 
 pub(super) fn write_page(
     json_mode: bool,
+    color: crate::output::ColorMode,
     bytes: Vec<u8>,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
@@ -514,7 +544,7 @@ pub(super) fn write_page(
     } else {
         crate::output::colorize_check(
             &String::from_utf8_lossy(&bytes),
-            crate::output::color_enabled(crate::output::Stream::Stdout, false),
+            crate::output::color_enabled(crate::output::Stream::Stdout, false, color),
         )
         .into_bytes()
     };
@@ -535,9 +565,9 @@ pub(super) fn report_error(
     stderr: &mut impl Write,
 ) -> ExitCode {
     if json_mode {
-        let mut document = output::error_document(error.code, &error.message);
+        let mut document = output::error_document(error.code, &error.message, run);
         if let Some(run) = run {
-            document["run"] = serde_json::Value::String(run.to_owned());
+            document["error"]["details"]["run"] = serde_json::Value::String(run.to_owned());
         }
         match output::compact_json(&document) {
             Ok(bytes) => {
@@ -551,7 +581,11 @@ pub(super) fn report_error(
         let message = format!("error: {}", error.message);
         let rendered = crate::output::colorize_error(
             &message,
-            crate::output::color_enabled(crate::output::Stream::Stderr, false),
+            crate::output::color_enabled(
+                crate::output::Stream::Stderr,
+                false,
+                crate::output::ColorMode::Auto,
+            ),
         );
         let _ = writeln!(stderr, "{rendered}");
     }

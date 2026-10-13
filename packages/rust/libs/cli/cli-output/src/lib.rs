@@ -8,7 +8,7 @@ use bloomery_init::{InitError, InitErrorKind, InitReport};
 use bloomery_model::{Diagnostic, diagnostics::SourceLocation};
 use bloomery_spec::SpecReport;
 use bloomery_sync::SyncReport;
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 use std::io::{self, IsTerminal, Write};
 use std::path::Path;
 
@@ -18,12 +18,39 @@ pub enum Stream {
     Stderr,
 }
 
-pub fn color_enabled(stream: Stream, json_mode: bool) -> bool {
+/// Explicit color selection shared by every human-readable output stream.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ColorMode {
+    #[default]
+    Auto,
+    Always,
+    Never,
+}
+
+impl ColorMode {
+    /// Resolve whether a stream is styled. JSON output never carries ANSI, even
+    /// when color is forced.
+    pub fn resolve(
+        self,
+        terminal: bool,
+        no_color: bool,
+        dumb_terminal: bool,
+        json_mode: bool,
+    ) -> bool {
+        match self {
+            ColorMode::Never => false,
+            ColorMode::Always => !json_mode,
+            ColorMode::Auto => terminal && !no_color && !dumb_terminal && !json_mode,
+        }
+    }
+}
+
+pub fn color_enabled(stream: Stream, json_mode: bool, mode: ColorMode) -> bool {
     let terminal = match stream {
         Stream::Stdout => io::stdout().is_terminal(),
         Stream::Stderr => io::stderr().is_terminal(),
     };
-    color_policy(
+    mode.resolve(
         terminal,
         std::env::var_os("NO_COLOR").is_some_and(|value| !value.is_empty()),
         std::env::var("TERM").is_ok_and(|term| term == "dumb"),
@@ -31,8 +58,235 @@ pub fn color_enabled(stream: Stream, json_mode: bool) -> bool {
     )
 }
 
-fn color_policy(terminal: bool, no_color: bool, dumb_terminal: bool, json_mode: bool) -> bool {
-    terminal && !no_color && !dumb_terminal && !json_mode
+/// Semantic roles shared by every command's human output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Role {
+    Heading,
+    Success,
+    Failure,
+    Warning,
+    Info,
+    Accent,
+    Identifier,
+    Muted,
+}
+
+impl Role {
+    pub fn sgr(self) -> &'static str {
+        match self {
+            Role::Heading => "1",
+            Role::Success => "1;32",
+            Role::Failure => "1;31",
+            Role::Warning => "1;33",
+            Role::Info => "36",
+            Role::Accent => "1;36",
+            Role::Identifier => "1;35",
+            Role::Muted => "2",
+        }
+    }
+}
+
+/// Apply a semantic role to a text fragment. Disabled styling returns the
+/// input unchanged so plain output keeps identical content and ordering.
+pub fn style(role: Role, text: &str, enabled: bool) -> String {
+    if !enabled || text.is_empty() {
+        return text.to_owned();
+    }
+    format!("\x1b[{}m{text}\x1b[0m", role.sgr())
+}
+
+/// Render a root heading.
+pub fn heading(text: &str, enabled: bool) -> String {
+    style(Role::Heading, text, enabled)
+}
+
+/// Render a `Label: value` line.
+pub fn field(label: &str, value: &str, enabled: bool) -> String {
+    format!("{}: {value}", style(Role::Muted, label, enabled))
+}
+
+/// Join independent sections with exactly one blank line between them and no
+/// trailing blank line.
+pub fn join_sections(sections: &[String]) -> String {
+    let mut output = String::new();
+    for section in sections.iter().filter(|section| !section.is_empty()) {
+        if !output.is_empty() {
+            output.push('\n');
+        }
+        output.push_str(section);
+        if !output.ends_with('\n') {
+            output.push('\n');
+        }
+    }
+    output
+}
+
+/// Shared status vocabulary for flat outcome lines.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutcomeStatus {
+    Passed,
+    Failed,
+    Warning,
+    Note,
+    Skipped,
+}
+
+impl OutcomeStatus {
+    pub fn glyph(self) -> &'static str {
+        match self {
+            OutcomeStatus::Passed => "✓",
+            OutcomeStatus::Failed => "✗",
+            OutcomeStatus::Warning => "!",
+            OutcomeStatus::Note => "ℹ",
+            OutcomeStatus::Skipped => "·",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            OutcomeStatus::Passed => "passed",
+            OutcomeStatus::Failed => "failed",
+            OutcomeStatus::Warning => "warning",
+            OutcomeStatus::Note => "note",
+            OutcomeStatus::Skipped => "skipped",
+        }
+    }
+
+    pub fn role(self) -> Role {
+        match self {
+            OutcomeStatus::Passed => Role::Success,
+            OutcomeStatus::Failed => Role::Failure,
+            OutcomeStatus::Warning => Role::Warning,
+            OutcomeStatus::Note => Role::Info,
+            OutcomeStatus::Skipped => Role::Muted,
+        }
+    }
+
+    /// Render `<glyph> <label>` followed by an optional detail.
+    pub fn render(self, detail: &str, enabled: bool) -> String {
+        let prefix = style(
+            self.role(),
+            &format!("{} {}", self.glyph(), self.label()),
+            enabled,
+        );
+        if detail.is_empty() {
+            prefix
+        } else {
+            format!("{prefix} {detail}")
+        }
+    }
+}
+
+/// Command outcome carried by the JSON envelope's `status` field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Status {
+    Succeeded,
+    Failed,
+    Error,
+    Interrupted,
+}
+
+impl Status {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Status::Succeeded => "succeeded",
+            Status::Failed => "failed",
+            Status::Error => "error",
+            Status::Interrupted => "interrupted",
+        }
+    }
+}
+
+/// One structured warning in the JSON envelope's `warnings` array.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Warning {
+    pub code: String,
+    pub message: String,
+}
+
+impl Warning {
+    pub fn new(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            code: code.into(),
+            message: message.into(),
+        }
+    }
+}
+
+fn warning_json(warning: &Warning) -> Value {
+    json!({
+        "code": warning.code,
+        "message": warning.message,
+    })
+}
+
+fn attach_warnings(mut value: Value, warnings: &[Warning]) -> Value {
+    if warnings.is_empty() {
+        return value;
+    }
+    if let Some(map) = value.as_object_mut() {
+        map.insert(
+            "warnings".to_owned(),
+            Value::Array(warnings.iter().map(warning_json).collect()),
+        );
+    }
+    value
+}
+
+fn take_operation(result: &mut Value) -> Option<String> {
+    result.as_object_mut().and_then(|map| {
+        map.remove("operation")
+            .and_then(|value| value.as_str().map(str::to_owned))
+    })
+}
+
+/// Build a shared success envelope. A command-specific `operation` field is
+/// lifted out of the result payload when present.
+pub fn success_envelope(
+    command: &str,
+    operation: Option<&str>,
+    status: Status,
+    mut result: Value,
+    warnings: Vec<Warning>,
+) -> Value {
+    let operation = operation
+        .map(str::to_owned)
+        .or_else(|| take_operation(&mut result));
+    let mut envelope = Map::new();
+    envelope.insert("command".to_owned(), json!(command));
+    if let Some(operation) = operation {
+        envelope.insert("operation".to_owned(), json!(operation));
+    }
+    envelope.insert("status".to_owned(), json!(status.as_str()));
+    envelope.insert("result".to_owned(), result);
+    attach_warnings(Value::Object(envelope), &warnings)
+}
+
+/// Build a shared failure envelope.
+pub fn error_envelope(
+    command: Option<&str>,
+    operation: Option<&str>,
+    status: Status,
+    code: &str,
+    kind: &str,
+    message: &str,
+    details: Option<Value>,
+) -> Value {
+    let mut error = Map::new();
+    error.insert("code".to_owned(), json!(code));
+    error.insert("kind".to_owned(), json!(kind));
+    error.insert("message".to_owned(), json!(message));
+    if let Some(details) = details {
+        error.insert("details".to_owned(), details);
+    }
+    let mut envelope = Map::new();
+    envelope.insert("command".to_owned(), json!(command));
+    if let Some(operation) = operation {
+        envelope.insert("operation".to_owned(), json!(operation));
+    }
+    envelope.insert("status".to_owned(), json!(status.as_str()));
+    envelope.insert("error".to_owned(), Value::Object(error));
+    Value::Object(envelope)
 }
 
 pub fn diagnostics_json(
@@ -45,11 +299,19 @@ pub fn diagnostics_json(
         .iter()
         .map(|diagnostic| diagnostic_json(root, diagnostic))
         .collect::<Vec<_>>();
-    json!({
-        "command": command,
-        "status": status,
-        "diagnostics": values,
-    })
+    let status = match status {
+        "failed" => Status::Failed,
+        _ => Status::Error,
+    };
+    error_envelope(
+        Some(command),
+        None,
+        status,
+        "Diagnostics",
+        "diagnostics",
+        "the workspace has validation diagnostics",
+        Some(json!({ "diagnostics": values })),
+    )
 }
 
 fn diagnostic_json(root: &Path, diagnostic: &Diagnostic) -> Value {
@@ -76,63 +338,72 @@ fn relative_path(root: &Path, location: &SourceLocation) -> String {
 }
 
 pub fn colorize_check(text: &str, enabled: bool) -> String {
-    colorize_lines(text, enabled, |line| {
-        if line.starts_with("PASS") {
-            Some("1;32")
-        } else if line.starts_with("ERROR [")
-            || line.starts_with("ERROR  ")
-            || line.starts_with("FAIL")
-            || line.starts_with("INTERRUPTED")
-        {
-            Some("1;31")
-        } else if line.starts_with("  -->") {
-            Some("36")
-        } else if line.starts_with("  = note:") {
-            Some("33")
-        } else if is_failure_id_line(line) {
-            Some("1;31")
-        } else {
-            None
-        }
-    })
+    colorize_roles(text, enabled, check_line_role)
 }
 
 pub fn colorize_review(text: &str, enabled: bool) -> String {
-    colorize_lines(text, enabled, |line| {
-        if line.starts_with("Total manual requirements") {
-            Some("1;32")
-        } else if line.starts_with("            Design:") {
-            Some("36")
-        } else if line.starts_with("        └── [") {
-            Some("1;35")
-        } else if line.starts_with("    └──") || line.starts_with("└──") {
-            Some("1;36")
-        } else if !line.trim().is_empty() && !line.starts_with(' ') {
-            Some("1;34")
-        } else {
-            None
-        }
-    })
+    colorize_roles(text, enabled, review_line_role)
 }
 
 pub fn colorize_error(text: &str, enabled: bool) -> String {
-    colorize_lines(text, enabled, |line| {
-        if line.starts_with("error:") || line.starts_with("sync failed") {
-            Some("1;31")
-        } else if line.starts_with("warning:") {
-            Some("1;33")
-        } else {
-            None
-        }
-    })
+    colorize_roles(text, enabled, error_line_role)
+}
+
+fn check_line_role(line: &str) -> Option<Role> {
+    if line.starts_with('✓') || line.starts_with("PASS") {
+        Some(Role::Success)
+    } else if line.starts_with('✗')
+        || line.starts_with("ERROR [")
+        || line.starts_with("ERROR  ")
+        || line.starts_with("FAIL")
+        || line.starts_with("INTERRUPTED")
+    {
+        Some(Role::Failure)
+    } else if line.starts_with("  -->") {
+        Some(Role::Info)
+    } else if line.starts_with("  = note:") {
+        Some(Role::Warning)
+    } else if is_failure_id_line(line) {
+        Some(Role::Failure)
+    } else {
+        None
+    }
+}
+
+fn review_line_role(line: &str) -> Option<Role> {
+    if line.starts_with("Total manual requirements") {
+        Some(Role::Success)
+    } else if line.starts_with("            Design:") {
+        Some(Role::Info)
+    } else if line.starts_with("        └── [") {
+        Some(Role::Identifier)
+    } else if line.starts_with("    └──") || line.starts_with("└──") {
+        Some(Role::Accent)
+    } else if !line.trim().is_empty() && !line.starts_with(' ') {
+        Some(Role::Heading)
+    } else {
+        None
+    }
+}
+
+fn error_line_role(line: &str) -> Option<Role> {
+    if line.starts_with("error:") || line.starts_with("sync failed") {
+        Some(Role::Failure)
+    } else if line.starts_with("warning:") {
+        Some(Role::Warning)
+    } else {
+        None
+    }
 }
 
 pub fn sync_success_json(report: &SyncReport) -> Value {
-    json!({
-        "command": "sync",
-        "status": "succeeded",
-        "result": report,
-    })
+    success_envelope(
+        "sync",
+        None,
+        Status::Succeeded,
+        serde_json::to_value(report).unwrap_or(Value::Null),
+        Vec::new(),
+    )
 }
 
 pub fn sync_failure_json(
@@ -143,124 +414,165 @@ pub fn sync_failure_json(
     captured_stderr: &str,
 ) -> Value {
     let (warnings, recommendations, tool_stderr) = categorize_stderr(captured_stderr);
-    json!({
-        "command": "sync",
-        "status": "failed",
-        "error": {
-            "stage": stage,
-            "message": message,
-            "completed_stages": completed_stages,
-            "partially_synchronized": partially_synchronized,
-            "recovery_guidance": if partially_synchronized {
-                Some("Fix the error and rerun `bloomery sync`.")
-            } else {
-                None
-            },
+    let notices = warnings
+        .iter()
+        .map(|warning| Warning::new("warning", warning.clone()))
+        .chain(
+            recommendations
+                .iter()
+                .map(|recommendation| Warning::new("recommendation", recommendation.clone())),
+        )
+        .collect::<Vec<_>>();
+    let details = json!({
+        "stage": stage,
+        "completed_stages": completed_stages,
+        "partially_synchronized": partially_synchronized,
+        "recovery_guidance": if partially_synchronized {
+            Some("Fix the error and rerun `bloomery sync`.")
+        } else {
+            None
         },
-        "notices": {
-            "warnings": warnings,
-            "recommendations": recommendations,
-            "tool_stderr": tool_stderr,
-        },
-    })
+        "tool_stderr": tool_stderr,
+    });
+    let envelope = error_envelope(
+        Some("sync"),
+        None,
+        Status::Error,
+        "SyncFailed",
+        "sync",
+        message,
+        Some(details),
+    );
+    attach_warnings(envelope, &notices)
 }
 
 pub fn init_success_json(report: &InitReport) -> Value {
-    json!({
-        "command": "init",
-        "status": "succeeded",
-        "directory": report.directory,
-        "template": report.template,
-        "created": report.created,
-        "lockfiles": report.lockfiles,
-    })
+    success_envelope(
+        "init",
+        None,
+        Status::Succeeded,
+        json!({
+            "directory": report.directory,
+            "template": report.template,
+            "created": report.created,
+            "lockfiles": report.lockfiles,
+        }),
+        Vec::new(),
+    )
 }
 
 pub fn init_failure_json(error: &InitError) -> Value {
-    json!({
-        "command": "init",
-        "status": "failed",
-        "error": {
-            "kind": match error.kind() {
-                InitErrorKind::Usage => "usage",
-                InitErrorKind::Operational => "operational",
-            },
-            "message": error.message(),
-        },
-    })
+    let (code, kind) = match error.kind() {
+        InitErrorKind::Usage => ("UsageError", "usage"),
+        InitErrorKind::Operational => ("InitError", "operational"),
+    };
+    error_envelope(
+        Some("init"),
+        None,
+        Status::Error,
+        code,
+        kind,
+        error.message(),
+        None,
+    )
 }
 
 pub fn config_success_json(report: &ConfigReport) -> Value {
-    json!({
-        "command": "config",
-        "status": "succeeded",
-        "warnings": report.warnings,
-        "result": report.outcome,
-    })
+    let result = serde_json::to_value(&report.outcome).unwrap_or(Value::Null);
+    success_envelope(
+        "config",
+        None,
+        Status::Succeeded,
+        result,
+        config_warnings(&report.warnings),
+    )
 }
 
 pub fn config_failure_json(command: &str, message: &str) -> Value {
-    json!({
-        "command": command,
-        "status": "failed",
-        "error": {
-            "kind": "config",
-            "message": message,
-        },
-    })
+    error_envelope(
+        Some(command),
+        None,
+        Status::Error,
+        "ConfigError",
+        "config",
+        message,
+        None,
+    )
+}
+
+fn config_warnings(warnings: &[bloomery_config::ConfigWarning]) -> Vec<Warning> {
+    warnings
+        .iter()
+        .map(|warning| match warning {
+            bloomery_config::ConfigWarning::MissingFlake => Warning::new(
+                "missing_flake",
+                "no Bloomery flake.nix in the current directory",
+            ),
+            bloomery_config::ConfigWarning::MissingConfig { path } => {
+                Warning::new("missing_config", format!("{path} is missing"))
+            }
+            bloomery_config::ConfigWarning::CreatedConfig { path } => {
+                Warning::new("created_config", format!("created {path}"))
+            }
+        })
+        .collect()
 }
 
 pub fn spec_success_json(report: &SpecReport) -> Value {
-    json!({
-        "command": "spec",
-        "status": "succeeded",
-        "result": report.outcome,
-    })
+    let result = serde_json::to_value(&report.outcome).unwrap_or(Value::Null);
+    success_envelope("spec", None, Status::Succeeded, result, Vec::new())
 }
 
 pub fn spec_failure_json(command: &str, message: &str) -> Value {
-    json!({
-        "command": command,
-        "status": "failed",
-        "error": {
-            "kind": "spec",
-            "message": message,
-        },
-    })
+    error_envelope(
+        Some(command),
+        None,
+        Status::Error,
+        "SpecError",
+        "spec",
+        message,
+        None,
+    )
 }
 
 pub fn disk_success_json(report: &DiskReport) -> Value {
-    json!({
-        "command": "disk",
-        "status": "succeeded",
-        "bytes": report.bytes,
-        "systems": report.systems,
-        "derivation": report.derivation,
-        "unmeasured": report.unmeasured,
-        "categories": report.categories,
-    })
+    success_envelope(
+        "disk",
+        None,
+        Status::Succeeded,
+        json!({
+            "bytes": report.bytes,
+            "systems": report.systems,
+            "derivation": report.derivation,
+            "unmeasured": report.unmeasured,
+            "categories": report.categories,
+        }),
+        Vec::new(),
+    )
 }
 
 pub fn disk_failure_json(message: &str) -> Value {
-    json!({
-        "command": "disk",
-        "status": "failed",
-        "error": {
-            "kind": "disk",
-            "message": message,
-        },
-    })
+    error_envelope(
+        Some("disk"),
+        None,
+        Status::Error,
+        "DiskError",
+        "disk",
+        message,
+        None,
+    )
 }
 
 pub fn usage_error_json(command: Option<&str>, message: &str) -> Value {
-    json!({
-        "command": command,
-        "status": "failed",
-        "error": {
-            "kind": "usage",
-            "message": message,
-        },
-    })
+    error_envelope(
+        command,
+        None,
+        Status::Error,
+        "UsageError",
+        "usage",
+        message,
+        None,
+    )
 }
 
 /// Shared message for the root `flake.nix` preflight required by every command.
@@ -273,14 +585,15 @@ pub const MISSING_FLAKE_CODE: &str = "MissingFlake";
 /// One structured setup error for a missing root flake, reused by every
 /// command so human and JSON modes carry the same guidance.
 pub fn flake_setup_error_json(command: Option<&str>) -> Value {
-    json!({
-        "command": command,
-        "status": "error",
-        "error": {
-            "code": MISSING_FLAKE_CODE,
-            "message": MISSING_FLAKE_MESSAGE,
-        },
-    })
+    error_envelope(
+        command,
+        None,
+        Status::Error,
+        MISSING_FLAKE_CODE,
+        "setup",
+        MISSING_FLAKE_MESSAGE,
+        None,
+    )
 }
 
 fn categorize_stderr(contents: &str) -> (Vec<String>, Vec<String>, Vec<String>) {
@@ -308,11 +621,7 @@ fn is_failure_id_line(line: &str) -> bool {
     })
 }
 
-fn colorize_lines(
-    text: &str,
-    enabled: bool,
-    style: impl Fn(&str) -> Option<&'static str>,
-) -> String {
+fn colorize_roles(text: &str, enabled: bool, role: impl Fn(&str) -> Option<Role>) -> String {
     if !enabled {
         return text.to_owned();
     }
@@ -321,12 +630,8 @@ fn colorize_lines(
         let (content, newline) = line
             .strip_suffix('\n')
             .map_or((line, ""), |content| (content, "\n"));
-        if let Some(code) = style(content) {
-            output.push_str("\x1b[");
-            output.push_str(code);
-            output.push('m');
-            output.push_str(content);
-            output.push_str("\x1b[0m");
+        if let Some(role) = role(content) {
+            output.push_str(&style(role, content, true));
         } else {
             output.push_str(content);
         }
@@ -374,17 +679,17 @@ impl<W: Write> ColorWriter<W> {
     fn emit_line(&mut self, newline: bool) -> io::Result<()> {
         let raw = String::from_utf8_lossy(&self.line);
         let line = raw.strip_suffix('\r').unwrap_or(&raw);
-        let style = match self.channel {
-            Channel::Stdout if line.starts_with("==>") => Some("1;36"),
-            Channel::Stdout if line.starts_with("Successfully synchronized") => Some("1;32"),
-            Channel::Stdout if line.starts_with("Skipped ") => Some("1;33"),
-            Channel::Stderr if line.starts_with("warning:") => Some("1;33"),
-            Channel::Stderr if line.starts_with("recommendation:") => Some("36"),
+        let role = match self.channel {
+            Channel::Stdout if line.starts_with("==>") => Some(Role::Accent),
+            Channel::Stdout if line.starts_with("Successfully synchronized") => Some(Role::Success),
+            Channel::Stdout if line.starts_with("Skipped ") => Some(Role::Warning),
+            Channel::Stderr if line.starts_with("warning:") => Some(Role::Warning),
+            Channel::Stderr if line.starts_with("recommendation:") => Some(Role::Info),
             _ => None,
         };
         if self.enabled {
-            if let Some(style) = style {
-                write!(self.inner, "\x1b[{style}m{line}\x1b[0m")?;
+            if let Some(role) = role {
+                write!(self.inner, "{}", style(role, line, true))?;
             } else {
                 self.inner.write_all(line.as_bytes())?;
             }
@@ -424,9 +729,10 @@ impl<W: Write> Write for ColorWriter<W> {
 #[cfg(test)]
 mod tests {
     use super::{
-        ColorWriter, Stream, color_enabled, color_policy, colorize_check, colorize_review,
-        diagnostics_json, disk_success_json, sync_failure_json, sync_success_json,
-        usage_error_json,
+        ColorMode, ColorWriter, OutcomeStatus, Role, Status, Stream, Warning, color_enabled,
+        colorize_check, colorize_review, diagnostics_json, disk_success_json, error_envelope,
+        field, heading, join_sections, style, success_envelope, sync_failure_json,
+        sync_success_json, usage_error_json,
     };
     use bloomery_disk::{DiskCategory, DiskEntry, DiskReport};
     use bloomery_model::Diagnostic;
@@ -435,36 +741,184 @@ mod tests {
     use std::io::Write;
     use std::path::Path;
 
-    #[test]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-001"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-002"))]
-    fn color_policy_colors_terminals_and_never_colors_json_or_no_color() {
-        assert!(color_policy(true, false, false, false));
-        assert!(!color_policy(false, false, false, false));
-        assert!(!color_policy(true, true, false, false));
-        assert!(!color_policy(true, false, true, false));
-        assert!(!color_policy(true, false, false, true));
-        assert!(!color_enabled(Stream::Stdout, true));
-        assert!(!color_enabled(Stream::Stderr, true));
+    fn assert_no_ansi(value: &serde_json::Value) {
+        let serialized = serde_json::to_string(value).expect("JSON");
+        assert!(!serialized.contains("\\u001b"), "ANSI leaked into JSON");
     }
 
     #[test]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-001"))]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-002"))]
-    fn human_renderers_apply_color_only_when_requested() {
-        let check = "PASS: done\nERROR [Missing]:\n  --> spec.toml:2\n";
-        let colored_check = colorize_check(check, true);
-        assert!(colored_check.contains("\x1b[1;32mPASS:"));
-        assert!(colored_check.contains("\x1b[1;31mERROR"));
-        assert!(colored_check.contains("\x1b[36m  -->"));
-        assert_eq!(colorize_check(check, false), check);
+    fn color_policy_colors_terminals_and_never_colors_json_or_no_color() {
+        assert!(ColorMode::Auto.resolve(true, false, false, false));
+        assert!(!ColorMode::Auto.resolve(false, false, false, false));
+        assert!(!ColorMode::Auto.resolve(true, true, false, false));
+        assert!(!ColorMode::Auto.resolve(true, false, true, false));
+        assert!(!ColorMode::Auto.resolve(true, false, false, true));
+    }
 
-        let review = "PARSER\n└── AUTH\n        └── [REQ-001] Review\n";
-        let colored_review = colorize_review(review, true);
-        assert!(colored_review.contains("\x1b[1;34mPARSER"));
-        assert!(colored_review.contains("\x1b[1;36m└── AUTH"));
-        assert!(colored_review.contains("\x1b[1;35m        └── [REQ-001]"));
-        assert_eq!(colorize_review(review, false), review);
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-029"))]
+    fn forced_color_overrides_redirected_and_no_color_streams() {
+        assert!(ColorMode::Always.resolve(false, true, true, false));
+        assert!(!ColorMode::Always.resolve(true, false, false, true));
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-030"))]
+    fn disabled_color_omits_styling_everywhere() {
+        assert!(!ColorMode::Never.resolve(true, false, false, false));
+        assert!(!ColorMode::Never.resolve(false, false, false, false));
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-031"))]
+    fn color_modes_cover_the_closed_set() {
+        assert_eq!(
+            [ColorMode::Auto, ColorMode::Always, ColorMode::Never],
+            [ColorMode::default(), ColorMode::Always, ColorMode::Never]
+        );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-005"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-009"))]
+    fn role_palette_is_stable_and_strips_to_plain_text() {
+        for role in [
+            Role::Heading,
+            Role::Success,
+            Role::Failure,
+            Role::Warning,
+            Role::Info,
+            Role::Accent,
+            Role::Identifier,
+            Role::Muted,
+        ] {
+            let styled = style(role, "value", true);
+            assert!(styled.contains("\x1b["));
+            assert!(styled.ends_with("\x1b[0m"));
+            assert_eq!(style(role, "value", false), "value");
+        }
+        // The same role always maps to the same SGR regardless of caller.
+        assert_eq!(style(Role::Failure, "x", true), "\x1b[1;31mx\x1b[0m");
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-004"))]
+    fn status_vocabulary_matches_the_presentation_grammar() {
+        assert_eq!(OutcomeStatus::Passed.glyph(), "✓");
+        assert_eq!(OutcomeStatus::Passed.label(), "passed");
+        assert_eq!(OutcomeStatus::Failed.glyph(), "✗");
+        assert_eq!(OutcomeStatus::Failed.label(), "failed");
+        assert_eq!(OutcomeStatus::Warning.glyph(), "!");
+        assert_eq!(OutcomeStatus::Skipped.label(), "skipped");
+        assert_eq!(
+            OutcomeStatus::Passed.render("28 passed", false),
+            "✓ passed 28 passed"
+        );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-006"))]
+    fn labeled_values_use_one_format() {
+        assert_eq!(
+            field("Design", "design/output.md", false),
+            "Design: design/output.md"
+        );
+        assert_eq!(heading("bloomery check", false), "bloomery check");
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-013"))]
+    fn independent_sections_are_separated_by_one_blank_line() {
+        let sections = vec!["a\n".to_owned(), String::new(), "b".to_owned()];
+        assert_eq!(join_sections(&sections), "a\n\nb\n");
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-016"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-019"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-021"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-022"))]
+    fn success_envelope_carries_command_status_result_and_warnings() {
+        let document = success_envelope(
+            "config",
+            None,
+            Status::Succeeded,
+            serde_json::json!({"operation": "get", "key": "checks.enable"}),
+            vec![Warning::new("missing_flake", "no flake")],
+        );
+        assert_eq!(document["command"], "config");
+        assert_eq!(document["operation"], "get");
+        assert_eq!(document["status"], "succeeded");
+        assert_eq!(document["result"]["key"], "checks.enable");
+        assert!(document["result"].get("operation").is_none());
+        assert_eq!(document["warnings"][0]["code"], "missing_flake");
+        assert_no_ansi(&document);
+
+        let first = serde_json::to_string(&document).expect("JSON");
+        let second = serde_json::to_string(&success_envelope(
+            "config",
+            None,
+            Status::Succeeded,
+            serde_json::json!({"operation": "get", "key": "checks.enable"}),
+            vec![Warning::new("missing_flake", "no flake")],
+        ))
+        .expect("JSON");
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-017"))]
+    fn error_envelope_carries_a_structured_error() {
+        let document = error_envelope(
+            Some("build"),
+            None,
+            Status::Error,
+            "MissingNix",
+            "operational",
+            "nix was not found on PATH",
+            None,
+        );
+        assert_eq!(document["command"], "build");
+        assert_eq!(document["status"], "error");
+        assert_eq!(document["error"]["code"], "MissingNix");
+        assert_eq!(document["error"]["kind"], "operational");
+        assert_eq!(document["error"]["message"], "nix was not found on PATH");
+        assert_no_ansi(&document);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-018"))]
+    fn warnings_are_structured_records() {
+        let document = error_envelope(
+            Some("sync"),
+            None,
+            Status::Error,
+            "SyncFailed",
+            "sync",
+            "failed",
+            None,
+        );
+        let document = super::attach_warnings(document, &[Warning::new("warning", "advisory")]);
+        assert_eq!(document["warnings"][0]["code"], "warning");
+        assert_eq!(document["warnings"][0]["message"], "advisory");
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-020"))]
+    fn json_documents_never_contain_ansi() {
+        for document in [
+            usage_error_json(Some("review"), "unknown option"),
+            diagnostics_json(
+                "check",
+                "failed",
+                Path::new("/repo"),
+                &[Diagnostic::new("MissingTest", "test missing")],
+            ),
+        ] {
+            assert_no_ansi(&document);
+        }
     }
 
     #[test]
@@ -478,14 +932,19 @@ mod tests {
         let document = diagnostics_json("check", "failed", root, &diagnostics);
         assert_eq!(document["command"], "check");
         assert_eq!(document["status"], "failed");
-        assert_eq!(document["diagnostics"][0]["code"], "MissingTest");
         assert_eq!(
-            document["diagnostics"][0]["location"]["path"],
+            document["error"]["details"]["diagnostics"][0]["code"],
+            "MissingTest"
+        );
+        assert_eq!(
+            document["error"]["details"]["diagnostics"][0]["location"]["path"],
             ".bloomery/specs/REQ.toml"
         );
-        assert_eq!(document["diagnostics"][0]["location"]["line"], 8);
-        let serialized = serde_json::to_string_pretty(&document).expect("JSON");
-        assert!(!serialized.contains("\x1b["));
+        assert_eq!(
+            document["error"]["details"]["diagnostics"][0]["location"]["line"],
+            8
+        );
+        assert_no_ansi(&document);
     }
 
     #[test]
@@ -500,11 +959,24 @@ mod tests {
             statement: "The CLI shall color terminal output.".to_owned(),
             design_ref: "design/output.md".to_owned(),
         };
-        let document = serde_json::to_value([item]).expect("review JSON");
-        assert!(document.is_array());
-        assert_eq!(document[0]["id"], "CLI-INTERFACE-OUTPUT-001");
-        assert_eq!(document[0]["design_ref"], "design/output.md");
-        assert_eq!(document[0].as_object().expect("review item").len(), 7);
+        let document = success_envelope(
+            "review",
+            None,
+            Status::Succeeded,
+            serde_json::to_value([item]).expect("review JSON"),
+            Vec::new(),
+        );
+        assert!(document["result"].is_array());
+        assert_eq!(document["result"][0]["id"], "CLI-INTERFACE-OUTPUT-001");
+        assert_eq!(document["result"][0]["design_ref"], "design/output.md");
+        assert_eq!(
+            document["result"][0]
+                .as_object()
+                .expect("review item")
+                .len(),
+            7
+        );
+        assert_no_ansi(&document);
     }
 
     #[test]
@@ -520,12 +992,11 @@ mod tests {
         let document = disk_success_json(&report);
         assert_eq!(document["command"], "disk");
         assert_eq!(document["status"], "succeeded");
-        assert_eq!(document["bytes"], 4096);
-        assert_eq!(document["systems"][0], "x86_64-linux");
-        assert_eq!(document["unmeasured"][0], "/nix/store/aaa-check");
-        assert!(document["bytes"].is_u64());
-        let serialized = serde_json::to_string(&document).expect("JSON");
-        assert!(!serialized.contains("\\u001b"));
+        assert_eq!(document["result"]["bytes"], 4096);
+        assert_eq!(document["result"]["systems"][0], "x86_64-linux");
+        assert_eq!(document["result"]["unmeasured"][0], "/nix/store/aaa-check");
+        assert!(document["result"]["bytes"].is_u64());
+        assert_no_ansi(&document);
     }
 
     #[test]
@@ -558,11 +1029,20 @@ mod tests {
             ],
         };
         let document = disk_success_json(&report);
-        assert_eq!(document["categories"][0]["name"], "packages");
-        assert_eq!(document["categories"][0]["entries"][0]["name"], "default");
-        assert_eq!(document["categories"][0]["entries"][0]["bytes"], 100);
-        assert_eq!(document["categories"][0]["entries"][0]["unmeasured"], false);
-        assert_eq!(document["categories"][1]["name"], "checks");
+        assert_eq!(document["result"]["categories"][0]["name"], "packages");
+        assert_eq!(
+            document["result"]["categories"][0]["entries"][0]["name"],
+            "default"
+        );
+        assert_eq!(
+            document["result"]["categories"][0]["entries"][0]["bytes"],
+            100
+        );
+        assert_eq!(
+            document["result"]["categories"][0]["entries"][0]["unmeasured"],
+            false
+        );
+        assert_eq!(document["result"]["categories"][1]["name"], "checks");
     }
 
     #[test]
@@ -582,9 +1062,7 @@ mod tests {
         assert_eq!(success["command"], "sync");
         assert_eq!(success["status"], "succeeded");
         assert_eq!(success["result"]["updated_ecosystems"][0], "rust");
-        let success_text = serde_json::to_string(&success).expect("JSON");
-        assert!(!success_text.contains("\\u001b"));
-        assert!(!success_text.contains("==>"));
+        assert_no_ansi(&success);
 
         let failure = sync_failure_json(
             "final Cargo metadata",
@@ -593,15 +1071,16 @@ mod tests {
             true,
             "warning: advisory\nrecommendation: feature\ntool detail\n",
         );
-        assert_eq!(failure["error"]["stage"], "final Cargo metadata");
-        assert_eq!(failure["error"]["partially_synchronized"], true);
+        assert_eq!(failure["error"]["details"]["stage"], "final Cargo metadata");
+        assert_eq!(failure["error"]["details"]["partially_synchronized"], true);
         assert_eq!(
-            failure["error"]["recovery_guidance"],
+            failure["error"]["details"]["recovery_guidance"],
             "Fix the error and rerun `bloomery sync`."
         );
-        assert_eq!(failure["notices"]["warnings"][0], "advisory");
-        assert_eq!(failure["notices"]["recommendations"][0], "feature");
-        assert_eq!(failure["notices"]["tool_stderr"][0], "tool detail");
+        assert_eq!(failure["warnings"][0]["message"], "advisory");
+        assert_eq!(failure["warnings"][1]["message"], "feature");
+        assert_eq!(failure["error"]["details"]["tool_stderr"][0], "tool detail");
+        assert_no_ansi(&failure);
     }
 
     #[test]
@@ -609,14 +1088,11 @@ mod tests {
     fn usage_errors_requested_as_json_are_single_machine_documents() {
         let document = usage_error_json(Some("review"), "unknown option");
         assert_eq!(document["command"], "review");
-        assert_eq!(document["status"], "failed");
+        assert_eq!(document["status"], "error");
         assert_eq!(document["error"]["kind"], "usage");
+        assert_eq!(document["error"]["code"], "UsageError");
         assert_eq!(document["error"]["message"], "unknown option");
-        assert!(
-            !serde_json::to_string(&document)
-                .expect("JSON")
-                .contains("\\u001b")
-        );
+        assert_no_ansi(&document);
     }
 
     #[test]
@@ -646,5 +1122,71 @@ mod tests {
         let errors = String::from_utf8(errors).expect("UTF-8 stderr");
         assert!(errors.contains("\x1b[1;33mwarning: config\x1b[0m\n"));
         assert!(errors.contains("\x1b[36mrecommendation: scanner\x1b[0m\n"));
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-005"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-009"))]
+    fn human_renderers_apply_color_only_when_requested() {
+        let check = "✓ passed · 2 checks\n✗ failed\nf1 BuildFailed\n";
+        let colored_check = colorize_check(check, true);
+        assert!(colored_check.contains("\x1b[1;32m✓ passed"));
+        assert!(colored_check.contains("\x1b[1;31m✗ failed"));
+        assert_eq!(colorize_check(check, false), check);
+
+        let review = "PARSER\n└── AUTH\n        └── [REQ-001] Review\n";
+        let colored_review = colorize_review(review, true);
+        assert!(colored_review.contains("\x1b[1mPARSER"));
+        assert!(colored_review.contains("\x1b[1;36m└── AUTH"));
+        assert!(colored_review.contains("\x1b[1;35m        └── [REQ-001]"));
+        assert_eq!(colorize_review(review, false), review);
+    }
+
+    #[test]
+    fn color_enabled_accepts_json_and_mode() {
+        assert!(!color_enabled(Stream::Stdout, true, ColorMode::Auto));
+        assert!(!color_enabled(Stream::Stderr, true, ColorMode::Always));
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-001"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-002"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-007"))]
+    fn shared_grammar_renders_headings_fields_and_summaries() {
+        let plain = join_sections(&[
+            heading("bloomery check", false),
+            field("Run", "r42", false),
+            OutcomeStatus::Passed.render("28 passed", false),
+        ]);
+        assert_eq!(plain, "bloomery check\n\nRun: r42\n\n✓ passed 28 passed\n");
+
+        let styled = join_sections(&[
+            heading("bloomery check", true),
+            field("Run", "r42", true),
+            OutcomeStatus::Passed.render("28 passed", true),
+        ]);
+        assert!(styled.contains("\x1b[1mbloomery check\x1b[0m"));
+        assert!(styled.contains("\x1b[2mRun\x1b[0m: r42"));
+        assert!(styled.contains("\x1b[1;32m✓ passed\x1b[0m"));
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-011"))]
+    fn automatic_color_targets_only_eligible_terminals() {
+        assert!(ColorMode::Auto.resolve(true, false, false, false));
+        assert!(!ColorMode::Auto.resolve(true, false, true, false));
+        assert!(!ColorMode::Auto.resolve(false, false, false, false));
+        assert!(!ColorMode::Auto.resolve(true, true, false, false));
+        assert!(!ColorMode::Auto.resolve(true, false, false, true));
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-012"))]
+    fn non_interactive_and_json_output_is_plain() {
+        assert!(!ColorMode::Auto.resolve(false, false, false, false));
+        assert!(!ColorMode::Auto.resolve(true, true, false, false));
+        assert!(!ColorMode::Auto.resolve(true, false, true, false));
+        assert!(!ColorMode::Auto.resolve(true, false, false, true));
+        assert!(!ColorMode::Never.resolve(true, false, false, false));
     }
 }

@@ -442,6 +442,7 @@ fn blocked_dependents_finalize_before_a_slow_worker_joins() {
             CheckContext {
                 root: &root_for_run,
                 json_mode: false,
+                color: crate::output::ColorMode::Auto,
                 backend: &backend,
                 interrupt: InterruptFlag::for_test(),
                 cache_base: Some(&cache_for_run),

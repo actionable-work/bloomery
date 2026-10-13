@@ -20,7 +20,7 @@ design = "design/output.md#human-readable-output"
 
 [requirements.ears]
 type = "unwanted_behavior"
-trigger = "the current output stream is not a terminal, NO_COLOR is non-empty, TERM is dumb, or --json is selected"
+trigger = "the current output stream is not a terminal, NO_COLOR is non-empty, TERM is dumb, or --json is selected, and color is not forced"
 system = "the bloomery CLI"
 action = "omit ANSI color codes from output"
 
@@ -33,7 +33,7 @@ design = "design/output.md"
 [requirements.ears]
 type = "ubiquitous"
 system = "the bloomery CLI"
-action = "accept --json for init, check, build, disk, review, sync, and spec"
+action = "accept --json for init, check, build, disk, review, sync, spec, and config"
 
 [[requirements]]
 id = "CLI-INTERFACE-OUTPUT-004"
@@ -57,7 +57,7 @@ design = "design/output.md#json-contracts"
 type = "event"
 trigger = "review is invoked with --json"
 system = "bloomery review"
-action = "emit the stable JSON array of manual review items"
+action = "emit the stable review catalog as the result of the shared JSON envelope"
 
 [[requirements]]
 id = "CLI-INTERFACE-OUTPUT-006"
@@ -178,3 +178,84 @@ type = "event"
 trigger = "build is invoked with --json"
 system = "bloomery build"
 action = "emit one object with the command identity, status, selected systems, and a package array carrying name, system, status, and realized path, plus the check-gate status when --check is selected"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-016"
+title = "JSON success uses the shared envelope"
+manual = false
+design = "design/output.md#json-envelope"
+
+[requirements.ears]
+type = "event"
+trigger = "an application command succeeds with --json selected"
+system = "the bloomery CLI"
+action = "emit one shared envelope carrying the command identity, status, and command result"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-017"
+title = "JSON failures use the shared envelope"
+manual = false
+design = "design/output.md#json-envelope"
+
+[requirements.ears]
+type = "event"
+trigger = "a usage or operational failure is requested with --json"
+system = "the bloomery CLI"
+action = "emit the shared envelope with a structured error carrying a stable code and message"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-018"
+title = "JSON warnings are structured"
+manual = false
+design = "design/output.md#json-envelope"
+
+[requirements.ears]
+type = "event"
+trigger = "an application command emits a warning with --json selected"
+system = "the bloomery CLI"
+action = "carry the warning in the shared envelope warnings array"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-019"
+title = "JSON mode writes one document to stdout"
+manual = false
+design = "design/output.md#machine-guarantees"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "write exactly one JSON envelope document to stdout in --json mode"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-020"
+title = "JSON mode emits no human notices"
+manual = false
+design = "design/output.md#machine-guarantees"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "an application command is invoked with --json"
+system = "the bloomery CLI"
+action = "write human-formatted notices or progress to stdout or stderr"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-021"
+title = "JSON output is valid without a terminal"
+manual = false
+design = "design/output.md#machine-guarantees"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "emit the same JSON documents when stdout is not a terminal"
+
+[[requirements]]
+id = "CLI-INTERFACE-OUTPUT-022"
+title = "JSON serialization is deterministic"
+manual = false
+design = "design/output.md#machine-guarantees"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "serialize identical retained results with stable field names and ordering"

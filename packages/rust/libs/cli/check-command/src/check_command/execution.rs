@@ -301,7 +301,7 @@ pub(super) fn run_checks(
     } else {
         crate::output::colorize_check(
             &output::run_summary_text(&record, final_metrics.as_deref()),
-            crate::output::color_enabled(crate::output::Stream::Stdout, false),
+            crate::output::color_enabled(crate::output::Stream::Stdout, false, context.color),
         )
         .into_bytes()
     };

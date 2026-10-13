@@ -4,9 +4,9 @@ name: Bloomery CLI Interface
 tagline: Define the user-visible command syntax and options for the bloomery executable.
 description: |
   The interface feature specifies the command tree, invocation root, shared
-  flake-presence preflight, flags, and output modes exposed by `bloomery`.
-  Command behavior is specified separately by the CHECK, BUILD, DISK, REVIEW,
-  SYNC, SPEC, and CONFIG features.
+  flake-presence preflight, flags, human presentation grammar, and machine
+  output contracts exposed by `bloomery`. Command behavior is specified
+  separately by the CHECK, BUILD, DISK, REVIEW, SYNC, SPEC, and CONFIG features.
 ---
 
 # CLI Interface
@@ -19,6 +19,7 @@ and how the target repository root is selected.
 
 - [Commands and invocation](design/commands.md)
 - [Flags and option values](design/flags.md)
+- [Human output presentation](design/presentation.md)
 - [Human and machine-readable output](design/output.md)
 
 ## Responsibilities
@@ -36,12 +37,16 @@ and how the target repository root is selected.
 - Require `.bloomery/config.toml` for repository commands while exempting parser
   help, `init`, and flake-exempt `config`, whose mutating commands create a
   missing file with a warning.
-- Specify shared `--json`, check selection/execution/retrieval options,
-  build package/system selection, command-specific
+- Specify shared `--json`, `--color`, check selection/execution/retrieval
+  options, build package/system selection, command-specific
   `sync --update`, `disk --system`, `spec list` filters, `config --prefix`/`config
   --dry-run`/`config
   --diff`, and `init
   --template`/`init --force` values.
-- Define human-readable terminal coloring and stable JSON output contracts.
+- Define one human presentation grammar with a shared tree language, status
+  vocabulary, semantic color palette, notice streams, and closing summary.
+- Define one JSON envelope carrying the command, operation, status, result,
+  optional warnings, and structured errors for every application command.
+- Define terminal color eligibility and explicit `--color` selection.
 - Keep command syntax distinct from init, check, build, disk, review, sync,
   spec, and config semantics.

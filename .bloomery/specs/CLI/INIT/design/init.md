@@ -68,11 +68,15 @@ with recovery guidance to fix the reported error and run `bloomery sync` (or
 
 ## Output and failure
 
-Human output names the target directory and selected template, lists the
-created paths, reports the generated lockfiles, and suggests next commands such
-as `nix develop`. With `--json`, init emits one document with the command name,
-outcome status, target directory, template name, created paths, and lockfile
-status. An unknown template name is a usage error before any write. Refusing a
+Human output follows the shared
+[presentation grammar](../../INTERFACE/design/presentation.md): it names the
+target directory and selected template, lists the created paths using the shared
+tree grammar, reports the generated lockfiles, suggests next commands such as
+`nix develop`, and closes with one summary. With `--json`, init carries the
+command name, outcome status, target directory, template name, created paths, and
+lockfile status as the `result` of the shared
+[JSON envelope](../../INTERFACE/design/output.md#json-envelope). An unknown
+template name is a usage error before any write. Refusing a
 target with an existing template path without `--force` prints a warning before
 exiting nonzero.
 

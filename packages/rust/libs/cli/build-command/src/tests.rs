@@ -540,6 +540,7 @@ fn human_report_lists_output_paths() {
     let status = run_at_with(
         default_args(),
         false,
+        ColorMode::Auto,
         &root,
         &backend,
         &FakeGate::default(),
@@ -567,6 +568,7 @@ fn failed_package_names_log_retrieval() {
     run_at_with(
         default_args(),
         false,
+        ColorMode::Auto,
         &root,
         &backend,
         &FakeGate::default(),
@@ -593,6 +595,7 @@ fn json_report_is_structured() {
     run_at_with(
         args,
         true,
+        ColorMode::Auto,
         &root,
         &backend,
         &FakeGate::default(),
@@ -601,10 +604,11 @@ fn json_report_is_structured() {
     );
     let value: serde_json::Value = serde_json::from_slice(&stdout).expect("json");
     assert_eq!(value["command"], "build");
-    assert_eq!(value["status"], "passed");
-    assert_eq!(value["packages"][0]["name"], "app");
-    assert_eq!(value["packages"][0]["path"], "/nix/store/app");
-    assert_eq!(value["checks"]["status"], "passed");
+    assert_eq!(value["status"], "succeeded");
+    assert_eq!(value["result"]["status"], "passed");
+    assert_eq!(value["result"]["packages"][0]["name"], "app");
+    assert_eq!(value["result"]["packages"][0]["path"], "/nix/store/app");
+    assert_eq!(value["result"]["checks"]["status"], "passed");
 }
 
 #[test]
@@ -621,6 +625,7 @@ fn json_usage_error_is_structured() {
     run_at_with(
         args,
         true,
+        ColorMode::Auto,
         &root,
         &backend,
         &FakeGate::default(),
@@ -628,7 +633,7 @@ fn json_usage_error_is_structured() {
         &mut stderr,
     );
     let value: serde_json::Value = serde_json::from_slice(&stdout).expect("json");
-    assert_eq!(value["status"], "failed");
+    assert_eq!(value["status"], "error");
     assert_eq!(value["error"]["kind"], "usage");
 }
 
@@ -642,6 +647,7 @@ fn json_output_has_no_progress_or_color() {
     run_at_with(
         default_args(),
         true,
+        ColorMode::Auto,
         &root,
         &backend,
         &FakeGate::default(),
@@ -667,6 +673,7 @@ fn raw_logs_are_not_streamed() {
     run_at_with(
         default_args(),
         false,
+        ColorMode::Auto,
         &root,
         &backend,
         &FakeGate::default(),
@@ -703,6 +710,7 @@ fn gate_failure_is_reported() {
     run_at_with(
         args,
         false,
+        ColorMode::Auto,
         &root,
         &backend,
         &gate,
@@ -710,7 +718,7 @@ fn gate_failure_is_reported() {
         &mut stderr,
     );
     let text = String::from_utf8(stdout).expect("stdout");
-    assert!(text.contains("checks: failed"), "{text}");
+    assert!(text.contains("checks failed"), "{text}");
     assert!(text.contains("app:test"), "{text}");
 }
 

@@ -62,7 +62,7 @@ fn concurrent_alias_retrieval_freezes_one_shared_derivation_log_snapshot() {
     };
     let (_, summary, _) = invoke(request(), &root, &cache, &backend, true);
     let summary: Value = serde_json::from_slice(&summary).unwrap();
-    let run = summary["run"].as_str().unwrap().to_owned();
+    let run = summary["result"]["run"].as_str().unwrap().to_owned();
     let (_, directory) = crate::check_command::store::RunStore::open(&root, Some(&cache))
         .unwrap()
         .load(&run)
@@ -86,8 +86,8 @@ fn concurrent_alias_retrieval_freezes_one_shared_derivation_log_snapshot() {
         (a.join().unwrap(), b.join().unwrap())
     });
     assert_eq!(backend.nix_log_requests.load(Ordering::SeqCst), 1);
-    assert_eq!(pages.0["records"], pages.1["records"]);
-    assert_eq!(pages.0["total"], 82);
+    assert_eq!(pages.0["result"]["records"], pages.1["result"]["records"]);
+    assert_eq!(pages.0["result"]["total"], 82);
     backend
         .nix_logs
         .lock()
@@ -131,8 +131,14 @@ fn diagnostics_keep_full_messages_and_default_details_start_at_the_failure() {
     let (status, summary, _) = invoke(request(), &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::FAILURE);
     let summary: Value = serde_json::from_slice(&summary).expect("summary");
-    let run = summary["run"].as_str().expect("run ID").to_owned();
-    let failure = summary["failures"][0]["id"].as_str().unwrap().to_owned();
+    let run = summary["result"]["run"]
+        .as_str()
+        .expect("run ID")
+        .to_owned();
+    let failure = summary["result"]["failures"][0]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
 
     let mut args = request();
     args.operation = Some(CheckOperation::Details(DetailsArgs {
@@ -144,15 +150,15 @@ fn diagnostics_keep_full_messages_and_default_details_start_at_the_failure() {
     let (status, output, _) = invoke(args, &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::SUCCESS);
     let details: Value = serde_json::from_slice(&output).expect("structured details");
-    assert_eq!(details["offset"], 0);
-    assert_eq!(details["code"], "MissingAutomatedTest");
+    assert_eq!(details["result"]["offset"], 0);
+    assert_eq!(details["result"]["code"], "MissingAutomatedTest");
     assert!(
-        details["location"]["path"]
+        details["result"]["location"]["path"]
             .as_str()
             .unwrap()
             .contains("requirements/CONTRACT.toml")
     );
-    let displayed = details["records"]
+    let displayed = details["result"]["records"]
         .as_array()
         .unwrap()
         .iter()
@@ -192,7 +198,7 @@ fn listing_discovers_and_filters_ids_without_executing_builds() {
     let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::SUCCESS);
     let result: Value = serde_json::from_slice(&stdout).expect("list JSON");
-    assert_eq!(result["checks"].as_array().unwrap().len(), 1);
+    assert_eq!(result["result"]["checks"].as_array().unwrap().len(), 1);
     assert_eq!(backend.evaluations.load(Ordering::SeqCst), 0);
     assert_eq!(backend.realizations.load(Ordering::SeqCst), 0);
     let _ = fs::remove_dir_all(root);
@@ -231,7 +237,10 @@ fn retrieval_pages_failures_and_details_without_reexecuting_work() {
     let (status, failures, _) = invoke(args, &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::SUCCESS);
     let failures: Value = serde_json::from_slice(&failures).expect("failure page");
-    let id = failures["failures"][0]["id"].as_str().unwrap().to_owned();
+    let id = failures["result"]["failures"][0]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
 
     let mut args = request();
     args.operation = Some(CheckOperation::Details(DetailsArgs {
@@ -243,11 +252,17 @@ fn retrieval_pages_failures_and_details_without_reexecuting_work() {
     let (status, details, _) = invoke(args, &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::SUCCESS);
     let details: Value = serde_json::from_slice(&details).expect("details page");
-    assert_eq!(details["code"], "BuildFailed");
-    assert!(details["records"].as_array().unwrap().iter().any(|line| {
-        line.as_str()
-            .is_some_and(|line| line.contains("build log output"))
-    }));
+    assert_eq!(details["result"]["code"], "BuildFailed");
+    assert!(
+        details["result"]["records"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|line| {
+                line.as_str()
+                    .is_some_and(|line| line.contains("build log output"))
+            })
+    );
     assert_eq!(backend.evaluations.load(Ordering::SeqCst), evaluations);
     assert_eq!(backend.realizations.load(Ordering::SeqCst), builds);
     let _ = fs::remove_dir_all(root);
@@ -276,8 +291,11 @@ fn detail_retrieval_loads_a_retained_nix_log_on_demand() {
     assert_eq!(status, std::process::ExitCode::FAILURE);
     assert_eq!(backend.nix_log_requests.load(Ordering::SeqCst), 0);
     let summary: Value = serde_json::from_slice(&summary).expect("check summary");
-    let run = summary["run"].as_str().expect("run ID").to_owned();
-    let failure = summary["failures"][0]["id"]
+    let run = summary["result"]["run"]
+        .as_str()
+        .expect("run ID")
+        .to_owned();
+    let failure = summary["result"]["failures"][0]["id"]
         .as_str()
         .expect("failure ID")
         .to_owned();
@@ -293,7 +311,7 @@ fn detail_retrieval_loads_a_retained_nix_log_on_demand() {
     assert_eq!(status, std::process::ExitCode::SUCCESS);
     assert_eq!(backend.nix_log_requests.load(Ordering::SeqCst), 1);
     let details: Value = serde_json::from_slice(&details).expect("details page");
-    let records = details["records"]
+    let records = details["result"]["records"]
         .as_array()
         .expect("detail records")
         .iter()
@@ -332,18 +350,23 @@ fn an_unavailable_nix_log_preserves_captured_failure_details() {
     let summary: Value = serde_json::from_slice(&summary).expect("check summary");
     let mut args = request();
     args.operation = Some(CheckOperation::Details(DetailsArgs {
-        failure: summary["failures"][0]["id"]
+        failure: summary["result"]["failures"][0]["id"]
             .as_str()
             .expect("failure ID")
             .to_owned(),
-        run: Some(summary["run"].as_str().expect("run ID").to_owned()),
+        run: Some(
+            summary["result"]["run"]
+                .as_str()
+                .expect("run ID")
+                .to_owned(),
+        ),
         offset: Some(0),
         limit: 40,
     }));
     let (status, details, _) = invoke(args, &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::SUCCESS);
     let details: Value = serde_json::from_slice(&details).expect("details page");
-    let records = details["records"]
+    let records = details["result"]["records"]
         .as_array()
         .expect("detail records")
         .iter()
@@ -359,8 +382,11 @@ fn an_unavailable_nix_log_preserves_captured_failure_details() {
         .insert(store_path.to_owned(), Ok(b"newly available log\n".to_vec()));
     let mut args = request();
     args.operation = Some(CheckOperation::Details(DetailsArgs {
-        failure: summary["failures"][0]["id"].as_str().unwrap().to_owned(),
-        run: Some(summary["run"].as_str().unwrap().to_owned()),
+        failure: summary["result"]["failures"][0]["id"]
+            .as_str()
+            .unwrap()
+            .to_owned(),
+        run: Some(summary["result"]["run"].as_str().unwrap().to_owned()),
         offset: Some(0),
         limit: 40,
     }));

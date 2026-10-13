@@ -291,3 +291,50 @@ design = "design/flags.md#shared-purpose-options"
 type = "ubiquitous"
 system = "the bloomery CLI"
 action = "accept a --check flag on build that runs the default check suite before realizing packages"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-028"
+title = "Color is selectable"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "accept --color with auto, always, or never, defaulting to auto"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-029"
+title = "Forced color styles redirected streams"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "event"
+trigger = "--color=always is selected"
+system = "the bloomery CLI"
+action = "apply ANSI styling to human output even when the output stream is not a terminal"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-030"
+title = "Disabled color omits styling"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "event"
+trigger = "--color=never is selected"
+system = "the bloomery CLI"
+action = "omit ANSI styling from human output"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-031"
+title = "Unknown color values are usage errors"
+manual = false
+design = "design/flags.md#shared-purpose-options"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "--color is given a value other than auto, always, or never"
+system = "the bloomery CLI"
+action = "return a usage error"

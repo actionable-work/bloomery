@@ -1,7 +1,7 @@
 use bloomery_cli_types::{
-    BuildArgs, CheckArgs, CheckOperation, CliCommand, CliInvocation, ConfigArgs, ConfigOperation,
-    DEFAULT_PAGE_LIMIT, DETAIL_PAGE_LIMIT, DetailsArgs, DiskArgs, DiskScope, FailureArgs, InitArgs,
-    ListArgs, SpecArgs, SpecOperation,
+    BuildArgs, CheckArgs, CheckOperation, CliCommand, CliInvocation, ColorChoice, ConfigArgs,
+    ConfigOperation, DEFAULT_PAGE_LIMIT, DETAIL_PAGE_LIMIT, DetailsArgs, DiskArgs, DiskScope,
+    FailureArgs, InitArgs, ListArgs, SpecArgs, SpecOperation,
 };
 use clap::{ArgAction, Args, Parser, Subcommand, ValueEnum, error::ErrorKind};
 use std::ffi::OsString;
@@ -81,6 +81,7 @@ where
 
     Ok(CliInvocation {
         json_mode: parsed.json,
+        color: parsed.color,
         command: parsed.command.into(),
     })
 }
@@ -116,8 +117,28 @@ struct RawCli {
     /// Emit machine-readable JSON instead of human-readable output.
     #[arg(long, global = true)]
     json: bool,
+    /// Select human-readable color: auto, always, or never.
+    #[arg(
+        long,
+        global = true,
+        value_name = "WHEN",
+        default_value = "auto",
+        value_parser = parse_color_choice
+    )]
+    color: ColorChoice,
     #[command(subcommand)]
     command: RawCommand,
+}
+
+fn parse_color_choice(value: &str) -> Result<ColorChoice, String> {
+    match value {
+        "auto" => Ok(ColorChoice::Auto),
+        "always" => Ok(ColorChoice::Always),
+        "never" => Ok(ColorChoice::Never),
+        other => Err(format!(
+            "invalid color '{other}': expected auto, always, or never"
+        )),
+    }
 }
 
 #[derive(Debug, Subcommand)]

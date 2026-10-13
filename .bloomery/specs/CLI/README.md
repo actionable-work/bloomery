@@ -83,7 +83,7 @@ other Nix checks directly. See [Nix orchestration](CHECK/design/workspace-check.
 
 | Feature | Responsibility | Design |
 | --- | --- | --- |
-| [Interface](INTERFACE/README.md) | User-visible commands and options | [commands](INTERFACE/design/commands.md), [flags](INTERFACE/design/flags.md), [output](INTERFACE/design/output.md) |
+| [Interface](INTERFACE/README.md) | User-visible commands and options | [commands](INTERFACE/design/commands.md), [flags](INTERFACE/design/flags.md), [presentation](INTERFACE/design/presentation.md), [output](INTERFACE/design/output.md) |
 | [Init](INIT/README.md) | Template-driven workspace scaffolding | [behavior](INIT/design/init.md), [templates](INIT/design/templates.md) |
 | [Check](CHECK/README.md) | Formatting preflight, then parallel validation with terminal progress and retained failures | [pipeline](CHECK/design/pipeline.md), [execution](CHECK/design/execution.md), [progress](CHECK/design/progress.md), [diagnostics](CHECK/design/diagnostics.md), [details](CHECK/design/details.md), [Nix orchestration](CHECK/design/workspace-check.md) |
 | [Build](BUILD/README.md) | Batched realization of the exact production package derivations | [command](BUILD/design/command.md), [production realization](BUILD/design/execution.md) |

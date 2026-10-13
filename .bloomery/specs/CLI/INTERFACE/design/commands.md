@@ -99,9 +99,11 @@ semantics are specified by
 [SYNC](../../SYNC/README.md),
 [SPEC](../../SPEC/README.md), and
 [CONFIG](../../CONFIG/README.md). Sync is a CLI-only replacement for the Nix
-lock app, not a new Nix app. The global `--json` flag is available after any
+lock app, not a new Nix app. The global `--json` and `--color` flags are
+available after any
 application subcommand and their nested commands; see the
-[output contract](output.md). Check without a nested command executes the
+[output contract](output.md) and
+[presentation grammar](presentation.md). Check without a nested command executes the
 selected suite; list discovers checks, failures pages retained failures, and
 details seeks within retained failure output. Build realizes the selected
 production packages and reports their output store paths. Retrieval never executes tests or

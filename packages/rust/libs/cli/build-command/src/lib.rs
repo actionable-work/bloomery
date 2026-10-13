@@ -10,7 +10,10 @@ mod backend;
 #[cfg(test)]
 mod tests;
 
-use bloomery_cli_output::{Stream, color_enabled, colorize_check, colorize_error};
+use bloomery_cli_output::{
+    ColorMode, OutcomeStatus, Status, Stream, color_enabled, error_envelope, heading,
+    success_envelope,
+};
 pub use bloomery_cli_types::BuildArgs;
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
@@ -196,7 +199,7 @@ impl CheckGate for CheckCommandGate {
 }
 
 /// Execute `bloomery build` for the current process.
-pub fn run(args: BuildArgs, json_mode: bool) -> ExitCode {
+pub fn run(args: BuildArgs, json_mode: bool, color: ColorMode) -> ExitCode {
     let root = match std::env::current_dir() {
         Ok(root) => root,
         Err(error) => {
@@ -204,6 +207,7 @@ pub fn run(args: BuildArgs, json_mode: bool) -> ExitCode {
             let mut stderr = io::stderr().lock();
             return report_error(
                 json_mode,
+                color,
                 &BuildError::operational(format!("unable to determine workspace root: {error}")),
                 &mut stdout,
                 &mut stderr,
@@ -212,13 +216,14 @@ pub fn run(args: BuildArgs, json_mode: bool) -> ExitCode {
     };
     let mut stdout = io::stdout().lock();
     let mut stderr = io::stderr().lock();
-    run_at(args, json_mode, &root, &mut stdout, &mut stderr)
+    run_at(args, json_mode, color, &root, &mut stdout, &mut stderr)
 }
 
 /// Execute `bloomery build` against an injected root.
 pub fn run_at(
     args: BuildArgs,
     json_mode: bool,
+    color: ColorMode,
     root: &Path,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
@@ -227,6 +232,7 @@ pub fn run_at(
     run_at_with(
         args,
         json_mode,
+        color,
         root,
         &backend,
         &CheckCommandGate,
@@ -236,9 +242,11 @@ pub fn run_at(
 }
 
 /// Execute `bloomery build` with injected Nix and gate backends.
+#[allow(clippy::too_many_arguments)]
 pub fn run_at_with<B: NixBackend, G: CheckGate>(
     args: BuildArgs,
     json_mode: bool,
+    color: ColorMode,
     root: &Path,
     backend: &B,
     gate: &G,
@@ -248,6 +256,7 @@ pub fn run_at_with<B: NixBackend, G: CheckGate>(
     if !root.join("flake.nix").is_file() {
         return report_error(
             json_mode,
+            color,
             &BuildError::usage(bloomery_cli_output::MISSING_FLAKE_MESSAGE),
             stdout,
             stderr,
@@ -267,18 +276,19 @@ pub fn run_at_with<B: NixBackend, G: CheckGate>(
                     let _ = writeln!(stderr, "bloomery: unable to write build result");
                     return ExitCode::from(2);
                 }
-            } else if write_text_report(&report, stdout, stderr).is_err() {
+            } else if write_text_report(&report, color, stdout, stderr).is_err() {
                 let _ = writeln!(stderr, "bloomery: unable to write build result");
                 return ExitCode::from(2);
             }
             ExitCode::from(status.exit_code())
         }
-        Err(error) => report_error(json_mode, &error, stdout, stderr),
+        Err(error) => report_error(json_mode, color, &error, stdout, stderr),
     }
 }
 
 fn report_error(
     json_mode: bool,
+    color: ColorMode,
     error: &BuildError,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
@@ -304,7 +314,10 @@ fn report_error(
         }
     } else {
         let message = format!("error: {error}");
-        let rendered = colorize_error(&message, color_enabled(Stream::Stderr, false));
+        let rendered = bloomery_cli_output::colorize_error(
+            &message,
+            color_enabled(Stream::Stderr, false, color),
+        );
         let _ = writeln!(stderr, "{rendered}");
     }
     ExitCode::from(error.exit_code())
@@ -520,11 +533,21 @@ fn package_result(
     }
 }
 
+fn outcome_status(outcome: Outcome) -> OutcomeStatus {
+    match outcome {
+        Outcome::Passed => OutcomeStatus::Passed,
+        Outcome::Failed => OutcomeStatus::Failed,
+        Outcome::Canceled | Outcome::NotRun => OutcomeStatus::Skipped,
+    }
+}
+
 fn write_text_report(
     report: &BuildReport,
+    color: ColorMode,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> io::Result<()> {
+    let styled = color_enabled(Stream::Stdout, false, color);
     if let Some(gate) = &report.gate {
         if !gate.stdout.is_empty() {
             stdout.write_all(&gate.stdout)?;
@@ -533,24 +556,17 @@ fn write_text_report(
             stderr.write_all(&gate.stderr)?;
         }
     }
-    let style = color_enabled(Stream::Stdout, false);
+    writeln!(stdout, "{}", heading("bloomery build", styled))?;
     for package in &report.packages {
-        let line = match &package.path {
-            Some(path) => format!(
-                "{} ({}) {} {}",
-                package.name,
-                package.system,
-                package.outcome.as_str(),
-                path
-            ),
-            None => format!(
-                "{} ({}) {}",
-                package.name,
-                package.system,
-                package.outcome.as_str()
-            ),
+        let detail = match &package.path {
+            Some(path) => format!("{} ({}) {path}", package.name, package.system),
+            None => format!("{} ({})", package.name, package.system),
         };
-        writeln!(stdout, "{}", colorize_check(&line, style))?;
+        writeln!(
+            stdout,
+            "{}",
+            outcome_status(package.outcome).render(&detail, styled)
+        )?;
         if let Some(error) = &package.error {
             writeln!(stderr, "  {error}")?;
         }
@@ -572,20 +588,30 @@ fn write_text_report(
         .count();
     if let Some(gate) = &report.gate {
         let summary = if gate.failed_checks.is_empty() {
-            format!("checks: {}", gate.status.as_str())
+            format!("checks {}", gate.status.as_str())
         } else {
             format!(
-                "checks: {} ({})",
+                "checks {} ({})",
                 gate.status.as_str(),
                 gate.failed_checks.join(", ")
             )
         };
-        writeln!(stdout, "{}", colorize_check(&summary, style))?;
+        let status = match gate.status.as_str() {
+            "passed" => OutcomeStatus::Passed,
+            "interrupted" => OutcomeStatus::Skipped,
+            _ => OutcomeStatus::Failed,
+        };
+        writeln!(stdout, "{}", status.render(&summary, styled))?;
     }
+    let overall = if failed == 0 {
+        OutcomeStatus::Passed
+    } else {
+        OutcomeStatus::Failed
+    };
     writeln!(
         stdout,
         "{}",
-        colorize_check(&format!("build: {passed} passed, {failed} failed"), style)
+        overall.render(&format!("build {passed} passed, {failed} failed"), styled)
     )?;
     stdout.flush()
 }
@@ -612,30 +638,45 @@ fn report_json(report: &BuildReport) -> Value {
             value
         })
         .collect::<Vec<_>>();
-    let mut value = json!({
-        "command": "build",
+    let mut result = json!({
         "status": report.status.as_str(),
         "systems": report.systems,
         "packages": packages,
     });
     if let Some(gate) = &report.gate {
-        value["checks"] = json!({
+        result["checks"] = json!({
             "status": gate.status.as_str(),
             "failed": gate.failed_checks,
         });
     }
-    value
+    success_envelope(
+        "build",
+        None,
+        envelope_status(report.status),
+        result,
+        Vec::new(),
+    )
+}
+
+fn envelope_status(status: BuildStatus) -> Status {
+    match status {
+        BuildStatus::Passed => Status::Succeeded,
+        BuildStatus::Failed => Status::Failed,
+        BuildStatus::Error => Status::Error,
+        BuildStatus::Interrupted => Status::Interrupted,
+    }
 }
 
 fn build_failure_json(message: &str) -> Value {
-    json!({
-        "command": "build",
-        "status": "error",
-        "error": {
-            "kind": "build",
-            "message": message,
-        },
-    })
+    error_envelope(
+        Some("build"),
+        None,
+        Status::Error,
+        "BuildError",
+        "build",
+        message,
+        None,
+    )
 }
 
 /// Case-sensitive anchored glob with `*` and `?`.

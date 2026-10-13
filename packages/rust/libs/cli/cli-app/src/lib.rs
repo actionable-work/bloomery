@@ -2,13 +2,13 @@ use bloomery_build_command as build_command;
 use bloomery_check_command as check_command;
 use bloomery_cli_output as output;
 use bloomery_cli_parser::{ParseError, ParseErrorKind, parse_from};
-use bloomery_cli_types::{CliCommand, CliInvocation, SpecArgs};
+use bloomery_cli_types::{CliCommand, CliInvocation, ColorChoice, SpecArgs};
 use bloomery_config::{
     ConfigError, ConfigErrorKind, ConfigOutcome, ConfigReport, ConfigWarning, DiffStatus,
 };
 use bloomery_model::{render_diagnostics, sort_diagnostics};
 use bloomery_spec::{SpecError, SpecOutcome, SpecReport};
-use serde_json::{Value, json};
+use serde_json::Value;
 use std::ffi::OsString;
 use std::io::{self, Write};
 use std::path::Path;
@@ -56,17 +56,34 @@ fn run_invocation_at(
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> ExitCode {
+    let color = color_mode(invocation.color);
     match invocation.command {
-        CliCommand::Init(args) => run_init_at(args, invocation.json_mode, root, stdout, stderr),
+        CliCommand::Init(args) => {
+            run_init_at(args, invocation.json_mode, color, root, stdout, stderr)
+        }
         CliCommand::Sync { update } => run_sync_at(
             root,
             update.as_deref(),
             invocation.json_mode,
+            color,
             stdout,
             stderr,
         ),
-        CliCommand::Config(args) => run_config_at(args, invocation.json_mode, root, stdout, stderr),
-        command => run_workspace_command_at(command, invocation.json_mode, root, stdout, stderr),
+        CliCommand::Config(args) => {
+            run_config_at(args, invocation.json_mode, color, root, stdout, stderr)
+        }
+        command => {
+            run_workspace_command_at(command, invocation.json_mode, color, root, stdout, stderr)
+        }
+    }
+}
+
+/// Map the CLI's color selection onto the shared output policy.
+fn color_mode(choice: ColorChoice) -> output::ColorMode {
+    match choice {
+        ColorChoice::Auto => output::ColorMode::Auto,
+        ColorChoice::Always => output::ColorMode::Always,
+        ColorChoice::Never => output::ColorMode::Never,
     }
 }
 
@@ -110,7 +127,7 @@ fn report_missing_flake(
         let message = format!("error: {}", output::MISSING_FLAKE_MESSAGE);
         let rendered = output::colorize_error(
             &message,
-            output::color_enabled(output::Stream::Stderr, false),
+            output::color_enabled(output::Stream::Stderr, false, output::ColorMode::Auto),
         );
         let _ = writeln!(stderr, "{rendered}");
     }
@@ -143,7 +160,7 @@ fn report_configuration_error(
         let rendered = render_diagnostics(root, std::slice::from_ref(&diagnostic));
         let rendered = output::colorize_check(
             &rendered,
-            output::color_enabled(output::Stream::Stderr, false),
+            output::color_enabled(output::Stream::Stderr, false, output::ColorMode::Auto),
         );
         let _ = stderr.write_all(rendered.as_bytes());
     }
@@ -190,7 +207,7 @@ fn report_parse_error_at(
     if error.json_mode() {
         if error.command() == Some("check") {
             let document =
-                check_command::check_output::error_document("UsageError", error.message());
+                check_command::check_output::error_document("UsageError", error.message(), None);
             if write_json(stdout, &document).is_err() {
                 let _ = writeln!(stderr, "bloomery: unable to render JSON usage error");
                 return ExitCode::from(1);
@@ -212,6 +229,7 @@ fn run_sync_at(
     root: &Path,
     update: Option<&str>,
     json_mode: bool,
+    color: output::ColorMode,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> ExitCode {
@@ -233,7 +251,7 @@ fn run_sync_at(
             } else {
                 let rendered = output::colorize_error(
                     &format!("error: {error}\nUsage: bloomery sync [--update[=nix,rust]]"),
-                    output::color_enabled(output::Stream::Stderr, false),
+                    output::color_enabled(output::Stream::Stderr, false, color),
                 );
                 let _ = writeln!(stderr, "{rendered}");
             }
@@ -282,11 +300,11 @@ fn run_sync_at(
     let result = {
         let mut stdout_writer = output::ColorWriter::stdout(
             &mut *stdout,
-            output::color_enabled(output::Stream::Stdout, false),
+            output::color_enabled(output::Stream::Stdout, false, color),
         );
         let mut stderr_writer = output::ColorWriter::stderr(
             &mut *stderr,
-            output::color_enabled(output::Stream::Stderr, false),
+            output::color_enabled(output::Stream::Stderr, false, color),
         );
         let result = bloomery_sync::run(
             root,
@@ -307,7 +325,7 @@ fn run_sync_at(
                 "{}",
                 output::colorize_error(
                     &format!("error: {error}"),
-                    output::color_enabled(output::Stream::Stderr, false)
+                    output::color_enabled(output::Stream::Stderr, false, color)
                 )
             );
             ExitCode::from(error.exit_code())
@@ -318,6 +336,7 @@ fn run_sync_at(
 fn run_config_at(
     args: bloomery_cli_types::ConfigArgs,
     json_mode: bool,
+    color: output::ColorMode,
     root: &Path,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
@@ -335,8 +354,8 @@ fn run_config_at(
                     return ExitCode::from(1);
                 }
             } else {
-                render_config_warnings(&report.warnings, stderr);
-                render_config_outcome(&report, stdout);
+                render_config_warnings(&report.warnings, color, stderr);
+                render_config_outcome(&report, color, stdout);
                 let _ = stdout.flush();
             }
             ExitCode::SUCCESS
@@ -345,7 +364,12 @@ fn run_config_at(
     }
 }
 
-fn render_config_warnings(warnings: &[ConfigWarning], stderr: &mut impl Write) {
+fn render_config_warnings(
+    warnings: &[ConfigWarning],
+    color: output::ColorMode,
+    stderr: &mut impl Write,
+) {
+    let styled = output::color_enabled(output::Stream::Stderr, false, color);
     for warning in warnings {
         let message = match warning {
             ConfigWarning::MissingFlake => {
@@ -356,7 +380,11 @@ fn render_config_warnings(warnings: &[ConfigWarning], stderr: &mut impl Write) {
             }
             ConfigWarning::CreatedConfig { path } => format!("warning: created {path}"),
         };
-        let _ = writeln!(stderr, "{message}");
+        let _ = writeln!(
+            stderr,
+            "{}",
+            output::style(output::Role::Warning, &message, styled)
+        );
     }
 }
 
@@ -366,7 +394,9 @@ fn render_config_value(value: Option<&toml::Value>) -> String {
         .unwrap_or_else(|| "unset".to_owned())
 }
 
-fn render_config_outcome(report: &ConfigReport, stdout: &mut impl Write) {
+fn render_config_outcome(report: &ConfigReport, color: output::ColorMode, stdout: &mut impl Write) {
+    let styled = output::color_enabled(output::Stream::Stdout, false, color);
+    let _ = writeln!(stdout, "{}", output::heading("bloomery config", styled));
     match &report.outcome {
         ConfigOutcome::Get { key } => {
             let origin = if key.configured {
@@ -502,7 +532,7 @@ fn report_config_error(
                 let rendered = render_diagnostics(root, std::slice::from_ref(diagnostic));
                 let rendered = output::colorize_check(
                     &rendered,
-                    output::color_enabled(output::Stream::Stderr, false),
+                    output::color_enabled(output::Stream::Stderr, false, output::ColorMode::Auto),
                 );
                 let _ = stderr.write_all(rendered.as_bytes());
             }
@@ -512,7 +542,11 @@ fn report_config_error(
                     "{}",
                     output::colorize_error(
                         &format!("error: {}", error.message()),
-                        output::color_enabled(output::Stream::Stderr, false),
+                        output::color_enabled(
+                            output::Stream::Stderr,
+                            false,
+                            output::ColorMode::Auto
+                        ),
                     )
                 );
             }
@@ -524,6 +558,7 @@ fn report_config_error(
 fn run_init_at(
     args: bloomery_cli_types::InitArgs,
     json_mode: bool,
+    color: output::ColorMode,
     root: &Path,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
@@ -539,13 +574,14 @@ fn run_init_at(
         force: args.force,
     };
     let mut stage = bloomery_init::SyncLockStage::system();
-    run_init_request(&request, &mut stage, json_mode, stdout, stderr)
+    run_init_request(&request, &mut stage, json_mode, color, stdout, stderr)
 }
 
 fn run_init_request<L: bloomery_init::LockStage>(
     request: &bloomery_init::InitRequest,
     stage: &mut L,
     json_mode: bool,
+    color: output::ColorMode,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> ExitCode {
@@ -559,6 +595,8 @@ fn run_init_request<L: bloomery_init::LockStage>(
                     return ExitCode::from(1);
                 }
             } else {
+                let styled = output::color_enabled(output::Stream::Stdout, false, color);
+                let _ = writeln!(stdout, "{}", output::heading("bloomery init", styled));
                 for path in &report.created {
                     let _ = writeln!(stdout, "created {}", path.display());
                 }
@@ -591,7 +629,7 @@ fn run_init_request<L: bloomery_init::LockStage>(
                     "{}",
                     output::colorize_error(
                         &format!("error: {error}"),
-                        output::color_enabled(output::Stream::Stderr, false)
+                        output::color_enabled(output::Stream::Stderr, false, color)
                     )
                 );
             }
@@ -603,6 +641,7 @@ fn run_init_request<L: bloomery_init::LockStage>(
 fn run_workspace_command_at(
     command: CliCommand,
     json_mode: bool,
+    color: output::ColorMode,
     root: &Path,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
@@ -616,11 +655,15 @@ fn run_workspace_command_at(
         return code;
     }
     match command {
-        CliCommand::Check(args) => check_command::run_at(args, json_mode, root, stdout, stderr),
-        CliCommand::Build(args) => build_command::run_at(args, json_mode, root, stdout, stderr),
-        CliCommand::Disk(args) => run_disk_at(args, json_mode, root, stdout, stderr),
-        CliCommand::Review => run_review_at(root, json_mode, stdout, stderr),
-        CliCommand::Spec(args) => run_spec_at(args, json_mode, root, stdout, stderr),
+        CliCommand::Check(args) => {
+            check_command::run_at_with_color(args, json_mode, color, root, stdout, stderr)
+        }
+        CliCommand::Build(args) => {
+            build_command::run_at(args, json_mode, color, root, stdout, stderr)
+        }
+        CliCommand::Disk(args) => run_disk_at(args, json_mode, color, root, stdout, stderr),
+        CliCommand::Review => run_review_at(root, json_mode, color, stdout, stderr),
+        CliCommand::Spec(args) => run_spec_at(args, json_mode, color, root, stdout, stderr),
         CliCommand::Init(_) => unreachable!("init is dispatched before workspace loading"),
         CliCommand::Sync { .. } => unreachable!("sync is dispatched before workspace loading"),
         CliCommand::Config(_) => unreachable!("config is dispatched before workspace loading"),
@@ -630,17 +673,19 @@ fn run_workspace_command_at(
 fn run_disk_at(
     args: bloomery_cli_types::DiskArgs,
     json_mode: bool,
+    color: output::ColorMode,
     root: &Path,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> ExitCode {
     let backend = bloomery_disk::NixCli::default();
-    run_disk_with_backend(args, json_mode, root, &backend, stdout, stderr)
+    run_disk_with_backend(args, json_mode, color, root, &backend, stdout, stderr)
 }
 
 fn run_disk_with_backend(
     args: bloomery_cli_types::DiskArgs,
     json_mode: bool,
+    color: output::ColorMode,
     root: &Path,
     backend: &impl bloomery_disk::NixQuery,
     stdout: &mut impl Write,
@@ -650,7 +695,11 @@ fn run_disk_with_backend(
     match bloomery_disk::run(root, &args, backend) {
         Ok(report) => {
             if json_mode {
-                if write_json(stdout, &output::disk_success_json(&report)).is_err() {
+                let mut document = output::disk_success_json(&report);
+                if tree {
+                    document["operation"] = serde_json::json!("tree");
+                }
+                if write_json(stdout, &document).is_err() {
                     let _ = writeln!(stderr, "bloomery: unable to render JSON disk result");
                     return ExitCode::from(1);
                 }
@@ -662,7 +711,7 @@ fn run_disk_with_backend(
                 };
                 let rendered = output::colorize_check(
                     &rendered,
-                    output::color_enabled(output::Stream::Stdout, false),
+                    output::color_enabled(output::Stream::Stdout, false, color),
                 );
                 let _ = stdout.write_all(rendered.as_bytes());
             }
@@ -688,7 +737,7 @@ fn run_disk_with_backend(
                     "{}",
                     output::colorize_error(
                         &format!("error: {error}"),
-                        output::color_enabled(output::Stream::Stderr, false)
+                        output::color_enabled(output::Stream::Stderr, false, color)
                     )
                 );
             }
@@ -701,6 +750,7 @@ fn run_disk_with_backend(
 fn run_workspace_command_from_current_dir(
     command: CliCommand,
     json_mode: bool,
+    color: output::ColorMode,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> ExitCode {
@@ -711,12 +761,13 @@ fn run_workspace_command_from_current_dir(
             return report_runtime_error(name, &error.to_string(), json_mode, stdout, stderr);
         }
     };
-    run_workspace_command_at(command, json_mode, &root, stdout, stderr)
+    run_workspace_command_at(command, json_mode, color, &root, stdout, stderr)
 }
 
 fn run_review_at(
     root: &Path,
     json_mode: bool,
+    color: output::ColorMode,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> ExitCode {
@@ -734,7 +785,7 @@ fn run_review_at(
                 let rendered = render_diagnostics(root, &diagnostics);
                 let rendered = output::colorize_check(
                     &rendered,
-                    output::color_enabled(output::Stream::Stderr, false),
+                    output::color_enabled(output::Stream::Stderr, false, color),
                 );
                 let _ = stderr.write_all(rendered.as_bytes());
             }
@@ -745,7 +796,14 @@ fn run_review_at(
     let items = bloomery_review::items(&context);
     if json_mode {
         match serde_json::to_value(&items) {
-            Ok(document) => {
+            Ok(items) => {
+                let document = output::success_envelope(
+                    "review",
+                    None,
+                    output::Status::Succeeded,
+                    items,
+                    Vec::new(),
+                );
                 if write_json(stdout, &document).is_err() {
                     let _ = writeln!(stderr, "bloomery: unable to render JSON review catalog");
                     ExitCode::from(1)
@@ -763,7 +821,7 @@ fn run_review_at(
         let rendered = bloomery_review::render_text(&items);
         let rendered = output::colorize_review(
             &rendered,
-            output::color_enabled(output::Stream::Stdout, false),
+            output::color_enabled(output::Stream::Stdout, false, color),
         );
         let _ = stdout.write_all(rendered.as_bytes());
         ExitCode::SUCCESS
@@ -773,6 +831,7 @@ fn run_review_at(
 fn run_spec_at(
     args: SpecArgs,
     json_mode: bool,
+    color: output::ColorMode,
     root: &Path,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
@@ -785,7 +844,7 @@ fn run_spec_at(
                     return ExitCode::from(1);
                 }
             } else {
-                render_spec_success(&report, stdout);
+                render_spec_success(&report, color, stdout);
             }
             ExitCode::SUCCESS
         }
@@ -793,7 +852,9 @@ fn run_spec_at(
     }
 }
 
-fn render_spec_success(report: &SpecReport, stdout: &mut impl Write) {
+fn render_spec_success(report: &SpecReport, color: output::ColorMode, stdout: &mut impl Write) {
+    let styled = output::color_enabled(output::Stream::Stdout, false, color);
+    let _ = writeln!(stdout, "{}", output::heading("bloomery spec", styled));
     match &report.outcome {
         SpecOutcome::List { records } => {
             for record in records {
@@ -911,7 +972,7 @@ fn report_spec_error(
             "{}",
             output::colorize_error(
                 &format!("error: {}", error.message()),
-                output::color_enabled(output::Stream::Stderr, false)
+                output::color_enabled(output::Stream::Stderr, false, output::ColorMode::Auto)
             )
         );
     }
@@ -931,11 +992,15 @@ fn report_runtime_error(
     stderr: &mut impl Write,
 ) -> ExitCode {
     if json_mode {
-        let document = json!({
-            "command": command,
-            "status": "failed",
-            "error": { "kind": "runtime", "message": message },
-        });
+        let document = output::error_envelope(
+            Some(command),
+            None,
+            output::Status::Error,
+            "RuntimeError",
+            "runtime",
+            message,
+            None,
+        );
         if write_json(stdout, &document).is_err() {
             let _ = writeln!(stderr, "bloomery: unable to render JSON error");
             return ExitCode::from(1);
@@ -946,7 +1011,7 @@ fn report_runtime_error(
             "{}",
             output::colorize_error(
                 &format!("error: bloomery: {message}"),
-                output::color_enabled(output::Stream::Stderr, false)
+                output::color_enabled(output::Stream::Stderr, false, output::ColorMode::Auto)
             )
         );
     }
@@ -961,6 +1026,7 @@ mod tests {
     };
     use bloomery_cli_parser::{ParseError, ParseErrorKind as ErrorKind, parse_from};
     use bloomery_cli_types::CliCommand as Command;
+    use bloomery_cli_types::ColorChoice;
     use serde_json::Value;
     use std::ffi::OsString;
     use std::fs;
@@ -1063,6 +1129,10 @@ mod tests {
 
     fn parse_json(args: &[&str]) -> Result<bool, ParseError> {
         Cli::try_parse_from(args).map(|cli| cli.json)
+    }
+
+    fn parse_color(args: &[&str]) -> Result<ColorChoice, ParseError> {
+        parse_from(args).map(|invocation| invocation.color)
     }
 
     fn fixture_root(name: &str) -> PathBuf {
@@ -1238,6 +1308,24 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-028"))]
+    fn clap_accepts_color_selection() {
+        assert_eq!(
+            parse_color(&["bloomery", "review"]).expect("default"),
+            ColorChoice::Auto
+        );
+        assert_eq!(
+            parse_color(&["bloomery", "review", "--color", "always"]).expect("separate"),
+            ColorChoice::Always
+        );
+        assert_eq!(
+            parse_color(&["bloomery", "--color=never", "check"]).expect("equals"),
+            ColorChoice::Never
+        );
+        assert!(Cli::try_parse_from(["bloomery", "review", "--color", "sometimes"]).is_err());
+    }
+
+    #[test]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-004"))]
     fn clap_provides_its_help_subcommand() {
         for args in [vec!["bloomery", "help"], vec!["bloomery", "help", "check"]] {
@@ -1267,6 +1355,7 @@ mod tests {
         let status = run_workspace_command_from_current_dir(
             Command::Review,
             false,
+            super::output::ColorMode::Auto,
             &mut stdout,
             &mut stderr,
         );
@@ -1284,6 +1373,7 @@ mod tests {
     #[test]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-009"))]
     #[cfg_attr(any(), bloomery("CLI-BUILD-COMMAND-002"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-008"))]
     fn every_application_command_requires_a_root_flake_before_working() {
         let command_argvs: &[&[&str]] = &[
             &["bloomery", "check"],
@@ -1463,7 +1553,10 @@ mod tests {
         assert!(stderr.is_empty());
         let document: Value = serde_json::from_slice(&stdout).expect("JSON configuration error");
         assert_eq!(document["status"], "failed");
-        assert_eq!(document["diagnostics"][0]["code"], "ConfigurationError");
+        assert_eq!(
+            document["error"]["details"]["diagnostics"][0]["code"],
+            "ConfigurationError"
+        );
         let _ = fs::remove_dir_all(root);
     }
 
@@ -1497,8 +1590,14 @@ mod tests {
         assert!(!json_mode);
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
-        let status =
-            run_workspace_command_at(Command::Review, json_mode, &root, &mut stdout, &mut stderr);
+        let status = run_workspace_command_at(
+            Command::Review,
+            json_mode,
+            super::output::ColorMode::Auto,
+            &root,
+            &mut stdout,
+            &mut stderr,
+        );
 
         assert_eq!(status, ExitCode::SUCCESS);
         assert!(stderr.is_empty());
@@ -1519,12 +1618,19 @@ mod tests {
         let root = fixture_workspace("CLI-CHECK-CONTRACT-001", true);
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
-        let status =
-            run_workspace_command_at(Command::Review, true, &root, &mut stdout, &mut stderr);
+        let status = run_workspace_command_at(
+            Command::Review,
+            true,
+            super::output::ColorMode::Auto,
+            &root,
+            &mut stdout,
+            &mut stderr,
+        );
 
         assert_eq!(status, ExitCode::SUCCESS);
         assert!(stderr.is_empty());
-        let items: Vec<Value> = serde_json::from_slice(&stdout).expect("review JSON array");
+        let document: Value = serde_json::from_slice(&stdout).expect("review JSON envelope");
+        let items = document["result"].as_array().expect("review result array");
         assert_eq!(items.len(), 1);
         assert_eq!(items[0]["id"], "CLI-CHECK-CONTRACT-001");
         let _ = fs::remove_dir_all(root);
@@ -1770,6 +1876,7 @@ mod tests {
         let status = run_disk_with_backend(
             bloomery_cli_types::DiskArgs::default(),
             true,
+            super::output::ColorMode::Auto,
             Path::new("/repo"),
             &Fake,
             &mut stdout,
@@ -1781,11 +1888,17 @@ mod tests {
         let document: Value = serde_json::from_slice(&stdout).expect("disk JSON");
         assert_eq!(document["command"], "disk");
         assert_eq!(document["status"], "succeeded");
-        assert_eq!(document["bytes"], 2048);
-        assert_eq!(document["systems"][0], "x86_64-linux");
-        assert_eq!(document["categories"][0]["name"], "runtime");
-        assert_eq!(document["categories"][0]["entries"][0]["name"], "default");
-        assert_eq!(document["categories"][0]["entries"][0]["bytes"], 2048);
+        assert_eq!(document["result"]["bytes"], 2048);
+        assert_eq!(document["result"]["systems"][0], "x86_64-linux");
+        assert_eq!(document["result"]["categories"][0]["name"], "runtime");
+        assert_eq!(
+            document["result"]["categories"][0]["entries"][0]["name"],
+            "default"
+        );
+        assert_eq!(
+            document["result"]["categories"][0]["entries"][0]["bytes"],
+            2048
+        );
     }
 
     #[test]
@@ -1971,7 +2084,7 @@ mod tests {
             let document: Value = serde_json::from_slice(&stdout).expect("spec JSON");
             assert_eq!(document["command"], "spec");
             assert_eq!(document["status"], "succeeded");
-            assert_eq!(document["result"]["operation"], operation);
+            assert_eq!(document["operation"], operation);
         }
         let _ = fs::remove_dir_all(root);
     }
@@ -2053,7 +2166,14 @@ mod tests {
         let mut stage = InitLock::default();
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
-        let status = super::run_init_request(&request, &mut stage, false, &mut stdout, &mut stderr);
+        let status = super::run_init_request(
+            &request,
+            &mut stage,
+            false,
+            super::output::ColorMode::Auto,
+            &mut stdout,
+            &mut stderr,
+        );
         assert_eq!(status, ExitCode::SUCCESS);
         assert!(stage.locked);
         assert!(root.join("app/flake.nix").is_file());
@@ -2134,13 +2254,15 @@ mod tests {
         assert_eq!(document["status"], "succeeded");
         let warnings = document["warnings"].as_array().expect("warnings");
         assert!(
-            warnings.iter().any(|warning| warning == "missing_flake"),
+            warnings
+                .iter()
+                .any(|warning| warning["code"] == "missing_flake"),
             "warnings: {warnings:?}"
         );
         assert!(
             warnings
                 .iter()
-                .any(|warning| { warning["created_config"]["path"] == ".bloomery/config.toml" }),
+                .any(|warning| warning["code"] == "created_config"),
             "warnings: {warnings:?}"
         );
         assert!(root.join(".bloomery/config.toml").is_file());
@@ -2268,7 +2390,7 @@ mod tests {
         let document: Value = serde_json::from_slice(&stdout).expect("get JSON");
         assert_eq!(document["command"], "config");
         assert_eq!(document["status"], "succeeded");
-        assert_eq!(document["result"]["operation"], "get");
+        assert_eq!(document["operation"], "get");
         assert_eq!(document["result"]["key"]["configured"], true);
         assert_eq!(document["result"]["key"]["value"], false);
 
@@ -2281,7 +2403,7 @@ mod tests {
             &mut stderr,
         );
         let document: Value = serde_json::from_slice(&stdout).expect("list JSON");
-        assert_eq!(document["result"]["operation"], "list");
+        assert_eq!(document["operation"], "list");
         assert!(
             document["result"]["keys"]
                 .as_array()
@@ -2304,7 +2426,7 @@ mod tests {
             &mut stderr,
         );
         let document: Value = serde_json::from_slice(&stdout).expect("set JSON");
-        assert_eq!(document["result"]["operation"], "set");
+        assert_eq!(document["operation"], "set");
         assert_eq!(document["result"]["changed"], true);
 
         let mut stdout = Vec::new();
@@ -2322,7 +2444,7 @@ mod tests {
             &mut stderr,
         );
         let document: Value = serde_json::from_slice(&stdout).expect("unset JSON");
-        assert_eq!(document["result"]["operation"], "unset");
+        assert_eq!(document["operation"], "unset");
         assert_eq!(document["result"]["removed"], true);
 
         let mut stdout = Vec::new();
@@ -2334,7 +2456,7 @@ mod tests {
             &mut stderr,
         );
         let document: Value = serde_json::from_slice(&stdout).expect("diff JSON");
-        assert_eq!(document["result"]["operation"], "upgrade");
+        assert_eq!(document["operation"], "upgrade");
         assert_eq!(document["result"]["written"], false);
         assert!(
             document["result"]["differences"]
@@ -2351,7 +2473,7 @@ mod tests {
             &mut stderr,
         );
         let document: Value = serde_json::from_slice(&stdout).expect("document JSON");
-        assert_eq!(document["result"]["operation"], "document");
+        assert_eq!(document["operation"], "document");
         assert!(
             document["result"]["documented"]
                 .as_array()
@@ -2426,14 +2548,21 @@ mod tests {
         let mut stage = InitLock::default();
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
-        let status = super::run_init_request(&request, &mut stage, true, &mut stdout, &mut stderr);
+        let status = super::run_init_request(
+            &request,
+            &mut stage,
+            true,
+            super::output::ColorMode::Auto,
+            &mut stdout,
+            &mut stderr,
+        );
         assert_eq!(status, ExitCode::SUCCESS);
         let document: Value = serde_json::from_slice(&stdout).expect("init JSON");
         assert_eq!(document["command"], "init");
         assert_eq!(document["status"], "succeeded");
-        assert_eq!(document["template"], "basic");
+        assert_eq!(document["result"]["template"], "basic");
         assert!(
-            document["created"]
+            document["result"]["created"]
                 .as_array()
                 .is_some_and(|paths| !paths.is_empty())
         );

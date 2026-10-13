@@ -194,10 +194,13 @@ for CLI usage errors. Identify the failing stage, retain useful subprocess
 stderr, and do not report completion or run later stages after a failure.
 
 Use stdout for stage progress and completion, stderr for warnings,
-recommendations, and failures. A successful summary identifies reconciled
-locks and selected update ecosystems. `sync --json` emits the structured success
-or failure contract
-specified by [CLI output design](../../INTERFACE/design/output.md). No
+recommendations, and failures. Human output follows the shared
+[presentation grammar](../../INTERFACE/design/presentation.md): the root heading,
+status vocabulary, semantic color roles, and one closing summary. A successful
+summary identifies reconciled
+locks and selected update ecosystems. `sync --json` carries its structured
+success or failure payload as the `result` of the shared
+[JSON envelope](../../INTERFACE/design/output.md#json-envelope). No
 interactive confirmation is introduced. Invoke subprocesses with structured
 arguments rather than interpolated shell commands.
 

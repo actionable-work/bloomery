@@ -95,7 +95,7 @@ fn sequence(id: &str) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use super::items;
+    use super::{items, render_text};
     use bloomery_model::{
         Area, Config, Context, DesignReference, EarsStatement, Feature, MarkdownFrontmatter,
         Requirement, RequirementEntry, RequirementGroup,
@@ -229,5 +229,17 @@ mod tests {
 
         assert_eq!(ids(&context), expected);
         assert_eq!(ids(&context), expected);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-003"))]
+    fn review_uses_the_shared_tree_grammar() {
+        let context = context(&[("ALPHA-ONE-GRP-001", true)]);
+        let text = render_text(&items(&context));
+        assert!(text.starts_with("ALPHA\n"), "{text}");
+        assert!(text.contains("└── ONE\n"), "{text}");
+        assert!(text.contains("    └── GRP\n"), "{text}");
+        assert!(text.contains("        └── [ALPHA-ONE-GRP-001] "), "{text}");
+        assert!(text.contains("            Design: "), "{text}");
     }
 }

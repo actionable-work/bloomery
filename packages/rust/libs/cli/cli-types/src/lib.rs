@@ -6,7 +6,17 @@ pub const DETAIL_PAGE_LIMIT: usize = 40;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CliInvocation {
     pub json_mode: bool,
+    pub color: ColorChoice,
     pub command: CliCommand,
+}
+
+/// Explicit color selection for human-readable output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ColorChoice {
+    #[default]
+    Auto,
+    Always,
+    Never,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

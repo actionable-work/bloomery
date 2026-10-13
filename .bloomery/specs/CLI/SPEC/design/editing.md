@@ -92,9 +92,14 @@ source, and never edit configuration or lockfiles.
 
 ## Output and exit codes
 
-Human output names the command, the affected requirement ID, and the resulting
-fields or change. `spec list` prints records in deterministic order by area,
-feature, group, and numeric sequence, matching the review catalog.
+Human output follows the shared
+[presentation grammar](../../INTERFACE/design/presentation.md): it names the
+command, the affected requirement ID, and the resulting fields or change using
+the shared status, identifier, and label roles, and closes with one summary.
+`spec list` prints records in deterministic order by area,
+feature, group, and numeric sequence, matching the review catalog. JSON payloads
+are carried as the `result` of the shared
+[JSON envelope](../../INTERFACE/design/output.md#json-envelope).
 
 Usage errors, including an unknown ID, an unknown field, an unparsable value, a
 duplicate ID, and an invalid resulting record, return exit code 2 before any

@@ -51,8 +51,12 @@ the configured test paths is not a candidate. See
 
 ## Output
 
-Human output prints a heading per requirement or a flat candidate list,
-highlighting IDs, scanner kinds, and source locations. `--json` emits one
-structured document per invocation: trace emits a record per requested
-requirement with its tied test references, and candidates emits an array of
-test-site records. JSON is deterministic and contains no ANSI escapes.
+Human output follows the shared
+[presentation grammar](../../INTERFACE/design/presentation.md) and prints a
+heading per requirement or a flat candidate list, using the shared identifier,
+info, and status roles for IDs, scanner kinds, and source locations. `--json`
+carries the payload as the `result` of the shared
+[JSON envelope](../../INTERFACE/design/output.md#json-envelope): trace carries a
+record per requested requirement with its tied test references, and candidates
+carries an array of test-site records. JSON is deterministic and contains no ANSI
+escapes.

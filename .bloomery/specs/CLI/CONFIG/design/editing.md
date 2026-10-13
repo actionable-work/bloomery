@@ -98,13 +98,16 @@ a malformed file; a malformed or unreadable file is a `ConfigurationError`.
 
 ## Output and exit codes
 
-Human output names the command, the affected key path, and the effective or
-changed value. Missing-flake and missing-configuration warnings are advisory
-and do not change the exit code. `config list` and `config upgrade` print
-sorted key paths.
+Human output follows the shared
+[presentation grammar](../../INTERFACE/design/presentation.md): it names the
+command, the affected key path, and the effective or changed value using the
+shared label and status vocabulary, and closes with one summary line.
+Missing-flake and missing-configuration warnings are advisory and do not change
+the exit code. `config list` and `config upgrade` print sorted key paths.
 
-`config --json` emits one structured document. Success documents identify the
-command, status, and command-specific fields: a key with an effective value,
+`config --json` carries its command-specific fields as the `result` of the shared
+[JSON envelope](../../INTERFACE/design/output.md#json-envelope). Success payloads
+identify the command, status, and command-specific fields: a key with an effective value,
 configured flag, and recommendation status for `get`, a key array for `list`,
 the changed key and whether the file changed for `set` and `unset`, and the
 added key paths or recommendation differences for `upgrade`.

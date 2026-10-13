@@ -74,17 +74,20 @@ raw Nix build logs. When `--check` is selected, the gate's check progress and
 outcomes are shown on the same terms as `bloomery check`.
 
 Plain output lists each selected package, its system, its status, and its output
-store path, followed by a summary count of passed and failed packages. When
-`--check` is selected, output first reports the gate status and, on failure, the
-failing check IDs. A failed
+store path, followed by a summary count of passed and failed packages. It uses
+the shared
+[presentation grammar](../../INTERFACE/design/presentation.md): a root heading,
+the status vocabulary, the semantic color roles, and a closing summary line.
+When `--check` is selected, output first reports the gate status and, on failure,
+the failing check IDs. A failed
 package names its derivation path and the `nix log` command that retrieves its
 build log.
 
-`build --json` emits one object with `command: "build"`, `status`, the selected
-`systems`, and a `packages` array. Each entry carries `name`, `system`,
-`status`, and, when realized, `path`; a failed entry also carries its
-derivation path. When `--check` is selected, the object also carries the gate
-`status` and, on failure, the failing check IDs. Usage and operational failures
-emit one structured error
-document retaining their normal exit codes. See the
-[output contract](../../INTERFACE/design/output.md).
+`build --json` carries the selected `systems` and a `packages` array as the
+`result` of the shared
+[JSON envelope](../../INTERFACE/design/output.md#json-envelope). Each entry
+carries `name`, `system`, `status`, and, when realized, `path`; a failed entry
+also carries its derivation path. When `--check` is selected, the result also
+carries the gate `status` and, on failure, the failing check IDs. Usage and
+operational failures emit the envelope's structured error retaining their normal
+exit codes. See the [output contract](../../INTERFACE/design/output.md).

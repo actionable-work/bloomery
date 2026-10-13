@@ -40,15 +40,22 @@ commands:
 | `disk` | `--json` | flag | human-readable text |
 | `disk` | `--system` | repeatable system name | host Nix system |
 | `disk` | `--scope` | `all`, `runtime`, or `build` | `all` |
+| all commands | `--color` | `auto`, `always`, or `never` | `auto` |
 | all commands | `-h`, `--help` | — | — |
 
 `--json` is a shared global option, accepted before or after the subcommand. It
-selects machine-readable output for check, build, disk, review, sync, and init; no
+selects machine-readable output for every application command; no
 command-specific `--format` or alternate JSON spelling is exposed. Human-readable
-output is the default. Terminal color behavior is automatic and consistent
-across commands; non-empty `NO_COLOR`, redirected streams, and JSON mode
-suppress ANSI styling.
-See the [output contract](output.md).
+output is the default and follows the shared
+[presentation grammar](presentation.md).
+
+`--color` is a shared global option that selects styling for human output.
+`auto` colors only eligible terminal streams, `always` forces styling of human
+output even on a redirected stream, and `never` disables styling. `--json`
+always omits ANSI regardless of `--color`. `auto` honors non-empty
+`NO_COLOR`, `TERM=dumb`, and JSON mode. An unsupported `--color` value is a usage
+error. See the [output contract](output.md) and
+[presentation grammar](presentation.md#non-interactive-and-color-control).
 
 Bloomery does not expose a command-specific repository-root flag. Check and
 review use the current working directory, as does sync. Init instead accepts an

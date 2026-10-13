@@ -1,0 +1,146 @@
+group = "PRESENTATION"
+
+[[requirements]]
+id = "CLI-INTERFACE-PRESENTATION-001"
+title = "Human output uses one presentation grammar"
+manual = false
+design = "design/presentation.md#visual-grammar"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "render every application command's human output through the shared presentation grammar"
+
+[[requirements]]
+id = "CLI-INTERFACE-PRESENTATION-002"
+title = "Human output opens with one root heading"
+manual = false
+design = "design/presentation.md#headings"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "open each command's human output with one root heading naming the command subject"
+
+[[requirements]]
+id = "CLI-INTERFACE-PRESENTATION-003"
+title = "Hierarchical output uses the shared tree grammar"
+manual = false
+design = "design/presentation.md#trees"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "render hierarchical output with the shared root-label and branch-connector tree grammar"
+
+[[requirements]]
+id = "CLI-INTERFACE-PRESENTATION-004"
+title = "Outcome lines use the shared status vocabulary"
+manual = false
+design = "design/presentation.md#status-lines"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "prefix every outcome line with its shared status glyph and text label"
+
+[[requirements]]
+id = "CLI-INTERFACE-PRESENTATION-005"
+title = "Styling uses semantic color roles"
+manual = false
+design = "design/presentation.md#color-roles"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "apply the shared semantic color palette by role"
+
+[[requirements]]
+id = "CLI-INTERFACE-PRESENTATION-006"
+title = "Labeled values use one format"
+manual = false
+design = "design/presentation.md#key-value-and-summary-lines"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "format labeled values as 'Label: value' with the label styled by role"
+
+[[requirements]]
+id = "CLI-INTERFACE-PRESENTATION-007"
+title = "Commands close with one summary line"
+manual = false
+design = "design/presentation.md#key-value-and-summary-lines"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "close each command's human output with one summary line"
+
+[[requirements]]
+id = "CLI-INTERFACE-PRESENTATION-008"
+title = "Notices are separated by stream"
+manual = false
+design = "design/presentation.md#notices"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "write primary results to stdout and errors and warnings to stderr"
+
+[[requirements]]
+id = "CLI-INTERFACE-PRESENTATION-009"
+title = "Styling preserves textual content"
+manual = false
+design = "design/presentation.md#principles"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "keep textual content, ordering, and summary values identical whether or not ANSI styling is applied"
+
+[[requirements]]
+id = "CLI-INTERFACE-PRESENTATION-010"
+title = "Default human output is bounded"
+manual = false
+design = "design/presentation.md#progressive-disclosure"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "bound default human output and leave unbounded detail to dedicated retrieval or --json"
+
+[[requirements]]
+id = "CLI-INTERFACE-PRESENTATION-011"
+title = "Default color is automatic"
+manual = false
+design = "design/presentation.md#non-interactive-and-color-control"
+
+[requirements.ears]
+type = "event"
+trigger = "color selection is automatic and the output stream is an eligible terminal"
+system = "the bloomery CLI"
+action = "apply ANSI styling"
+
+[[requirements]]
+id = "CLI-INTERFACE-PRESENTATION-012"
+title = "Non-interactive output is plain"
+manual = false
+design = "design/presentation.md#non-interactive-and-color-control"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "human output is written to a non-terminal stream, NO_COLOR is non-empty, TERM is dumb, or --json is selected, and color is not forced"
+system = "the bloomery CLI"
+action = "omit ANSI styling, cursor control, and transient progress"
+
+[[requirements]]
+id = "CLI-INTERFACE-PRESENTATION-013"
+title = "Output sections use consistent spacing"
+manual = false
+design = "design/presentation.md#spacing"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the bloomery CLI"
+action = "separate independent output sections with one blank line and end output without a trailing blank line"

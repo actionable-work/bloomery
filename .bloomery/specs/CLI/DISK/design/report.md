@@ -57,6 +57,9 @@ Systems: x86_64-linux
 ```
 
 Each category and entry shows its human-readable byte size. Entries with no
-claimed bytes render as `0 B`; unmeasured entries are marked as unmeasured.
-JSON mode carries the same categories and entries as structured records for
-both output modes.
+claimed bytes render as `0 B`; unmeasured entries are marked as unmeasured. Tree
+connectors, the root heading, byte labels, and the closing summary follow the
+shared [presentation grammar](../../INTERFACE/design/presentation.md). JSON mode
+carries the same categories and entries as the `result` payload of the shared
+[JSON envelope](../../INTERFACE/design/output.md#json-envelope) for both output
+modes.

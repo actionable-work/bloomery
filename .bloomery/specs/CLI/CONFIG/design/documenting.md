@@ -63,10 +63,13 @@ existing file unchanged.
 
 ## Output and exit codes
 
-Human output names the command, the count of documented keys, and the sorted key
-paths that gained documentation. `config document --json` emits one document
-identifying the command, status, the sorted documented key paths, and whether
-the file changed. Documented keys are reported in sorted order.
+Human output follows the shared
+[presentation grammar](../../INTERFACE/design/presentation.md) and names the
+command, the count of documented keys, and the sorted key paths that gained
+documentation. `config document --json` carries the sorted documented key paths
+and whether the file changed as the `result` of the shared
+[JSON envelope](../../INTERFACE/design/output.md#json-envelope). Documented keys
+are reported in sorted order.
 
 Usage errors return exit code 2 before any mutation. Configuration read,
 validation, or write failures return exit code 1. A successful run returns 0,

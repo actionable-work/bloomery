@@ -77,7 +77,7 @@ fn failed_nix_checks_retain_referenced_derivation_log_paths() {
     let (status, summary, _) = invoke(request(), &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::FAILURE);
     let summary: Value = serde_json::from_slice(&summary).expect("check summary");
-    let run_id = summary["run"].as_str().expect("run ID");
+    let run_id = summary["result"]["run"].as_str().expect("run ID");
     let store = RunStore::open(&root, Some(&cache)).expect("run store");
     let (record, _) = store.load(run_id).expect("retained run");
 
@@ -108,8 +108,8 @@ fn aliased_check_build_requests_rely_on_native_store_deduplication() {
     assert_eq!(backend.build_commands.load(Ordering::SeqCst), 1);
     assert_eq!(backend.realizations.load(Ordering::SeqCst), 1);
     let result: Value = serde_json::from_slice(&stdout).expect("summary");
-    assert_eq!(result["counts"]["passed"], 3);
-    assert_eq!(result["total"], 0);
+    assert_eq!(result["result"]["counts"]["passed"], 3);
+    assert_eq!(result["result"]["total"], 0);
     let store =
         crate::check_command::store::RunStore::open(&root, Some(&cache)).expect("retained store");
     let retained = store.latest().expect("latest run").0;
@@ -223,7 +223,7 @@ fn real_nix_runner_builds_two_aliases_of_one_low_storage_derivation() {
         String::from_utf8_lossy(&stderr)
     );
     let summary: Value = serde_json::from_slice(&stdout).expect("runner summary");
-    assert_eq!(summary["counts"]["passed"], 3);
+    assert_eq!(summary["result"]["counts"]["passed"], 3);
 
     let store = RunStore::open(&root, Some(&cache)).expect("retained store");
     let retained = store.latest().expect("retained run").0;
@@ -262,7 +262,7 @@ fn default_execution_attempts_other_independent_checks_after_a_build_failure() {
     assert_eq!(status, std::process::ExitCode::FAILURE);
     assert_eq!(backend.realizations.load(Ordering::SeqCst), 2);
     let result: Value = serde_json::from_slice(&stdout).expect("summary");
-    assert_eq!(result["counts"]["failed"], 2);
+    assert_eq!(result["result"]["counts"]["failed"], 2);
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
 }
@@ -342,7 +342,7 @@ fn evaluation_failures_are_check_failures_and_store_failures_are_operational() {
     let (status, stdout, _) = invoke(request(), &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::FAILURE);
     let result: Value = serde_json::from_slice(&stdout).expect("evaluation failure");
-    assert_eq!(result["failures"][0]["code"], "EvaluationFailed");
+    assert_eq!(result["result"]["failures"][0]["code"], "EvaluationFailed");
 
     let (root2, cache2) = fixture(true);
     let blocked_cache = root2.join("not-a-directory");
@@ -355,6 +355,7 @@ fn evaluation_failures_are_check_failures_and_store_failures_are_operational() {
         CheckContext {
             root: &root2,
             json_mode: true,
+            color: crate::output::ColorMode::Auto,
             backend: &backend,
             interrupt: InterruptFlag::for_test(),
             cache_base: Some(&blocked_cache),
@@ -395,7 +396,7 @@ fn fail_fast_retains_started_results_and_does_not_admit_queued_work() {
     let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::FAILURE);
     let result: Value = serde_json::from_slice(&stdout).expect("summary");
-    assert!(result["counts"]["not_run"].as_u64().unwrap_or(0) > 0);
+    assert!(result["result"]["counts"]["not_run"].as_u64().unwrap_or(0) > 0);
     assert_eq!(backend.realizations.load(Ordering::SeqCst), 1);
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
@@ -452,7 +453,12 @@ fn failure_to_finalize_a_run_never_returns_success() {
     assert_eq!(status, std::process::ExitCode::from(2));
     let error: Value = serde_json::from_slice(&stdout).expect("finalization error");
     assert_eq!(error["error"]["code"], "OperationalError");
-    assert!(error.get("run").and_then(Value::as_str).is_some());
+    assert!(
+        error["error"]["details"]
+            .get("run")
+            .and_then(Value::as_str)
+            .is_some()
+    );
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
 }
@@ -496,7 +502,7 @@ fn interrupted_runs_retain_completed_outcomes_and_return_130() {
         invoke_with_interrupt(request(), &root, &cache, &backend, true, interrupt);
     assert_eq!(status, std::process::ExitCode::from(130));
     let result: Value = serde_json::from_slice(&stdout).expect("interrupted summary");
-    assert_eq!(result["status"], "interrupted");
+    assert_eq!(result["result"]["status"], "interrupted");
     let store =
         crate::check_command::store::RunStore::open(&root, Some(&cache)).expect("retained store");
     let retained = store.latest().expect("interrupted run").0;
@@ -535,15 +541,15 @@ fn prerequisite_failures_block_dependents_without_suppressing_nix_checks() {
     let (status, stdout, _) = invoke(request(), &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::FAILURE);
     let result: Value = serde_json::from_slice(&stdout).expect("summary JSON");
-    assert_eq!(result["counts"]["failed"], 1);
-    assert_eq!(result["counts"]["blocked"], 1);
-    assert_eq!(result["counts"]["passed"], 2);
+    assert_eq!(result["result"]["counts"]["failed"], 1);
+    assert_eq!(result["result"]["counts"]["blocked"], 1);
+    assert_eq!(result["result"]["counts"]["passed"], 2);
     assert_eq!(backend.realizations.load(Ordering::SeqCst), 1);
     assert_eq!(
         backend.systems.lock().unwrap().as_slice(),
         &["x86_64-linux"]
     );
-    assert_eq!(result["failures"].as_array().unwrap().len(), 1);
+    assert_eq!(result["result"]["failures"].as_array().unwrap().len(), 1);
     let store =
         crate::check_command::store::RunStore::open(&root, Some(&cache)).expect("retained store");
     let retained = store.latest().expect("retained run").0;
@@ -601,8 +607,8 @@ fn summaries_agree_between_human_and_json_and_do_not_stream_logs() {
     assert!(text.contains("1 failure record"));
     assert!(text.contains("f1"));
     assert!(!text.contains("build log output"));
-    assert_eq!(json["counts"]["failed"], 1);
-    assert!(json["failures"][0].get("message").is_none());
+    assert_eq!(json["result"]["counts"]["failed"], 1);
+    assert!(json["result"]["failures"][0].get("message").is_none());
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
 }
@@ -660,10 +666,10 @@ fn formatter_failure_stops_all_check_work_regardless_of_fail_fast() {
         assert_eq!(backend.formatter_runs.load(Ordering::SeqCst), 1);
         assert_eq!(backend.realizations.load(Ordering::SeqCst), 0);
         let result: Value = serde_json::from_slice(&stdout).expect("summary");
-        assert_eq!(result["counts"]["failed"], 1);
-        assert!(result["counts"]["not_run"].as_u64().unwrap_or(0) >= 2);
-        assert_eq!(result["failures"][0]["check"], "format:workspace");
-        assert_eq!(result["failures"][0]["code"], "NixFormatFailed");
+        assert_eq!(result["result"]["counts"]["failed"], 1);
+        assert!(result["result"]["counts"]["not_run"].as_u64().unwrap_or(0) >= 2);
+        assert_eq!(result["result"]["failures"][0]["check"], "format:workspace");
+        assert_eq!(result["result"]["failures"][0]["code"], "NixFormatFailed");
         let store = RunStore::open(&root, Some(&cache)).expect("retained store");
         let record = store.latest().expect("retained run").0;
         assert!(record.outcomes.iter().any(|outcome| {
@@ -687,7 +693,7 @@ fn selected_checks_run_against_the_formatted_workspace() {
     let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::FAILURE);
     let result: Value = serde_json::from_slice(&stdout).expect("summary");
-    assert_eq!(result["failures"][0]["code"], "MissingDocument");
+    assert_eq!(result["result"]["failures"][0]["code"], "MissingDocument");
     assert!(!root.join(".bloomery/specs/CLI/CHECK/README.md").exists());
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
@@ -845,8 +851,8 @@ fn selective_batch_failures_are_attributed_per_check() {
     let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::FAILURE);
     let result: Value = serde_json::from_slice(&stdout).expect("summary");
-    assert_eq!(result["counts"]["failed"], 1);
-    assert_eq!(result["counts"]["passed"], 2);
+    assert_eq!(result["result"]["counts"]["failed"], 1);
+    assert_eq!(result["result"]["counts"]["passed"], 2);
     let store = RunStore::open(&root, Some(&cache)).expect("retained store");
     let (record, _) = store.latest().expect("retained run");
     assert!(record.outcomes.iter().any(|outcome| {
@@ -881,7 +887,7 @@ fn dependency_failure_retains_a_causal_derivation_log() {
     let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::FAILURE);
     let result: Value = serde_json::from_slice(&stdout).expect("summary");
-    assert_eq!(result["counts"]["failed"], 2);
+    assert_eq!(result["result"]["counts"]["failed"], 2);
     let store = RunStore::open(&root, Some(&cache)).expect("retained store");
     let (record, _) = store.latest().expect("retained run");
     let dependent = record
@@ -958,8 +964,8 @@ fn real_nix_batched_failures_resolve_per_check_and_causal_logs() {
         String::from_utf8_lossy(&stderr)
     );
     let summary: Value = serde_json::from_slice(&stdout).expect("runner summary");
-    assert_eq!(summary["counts"]["failed"], 2);
-    assert_eq!(summary["counts"]["passed"], 2);
+    assert_eq!(summary["result"]["counts"]["failed"], 2);
+    assert_eq!(summary["result"]["counts"]["passed"], 2);
 
     let store = RunStore::open(&root, Some(&cache)).expect("retained store");
     let (record, _) = store.latest().expect("retained run");
