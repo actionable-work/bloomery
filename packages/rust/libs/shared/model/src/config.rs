@@ -42,6 +42,10 @@ pub struct Config {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SpecsConfig {
+    /// Explicit enablement override. `None` auto-detects from the presence of
+    /// the configured specification root.
+    #[serde(default)]
+    pub enable: Option<bool>,
     #[serde(default = "default_specs_dir")]
     pub dir: String,
 }
@@ -127,6 +131,7 @@ fn default_nix_test_paths() -> Vec<String> {
 impl Default for SpecsConfig {
     fn default() -> Self {
         Self {
+            enable: None,
             dir: default_specs_dir(),
         }
     }
@@ -286,6 +291,16 @@ impl Config {
         self.validate_specs_dir()?;
         Ok(root.join(".bloomery").join(&self.specs.dir))
     }
+
+    /// Whether specification management is active. An explicit `specs.enable`
+    /// wins; otherwise management is enabled exactly when the configured
+    /// specification root exists.
+    pub fn spec_management_enabled(&self, root: &Path) -> bool {
+        match self.specs.enable {
+            Some(enabled) => enabled,
+            None => self.specs_root(root).is_ok_and(|path| path.is_dir()),
+        }
+    }
 }
 
 #[allow(clippy::result_large_err)]
@@ -399,6 +414,7 @@ mod tests {
         fs::write(&config_path, "").expect("empty config");
         let config = load(&root).expect("empty config should use defaults");
         assert_eq!(config.specs.dir, "specs");
+        assert_eq!(config.specs.enable, None);
         assert_default_scanners(
             &config.scanners.rust,
             &config.scanners.playwright,
@@ -431,6 +447,55 @@ mod tests {
             &config.scanners.playwright,
             &config.scanners.nix,
         );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-020"))]
+    fn spec_management_enable_override_parses() {
+        let root = root();
+        let config_path = root.join(".bloomery/config.toml");
+        fs::create_dir_all(config_path.parent().expect("config parent")).expect("config dir");
+
+        fs::write(&config_path, "[specs]\nenable = false\n").expect("explicit false");
+        let config = load(&root).expect("explicit false should load");
+        assert_eq!(config.specs.enable, Some(false));
+
+        fs::write(&config_path, "[specs]\nenable = true\n").expect("explicit true");
+        let config = load(&root).expect("explicit true should load");
+        assert_eq!(config.specs.enable, Some(true));
+
+        fs::write(&config_path, "[specs]\ndir = \"specs\"\n").expect("absent override");
+        let config = load(&root).expect("absent override should load");
+        assert_eq!(config.specs.enable, None);
+
+        fs::write(&config_path, "[specs]\nenable = \"yes\"\n").expect("invalid override");
+        assert_configuration_error(&root);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn spec_management_auto_detects_and_overrides() {
+        let root = root();
+        let config_path = root.join(".bloomery/config.toml");
+        fs::create_dir_all(config_path.parent().expect("config parent")).expect("config dir");
+        let specs = root.join(".bloomery/specs");
+
+        fs::write(&config_path, "[specs]\ndir = \"specs\"\n").expect("config");
+        let config = load(&root).expect("load");
+        assert!(!config.spec_management_enabled(&root));
+
+        fs::create_dir_all(&specs).expect("specs directory");
+        assert!(config.spec_management_enabled(&root));
+
+        fs::write(&config_path, "[specs]\nenable = false\ndir = \"specs\"\n").expect("config");
+        let config = load(&root).expect("load");
+        assert!(!config.spec_management_enabled(&root));
+
+        fs::write(&config_path, "[specs]\nenable = true\ndir = \"specs\"\n").expect("config");
+        let config = load(&root).expect("load");
+        fs::remove_dir_all(&specs).expect("remove specs");
+        assert!(config.spec_management_enabled(&root));
         let _ = fs::remove_dir_all(root);
     }
 

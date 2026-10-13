@@ -8,7 +8,7 @@ below the repository's top-level `.bloomery/` directory:
 ```text
 .bloomery/
 ├── config.toml                       # required
-└── specs/
+└── specs/                            # present when spec management is enabled
     └── <AREA>/
         ├── README.md
         └── <FEATURE>/
@@ -25,6 +25,19 @@ use the validated defaults described in the
 [configuration file design](../../CONFIGURATION/design/config-file.md). The file
 also carries the build tables consumed by the flake interface, described in
 [NIXLIB/FLAKE](../../../NIXLIB/FLAKE/design/configuration.md).
+
+## Optional specification tree
+
+Specification management is resolved from `specs.enable` and the presence of
+`.bloomery/<specs.dir>/`. When `specs.enable` is absent, management is enabled
+exactly when the specification root exists. An explicit `specs.enable`
+overrides detection: `true` requires the root and `false` disables management
+even when the root is present.
+
+When it is enabled, `.bloomery/<specs.dir>/` is required and the contract below
+applies. When it is disabled, the specification tree is neither required nor
+read: the workspace loader returns an empty workspace with no areas and no
+diagnostics, so build and check operate without specifications.
 
 Every feature contains a `requirements/` directory with at least one grouped
 TOML file. The checker rejects a feature whose requirements directory is absent

@@ -3,7 +3,9 @@
 `bloomery spec trace` and `bloomery spec candidates` are read-only projections
 over the resolved requirement model and the statically discovered test sites.
 Both require the shared root `flake.nix` and `.bloomery/config.toml`
-preflights. Neither mutates the specification tree, configuration, or lockfiles,
+preflights. When specification management is disabled,
+both report an error naming the disabled management instead of loading a
+requirement model. Neither mutates the specification tree, configuration, or lockfiles,
 and neither executes tests.
 
 ```text

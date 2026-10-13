@@ -18,7 +18,9 @@ selected systems' `packages.<system>` outputs, resolves each selected name to
 its production derivation, and realizes the selection in one batched Nix
 invocation. The production derivation for a binary is the optimized variant
 when `[optimize]` enables it and the release build otherwise; dev-profile
-derivations are never built.
+derivations are never built. Build is independent of specification management:
+it never loads the requirement model, so it runs whether or not a specification
+tree exists.
 
 Build is the counterpart to [check](../CHECK/README.md): check provides fast
 workspace verification, while build produces the deployable package
@@ -34,6 +36,7 @@ a single command can verify and build.
 ## Responsibilities
 
 - Require the shared root-flake preflight and `.bloomery/config.toml`.
+- Run without loading the requirement model or requiring a specification tree.
 - Select production packages by name or glob for the selected systems.
 - Evaluate each selected system's packages catalog once.
 - Realize the selected production derivations in one batched Nix invocation.
@@ -49,7 +52,8 @@ Build evaluates the workspace flake and realizes production package
 derivations. By default it does not run `nix fmt`, static specification
 validation, tests, clippy, documentation, or package checks; `--check` runs the
 default check suite as a prerequisite and skips realization when it does not
-pass. It creates no result links and
+pass. When specification management is disabled, that gate contains no static
+specification checks and proceeds on the formatter and Nix checks. It creates no result links and
 does not retain a run store; failures name the failed derivation path so a user
 can retrieve its log with `nix log`. The `packages` output shape is owned by
 [NIXLIB/FLAKE](../../NIXLIB/FLAKE/design/output-contract.md), and the

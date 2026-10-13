@@ -13,7 +13,9 @@ description: |
 
 Review is a read-only projection of the requirement model for human auditing
 and downstream workflow systems. It requires the shared root `flake.nix`
-preflight like every command, but does not run the check formatter.
+preflight like every command, but does not run the check formatter. When
+specification management is disabled, review reports an error explaining that
+no requirement model is available.
 
 ## Design documents
 
@@ -23,6 +25,7 @@ preflight like every command, but does not run the check formatter.
 ## Responsibilities
 
 - Filter to manual requirements.
+- Require specification management to be enabled.
 - Sort by area, feature, group, and numeric sequence.
 - Render the canonical EARS statement and design reference.
 - Support the shared `--json` option and a human-readable, colorized tree output.

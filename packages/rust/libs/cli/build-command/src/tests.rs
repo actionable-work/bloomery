@@ -530,6 +530,17 @@ fn build_without_check_skips_gate() {
 }
 
 #[test]
+#[cfg_attr(any(), bloomery("CLI-BUILD-EXECUTION-026"))]
+fn build_executes_without_a_specification_tree() {
+    let root = flake_root();
+    let backend = passed_backend(&["app"]);
+    let report = execute(default_args(), &root, &backend, &FakeGate::default()).expect("report");
+    assert_eq!(report.status, BuildStatus::Passed);
+    assert_eq!(backend.realize_calls.lock().unwrap().len(), 1);
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
 #[cfg_attr(any(), bloomery("CLI-BUILD-OUTPUT-001"))]
 #[cfg_attr(any(), bloomery("CLI-BUILD-OUTPUT-002"))]
 fn human_report_lists_output_paths() {

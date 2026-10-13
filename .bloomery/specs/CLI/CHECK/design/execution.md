@@ -10,21 +10,27 @@
 
 Preserve the existing static validations; these IDs group the existing passes,
 not new independent validation semantics. Static structure is a prerequisite
-of traceability. The shared CLI preflight requires a root `flake.nix` before any
+of traceability. `static:structure` and `static:traceability` exist in the
+catalog only when specification management is enabled; when it is disabled they
+are absent and cannot be selected. The shared CLI preflight requires
+a root `flake.nix` before any
 check operation. Nix catalog discovery is setup and does not depend on
 specification validity. The formatter gate runs before selected check tasks; a
 failure prevents static validation and Nix check realization. After it passes,
 failures in either pipeline do not suppress the other in default mode.
 
-With no selectors, run both static checks and every check attribute for the
-host Nix system. Include generated Rust tests, clippy, documentation, doctests,
+With no selectors, run every available check: both static checks when
+specification management is enabled, plus every check attribute for the host
+Nix system. Include generated Rust tests, clippy, documentation, doctests,
 lock validation, formatter checks, and integration-flake checks when present in
 that output. Package checks are included only when
 `checks.includePackageChecks` enables them; the default suite omits them and
 [build](../../BUILD/README.md) materializes production packages instead. Do not
 implicitly build packages outside checks
 or select other architectures. Every check command requires the shared flake
-preflight, including static-only and read-only selections.
+preflight, including static-only and read-only selections. When specification
+management is disabled, a selector naming a static check matches no catalog
+entry and is rejected like any other unmatched selector.
 
 ## Formatting gate
 

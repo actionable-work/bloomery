@@ -25,6 +25,7 @@ The scanner and spec configuration shape is:
 ```toml
 [specs]
 dir = "specs"
+# enable = true   # optional override; absent auto-detects from the specification tree
 
 [scanners.rust]
 enabled = true
@@ -51,6 +52,30 @@ the default paths above. `scanners.nix.testPaths` selects the Nix test files
 that [test discovery](../../SCANNING/design/test-discovery.md) treats as test
 sites; an empty list disables Nix test-file discovery while `scanners.nix.paths`
 still supplies `passthru.bloomery` references.
+
+## Spec management enablement
+
+Specification management is resolved from `specs.enable` and the presence of
+the specification tree at `.bloomery/<specs.dir>/`:
+
+| `specs.enable` | Specification tree | Result |
+| --- | --- | --- |
+| absent | present | enabled |
+| absent | absent | disabled |
+| `true` | present | enabled |
+| `true` | absent | error |
+| `false` | either | disabled |
+
+An absent `specs.enable` auto-detects: a repository with a specification tree
+has specification management, and one without it does not. An explicit value
+overrides detection, so `specs.enable = false` disables management even when a
+tree is present, and `specs.enable = true` requires the tree.
+
+When specification management is disabled, the tree is neither required nor
+read, the workspace resolves to an empty model, `bloomery check` omits the
+static specification checks, and the requirement-management commands report
+that specification management is disabled. Scanner keys remain independently
+configurable but produce no references without a requirement model.
 
 ## Build tables
 

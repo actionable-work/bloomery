@@ -1,10 +1,10 @@
 use crate::check_command::catalog::{NixBackend, NixCli};
 use crate::check_command::command::{
-    CheckArgs, CheckOperation, FailureArgs, ListArgs, validate_args,
+    CheckArgs, CheckOperation, FailureArgs, ListArgs, discover_for_selection, validate_args,
 };
 use crate::check_command::execution::validate_execution_selection;
 use crate::check_command::test_support::{
-    FakeNix, fixture, invoke, lock_fixture_flake, nix_is_available, request,
+    FakeNix, fixture, fixture_without_specs, invoke, lock_fixture_flake, nix_is_available, request,
 };
 use serde_json::Value;
 use std::fs;
@@ -304,6 +304,46 @@ fn completed_check_runs_are_retained_for_retrieval() {
         crate::check_command::store::RunStore::open(&root, Some(&cache)).expect("run store");
     let (record, _) = store.latest().expect("retained run");
     assert!(!record.id.is_empty());
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-CONTRACT-004"))]
+fn disabled_spec_management_omits_static_checks_from_the_catalog() {
+    let (root, cache) = fixture_without_specs(true, "[specs]\nenable = false\n");
+    let backend = FakeNix {
+        names: vec!["core:test".to_owned()],
+        ..FakeNix::default()
+    };
+    let catalog = discover_for_selection(&root, &[], &[], &backend).expect("catalog");
+    assert!(
+        !catalog.ids.iter().any(|id| id.starts_with("static:")),
+        "static checks must be absent from the catalog when management is disabled"
+    );
+    assert!(
+        catalog
+            .ids
+            .iter()
+            .any(|id| id == "nix:x86_64-linux:core:test")
+    );
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-023"))]
+fn disabled_spec_management_rejects_static_selectors() {
+    let (root, cache) = fixture_without_specs(true, "[specs]\nenable = false\n");
+    let backend = FakeNix::default();
+    let mut args = request();
+    args.selectors = vec!["static:structure".to_owned()];
+    let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::from(2));
+    let error: Value = serde_json::from_slice(&stdout).expect("usage error");
+    assert_eq!(error["error"]["code"], "UsageError");
+    assert_eq!(backend.formatter_runs.load(Ordering::SeqCst), 0);
+    assert_eq!(backend.evaluations.load(Ordering::SeqCst), 0);
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
 }

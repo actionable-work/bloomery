@@ -638,10 +638,7 @@ pub fn discover_catalog(
     systems: &[String],
     backend: &dyn NixBackend,
 ) -> Result<(Vec<String>, Vec<Notice>), String> {
-    let mut ids = vec![
-        "static:structure".to_owned(),
-        "static:traceability".to_owned(),
-    ];
+    let mut ids = Vec::new();
     let mut notices = Vec::new();
     for system in systems {
         let attributes = backend.discover(root, system)?;

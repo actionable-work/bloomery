@@ -40,7 +40,9 @@ contracts with a typesafe editing and read-only projection layer.
 
 Spec mutations edit grouped TOML requirement records below
 `.bloomery/<specs.dir>/`. They never edit area or feature READMEs, design
-documents, configuration, or lockfiles. Trace and candidate discovery read
+documents, configuration, or lockfiles. Spec commands operate only when
+specification management is enabled; when it is disabled they report
+that specification management is disabled. Trace and candidate discovery read
 source configured through `scanners.*` and never execute tests, launch
 applications, or instantiate derivations. Spec does not run checks, manage
 review status, or assign owners.

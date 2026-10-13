@@ -47,6 +47,17 @@ mod tests {
         root
     }
 
+    fn config_only_fixture(config: &str) -> PathBuf {
+        let suffix = FIXTURE_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!(
+            "bloomery-workspace-{}-{suffix}",
+            std::process::id()
+        ));
+        fs::create_dir_all(root.join(".bloomery")).expect("configuration directory");
+        fs::write(root.join(".bloomery/config.toml"), config).expect("configuration");
+        root
+    }
+
     #[test]
     fn loads_a_complete_workspace() {
         let root = fixture();
@@ -184,6 +195,56 @@ mod tests {
         assert_eq!(
             requirement.design.display,
             ".bloomery/specs/PARSER/WORKSPACE/design/overview.md"
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-WORKSPACE-STRUCTURE-006"))]
+    #[cfg_attr(any(), bloomery("PARSER-WORKSPACE-STRUCTURE-004"))]
+    fn absent_override_auto_detects_a_missing_specification_tree() {
+        let root = config_only_fixture("[specs]\ndir = \"specs\"\n");
+        let context = load(&root).expect("workspace should load without a specification tree");
+        assert!(context.areas.is_empty());
+        assert!(!context.spec_management_enabled());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-WORKSPACE-STRUCTURE-006"))]
+    fn absent_override_auto_detects_a_present_specification_tree() {
+        let root = fixture();
+        let context = load(&root).expect("workspace should load");
+        assert_eq!(context.areas.len(), 1);
+        assert!(context.spec_management_enabled());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-WORKSPACE-STRUCTURE-007"))]
+    fn explicit_disablement_ignores_a_present_specification_tree() {
+        let root = fixture();
+        fs::write(
+            root.join(".bloomery/config.toml"),
+            "[specs]\nenable = false\ndir = \"specs\"\n",
+        )
+        .expect("configuration");
+
+        let context = load(&root).expect("disabled management should ignore the tree");
+        assert!(context.areas.is_empty());
+        assert!(!context.spec_management_enabled());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-WORKSPACE-STRUCTURE-005"))]
+    fn explicit_enablement_requires_the_specification_tree() {
+        let root = config_only_fixture("[specs]\nenable = true\ndir = \"specs\"\n");
+        let diagnostics = load(&root).expect_err("explicit enablement requires the tree");
+        assert!(
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code == "MissingSpecsDirectory")
         );
         let _ = fs::remove_dir_all(root);
     }

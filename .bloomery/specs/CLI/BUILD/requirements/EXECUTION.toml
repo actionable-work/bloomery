@@ -288,3 +288,26 @@ type = "event"
 trigger = "the selected check gate fails operationally"
 system = "bloomery build"
 action = "return exit code 2 and realize no selected package"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-026"
+title = "Build does not depend on spec management"
+manual = false
+design = "design/execution.md#catalog-evaluation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery build"
+action = "evaluate and realize packages without loading or requiring the specification tree"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-027"
+title = "The check gate tolerates disabled spec management"
+manual = false
+design = "design/execution.md#check-gate"
+
+[requirements.ears]
+type = "event"
+trigger = "--check runs while specification management is disabled"
+system = "bloomery build"
+action = "gate realization on the formatter and Nix checks without requiring a specification tree"

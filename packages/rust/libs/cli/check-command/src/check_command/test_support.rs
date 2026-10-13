@@ -398,6 +398,27 @@ pub(super) fn fixture(with_flake: bool) -> (PathBuf, PathBuf) {
     (root, cache)
 }
 
+/// Workspace fixture with no specification tree. `config` is written verbatim,
+/// so callers can exercise auto-detection or an explicit `specs.enable` value.
+pub(super) fn fixture_without_specs(with_flake: bool, config: &str) -> (PathBuf, PathBuf) {
+    let id = FIXTURE.fetch_add(1, Ordering::Relaxed);
+    let root = std::env::temp_dir().join(format!(
+        "bloomery-check-command-{}-{id}",
+        std::process::id()
+    ));
+    let cache = std::env::temp_dir().join(format!(
+        "bloomery-check-command-cache-{}-{id}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&root).expect("workspace root");
+    if with_flake {
+        fs::write(root.join("flake.nix"), "{}\n").expect("flake marker");
+    }
+    fs::create_dir_all(root.join(".bloomery")).expect("configuration directory");
+    fs::write(root.join(".bloomery/config.toml"), config).expect("configuration");
+    (root, cache)
+}
+
 pub(super) fn request() -> CheckArgs {
     CheckArgs::default()
 }

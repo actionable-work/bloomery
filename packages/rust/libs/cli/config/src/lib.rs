@@ -542,6 +542,12 @@ mod tests {
             ConfigOutcome::List { keys } => {
                 assert!(keys.iter().any(|key| key.key == "specs.dir"));
                 assert!(keys.iter().any(|key| key.key == "build.unify"));
+                let enable = keys
+                    .iter()
+                    .find(|key| key.key == "specs.enable")
+                    .expect("specs.enable is listed");
+                assert!(!enable.configured);
+                assert!(!enable.recommended);
                 assert!(
                     keys.iter()
                         .all(|key| key.configured == (key.key == "checks.enable"))

@@ -163,6 +163,11 @@ pub struct SpecReport {
 /// Execute one `bloomery spec` command against the repository rooted at `root`.
 pub fn run_at(operation: &SpecOperation, root: &Path) -> Result<SpecReport, SpecError> {
     let context = bloomery_workspace::load(root).map_err(SpecError::from_diagnostics)?;
+    if !context.spec_management_enabled() {
+        return Err(SpecError::failure(
+            "specification management is disabled; set specs.enable = true or add .bloomery/specs",
+        ));
+    }
     let outcome = match operation {
         SpecOperation::List {
             area,
@@ -848,5 +853,30 @@ mod tests {
         )
         .expect("remove must not scan");
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-SPEC-COMMANDS-012"))]
+    fn spec_commands_require_spec_management() {
+        for (name, config) in [
+            ("disabled", "[specs]\nenable = false\n"),
+            ("auto-detected", "[specs]\ndir = \"specs\"\n"),
+        ] {
+            let root = root(name);
+            write(&root.join("flake.nix"), "{ }\n");
+            write(&root.join(".bloomery/config.toml"), config);
+            let error = run(
+                SpecOperation::List {
+                    area: None,
+                    feature: None,
+                    group: None,
+                },
+                &root,
+            )
+            .expect_err("disabled management must fail");
+            assert_eq!(error.kind(), SpecErrorKind::Failure);
+            assert!(error.message().contains("disabled"));
+            let _ = fs::remove_dir_all(root);
+        }
     }
 }

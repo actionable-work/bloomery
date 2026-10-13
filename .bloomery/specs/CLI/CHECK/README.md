@@ -12,6 +12,9 @@ description: |
   `checks.includePackageChecks` enables them, so the default check suite stays
   lightweight; [build](../BUILD/README.md) is the production materialization
   gate, and `bloomery build --check` composes this suite as its prerequisite.
+  Static specification validation is part of the suite only when
+  specification management is enabled, so check also runs without
+  specifications.
 ---
 
 # `bloomery check`
@@ -21,7 +24,9 @@ certifies only its selection. The shared CLI preflight requires a root
 `flake.nix` for every command. For every valid check execution, the mandatory
 `nix fmt` preflight runs, including partial selections, and must succeed before
 any selected check starts. Static evidence remains necessary but is not a
-substitute for executing the selected Nix checks.
+substitute for executing the selected Nix checks. When specification management
+is disabled, the static specification checks are absent and check runs the
+formatter gate and Nix checks only.
 
 ## Design documents
 
@@ -35,7 +40,10 @@ substitute for executing the selected Nix checks.
 ## Responsibilities
 
 - Preserve structure, grammar, design-link, scanner, and traceability validation
-  from the [PARSER area](../../PARSER/README.md).
+  from the [PARSER area](../../PARSER/README.md) when specification management
+  is enabled.
+- Run the formatter gate and Nix checks without a specification tree when
+  specification management is disabled.
 - Require the shared root-flake preflight for every command.
 - Run `nix fmt` before selected checks and stop on formatting failure.
 - Run independent static and Nix work concurrently with bounded scheduling,

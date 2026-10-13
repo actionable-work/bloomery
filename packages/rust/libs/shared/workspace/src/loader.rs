@@ -13,6 +13,13 @@ pub fn load(root: &Path) -> Result<Context, Vec<Diagnostic>> {
         Ok(configuration) => configuration,
         Err(diagnostic) => return Err(vec![diagnostic]),
     };
+    if !configuration.spec_management_enabled(root) {
+        return Ok(Context {
+            root: root.to_path_buf(),
+            config: configuration,
+            areas: Vec::new(),
+        });
+    }
     let specs_root = match configuration.specs_root(root) {
         Ok(path) => path,
         Err(diagnostic) => return Err(vec![diagnostic]),

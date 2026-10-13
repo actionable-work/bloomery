@@ -85,7 +85,7 @@ impl KeySpec {
 }
 
 /// Increment when the catalog changes.
-pub const CATALOG_VERSION: u32 = 7;
+pub const CATALOG_VERSION: u32 = 8;
 
 const OPT_LEVEL: &[ValueType] = &[
     ValueType::UnsignedUpTo(3),
@@ -153,6 +153,12 @@ macro_rules! formatter {
 /// Every recognized configuration key, in stable path order.
 pub const CATALOG: &[CatalogEntry] = &[
     // CLI-owned spec and scanner tables.
+    CatalogEntry {
+        path: &["specs", "enable"],
+        value_type: ValueType::Bool,
+        recommended: None,
+        documentation: "Override specification-management auto-detection; absent enables it exactly when the specification tree exists.",
+    },
     CatalogEntry {
         path: &["specs", "dir"],
         value_type: ValueType::Path,
@@ -962,6 +968,7 @@ mod tests {
         paths.dedup();
         assert_eq!(paths.len(), count, "catalog paths must be unique");
         for expected in [
+            "specs.enable",
             "specs.dir",
             "scanners.rust.enabled",
             "build.cargoToml",
@@ -984,6 +991,10 @@ mod tests {
     #[test]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-002"))]
     fn catalog_entries_pair_paths_with_types() {
+        assert_eq!(
+            lookup(&["specs", "enable"]).unwrap().value_type,
+            ValueType::Bool
+        );
         assert_eq!(
             lookup(&["checks", "enable"]).unwrap().value_type,
             ValueType::Bool
@@ -1123,8 +1134,23 @@ mod tests {
     #[test]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-005"))]
     fn catalog_version_tracks_the_binary() {
-        assert_eq!(CATALOG_VERSION, 7);
+        assert_eq!(CATALOG_VERSION, 8);
         assert!(!CATALOG.is_empty());
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-020"))]
+    fn spec_management_enablement_is_catalogued() {
+        let entry = lookup(&["specs", "enable"]).expect("specs.enable is catalogued");
+        assert_eq!(entry.value_type, ValueType::Bool);
+        assert!(!entry.documentation.is_empty());
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-021"))]
+    fn spec_management_enablement_has_no_recommendation() {
+        assert_eq!(lookup(&["specs", "enable"]).unwrap().recommended, None);
+        assert_eq!(effective_default(&["specs", "enable"]), None);
     }
 
     #[test]
@@ -1137,6 +1163,7 @@ mod tests {
             "features.cratesIoIndex",
             "profile.release.optLevel",
             "profile.dev.linkArgs",
+            "specs.enable",
         ] {
             let parts = path.split('.').collect::<Vec<_>>();
             assert_eq!(lookup(&parts).unwrap().recommended, None, "{path}");

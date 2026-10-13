@@ -122,3 +122,15 @@ type = "event"
 trigger = "spec add, spec set, or spec remove runs"
 system = "bloomery spec"
 action = "operate on the specification tree without scanning source"
+
+[[requirements]]
+id = "CLI-SPEC-COMMANDS-012"
+title = "Spec commands require spec management"
+manual = false
+design = "design/editing.md"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "any bloomery spec command runs while specification management is disabled"
+system = "bloomery spec"
+action = "return an error explaining that specification management is disabled"

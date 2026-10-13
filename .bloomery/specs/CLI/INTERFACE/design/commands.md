@@ -77,6 +77,10 @@ help,
  structured error and `config` emits a structured warning. The specs and
  scanner tables are then loaded as described in
  [PARSER/CONFIGURATION](../../../PARSER/CONFIGURATION/design/config-file.md).
+ Specification management is auto-detected from the specification tree and can
+ be overridden by `specs.enable`; when it is disabled,
+ build and check proceed without a specification tree while commands that
+ require a requirement model report that management is disabled.
 
 The `check`, `build`, `disk`, `review`, `sync`, and `spec` commands operate on
 the validated root. The

@@ -39,7 +39,7 @@ The checker validates both the file and the anchor when a link is explicit.
 
 ## Living-document invariant
 
-Architecture is committed alongside the records and code it explains. Bloomery
-does not accept a requirement as a detached list item with no area or
-feature context. Lifecycle state belongs to Git branches and pull requests,
-not to frontmatter.
+When specification management is enabled, architecture is committed alongside
+the records and code it explains. Bloomery does not accept a requirement as a
+detached list item with no area or feature context. Lifecycle state belongs to
+Git branches and pull requests, not to frontmatter.

@@ -21,3 +21,39 @@ design = "design/pipeline.md"
 type = "ubiquitous"
 system = "bloomery check"
 action = "return failure when traceability invariants are invalid"
+
+[[requirements]]
+id = "CLI-CHECK-CONTRACT-003"
+title = "Check succeeds without spec management"
+manual = false
+design = "design/pipeline.md#static-validation-pipeline"
+
+[requirements.ears]
+type = "event"
+trigger = "specification management is disabled and the formatter gate and every selected Nix check pass"
+system = "bloomery check"
+action = "return success without a specification tree"
+
+[[requirements]]
+id = "CLI-CHECK-CONTRACT-004"
+title = "Disabled spec management omits static specification checks"
+manual = false
+design = "design/execution.md#check-catalog"
+
+[requirements.ears]
+type = "event"
+trigger = "specification management is disabled"
+system = "bloomery check"
+action = "exclude static:structure and static:traceability from the check catalog"
+
+[[requirements]]
+id = "CLI-CHECK-CONTRACT-005"
+title = "Disabled spec management skips evidence scanning"
+manual = false
+design = "design/pipeline.md#static-validation-pipeline"
+
+[requirements.ears]
+type = "event"
+trigger = "specification management is disabled"
+system = "bloomery check"
+action = "run no specification or evidence scanner pass"

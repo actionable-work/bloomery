@@ -10,7 +10,7 @@ design = "design/execution.md#selection"
 type = "event"
 trigger = "no check selectors are supplied"
 system = "bloomery check"
-action = "select both static checks and every available Nix check for the default system"
+action = "select every available check for the default system, including both static checks when specification management is enabled"
 
 [[requirements]]
 id = "CLI-CHECK-SELECT-002"
@@ -240,3 +240,27 @@ type = "unwanted_behavior"
 trigger = "the next catalog ID exceeds 4 KiB or cannot fit alone in the bounded response"
 system = "bloomery check list"
 action = "return an operational error at that offset instead of truncating the ID or returning a non-advancing continuation"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-022"
+title = "Default selection respects spec management enablement"
+manual = false
+design = "design/execution.md#selection"
+
+[requirements.ears]
+type = "event"
+trigger = "no check selectors are supplied while specification management is disabled"
+system = "bloomery check"
+action = "select every available Nix check without selecting static specification checks"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-023"
+title = "Explicit static selectors require spec management"
+manual = false
+design = "design/execution.md#selection"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a selector names static:structure or static:traceability while specification management is disabled"
+system = "bloomery check"
+action = "report an unmatched-selector usage error"

@@ -47,7 +47,8 @@ and test discovery share one command-scoped parse cache. See the
 
 ## Safety boundary
 
-The scanners may read configured files and, for Nix metadata, invoke the
+Static scanning is invoked only when specification management is enabled. The
+scanners may read configured files and, for Nix metadata, invoke the
 configured evaluation operation. They do not execute test functions, launch
 applications, instantiate derivations, fetch dependencies, or open network
 connections.

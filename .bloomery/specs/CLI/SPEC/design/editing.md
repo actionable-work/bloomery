@@ -3,7 +3,9 @@
 `bloomery spec` creates, reads, updates, and removes individual requirement
 records. It requires the shared root `flake.nix` and `.bloomery/config.toml`
 preflights, then loads the specification tree at
-`.bloomery/<specs.dir>/`.
+`.bloomery/<specs.dir>/`. When specification management is disabled,
+every `bloomery spec` command reports an error naming the
+disabled management instead of loading a tree.
 
 ## Invocation
 

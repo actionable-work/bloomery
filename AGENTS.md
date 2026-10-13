@@ -11,3 +11,4 @@
 - Design files should always capture the desired state.  Never include prose about current state or the path to get to the desired state.
 - Requirements should only be marked as manual if there is no possible way to test them automatically.  Great effort should be put into keeping the list of manual checks as small as possible.
 - When iterating on bloomery, make sure to use the nix dev outputs, ex. `nix run .#bloomery:dev -- check`
+- Prefer using the bloomery cli to make spec changes instead of directly editing files.  Ex. `nix run .#bloomery:dev -- spec add`

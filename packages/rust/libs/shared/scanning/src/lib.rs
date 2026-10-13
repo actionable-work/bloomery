@@ -91,6 +91,7 @@ mod tests {
             root: root.to_path_buf(),
             config: Config {
                 specs: SpecsConfig {
+                    enable: None,
                     dir: "specs".into(),
                 },
                 scanners: ScannersConfig {

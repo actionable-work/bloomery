@@ -48,9 +48,12 @@ Without `--check`, build goes straight to catalog evaluation and realization.
 With `--check`, run the default `bloomery check` suite for the selected systems
 before catalog evaluation and realization, using the same execution as a
 no-selector check invocation: the
-formatter preflight runs, static validation and the generated check set run,
+formatter preflight runs, static validation runs when specification management
+is enabled, the generated check set runs,
 and the run is retained. The gate is a prerequisite of every package; build
-evaluates and realizes no package until it passes.
+evaluates and realizes no package until it passes. When specification
+management is disabled the gate contains no static specification checks and
+proceeds on the formatter and Nix checks.
 
 A passed gate lets realization proceed. A failed gate realizes no selected
 package, returns exit code 1, and reports the failing check IDs; because the

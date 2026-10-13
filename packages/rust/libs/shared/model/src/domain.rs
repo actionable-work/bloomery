@@ -159,6 +159,11 @@ pub struct Context {
 }
 
 impl Context {
+    /// Whether specification management is active for this workspace.
+    pub fn spec_management_enabled(&self) -> bool {
+        self.config.spec_management_enabled(&self.root)
+    }
+
     pub fn requirements(&self) -> impl Iterator<Item = (&Area, &Feature, &Requirement)> {
         self.areas.iter().flat_map(|area| {
             area.features.iter().flat_map(move |feature| {

@@ -208,3 +208,25 @@ design = "design/schema-catalog.md#checks"
 type = "ubiquitous"
 system = "the schema catalog"
 action = "recommend false for checks.includePackageChecks"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-020"
+title = "Spec management enablement is catalogued"
+manual = false
+design = "design/schema-catalog.md#spec-and-scanner-tables"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "catalogue specs.enable as an optional boolean that overrides specification-management auto-detection"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-021"
+title = "Spec management enablement carries no recommendation"
+manual = false
+design = "design/schema-catalog.md#catalog-fields"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "omit a recommended default for specs.enable because its omission auto-detects"

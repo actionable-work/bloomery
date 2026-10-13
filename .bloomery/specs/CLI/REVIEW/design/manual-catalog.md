@@ -25,4 +25,6 @@ alter identifiers or source documents.
 
 Review reads the same validated requirement model as check. If the input model
 is malformed, review reports parsing and linkage errors rather than presenting
-a partially interpreted catalogue.
+a partially interpreted catalogue. If specification management is disabled,
+review reports an error explaining that no requirement model is available
+instead of presenting an empty catalogue.

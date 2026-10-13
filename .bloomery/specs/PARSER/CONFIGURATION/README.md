@@ -5,7 +5,9 @@ tagline: Required roots, scanner paths, and parser options.
 description: |
   Configuration controls where requirements are discovered and which source
   trees are inspected for static references and test sites. It selects scanner
-  behavior without changing requirement identity or the architecture model.
+  behavior without changing requirement identity or the architecture model. It
+  also resolves whether specification management is active so build and check
+  can run without a specification tree.
 ---
 
 # Configuration
@@ -32,6 +34,8 @@ during loading and passes through for the flake interface.
 - Use validated defaults for tables and keys omitted from a present file,
   including enabling every supported scanner by default.
 - Locate the specs root relative to `.bloomery/`.
+- Resolve specification management from an optional enable override and the
+  presence of the specification tree.
 - Enable or disable supported scanners.
 - Define source globs relative to the repository root.
 - Define Playwright tag prefixes.
@@ -50,8 +54,9 @@ during loading and passes through for the flake interface.
 
 ## Dependencies
 
-[PARSER/WORKSPACE](../WORKSPACE/README.md) consumes the specs root.
-[PARSER/SCANNING](../SCANNING/README.md) consumes scanner paths and
+[PARSER/WORKSPACE](../WORKSPACE/README.md) consumes the resolved
+specification-management state and the specs root; when management is disabled
+it produces an empty workspace. [PARSER/SCANNING](../SCANNING/README.md) consumes scanner paths and
 source-specific options; Nix evidence is read statically from source metadata. [CLI/CHECK](../../CLI/CHECK/README.md) treats
 configuration errors as an early failure and does not proceed with an
 incomplete configuration. [CLI/CONFIG](../../CLI/CONFIG/README.md) edits every

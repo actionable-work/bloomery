@@ -21,3 +21,15 @@ design = "design/manual-catalog.md"
 type = "ubiquitous"
 system = "bloomery review"
 action = "order the review catalog deterministically by area, feature, group, and numeric sequence"
+
+[[requirements]]
+id = "CLI-REVIEW-CATALOG-003"
+title = "Review requires spec management"
+manual = false
+design = "design/manual-catalog.md"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "bloomery review runs while specification management is disabled"
+system = "bloomery review"
+action = "return an error explaining that no requirement model is available"

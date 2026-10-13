@@ -772,24 +772,17 @@ fn run_review_at(
     stderr: &mut impl Write,
 ) -> ExitCode {
     let context = match bloomery_workspace::load(root) {
-        Ok(context) => context,
+        Ok(context) if context.spec_management_enabled() => context,
+        Ok(_) => {
+            let diagnostics = vec![bloomery_model::Diagnostic::new(
+                "SpecManagementDisabled",
+                "specification management is disabled; set specs.enable = true or add .bloomery/specs",
+            )];
+            return report_review_diagnostics(root, json_mode, color, &diagnostics, stdout, stderr);
+        }
         Err(mut diagnostics) => {
             sort_diagnostics(&mut diagnostics);
-            if json_mode {
-                let document = output::diagnostics_json("review", "failed", root, &diagnostics);
-                if write_json(stdout, &document).is_err() {
-                    let _ = writeln!(stderr, "bloomery: unable to render JSON diagnostics");
-                    return ExitCode::from(1);
-                }
-            } else {
-                let rendered = render_diagnostics(root, &diagnostics);
-                let rendered = output::colorize_check(
-                    &rendered,
-                    output::color_enabled(output::Stream::Stderr, false, color),
-                );
-                let _ = stderr.write_all(rendered.as_bytes());
-            }
-            return ExitCode::from(1);
+            return report_review_diagnostics(root, json_mode, color, &diagnostics, stdout, stderr);
         }
     };
 
@@ -826,6 +819,31 @@ fn run_review_at(
         let _ = stdout.write_all(rendered.as_bytes());
         ExitCode::SUCCESS
     }
+}
+
+fn report_review_diagnostics(
+    root: &Path,
+    json_mode: bool,
+    color: output::ColorMode,
+    diagnostics: &[bloomery_model::Diagnostic],
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
+    if json_mode {
+        let document = output::diagnostics_json("review", "failed", root, diagnostics);
+        if write_json(stdout, &document).is_err() {
+            let _ = writeln!(stderr, "bloomery: unable to render JSON diagnostics");
+            return ExitCode::from(1);
+        }
+    } else {
+        let rendered = render_diagnostics(root, diagnostics);
+        let rendered = output::colorize_check(
+            &rendered,
+            output::color_enabled(output::Stream::Stderr, false, color),
+        );
+        let _ = stderr.write_all(rendered.as_bytes());
+    }
+    ExitCode::from(1)
 }
 
 fn run_spec_at(
@@ -1365,7 +1383,7 @@ mod tests {
         assert!(
             String::from_utf8(stderr)
                 .expect("diagnostics")
-                .contains("MissingSpecsDirectory")
+                .contains("SpecManagementDisabled")
         );
         let _ = fs::remove_dir_all(root);
     }
@@ -1493,7 +1511,7 @@ mod tests {
         let mut stderr = Vec::new();
         let status = run_args_at(["bloomery", "review"], &root, &mut stdout, &mut stderr);
         assert_eq!(status, ExitCode::FAILURE);
-        assert!(String::from_utf8_lossy(&stderr).contains("MissingSpecsDirectory"));
+        assert!(String::from_utf8_lossy(&stderr).contains("SpecManagementDisabled"));
 
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
@@ -1633,6 +1651,34 @@ mod tests {
         let items = document["result"].as_array().expect("review result array");
         assert_eq!(items.len(), 1);
         assert_eq!(items[0]["id"], "CLI-CHECK-CONTRACT-001");
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-REVIEW-CATALOG-003"))]
+    fn review_requires_spec_management() {
+        let root = fixture_root("review-disabled");
+        fs::create_dir_all(root.join(".bloomery")).expect("workspace root");
+        fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
+        fs::write(
+            root.join(".bloomery/config.toml"),
+            "[specs]\nenable = false\n",
+        )
+        .expect("configuration");
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_workspace_command_at(
+            Command::Review,
+            true,
+            super::output::ColorMode::Auto,
+            &root,
+            &mut stdout,
+            &mut stderr,
+        );
+        assert_eq!(status, ExitCode::from(1));
+        let rendered = String::from_utf8(stdout).expect("review error output");
+        assert!(rendered.contains("SpecManagementDisabled"));
+        assert!(rendered.contains("disabled"));
         let _ = fs::remove_dir_all(root);
     }
 

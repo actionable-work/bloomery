@@ -6,7 +6,9 @@ description: |
   The workspace feature defines how Bloomery finds its configuration and
   specification tree, pairs area and feature documents with directories,
   and resolves relative design references. It provides the filesystem contract
-  consumed by the other PARSER features.
+  consumed by the other PARSER features. When specification management is
+  disabled the loader produces an empty workspace without reading the
+  specification tree.
 ---
 
 # Specification Workspace
@@ -23,7 +25,10 @@ remain in their normal repository locations and are found through
 
 ## Responsibilities
 
-- Establish the `.bloomery/config.toml` and `.bloomery/specs/` roots.
+- Establish the `.bloomery/config.toml` root and the optional `.bloomery/specs/`
+  specification root.
+- Return an empty workspace without a specification tree when spec management
+  is disabled.
 - Discover area and feature directories without case normalization.
 - Require an area `README.md` and a feature `README.md` when those nodes
   exist in the design tree.

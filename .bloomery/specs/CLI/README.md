@@ -24,7 +24,8 @@ parser:
   runs `nix fmt` before static validation and Nix checks, then runs independent
   checks in parallel with terminal work metrics, bounded summaries, and
   seekable failure details. Package checks are excluded unless
-  `checks.includePackageChecks` enables them.
+  `checks.includePackageChecks` enables them, and static specification checks
+  are present only when specification management is enabled.
 - [`bloomery build`](BUILD/README.md) materializes the exact production package
   derivations for the selected systems in one batched Nix realization and
   reports their output store paths. `--check` gates realization on the default
@@ -114,7 +115,8 @@ other Nix checks directly. See [Nix orchestration](CHECK/design/workspace-check.
 
 ## Model invariant
 
-Every feature has at least one grouped requirement file. Requirement records are
+Every feature has at least one grouped requirement file while specification
+management is enabled. Requirement records are
 validated according to the [requirements design](../PARSER/REQUIREMENTS/README.md),
 associated with living architecture, and consumed by check, review, and spec.
 Sync

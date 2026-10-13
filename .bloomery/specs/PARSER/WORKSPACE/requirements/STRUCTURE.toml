@@ -32,3 +32,51 @@ design = "design/layout.md"
 type = "ubiquitous"
 system = "workspace loader"
 action = "require each feature to contain at least one grouped TOML requirements file"
+
+[[requirements]]
+id = "PARSER-WORKSPACE-STRUCTURE-004"
+title = "Disabled spec management yields an empty workspace"
+manual = false
+design = "design/layout.md#optional-specification-tree"
+
+[requirements.ears]
+type = "event"
+trigger = "specification management is disabled"
+system = "the workspace loader"
+action = "return an empty workspace with no areas and no diagnostics without reading or requiring the specification tree"
+
+[[requirements]]
+id = "PARSER-WORKSPACE-STRUCTURE-005"
+title = "Explicit enablement requires the specification tree"
+manual = false
+design = "design/layout.md#optional-specification-tree"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "specs.enable is true and the configured specification root does not exist"
+system = "the workspace loader"
+action = "report a missing specifications directory diagnostic"
+
+[[requirements]]
+id = "PARSER-WORKSPACE-STRUCTURE-006"
+title = "Absent enablement auto-detects from the specification tree"
+manual = false
+design = "design/layout.md#optional-specification-tree"
+
+[requirements.ears]
+type = "event"
+trigger = "specs.enable is absent"
+system = "the workspace loader"
+action = "enable specification management exactly when the configured specification root exists"
+
+[[requirements]]
+id = "PARSER-WORKSPACE-STRUCTURE-007"
+title = "Explicit disablement ignores a present tree"
+manual = false
+design = "design/layout.md#optional-specification-tree"
+
+[requirements.ears]
+type = "event"
+trigger = "specs.enable is false and the configured specification root exists"
+system = "the workspace loader"
+action = "disable specification management without reading the specification tree"

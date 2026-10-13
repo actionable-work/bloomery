@@ -13,7 +13,8 @@ default is present only when omitting the key has a single fixed
 Bloomery-defined effective value. Keys whose omission is semantic are
 addressable but have no recommendation:
 `build.bloomeryLock` auto-detects, `build.members` means all members,
-`toolchain.linker` is host-dependent, `features.cratesIoIndex` means none, and
+`toolchain.linker` is host-dependent, `features.cratesIoIndex` means none,
+`specs.enable` auto-detects from the specification tree, and
 the `profile.*` fields inherit from `Cargo.toml` and rustc.
 
 `bloomery config upgrade` materializes recommended keys only. Keys without a
@@ -28,6 +29,7 @@ Owned by [PARSER/CONFIGURATION](../README.md) and consumed by the CLI.
 
 | Key | Type | Recommended default |
 | --- | --- | --- |
+| `specs.enable` | optional boolean | none |
 | `specs.dir` | path inside `.bloomery/` | `"specs"` |
 | `scanners.rust.enabled` | boolean | `true` |
 | `scanners.rust.paths` | list of repository-relative globs | `["packages/rust/**/*.rs"]` |
@@ -37,6 +39,12 @@ Owned by [PARSER/CONFIGURATION](../README.md) and consumed by the CLI.
 | `scanners.nix.enabled` | boolean | `true` |
 | `scanners.nix.paths` | list of repository-relative globs | `["*.nix", "lib/**/*.nix", "nix/**/*.nix", "tests/**/*.nix"]` |
 | `scanners.nix.testPaths` | list of repository-relative globs | `["**/*.test.nix"]` |
+
+`specs.enable` overrides specification-management auto-detection. When it is
+absent, a repository has specification management exactly when its
+specification tree exists; `true` requires the tree and `false` disables
+management. Because omission is semantic, it carries no recommended default.
+See the [configuration file design](config-file.md#spec-management-enablement).
 
 ## Build tables
 

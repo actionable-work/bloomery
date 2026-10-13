@@ -1,13 +1,15 @@
 use crate::check_command::catalog::{NixBackend, NixCli, NixTaskResult};
 use crate::check_command::command::{
     CheckContext, CheckOperation, DetailsArgs, FailureArgs, ListArgs, run_at_with,
+    run_gate_at_with_backend,
 };
 use crate::check_command::execution::{FailureDraft, assign_failure_ids, default_jobs};
 use crate::check_command::interrupt::InterruptFlag;
 use crate::check_command::model::{Outcome, RunStatus};
 use crate::check_command::store::RunStore;
 use crate::check_command::test_support::{
-    FakeNix, fixture, invoke, invoke_with_interrupt, lock_fixture_flake, nix_is_available, request,
+    FakeNix, fixture, fixture_without_specs, invoke, invoke_with_interrupt, lock_fixture_flake,
+    nix_is_available, request,
 };
 use serde_json::Value;
 use std::fs;
@@ -576,6 +578,71 @@ fn successful_exit_requires_every_selected_check_to_pass() {
 }
 
 #[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-CONTRACT-003"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-022"))]
+fn check_passes_without_spec_management() {
+    let (root, cache) = fixture_without_specs(true, "[specs]\nenable = false\n");
+    let backend = FakeNix {
+        names: vec!["core:test".to_owned()],
+        ..FakeNix::default()
+    };
+    let (status, stdout, _) = invoke(request(), &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::SUCCESS);
+    let result: Value = serde_json::from_slice(&stdout).expect("summary JSON");
+    // The formatter gate plus the single Nix check; no static checks exist.
+    assert_eq!(result["result"]["counts"]["passed"], 2);
+    assert_eq!(backend.formatter_runs.load(Ordering::SeqCst), 1);
+    assert_eq!(backend.evaluations.load(Ordering::SeqCst), 1);
+    let store = RunStore::open(&root, Some(&cache)).expect("retained store");
+    let retained = store.latest().expect("retained run").0;
+    assert!(
+        !retained
+            .outcomes
+            .iter()
+            .any(|outcome| outcome.id.starts_with("static:")),
+        "no static outcome is recorded when management is disabled"
+    );
+    assert!(retained.outcomes.iter().any(|outcome| {
+        outcome.id == "nix:x86_64-linux:core:test" && outcome.outcome == Outcome::Passed
+    }));
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-CONTRACT-005"))]
+fn disabled_spec_management_skips_static_validation_of_a_present_tree() {
+    let (root, cache) = fixture_without_specs(true, "[specs]\nenable = false\n");
+    // A present but structurally invalid tree would fail static:structure.
+    let feature = root.join(".bloomery/specs/CLI/CHECK");
+    fs::create_dir_all(&feature).expect("feature directory");
+    fs::write(
+        root.join(".bloomery/specs/CLI/README.md"),
+        "---\nid: CLI\nname: CLI\ntagline: CLI\ndescription: Area\n---\n# CLI\n",
+    )
+    .expect("area README");
+    let backend = FakeNix {
+        names: vec!["core:test".to_owned()],
+        ..FakeNix::default()
+    };
+    let (status, stdout, _) = invoke(request(), &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::SUCCESS);
+    let result: Value = serde_json::from_slice(&stdout).expect("summary JSON");
+    assert_eq!(result["result"]["counts"]["passed"], 2);
+    if let Some(failures) = result["result"]["failures"].as_array() {
+        assert!(
+            failures.iter().all(|failure| !failure["check"]
+                .as_str()
+                .unwrap_or_default()
+                .starts_with("static:")),
+            "static validation must not run against an ignored tree"
+        );
+    }
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
 #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-001"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-002"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-003"))]
@@ -983,6 +1050,40 @@ fn real_nix_batched_failures_resolve_per_check_and_causal_logs() {
         "expected the causal failed derivation, got {causal}"
     );
 
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-BUILD-EXECUTION-027"))]
+fn check_gate_passes_without_spec_management() {
+    let (root, cache) = fixture_without_specs(true, "[specs]\nenable = false\n");
+    let backend = FakeNix {
+        names: vec!["core:test".to_owned()],
+        ..FakeNix::default()
+    };
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let outcome = run_gate_at_with_backend(
+        request(),
+        &root,
+        Some(&cache),
+        &backend,
+        &mut stdout,
+        &mut stderr,
+    );
+    assert_eq!(outcome.status, RunStatus::Passed);
+    assert!(outcome.failed_checks.is_empty());
+    assert_eq!(outcome.exit_code, 0);
+    let store = RunStore::open(&root, Some(&cache)).expect("retained store");
+    let retained = store.latest().expect("retained run").0;
+    assert!(
+        !retained
+            .outcomes
+            .iter()
+            .any(|outcome| outcome.id.starts_with("static:")),
+        "the gate must not require static checks when management is disabled"
+    );
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
 }

@@ -4,6 +4,13 @@ The static branch retains ordered passes so each check operates on a known model
 The independent Nix branch runs concurrently; see [execution](execution.md).
 `static:structure` covers passes 1–3, and `static:traceability` covers passes 4–5:
 
+Static validation is available only when specification management is enabled,
+whether auto-detected from the specification tree or explicitly configured
+(`specs.enable = true`). When it is disabled, `static:structure` and
+`static:traceability` are absent from the catalog, no workspace or evidence pass
+runs, and a disabled specification tree produces no static diagnostics. The
+formatter gate and Nix checks are unaffected.
+
 1. **Configuration ingestion** — require and parse `.bloomery/config.toml`,
    resolve roots, and validate scanner settings. A missing or invalid file is a
    `ConfigurationError` that stops the pipeline.

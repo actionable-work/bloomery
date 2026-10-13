@@ -174,13 +174,24 @@ pub fn run_gate_at(
     stderr: &mut impl Write,
 ) -> GateOutcome {
     let backend = NixCli::default();
+    run_gate_at_with_backend(args, root, cache_base, &backend, stdout, stderr)
+}
+
+pub(super) fn run_gate_at_with_backend(
+    args: CheckArgs,
+    root: &Path,
+    cache_base: Option<&Path>,
+    backend: &dyn NixBackend,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> GateOutcome {
     run_at_with(
         args,
         CheckContext {
             root,
             json_mode: false,
             color: crate::output::ColorMode::Auto,
-            backend: &backend,
+            backend,
             interrupt: InterruptFlag::install(),
             cache_base,
             terminal: TerminalFacts::from_environment(),
@@ -397,6 +408,23 @@ pub(super) struct PlannedCatalog {
     pub(super) dependencies: BTreeMap<String, Vec<String>>,
 }
 
+pub(super) fn spec_management_enabled(root: &Path) -> Result<bool, CheckError> {
+    bloomery_model::config::load(root)
+        .map(|config| config.spec_management_enabled(root))
+        .map_err(|diagnostic| CheckError::operational(diagnostic.message))
+}
+
+fn static_check_ids(enabled: bool) -> Vec<String> {
+    if enabled {
+        vec![
+            "static:structure".to_owned(),
+            "static:traceability".to_owned(),
+        ]
+    } else {
+        Vec::new()
+    }
+}
+
 pub(super) fn plan_for_selection(
     root: &Path,
     selectors: &[String],
@@ -409,6 +437,7 @@ pub(super) fn plan_for_selection(
             message: crate::output::MISSING_FLAKE_MESSAGE.to_owned(),
         });
     }
+    let spec_management = spec_management_enabled(root)?;
 
     if requested_systems.is_empty()
         && !selectors.is_empty()
@@ -417,10 +446,7 @@ pub(super) fn plan_for_selection(
             .all(|selector| !selector_may_match_prefix(selector, "nix:"))
     {
         return Ok(PlannedCatalog {
-            ids: vec![
-                "static:structure".to_owned(),
-                "static:traceability".to_owned(),
-            ],
+            ids: static_check_ids(spec_management),
             systems: Vec::new(),
             notices: Vec::new(),
             plans: BTreeMap::new(),
@@ -429,10 +455,7 @@ pub(super) fn plan_for_selection(
     }
 
     let systems = effective_systems(root, requested_systems, backend)?;
-    let mut ids = vec![
-        "static:structure".to_owned(),
-        "static:traceability".to_owned(),
-    ];
+    let mut ids = static_check_ids(spec_management);
     let mut notices = Vec::new();
     let mut plans = BTreeMap::new();
     let mut dependencies = BTreeMap::new();
@@ -480,6 +503,7 @@ pub(super) fn discover_for_selection(
             message: crate::output::MISSING_FLAKE_MESSAGE.to_owned(),
         });
     }
+    let spec_management = spec_management_enabled(root)?;
 
     if requested_systems.is_empty()
         && !selectors.is_empty()
@@ -488,18 +512,18 @@ pub(super) fn discover_for_selection(
             .all(|selector| !selector_may_match_prefix(selector, "nix:"))
     {
         return Ok(Catalog {
-            ids: vec![
-                "static:structure".to_owned(),
-                "static:traceability".to_owned(),
-            ],
+            ids: static_check_ids(spec_management),
             systems: Vec::new(),
             notices: Vec::new(),
         });
     }
 
     let systems = effective_systems(root, requested_systems, backend)?;
-    let (ids, notices) =
+    let (mut ids, notices) =
         discover_catalog(root, &systems, backend).map_err(CheckError::operational)?;
+    ids.extend(static_check_ids(spec_management));
+    ids.sort();
+    ids.dedup();
     Ok(Catalog {
         ids,
         systems,
