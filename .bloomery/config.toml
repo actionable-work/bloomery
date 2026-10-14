@@ -7,7 +7,9 @@ profileName = "release"  # Active Cargo profile name for release builds.
 unify = false            # Unify workspace features like Cargo's resolver.
 
 [checks]
+crateCheck = true            # Generate per-crate type-check entries.
 enable = true                # Generate workspace checks.
+includePackageChecks = false # Include binary and library build checks.
 noDefaultFeatures = true     # Require default features to be disabled on workspace dependencies.
 throwOnOutOfDate = true      # Fail evaluation when bloomery.lock is out of date.
 workspaceDependencies = true # Validate workspace dependency declarations.
@@ -18,7 +20,7 @@ packages = []  # Additional nixpkgs packages in the development shell.
 shellHook = "" # Shell hook run when entering the development shell.
 
 [flags]
-clippy = []               # Extra rustc flags for clippy runs.
+clippy = ["-Dwarnings"]   # Extra rustc flags for clippy runs.
 doc = ["-Dwarnings"]      # Extra rustdoc flags for documentation builds.
 doctest = []              # Extra rustdoc flags for doctests.
 rustc = ["-Copt-level=3"] # Extra rustc flags for release compilation.
@@ -64,6 +66,48 @@ path = "tests/single-crate-workspace"
 checks = "aggregate"
 path = "tests/source-isolation-workspace"
 
+[formatters]
+
+[formatters.alejandra]
+after = []    # Formatters that must run before the Alejandra formatter.
+before = []   # Formatters that must run after the Alejandra formatter.
+enable = true # Enable the Alejandra Nix formatter.
+
+[formatters.deadnix]
+after = []    # Formatters that must run before the deadnix formatter.
+before = []   # Formatters that must run after the deadnix formatter.
+enable = true # Enable the deadnix Nix formatter.
+
+[formatters.rustfmt]
+after = []    # Formatters that must run before the rustfmt formatter.
+before = []   # Formatters that must run after the rustfmt formatter.
+enable = true # Enable the rustfmt formatter.
+
+[formatters.shellcheck]
+after = []    # Formatters that must run before the shellcheck formatter.
+before = []   # Formatters that must run after the shellcheck formatter.
+enable = true # Enable the shellcheck formatter.
+
+[formatters.shfmt]
+after = []    # Formatters that must run before the shfmt formatter.
+before = []   # Formatters that must run after the shfmt formatter.
+enable = true # Enable the shfmt shell formatter.
+
+[formatters.taplo]
+after = []    # Formatters that must run before the taplo formatter.
+before = []   # Formatters that must run after the taplo formatter.
+enable = true # Enable the taplo TOML formatter.
+
+[formatters.toml-sort]
+after = []    # Formatters that must run before the toml-sort formatter.
+before = []   # Formatters that must run after the toml-sort formatter.
+enable = true # Enable the toml-sort TOML formatter.
+
+[formatters.yamlfmt]
+after = []    # Formatters that must run before the yamlfmt formatter.
+before = []   # Formatters that must run after the yamlfmt formatter.
+enable = true # Enable the yamlfmt formatter.
+
 [profile.release]
 codegenUnits = 1 # release profile: number of codegen units
 lto = "fat"      # release profile: link-time optimization mode
@@ -77,6 +121,9 @@ paths = [
   "nix/**/*.nix",
   "tests/**/*.nix",
 ] # Repository-relative globs for Nix source files.
+testPaths = [
+  "**/*.test.nix",
+] # Repository-relative globs for Nix test files discovered as candidates.
 
 [scanners.playwright]
 enabled = false           # Enable the Playwright evidence scanner.

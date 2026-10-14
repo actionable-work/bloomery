@@ -150,7 +150,7 @@ mod tests {
         );
         fixture.write("README.md", "# Docs\n");
         fixture.write(
-            "docs.manifest.toml",
+            ".bloomery/docs.manifest.toml",
             "roots = [\"README.md\"]\n\n[[surfaces]]\npath = \"README.md\"\nfeatures = []\n",
         );
 

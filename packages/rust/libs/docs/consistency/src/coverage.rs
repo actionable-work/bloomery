@@ -1,5 +1,5 @@
 use crate::glob;
-use crate::manifest::Manifest;
+use crate::manifest::{MANIFEST_RELATIVE_PATH, Manifest};
 use bloomery_model::Diagnostic;
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -8,7 +8,7 @@ use std::path::Path;
 /// tree. Diagnostics are ordered deterministically.
 pub fn check(root: &Path, manifest: &Manifest, features: &[String]) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
-    let manifest_path = root.join("docs.manifest.toml");
+    let manifest_path = root.join(MANIFEST_RELATIVE_PATH);
 
     let matched = glob::expand(root, &manifest.roots);
     let declared: BTreeSet<&str> = manifest
@@ -162,5 +162,20 @@ mod tests {
                 .any(|diagnostic| diagnostic.code == "UndocumentedFeature"),
             "{diagnostics:?}"
         );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("DOCS-CONSISTENCY-COVERAGE-008"))]
+    fn manifest_under_bloomery_resolves_paths_against_root() {
+        let fixture = TempRoot::new("coverage-root-relative");
+        fixture.write("docs/a.md", "# a\n");
+        fixture.write(
+            ".bloomery/docs.manifest.toml",
+            "roots = [\"docs/*.md\"]\n\n[[surfaces]]\npath = \"docs/a.md\"\nfeatures = [\"REAL/FEATURE\"]\n",
+        );
+
+        let manifest = crate::load_manifest(fixture.path()).expect("manifest should load");
+        let diagnostics = check(fixture.path(), &manifest, &["REAL/FEATURE".to_string()]);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
     }
 }

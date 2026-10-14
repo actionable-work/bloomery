@@ -19,7 +19,7 @@ workspaces, and repository-local Bloomery metadata.
 | `benchmarks/` | Benchmark subflake: fixture groups, per-builder subflakes, and the hyperfine harness; outside root flake composition. |
 | `.bloomery/config.toml` | Required Bloomery configuration: scanner and spec targets plus the Nix build tables consumed by the flake interface. |
 | `.bloomery/specs/` | Bloomery area and feature specifications for this repository. |
-| `docs.manifest.toml` | Repository-local documentation coverage manifest read by the repository's documentation consistency check, mapping authored documentation surfaces to specification features. |
+| `.bloomery/docs.manifest.toml` | Repository-local documentation coverage manifest read by the repository's documentation consistency check, mapping authored documentation surfaces to specification features. |
 
 The Rust workspace contains these binaries and libraries:
 

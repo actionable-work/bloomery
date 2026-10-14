@@ -89,5 +89,5 @@ The Bloomery repository is itself a Rust workspace, a reusable Nix library, and 
 | `DOCS/UI` | `packages/rust/libs/docs/ui` |
 | `DOCS/SERVER` | `packages/rust/bins/docs` and `packages/rust/libs/docs/docs-server` |
 | `DOCS/CONSISTENCY` | `packages/rust/libs/docs/consistency` and `nix/checks/validate-docs-consistency.nix` |
-| `REPOSITORY/LAYOUT` | `.bloomery/specs/`, `docs.manifest.toml`, and `lib/repository-layout.test.nix` |
+| `REPOSITORY/LAYOUT` | `.bloomery/specs/`, `.bloomery/docs.manifest.toml`, and `lib/repository-layout.test.nix` |
 | `REPOSITORY/BENCHMARKS` | `benchmarks/` |

@@ -85,6 +85,13 @@ in {
     expected = true;
   };
 
+  testDocumentationManifestResidesUnderBloomery = {
+    expr =
+      builtins.pathExists (root + "/.bloomery/docs.manifest.toml")
+      && !builtins.pathExists (root + "/docs.manifest.toml");
+    expected = true;
+  };
+
   testBenchmarksFixturesResideUnderBenchmarks = {
     expr =
       builtins.pathExists (root + "/benchmarks/run.sh")

@@ -23,9 +23,12 @@ pub struct Surface {
     pub features: Vec<String>,
 }
 
-/// Load `docs.manifest.toml` from the repository root.
+/// Repository-relative path of the documentation coverage manifest.
+pub const MANIFEST_RELATIVE_PATH: &str = ".bloomery/docs.manifest.toml";
+
+/// Load the documentation coverage manifest.
 pub fn load_manifest(root: &Path) -> Result<Manifest, String> {
-    let path = root.join("docs.manifest.toml");
+    let path = root.join(MANIFEST_RELATIVE_PATH);
     let contents = fs::read_to_string(&path)
         .map_err(|error| format!("unable to read {}: {error}", path.display()))?;
     toml::from_str(&contents)
@@ -43,7 +46,7 @@ mod tests {
     fn loads_roots_and_surfaces() {
         let fixture = TempRoot::new("manifest");
         fixture.write(
-            "docs.manifest.toml",
+            MANIFEST_RELATIVE_PATH,
             "roots = [\"README.md\", \"docs/*.md\"]\n\n\
              [[surfaces]]\npath = \"README.md\"\nfeatures = [\"CLI/INTERFACE\"]\n\n\
              [[surfaces]]\npath = \"docs/a.md\"\nfeatures = [\"DOCS/CONTENT\", \"DOCS/UI\"]\n",
@@ -55,5 +58,22 @@ mod tests {
         assert_eq!(manifest.surfaces[0].path, "README.md");
         assert_eq!(manifest.surfaces[0].features, vec!["CLI/INTERFACE"]);
         assert_eq!(manifest.surfaces[1].features.len(), 2);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("DOCS-CONSISTENCY-COVERAGE-007"))]
+    fn manifest_is_read_from_bloomery_directory() {
+        let fixture = TempRoot::new("manifest-location");
+        fixture.write(".bloomery/docs.manifest.toml", "roots = [\"README.md\"]\n");
+
+        let manifest = load_manifest(fixture.path()).expect("manifest should load");
+        assert_eq!(manifest.roots, vec!["README.md"]);
+
+        let legacy = TempRoot::new("manifest-legacy-root");
+        legacy.write("docs.manifest.toml", "roots = [\"README.md\"]\n");
+        assert!(
+            load_manifest(legacy.path()).is_err(),
+            "a root-level manifest must not be read"
+        );
     }
 }

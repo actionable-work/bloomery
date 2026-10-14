@@ -68,3 +68,25 @@ design = "design/consistency.md#coverage"
 type = "ubiquitous"
 system = "the documentation consistency check"
 action = "require every specification feature to be named by at least one documentation surface"
+
+[[requirements]]
+id = "DOCS-CONSISTENCY-COVERAGE-007"
+title = "The manifest resides under .bloomery"
+manual = false
+design = "design/consistency.md#documentation-manifest"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the documentation consistency check"
+action = "read the documentation coverage manifest from .bloomery/docs.manifest.toml"
+
+[[requirements]]
+id = "DOCS-CONSISTENCY-COVERAGE-008"
+title = "Manifest paths resolve against the repository root"
+manual = false
+design = "design/consistency.md#documentation-manifest"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the documentation coverage manifest"
+action = "resolve its roots and surface paths relative to the repository root rather than the manifest directory"

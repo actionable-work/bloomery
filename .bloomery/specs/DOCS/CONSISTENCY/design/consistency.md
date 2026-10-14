@@ -6,11 +6,14 @@ references explicit and validates them statically.
 
 ## Documentation manifest
 
-`docs.manifest.toml` at the repository root is the documentation coverage
+`.bloomery/docs.manifest.toml` is the repository-local documentation coverage
 manifest. It declares the
 `roots` globs that enumerate authored documentation surfaces and one
 `[[surfaces]]` entry per surface. A surface entry names its repository-relative
 `path` and the specification `features` it documents.
+
+Both `roots` and `path` are repository-root-relative, so the manifest addresses
+the same files regardless of where it is stored.
 
 ```toml
 roots = [
@@ -27,8 +30,9 @@ path = "packages/rust/libs/docs/content/src/docs/api.md"
 features = ["NIXLIB/FLAKE"]
 ```
 
-The manifest is repository data, not shared Bloomery configuration. It is read
-only by the repository's documentation consistency check.
+The manifest is repository data, not shared Bloomery configuration. It lives
+under `.bloomery/` with the rest of the repository's Bloomery metadata and is
+read only by the repository's documentation consistency check.
 
 ## Coverage
 

@@ -18,7 +18,7 @@ failure instead of a silent omission.
 
 ## Responsibilities
 
-- Own `docs.manifest.toml`, the documentation coverage manifest.
+- Own `.bloomery/docs.manifest.toml`, the documentation coverage manifest.
 - Require every specification feature to be named by at least one documentation
   surface.
 - Require every documentation surface to be registered and to exist.

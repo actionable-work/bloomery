@@ -120,3 +120,14 @@ design = "design/repository-layout.md"
 type = "ubiquitous"
 system = "the Bloomery repository"
 action = "keep the benchmark flake, fixture groups, per-builder subflakes, and harness under benchmarks"
+
+[[requirements]]
+id = "REPOSITORY-LAYOUT-STRUCTURE-012"
+title = "Repository-local documentation metadata resides under .bloomery"
+manual = false
+design = "design/repository-layout.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the Bloomery repository"
+action = "keep the documentation coverage manifest under .bloomery"
