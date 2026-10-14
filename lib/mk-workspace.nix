@@ -242,12 +242,34 @@ in
     buildTestMembers = lib.mapAttrs (_: info: info.src) testMemberSourceInfo;
     memberHasLib = name: (memberSourceInfo.${name} or {}).hasLibrary or false;
     testMemberHasLib = name: (testMemberSourceInfo.${name} or {}).hasLibrary or false;
+    # Whether a member declares or conventionally provides a build script. The
+    # manifest is read purely, so registry crates cannot be inspected this way.
+    memberHasBuildScript = name: let
+      crateDir = discoveredWorkspaceMembers.${name} or null;
+      manifestPath =
+        if crateDir != null
+        then crateDir + "/Cargo.toml"
+        else null;
+      manifest =
+        if manifestPath != null && builtins.pathExists manifestPath
+        then builtins.fromTOML (builtins.readFile manifestPath)
+        else {};
+      declared = manifest.build or null;
+    in
+      if crateDir == null
+      then false
+      else if declared == false
+      then false
+      else if builtins.isString declared
+      then builtins.pathExists (crateDir + "/${declared}")
+      else builtins.pathExists (crateDir + "/build.rs");
 
     builderCrate = builders.buildCrateWith {inherit rustc stdenv mold lld defaultLinker;};
     builderBin = builders.buildBinWith {inherit rustc stdenv mold lld defaultLinker;};
     builderTest = builders.testCrateWith {inherit rustc stdenv mold lld defaultLinker;};
     builderOptimize = builders.optimizeBinWith {inherit rustc stdenv mold lld defaultLinker;};
     builderClippy = builders.clippyCrateWith {inherit rustc clippy stdenv;};
+    builderCheck = builders.checkCrateWith {inherit rustc stdenv;};
     builderDoc = builders.docCrateWith {inherit rustc stdenv;};
     builderDocTest = builders.doctestCrateWith {inherit rustc stdenv mold lld defaultLinker;};
     builderLockCheck = import ./workspace/lock-check.nix {inherit pkgs lib;};
@@ -438,6 +460,9 @@ in
       rustFlags,
       resolveDep,
       variantName ? null,
+      metadataOnly ? false,
+      releaseDep ? null,
+      fullBuildScriptDeps ? false,
     }: let
       pkg = parsed.byId.${package} or (throw "Bloomery build node '${key}' references unknown package '${package}'");
       pkgLock =
@@ -464,11 +489,19 @@ in
         then dependencies
         else getDepIds key pkg.depIds;
       depDrvs = map resolveDep depIds;
+      # Metadata-only targets resolve build-script dependencies separately so
+      # build scripts link object code while the target stays metadata-only.
+      buildScriptDrvs =
+        if metadataOnly && fullBuildScriptDeps && releaseDep != null
+        then map releaseDep depIds
+        else depDrvs;
     in
       builderCrate {
         inherit pkg;
         src = resolveCrateSrc pkg;
         dependencies = depDrvs;
+        buildScriptDependencies = buildScriptDrvs;
+        metadataOnly = metadataOnly;
         override = cOverride;
         features = pkgFeatures;
         defaultRustcFlags = rustFlags;
@@ -487,8 +520,38 @@ in
       })
     parsed.byId;
 
+    # Metadata-only variants for every non-proc-macro crate. Proc-macro crates
+    # alias their release crate because expansion loads the dynamic library.
+    # Registry and Git crates always keep full build-script dependencies since
+    # their build scripts cannot be detected during pure evaluation.
+    globalMetadataCrates = let
+      graph = lib.mapAttrs (pkgKey: _: let
+        pkg = parsed.byId.${pkgKey};
+        pkgLock =
+          if lockManifest != null
+          then (lockManifest.packages.${pkgKey} or {})
+          else {};
+        isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or false;
+      in
+        if isProcMacro
+        then globalCrates.${pkgKey}
+        else
+          mkCrateNode {
+            key = pkgKey;
+            package = pkgKey;
+            rustFlags = defaultRustcFlags;
+            resolveDep = dep: graph.${dep};
+            releaseDep = dep: globalCrates.${dep};
+            metadataOnly = true;
+            fullBuildScriptDeps = !pkg.isWorkspace || memberHasBuildScript pkg.name;
+            variantName = "metadata";
+          })
+      parsed.byId;
+    in
+      graph;
+
     globalDevCrates =
-      if createDevPackages
+      if createDevPackages || cfg.checks.enable
       then
         lib.mapAttrs (pkgKey: _: let
           pkg = parsed.byId.${pkgKey};
@@ -581,7 +644,7 @@ in
       graph;
 
     contextDevCrates =
-      if createDevPackages
+      if createDevPackages || cfg.checks.enable
       then
         lib.mapAttrs (root: context:
           lib.mapAttrs (pkgKey: _: let
@@ -603,6 +666,34 @@ in
         lockContexts
       else {};
 
+    contextMetadataCrates = lib.mapAttrs (root: context: let
+      graph = lib.mapAttrs (pkgKey: entry: let
+        pkg = parsed.byId.${pkgKey};
+        pkgLock =
+          if lockManifest != null
+          then (lockManifest.packages.${pkgKey} or {})
+          else {};
+        isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or false;
+      in
+        if isProcMacro
+        then contextCrates.${root}.${pkgKey}
+        else
+          mkCrateNode {
+            key = pkgKey;
+            package = pkgKey;
+            inherit (entry) features dependencies;
+            rustFlags = defaultRustcFlags;
+            resolveDep = dep: graph.${dep};
+            releaseDep = dep: contextCrates.${root}.${dep};
+            metadataOnly = true;
+            fullBuildScriptDeps = !pkg.isWorkspace || memberHasBuildScript pkg.name;
+            variantName = "${root}-metadata";
+          })
+      context;
+    in
+      graph)
+    lockContexts;
+
     # The active graph for a workspace member: global when unifying, otherwise
     # the member's own context.
     cratesFor = root:
@@ -613,6 +704,10 @@ in
       if unifyFeatures || !(lockContexts ? ${root})
       then globalDevCrates
       else contextDevCrates.${root};
+    metadataCratesFor = root:
+      if unifyFeatures || !(lockContexts ? ${root})
+      then globalMetadataCrates
+      else contextMetadataCrates.${root};
     getDepIdsFor = root: id: defaultDepIds:
       if unifyFeatures || !(lockContexts ? ${root})
       then getDepIds id defaultDepIds
@@ -628,9 +723,14 @@ in
       then mkGlobalProfileCrates {inherit extraFlags variantName scope;}
       else mkContextProfileCrates {inherit extraFlags variantName root scope;};
 
-    # Public crates expose the global unified view.
+    # Public crates expose the global unified view. The dev graph is built for
+    # the check suite even when dev apps are hidden, but cratesDev stays gated
+    # on build.devPackages.
     crates = globalCrates;
-    devCrates = globalDevCrates;
+    devCrates =
+      if createDevPackages
+      then globalDevCrates
+      else {};
 
     # Find and build binaries for workspace crates (both release and dev profiles)
     workspaceBinaries =
@@ -950,7 +1050,7 @@ in
     workspaceTests = lib.listToAttrs (
       map (
         wpkg: let
-          crates = cratesFor wpkg.id;
+          crates = devCratesFor wpkg.id;
           getDepIds = getDepIdsFor wpkg.id;
           cratePath = buildTestMembers.${wpkg.name};
           depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
@@ -985,10 +1085,16 @@ in
     workspaceClippy = lib.listToAttrs (
       map (
         wpkg: let
-          crates = cratesFor wpkg.id;
+          crates = metadataCratesFor wpkg.id;
+          releaseCrates = cratesFor wpkg.id;
           getDepIds = getDepIdsFor wpkg.id;
           cratePath = buildMembers.${wpkg.name};
           depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
+          hasBuildScript = memberHasBuildScript wpkg.name;
+          buildScriptDepDrvs =
+            if hasBuildScript
+            then map (depId: releaseCrates.${depId}) (getDepIds wpkg.id wpkg.depIds)
+            else depDrvs;
           cOverride = getOverride wpkg.name;
           pkgLock =
             if lockManifest != null
@@ -1002,8 +1108,48 @@ in
             src = cratePath;
             inherit edition;
             dependencies = depDrvs;
+            buildScriptDependencies = buildScriptDepDrvs;
+            splitBuildScriptDeps = hasBuildScript;
             override = cOverride;
             defaultRustcFlags = clippyRustcFlags;
+            isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or null;
+          };
+        }
+      )
+      selectedWorkspacePackages
+    );
+
+    # Type-check entries for all workspace crates
+    workspaceChecks = lib.listToAttrs (
+      map (
+        wpkg: let
+          crates = metadataCratesFor wpkg.id;
+          releaseCrates = cratesFor wpkg.id;
+          getDepIds = getDepIdsFor wpkg.id;
+          cratePath = buildMembers.${wpkg.name};
+          depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
+          hasBuildScript = memberHasBuildScript wpkg.name;
+          buildScriptDepDrvs =
+            if hasBuildScript
+            then map (depId: releaseCrates.${depId}) (getDepIds wpkg.id wpkg.depIds)
+            else depDrvs;
+          cOverride = getOverride wpkg.name;
+          pkgLock =
+            if lockManifest != null
+            then (lockManifest.packages.${wpkg.id} or lockManifest.packages.${wpkg.name} or {})
+            else {};
+          edition = pkgLock.edition or null;
+        in {
+          name = mkCheckName wpkg.name "check";
+          value = builderCheck {
+            pkg = wpkg;
+            src = cratePath;
+            inherit edition;
+            dependencies = depDrvs;
+            buildScriptDependencies = buildScriptDepDrvs;
+            splitBuildScriptDeps = hasBuildScript;
+            override = cOverride;
+            defaultRustcFlags = defaultRustcFlags;
             isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or null;
           };
         }
@@ -1015,10 +1161,16 @@ in
     workspaceDocs = lib.listToAttrs (
       map (
         wpkg: let
-          crates = cratesFor wpkg.id;
+          crates = metadataCratesFor wpkg.id;
+          releaseCrates = cratesFor wpkg.id;
           getDepIds = getDepIdsFor wpkg.id;
           cratePath = buildMembers.${wpkg.name};
           depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
+          hasBuildScript = memberHasBuildScript wpkg.name;
+          buildScriptDepDrvs =
+            if hasBuildScript
+            then map (depId: releaseCrates.${depId}) (getDepIds wpkg.id wpkg.depIds)
+            else depDrvs;
           cOverride = getOverride wpkg.name;
           pkgLock =
             if lockManifest != null
@@ -1032,6 +1184,8 @@ in
             src = cratePath;
             inherit edition;
             dependencies = depDrvs;
+            buildScriptDependencies = buildScriptDepDrvs;
+            splitBuildScriptDeps = hasBuildScript;
             override = cOverride;
             defaultRustdocFlags = docRustdocFlags;
             isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or null;
@@ -1046,7 +1200,7 @@ in
       builtins.filter (x: x != null) (
         map (
           wpkg: let
-            crates = cratesFor wpkg.id;
+            crates = devCratesFor wpkg.id;
             getDepIds = getDepIdsFor wpkg.id;
             cratePath = buildMembers.${wpkg.name};
             hasLib = memberHasLib wpkg.name;
@@ -1199,6 +1353,11 @@ in
         // workspaceDocTests
         // workspaceDocs
         // (
+          if cfg.checks.crateCheck
+          then workspaceChecks
+          else {}
+        )
+        // (
           if includePackageChecks
           then packageChecks
           else {}
@@ -1238,7 +1397,7 @@ in
     cratesDev = devCrates;
 
     # Per-member resolution contexts and their crate graphs
-    inherit lockContexts contextCrates contextDevCrates globalCrates globalDevCrates cratesFor devCratesFor;
+    inherit lockContexts contextCrates contextDevCrates globalCrates globalDevCrates globalMetadataCrates contextMetadataCrates cratesFor devCratesFor metadataCratesFor;
 
     # Expose both binaries and libraries
     packages =
@@ -1251,7 +1410,7 @@ in
     # Runnable apps (binaries, documentation servers, and default app)
     inherit apps;
 
-    # Standardized CI checks (crate:test, crate:clippy, crate:doc, crate:doctest, crate:bin, crate:lib, lock-check)
+    # Standardized CI checks (crate:check, crate:test, crate:clippy, crate:doc, crate:doctest, crate:bin, crate:lib, lock-check)
     inherit checks;
 
     # Preconfigured development shell (direnv / nix develop)

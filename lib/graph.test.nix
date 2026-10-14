@@ -11,6 +11,27 @@
     root = ../tests/basic-workspace;
     createDevPackages = true;
   };
+  procMacroWorkspace = mkWorkspace {
+    root = ../packages/rust/libs/shared/test-macros;
+    source.cargoLock = builtins.toFile "proc-macro-graph-tests-Cargo.lock" ''
+      version = 4
+
+      [[package]]
+      name = "bloomery-test-macros"
+      version = "0.1.0"
+    '';
+    source.bloomeryLock = builtins.toFile "proc-macro-graph-tests-bloomery.lock" ''
+      version = 1
+
+      [packages."bloomery-test-macros-0.1.0"]
+      features = []
+      dependencies = []
+      proc-macro = true
+      edition = "2024"
+    '';
+    checks.includePackageChecks = false;
+    devShell.enable = false;
+  };
   indexWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
     source.bloomeryLock = null;
@@ -243,6 +264,64 @@ in {
       hasWorkspaceDev = true;
       sharesExternalRelease = true;
       omitsWithoutDevPackages = true;
+    };
+  };
+
+  testMetadataCrateNodesAreDistinct = {
+    expr = {
+      workspaceVariant =
+        metadataWorkspace.globalMetadataCrates."lib-core-0.1.0".drvPath
+        != metadataWorkspace.crates."lib-core-0.1.0".drvPath;
+      registryVariant =
+        metadataWorkspace.globalMetadataCrates."itoa-1.0.18".drvPath
+        != metadataWorkspace.crates."itoa-1.0.18".drvPath;
+    };
+    expected = {
+      workspaceVariant = true;
+      registryVariant = true;
+    };
+  };
+
+  testProcMacroMetadataAliasesRelease = {
+    expr =
+      procMacroWorkspace.globalMetadataCrates."bloomery-test-macros-0.1.0".drvPath
+      == procMacroWorkspace.crates."bloomery-test-macros-0.1.0".drvPath;
+    expected = true;
+  };
+
+  testCheckGraphUsesMetadataVariants = {
+    expr = {
+      hasCheck = builtins.hasAttr "lib-calc:check" metadataWorkspace.checks;
+      checkUsesMetadataDep =
+        builtins.any
+        (dep: dep.drvPath == metadataWorkspace.globalMetadataCrates."lib-core-0.1.0".drvPath)
+        metadataWorkspace.checks."lib-calc:check".dependencies;
+      clippyUsesMetadataDep =
+        builtins.any
+        (dep: dep.drvPath == metadataWorkspace.globalMetadataCrates."lib-core-0.1.0".drvPath)
+        metadataWorkspace.checks."lib-calc:clippy".dependencies;
+    };
+    expected = {
+      hasCheck = true;
+      checkUsesMetadataDep = true;
+      clippyUsesMetadataDep = true;
+    };
+  };
+
+  testTestsUseDevProfileCrates = {
+    expr = {
+      testCrateIsDev =
+        metadataWorkspace.checks."lib-calc:test".crateDrv.drvPath
+        == metadataWorkspace.globalDevCrates."lib-calc-0.1.0".drvPath;
+      doctestCrateIsDev =
+        metadataWorkspace.checks."lib-calc:doctest".crateDrv.drvPath
+        == metadataWorkspace.globalDevCrates."lib-calc-0.1.0".drvPath;
+      cratesDevStaysGated = metadataWorkspace.cratesDev == {};
+    };
+    expected = {
+      testCrateIsDev = true;
+      doctestCrateIsDev = true;
+      cratesDevStaysGated = true;
     };
   };
 

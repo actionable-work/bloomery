@@ -11,6 +11,8 @@
   defaultRustdocFlags ? ["-Dwarnings"],
   edition ? null,
   isProcMacro ? null,
+  buildScriptDependencies ? dependencies,
+  splitBuildScriptDeps ? false,
 }: let
   pname = pkg.name;
   version = pkg.version;
@@ -28,7 +30,11 @@ in
 
       nativeBuildInputs = nativeBuildInputs;
       buildInputs = buildInputs;
-      inherit dependencies;
+      inherit dependencies buildScriptDependencies;
+      SPLIT_BUILD_SCRIPT_DEPS =
+        if splitBuildScriptDeps
+        then "1"
+        else "0";
 
       RUSTDOC = "${rustc}/bin/rustdoc";
       RUSTC = "${rustc}/bin/rustc";
@@ -120,70 +126,98 @@ in
           exit 0
         fi
 
-        mkdir -p _deps
-        declare -A SEEN_EXTERNS=()
-        EXTERN_FLAGS=()
-
-        for dep in $dependencies; do
-          DEP_LIB_PATH=""
-          if [ -f "$dep/nix-support/meta.sh" ]; then
-            source "$dep/nix-support/meta.sh"
-            if [ -n "$DEP_LIB_ARCHIVE" ] && [ -f "$DEP_LIB_ARCHIVE" ]; then
-              tar --zstd -xf "$DEP_LIB_ARCHIVE" -C _deps
-              DEP_LIB_PATH="_deps/$DEP_LIB_NAME"
-            fi
-            if [ -n "$DEP_CRATE_NAME" ] && [ -n "$DEP_LIB_PATH" ] && [ -f "$DEP_LIB_PATH" ]; then
-              if [ -z "''${SEEN_EXTERNS[$DEP_CRATE_NAME]:-}" ]; then
-                EXTERN_FLAGS+=("--extern" "$DEP_CRATE_NAME=$DEP_LIB_PATH")
-                SEEN_EXTERNS["$DEP_CRATE_NAME"]=1
+        # Resolve a dependency list into extern flags. The named array receives
+        # --extern flags and the given directory receives extracted archives.
+        resolve_deps() {
+          local extern_name="$1"
+          shift
+          local deps_dir="$1"
+          shift
+          local -n extern_ref="$extern_name"
+          local dep fname cname f target
+          local -A seen=()
+          for dep in "$@"; do
+            DEP_LIB_PATH=""
+            dep_is_proc_macro=0
+            if [ -f "$dep/nix-support/meta.sh" ]; then
+              source "$dep/nix-support/meta.sh"
+              dep_is_proc_macro="''${DEP_IS_PROC_MACRO:-0}"
+              if [ -n "$DEP_LIB_ARCHIVE" ] && [ -f "$DEP_LIB_ARCHIVE" ]; then
+                tar --zstd -xf "$DEP_LIB_ARCHIVE" -C "$deps_dir"
+                DEP_LIB_PATH="$deps_dir/$DEP_LIB_NAME"
               fi
-            fi
-            for env_var in $(compgen -v | grep '^DEP_'); do
-              export "$env_var"
-            done
-          elif [ -d "$dep/lib" ]; then
-            for f in "$dep/lib"/*; do
-              if [ -f "$f" ]; then
-                fname=$(basename "$f")
-                cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
-                if [ -z "''${SEEN_EXTERNS[$cname]:-}" ]; then
-                  EXTERN_FLAGS+=("--extern" "$cname=$f")
-                  SEEN_EXTERNS["$cname"]=1
+              if [ -n "$DEP_CRATE_NAME" ] && [ -n "$DEP_LIB_PATH" ] && [ -f "$DEP_LIB_PATH" ]; then
+                if [ -z "''${seen[$DEP_CRATE_NAME]:-}" ]; then
+                  extern_ref+=("--extern" "$DEP_CRATE_NAME=$DEP_LIB_PATH")
+                  seen["$DEP_CRATE_NAME"]=1
                 fi
               fi
-            done
-          fi
-
-          if [ -d "$dep/nix-support/deps-closure" ]; then
-            for f in "$dep/nix-support/deps-closure"/*; do
-              if [ -e "$f" ]; then
-                case "$f" in
-                  *.tar.zst) tar --zstd -xf "$f" -C _deps ;;
-                  *) ln -sf "$(readlink -f "$f")" "_deps/$(basename "$f")" ;;
-                esac
-              fi
-            done
-          fi
-          if [ -d "$dep/lib" ]; then
-            for f in "$dep/lib"/*; do
-              if [ -e "$f" ]; then
-                target=$(readlink -f "$f")
-                ln -sf "$target" "_deps/$(basename "$f")"
-              fi
-            done
-          fi
-        done
-
-        for f in _deps/lib*.rlib _deps/lib*.so _deps/lib*.dylib; do
-          if [ -f "$f" ]; then
-            fname=$(basename "$f")
-            cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
-            if [ -z "''${SEEN_EXTERNS[$cname]:-}" ]; then
-              EXTERN_FLAGS+=("--extern" "$cname=$f")
-              SEEN_EXTERNS["$cname"]=1
+              for env_var in $(compgen -v | grep '^DEP_'); do
+                export "$env_var"
+              done
+            elif [ -d "$dep/lib" ]; then
+              for f in "$dep/lib"/*; do
+                if [ -f "$f" ]; then
+                  fname=$(basename "$f")
+                  cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
+                  if [ -z "''${seen[$cname]:-}" ]; then
+                    extern_ref+=("--extern" "$cname=$f")
+                    seen["$cname"]=1
+                  fi
+                fi
+              done
             fi
-          fi
-        done
+
+            if [ "$SKIP_PROC_MACRO_CLOSURE" = "1" ] && [ "$dep_is_proc_macro" = "1" ]; then
+              continue
+            fi
+
+            if [ -d "$dep/nix-support/deps-closure" ]; then
+              for f in "$dep/nix-support/deps-closure"/*; do
+                if [ -e "$f" ]; then
+                  case "$f" in
+                    *.tar.zst) tar --zstd -xf "$f" -C "$deps_dir" ;;
+                    *) ln -sf "$(readlink -f "$f")" "$deps_dir/$(basename "$f")" ;;
+                  esac
+                fi
+              done
+            fi
+            if [ -d "$dep/lib" ]; then
+              for f in "$dep/lib"/*; do
+                if [ -e "$f" ]; then
+                  target=$(readlink -f "$f")
+                  ln -sf "$target" "$deps_dir/$(basename "$f")"
+                fi
+              done
+            fi
+          done
+
+          for f in "$deps_dir"/lib*.rlib "$deps_dir"/lib*.so "$deps_dir"/lib*.dylib; do
+            if [ -f "$f" ]; then
+              fname=$(basename "$f")
+              cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
+              if [ -z "''${seen[$cname]:-}" ]; then
+                extern_ref+=("--extern" "$cname=$f")
+                seen["$cname"]=1
+              fi
+            fi
+          done
+        }
+
+        mkdir -p _deps
+        EXTERN_FLAGS=()
+        SKIP_PROC_MACRO_CLOSURE=1
+        resolve_deps EXTERN_FLAGS _deps $dependencies
+
+        BUILD_SCRIPT_DEPS_DIR="_deps"
+        BUILD_SCRIPT_EXTERN_FLAGS=("''${EXTERN_FLAGS[@]}")
+        if [ "$SPLIT_BUILD_SCRIPT_DEPS" = "1" ]; then
+          mkdir -p _deps_bs
+          BUILD_SCRIPT_DEPS_DIR="_deps_bs"
+          BUILD_SCRIPT_EXTERN_FLAGS=()
+          SKIP_PROC_MACRO_CLOSURE=0
+          resolve_deps BUILD_SCRIPT_EXTERN_FLAGS _deps_bs $buildScriptDependencies
+        fi
 
         runHook postConfigure
       '';
@@ -198,8 +232,8 @@ in
             --crate-name build_script_build \
             --crate-type bin \
             $EDITION_FLAG \
-            -L dependency=_deps \
-            "''${EXTERN_FLAGS[@]}" \
+            -L dependency=$BUILD_SCRIPT_DEPS_DIR \
+            "''${BUILD_SCRIPT_EXTERN_FLAGS[@]}" \
             -o _build_script/build_script_build
 
           export OUT_DIR="$PWD/_build_script/out"

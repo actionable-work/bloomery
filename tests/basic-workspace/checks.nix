@@ -17,6 +17,8 @@
         assert builtins.hasAttr "bin-calc:test" workspace.checks;
         assert builtins.hasAttr "bin-calc:clippy" workspace.checks;
         assert builtins.hasAttr "bin-calc:doc" workspace.checks;
+        assert builtins.hasAttr "bin-calc:check" workspace.checks;
+        assert builtins.hasAttr "lib-calc:check" workspace.checks;
         assert builtins.hasAttr "lib-calc:doctest" workspace.checks;
         assert builtins.hasAttr "bin-calc:bin" workspace.checks;
         assert builtins.hasAttr "lib-calc:lib" workspace.checks;
@@ -54,6 +56,7 @@
               "NIXLIB-FLAKE-OUTPUTS-006"
               "NIXLIB-FLAKE-OUTPUTS-007"
               "NIXLIB-FLAKE-OUTPUTS-008"
+              "NIXLIB-FLAKE-OUTPUTS-029"
               "NIXLIB-FLAKE-OUTPUTS-010"
               "NIXLIB-FLAKE-OUTPUTS-012"
               "NIXLIB-FLAKE-OUTPUTS-017"

@@ -100,6 +100,31 @@
     edition = "2021";
     isProcMacro = false;
   };
+  metadataCrateDrv = (builderExports.buildCrateWith {defaultLinker = null;}) {
+    pkg = {
+      name = "metadata-fixture";
+      version = "0.1.0";
+      crateName = "metadata_fixture";
+      id = "metadata-fixture-0.1.0";
+      isWorkspace = true;
+    };
+    src = source;
+    features = [];
+    edition = "2021";
+    isProcMacro = false;
+    metadataOnly = true;
+    buildScriptDependencies = [];
+  };
+  checkDrv = (builderExports.checkCrateWith {}) {
+    pkg = {
+      name = "check-fixture";
+      version = "0.1.0";
+      crateName = "check_fixture";
+    };
+    src = source;
+    edition = "2021";
+    isProcMacro = false;
+  };
   binDrv = (builderExports.buildBinWith {defaultLinker = null;}) {
     binName = "bin-fixture";
     pkg = {
@@ -295,6 +320,43 @@ in {
       listsActiveFeatures = true;
       expandsImpliedFeatures = true;
       skipsMissingOptionalDeps = true;
+    };
+  };
+
+  testCrateBuilderMetadataOnly = {
+    expr = {
+      emitsMetadata = lib.hasInfix "--emit=metadata" metadataCrateDrv.buildPhase;
+      omitsLink = !(lib.hasInfix "--emit=link,metadata" metadataCrateDrv.buildPhase);
+      metadataFlag = metadataCrateDrv.METADATA_ONLY == "1";
+      selectsRmeta = lib.hasInfix ".rmeta" metadataCrateDrv.installPhase;
+      splitsBuildScriptDeps =
+        lib.hasInfix "BUILD_SCRIPT_EXTERN_FLAGS" metadataCrateDrv.configurePhase
+        && lib.hasInfix "BUILD_SCRIPT_DEPS_DIR" metadataCrateDrv.buildPhase
+        && lib.hasInfix "$buildScriptDependencies" metadataCrateDrv.configurePhase;
+      buildScriptDeps = metadataCrateDrv.buildScriptDependencies == [];
+    };
+    expected = {
+      emitsMetadata = true;
+      omitsLink = true;
+      metadataFlag = true;
+      selectsRmeta = true;
+      splitsBuildScriptDeps = true;
+      buildScriptDeps = true;
+    };
+  };
+
+  testCheckBuilderTypeChecksWithRustc = {
+    expr = {
+      invokesRustc = lib.hasInfix "$RUSTC" checkDrv.buildPhase;
+      emitsMetadata = lib.hasInfix "--emit=metadata" checkDrv.buildPhase;
+      doesNotInvokeClippy = !(lib.hasInfix "clippy-driver" checkDrv.buildPhase);
+      recordsSuccess = lib.hasInfix "check-clean.txt" checkDrv.installPhase;
+    };
+    expected = {
+      invokesRustc = true;
+      emitsMetadata = true;
+      doesNotInvokeClippy = true;
+      recordsSuccess = true;
     };
   };
 

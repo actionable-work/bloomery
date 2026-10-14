@@ -86,6 +86,7 @@ shellHook = ""                  # bash setup hook
 [checks]
 enable = true                   # generate crate checks and lock validation
 includePackageChecks = true     # build final packages as CI checks
+crateCheck = true               # generate per-crate type-check entries
 throwOnOutOfDate = false        # error evaluation if bloomery.lock is out of date
 
 [features]

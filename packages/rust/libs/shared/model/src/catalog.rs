@@ -463,6 +463,12 @@ pub const CATALOG: &[CatalogEntry] = &[
         documentation: "Include binary and library build checks.",
     },
     CatalogEntry {
+        path: &["checks", "crateCheck"],
+        value_type: ValueType::Bool,
+        recommended: Some(DefaultValue::Bool(true)),
+        documentation: "Generate per-crate type-check entries.",
+    },
+    CatalogEntry {
         path: &["checks", "throwOnOutOfDate"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(false)),
@@ -1055,6 +1061,15 @@ mod tests {
         );
         assert_eq!(
             effective_default(&["checks", "noDefaultFeatures"]),
+            Some(Value::Boolean(true))
+        );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-022"))]
+    fn crate_check_is_recommended_on() {
+        assert_eq!(
+            effective_default(&["checks", "crateCheck"]),
             Some(Value::Boolean(true))
         );
     }

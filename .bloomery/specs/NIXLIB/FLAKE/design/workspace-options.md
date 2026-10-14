@@ -76,8 +76,10 @@ supplies a local crates.io index for the no-lock fallback.
 ## Development shell and checks
 
 `devShell` controls shell generation, extra packages, and the shell hook.
-`checks` enables or disables generated checks. `checks.includePackageChecks`
-defaults to off, so generated checks omit package build checks unless enabled;
+`checks` enables or disables generated checks. `checks.crateCheck` defaults to
+on and generates the `<crate>:check` type-check entries; disabling it omits
+them. `checks.includePackageChecks` defaults to off, so generated checks omit
+package build checks unless enabled;
 when enabled, package checks reuse the release crate and binary derivations
 while [build](../../../CLI/BUILD/README.md) realizes the exported production
 packages. `checks` also optionally fails evaluation on an out-of-date lock, and

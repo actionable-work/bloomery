@@ -33,7 +33,7 @@
     ];
     flags = ["rustc" "test" "clippy" "doc" "doctest"];
     devShell = ["enable" "packages" "shellHook"];
-    checks = ["enable" "includePackageChecks" "throwOnOutOfDate" "workspaceDependencies" "noDefaultFeatures"];
+    checks = ["enable" "includePackageChecks" "crateCheck" "throwOnOutOfDate" "workspaceDependencies" "noDefaultFeatures"];
     features = ["cratesIoIndex"];
   };
 

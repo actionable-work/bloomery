@@ -16,6 +16,7 @@ in {
       devShellEnabled = cfg.devShell.enable;
       checksEnabled = cfg.checks.enable;
       includePackageChecks = cfg.checks.includePackageChecks;
+      crateCheck = cfg.checks.crateCheck;
       unifyFeatures = cfg.build.unify;
       linker = cfg.toolchain.linker;
       libPackages = cfg.createLibPackages;
@@ -30,6 +31,7 @@ in {
       devShellEnabled = true;
       checksEnabled = true;
       includePackageChecks = false;
+      crateCheck = true;
       unifyFeatures = true;
       linker =
         if pkgs.stdenv.hostPlatform.isLinux
@@ -56,6 +58,23 @@ in {
     expected = {
       workspaceDependencies = false;
       noDefaultFeatures = false;
+    };
+  };
+
+  testCrateCheckOption = {
+    expr = let
+      defaultCfg = options.evalWorkspaceOptions {root = ./.;};
+      disabledCfg = options.evalWorkspaceOptions {
+        root = ./.;
+        checks.crateCheck = false;
+      };
+    in {
+      defaultValue = defaultCfg.checks.crateCheck;
+      overridden = disabledCfg.checks.crateCheck;
+    };
+    expected = {
+      defaultValue = true;
+      overridden = false;
     };
   };
 

@@ -20,6 +20,8 @@ build.
 
 - [Lock data and graph resolution](design/resolution.md)
 - [Derivation contracts](design/derivations.md)
+- [Metadata-only check compilation](design/metadata-check.md)
+- [Check profile selection](design/check-profiles.md)
 - [Build-script native artifacts](design/native-artifacts.md)
 - [Manifest policy checks](design/manifest-checks.md)
 
@@ -28,5 +30,6 @@ build.
 This feature covers graph inputs, workspace discovery, feature and dependency
 resolution, feature unification modes, crate sourcing, crate identity, binary
 discovery, build scripts, build-script native artifacts, propagation metadata,
-asset flow, lock validation, and the workspace check derivations. Fileset
+asset flow, lock validation, metadata-only check compilation, check profile
+selection, and the workspace check derivations. Fileset
 selection mechanics are owned by [NIX/SOURCES](../../NIX/SOURCES/README.md).

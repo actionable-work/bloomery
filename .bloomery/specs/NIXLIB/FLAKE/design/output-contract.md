@@ -26,9 +26,14 @@ dev-profile builds. Each app is an attribute set with `type = "app"` and a
 
 ## Checks
 
-When checks are enabled, `checks` contains `<crate>:test`, `<crate>:clippy`,
-`<crate>:doc`, and `<crate>:doctest` for workspace crates; `<crate>:doctest`
-exists only for crates with a library entrypoint. Package checks `<bin>:bin`
+When checks are enabled, `checks` contains `<crate>:check`, `<crate>:test`,
+`<crate>:clippy`, `<crate>:doc`, and `<crate>:doctest` for workspace crates;
+`<crate>:doctest` exists only for crates with a library entrypoint.
+`<crate>:check`, clippy, and documentation checks compile their dependency
+crates metadata-only; test and doctest compile workspace crates with the dev
+profile; package checks use full release crates. `<crate>:check` is generated
+when `checks.crateCheck` is enabled, which is the default; disabling it omits
+the `<crate>:check` entries while retaining the rest. Package checks `<bin>:bin`
 and `<crate>:lib` are included when package checks are enabled, which is off by
 default; enabling them reuses the release crate and binary derivations.
 `workspace:lock` validates lock consistency, `workspace:dependencies`

@@ -36,6 +36,8 @@
   isProcMacro ? null,
   edition ? null,
   variantName ? null,
+  metadataOnly ? false,
+  buildScriptDependencies ? dependencies,
 }: let
   pname = pkg.name;
   version = pkg.version;
@@ -78,7 +80,13 @@ in
       buildInputs = buildInputs;
 
       # Pass dependencies so nix tracks and provides them in builder
-      inherit dependencies;
+      inherit dependencies buildScriptDependencies;
+
+      # Compile the target to metadata only, without linking object code.
+      METADATA_ONLY =
+        if metadataOnly
+        then "1"
+        else "0";
 
       # Environment variables
       RUSTC = "${rustc}/bin/rustc";
@@ -211,81 +219,123 @@ in
           ENTRY="src/lib.rs"
         fi
 
-        # Resolve dependencies
+        # Resolve a dependency list into extern flags. The named array receives
+        # --extern flags, and each dependency's archive and transitive closure
+        # are extracted into the given directory.
+        resolve_deps() {
+          local extern_name="$1"
+          shift
+          local link_name="$1"
+          shift
+          local deps_dir="$1"
+          shift
+          local -n extern_ref="$extern_name"
+          local -n link_ref="$link_name"
+          local dep fname cname f target
+          for dep in "$@"; do
+            DEP_LIB_PATH=""
+            dep_is_proc_macro=0
+            if [ -f "$dep/nix-support/meta.sh" ]; then
+              # Load structured metadata
+              source "$dep/nix-support/meta.sh"
+              dep_is_proc_macro="''${DEP_IS_PROC_MACRO:-0}"
+              if [ -n "$DEP_LIB_ARCHIVE" ] && [ -f "$DEP_LIB_ARCHIVE" ]; then
+                tar --zstd -xf "$DEP_LIB_ARCHIVE" -C "$deps_dir"
+                DEP_LIB_PATH="$deps_dir/$DEP_LIB_NAME"
+              fi
+              if [ -n "$DEP_CRATE_NAME" ] && [ -n "$DEP_LIB_PATH" ] && [ -f "$DEP_LIB_PATH" ]; then
+                extern_ref+=("--extern" "$DEP_CRATE_NAME=$DEP_LIB_PATH")
+                if [ -f Cargo.toml ]; then
+                  PKG_SEARCH="''${DEP_PKG_NAME:-$DEP_CRATE_NAME}"
+                  ALIASES=$(awk -v pkg="$PKG_SEARCH" -v crate="$DEP_CRATE_NAME" '
+                    /^\[.*dependencies\.([a-zA-Z0-9_-]+)\]/ {
+                      match($0, /^\[.*dependencies\.([a-zA-Z0-9_-]+)\]/, m)
+                      current_alias = m[1]
+                    }
+                    /^\[/ && !/^\[.*dependencies\./ {
+                      current_alias = ""
+                    }
+                    current_alias != "" && $0 ~ "package[[:space:]]*=[[:space:]]*\"(" pkg "|" crate ")\"" {
+                      print current_alias
+                    }
+                    /^[[:space:]]*[a-zA-Z0-9_-]+[[:space:]]*=[[:space:]]*\{.*package[[:space:]]*=/ {
+                      if ($0 ~ "package[[:space:]]*=[[:space:]]*\"(" pkg "|" crate ")\"") {
+                        match($0, /^[[:space:]]*([a-zA-Z0-9_-]+)/, m)
+                        print m[1]
+                      }
+                    }
+                  ' Cargo.toml | sort -u)
+                  for alias in $ALIASES; do
+                    alias_ident=$(echo "$alias" | tr '-' '_')
+                    extern_ref+=("--extern" "$alias_ident=$DEP_LIB_PATH")
+                  done
+                fi
+              fi
+              if [ -n "$DEP_RUSTC_LINK_FLAGS" ]; then
+                link_ref+=($DEP_RUSTC_LINK_FLAGS)
+              fi
+            elif [ -d "$dep/lib" ]; then
+              for f in "$dep/lib"/*; do
+                if [ -f "$f" ]; then
+                  fname=$(basename "$f")
+                  cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
+                  extern_ref+=("--extern" "$cname=$f")
+                fi
+              done
+            fi
+
+            # A proc-macro is loaded directly. Its full release closure is not
+            # part of a metadata search path, so skipping it avoids duplicate
+            # crate versions in the dependency directory.
+            if [ "$SKIP_PROC_MACRO_CLOSURE" = "1" ] && [ "$dep_is_proc_macro" = "1" ]; then
+              continue
+            fi
+
+            # Collect all transitive dependencies from closure
+            if [ -d "$dep/nix-support/deps-closure" ]; then
+              for f in "$dep/nix-support/deps-closure"/*; do
+                if [ -e "$f" ]; then
+                  case "$f" in
+                    *.tar.zst) tar --zstd -xf "$f" -C "$deps_dir" ;;
+                    *) ln -sf "$(readlink -f "$f")" "$deps_dir/$(basename "$f")" ;;
+                  esac
+                fi
+              done
+            fi
+            if [ -d "$dep/lib" ]; then
+              for f in "$dep/lib"/*; do
+                if [ -e "$f" ]; then
+                  target=$(readlink -f "$f")
+                  ln -sf "$target" "$deps_dir/$(basename "$f")"
+                fi
+              done
+            fi
+          done
+        }
+
         mkdir -p _deps
         EXTERN_FLAGS=("''${EXTRA_FLAGS[@]}")
         EXTRA_LINK_FLAGS=()
+        SKIP_PROC_MACRO_CLOSURE=${
+          if metadataOnly
+          then "1"
+          else "0"
+        }
+        resolve_deps EXTERN_FLAGS EXTRA_LINK_FLAGS _deps $dependencies
 
-        for dep in $dependencies; do
-          DEP_LIB_PATH=""
-          if [ -f "$dep/nix-support/meta.sh" ]; then
-            # Load structured metadata
-            source "$dep/nix-support/meta.sh"
-            if [ -n "$DEP_LIB_ARCHIVE" ] && [ -f "$DEP_LIB_ARCHIVE" ]; then
-              tar --zstd -xf "$DEP_LIB_ARCHIVE" -C _deps
-              DEP_LIB_PATH="_deps/$DEP_LIB_NAME"
-            fi
-            if [ -n "$DEP_CRATE_NAME" ] && [ -n "$DEP_LIB_PATH" ] && [ -f "$DEP_LIB_PATH" ]; then
-              EXTERN_FLAGS+=("--extern" "$DEP_CRATE_NAME=$DEP_LIB_PATH")
-              if [ -f Cargo.toml ]; then
-                PKG_SEARCH="''${DEP_PKG_NAME:-$DEP_CRATE_NAME}"
-                ALIASES=$(awk -v pkg="$PKG_SEARCH" -v crate="$DEP_CRATE_NAME" '
-                  /^\[.*dependencies\.([a-zA-Z0-9_-]+)\]/ {
-                    match($0, /^\[.*dependencies\.([a-zA-Z0-9_-]+)\]/, m)
-                    current_alias = m[1]
-                  }
-                  /^\[/ && !/^\[.*dependencies\./ {
-                    current_alias = ""
-                  }
-                  current_alias != "" && $0 ~ "package[[:space:]]*=[[:space:]]*\"(" pkg "|" crate ")\"" {
-                    print current_alias
-                  }
-                  /^[[:space:]]*[a-zA-Z0-9_-]+[[:space:]]*=[[:space:]]*\{.*package[[:space:]]*=/ {
-                    if ($0 ~ "package[[:space:]]*=[[:space:]]*\"(" pkg "|" crate ")\"") {
-                      match($0, /^[[:space:]]*([a-zA-Z0-9_-]+)/, m)
-                      print m[1]
-                    }
-                  }
-                ' Cargo.toml | sort -u)
-                for alias in $ALIASES; do
-                  alias_ident=$(echo "$alias" | tr '-' '_')
-                  EXTERN_FLAGS+=("--extern" "$alias_ident=$DEP_LIB_PATH")
-                done
-              fi
-            fi
-            if [ -n "$DEP_RUSTC_LINK_FLAGS" ]; then
-              EXTRA_LINK_FLAGS+=($DEP_RUSTC_LINK_FLAGS)
-            fi
-          elif [ -d "$dep/lib" ]; then
-            for f in "$dep/lib"/*; do
-              if [ -f "$f" ]; then
-                fname=$(basename "$f")
-                cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
-                EXTERN_FLAGS+=("--extern" "$cname=$f")
-              fi
-            done
-          fi
-
-          # Collect all transitive dependencies from closure
-          if [ -d "$dep/nix-support/deps-closure" ]; then
-            for f in "$dep/nix-support/deps-closure"/*; do
-              if [ -e "$f" ]; then
-                case "$f" in
-                  *.tar.zst) tar --zstd -xf "$f" -C _deps ;;
-                  *) ln -sf "$(readlink -f "$f")" "_deps/$(basename "$f")" ;;
-                esac
-              fi
-            done
-          fi
-          if [ -d "$dep/lib" ]; then
-            for f in "$dep/lib"/*; do
-              if [ -e "$f" ]; then
-                target=$(readlink -f "$f")
-                ln -sf "$target" "_deps/$(basename "$f")"
-              fi
-            done
-          fi
-        done
+        # A metadata-only target compiles its build script against full release
+        # dependencies, because build scripts link and execute object code.
+        BUILD_SCRIPT_DEPS_DIR="_deps"
+        BUILD_SCRIPT_EXTERN_FLAGS=("''${EXTERN_FLAGS[@]}")
+        BUILD_SCRIPT_DEP_LINK_FLAGS=("''${EXTRA_LINK_FLAGS[@]}")
+        if [ "$METADATA_ONLY" = "1" ]; then
+          mkdir -p _deps_bs
+          BUILD_SCRIPT_DEPS_DIR="_deps_bs"
+          BUILD_SCRIPT_EXTERN_FLAGS=("''${EXTRA_FLAGS[@]}")
+          BUILD_SCRIPT_DEP_LINK_FLAGS=()
+          SKIP_PROC_MACRO_CLOSURE=0
+          resolve_deps BUILD_SCRIPT_EXTERN_FLAGS BUILD_SCRIPT_DEP_LINK_FLAGS _deps_bs $buildScriptDependencies
+        fi
 
         # Resolve active features and expand implied features from Cargo.toml
         ACTIVE_FEATURES=(${lib.escapeShellArgs (
@@ -440,8 +490,8 @@ in
             --crate-name build_script_build \
             --crate-type bin \
             $EDITION_FLAG \
-            -L dependency=_deps \
-            "''${EXTERN_FLAGS[@]}" \
+            -L dependency=$BUILD_SCRIPT_DEPS_DIR \
+            "''${BUILD_SCRIPT_EXTERN_FLAGS[@]}" \
             ${
           if defaultLinker != null
           then "-Clink-arg=-fuse-ld=${defaultLinker}"
@@ -531,7 +581,11 @@ in
           --crate-name "$CRATE_NAME" \
           --crate-type "$CRATE_TYPE" \
           "''${EXTRA_CRATE_TYPES[@]}" \
-          --emit=link,metadata \
+          ${
+          if metadataOnly
+          then "--emit=metadata"
+          else "--emit=link,metadata"
+        } \
           $EDITION_FLAG \
           -L dependency=_deps \
           "''${EXTERN_FLAGS[@]}" \
@@ -548,7 +602,12 @@ in
         runHook preInstall
 
         OUT_LIB=""
-        if [ "$IS_PROC_MACRO" = "1" ] || [ "$CRATE_TYPE" = "proc-macro" ]; then
+        if [ "$METADATA_ONLY" = "1" ]; then
+          OUT_LIB=$(ls $out/lib/lib${crateName}*.rmeta 2>/dev/null | head -n 1)
+          if [ -z "$OUT_LIB" ]; then
+            OUT_LIB=$(ls $out/lib/*.rmeta 2>/dev/null | head -n 1)
+          fi
+        elif [ "$IS_PROC_MACRO" = "1" ] || [ "$CRATE_TYPE" = "proc-macro" ]; then
           OUT_LIB=$(ls $out/lib/lib${crateName}*.so $out/lib/lib${crateName}*.dylib 2>/dev/null | head -n 1)
           if [ -z "$OUT_LIB" ]; then
             OUT_LIB=$(ls $out/lib/*.so $out/lib/*.dylib 2>/dev/null | head -n 1)
@@ -588,6 +647,21 @@ in
         mkdir -p "$out/nix-support/deps-closure"
         ln -sf "$out/lib.tar.zst" "$out/nix-support/deps-closure/$(basename "$out")-lib.tar.zst"
         for dep in $dependencies; do
+          dep_is_proc_macro=0
+          dep_archive=""
+          if [ -f "$dep/nix-support/meta.sh" ]; then
+            # Read the dependency metadata without sourcing it: sourcing would
+            # overwrite this crate's own DEP_* values before they are published.
+            dep_is_proc_macro=$(sed -n 's/^export DEP_IS_PROC_MACRO="\(.*\)"$/\1/p' "$dep/nix-support/meta.sh" | head -n 1)
+            dep_archive=$(sed -n 's/^export DEP_LIB_ARCHIVE="\(.*\)"$/\1/p' "$dep/nix-support/meta.sh" | head -n 1)
+          fi
+          if [ "$METADATA_ONLY" = "1" ] && [ "$dep_is_proc_macro" = "1" ]; then
+            # Propagate the proc-macro itself but not its full release closure.
+            if [ -n "$dep_archive" ] && [ -f "$dep_archive" ]; then
+              ln -sf "$dep_archive" "$out/nix-support/deps-closure/$(basename "$dep")-lib.tar.zst"
+            fi
+            continue
+          fi
           if [ -d "$dep/nix-support/deps-closure" ]; then
             for f in "$dep/nix-support/deps-closure"/*; do
               if [ -e "$f" ]; then

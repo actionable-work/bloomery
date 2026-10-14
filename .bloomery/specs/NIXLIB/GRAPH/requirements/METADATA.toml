@@ -1,0 +1,210 @@
+group = "METADATA"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-METADATA-001"
+title = "Metadata-only dependency variants are compiled"
+manual = false
+design = "design/metadata-check.md#metadata-only-crate-variants"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "compile a non-proc-macro dependency crate with rustc --emit=metadata when producing its metadata-only variant"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-METADATA-002"
+title = "Metadata-only variants resolve dependencies metadata-only"
+manual = false
+design = "design/metadata-check.md#metadata-only-crate-variants"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "resolve every non-proc-macro dependency of a metadata-only variant to its metadata-only variant"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-METADATA-003"
+title = "Metadata-only variants preserve crate identity"
+manual = false
+design = "design/metadata-check.md#metadata-only-crate-variants"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "use the same package ID, active features, edition, resolution context, and crate disambiguator for a metadata-only variant as for its release crate"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-METADATA-004"
+title = "Clippy consumes metadata-only dependencies"
+manual = false
+design = "design/metadata-check.md#type-checking-consumers"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the clippy builder"
+action = "resolve its dependency closure to metadata-only variants"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-METADATA-005"
+title = "Documentation consumes metadata-only dependencies"
+manual = false
+design = "design/metadata-check.md#type-checking-consumers"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the documentation builder"
+action = "resolve its dependency closure to metadata-only variants"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-METADATA-006"
+title = "Tests consume full dependencies"
+manual = false
+design = "design/metadata-check.md#linking-consumers"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the test builder"
+action = "resolve the crate under test and its workspace dependency closure to dev-profile crate variants"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-METADATA-007"
+title = "Doctests consume full dependencies"
+manual = false
+design = "design/metadata-check.md#linking-consumers"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the doctest builder"
+action = "resolve the crate under test and its workspace dependency closure to dev-profile crate variants"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-METADATA-008"
+title = "Package checks consume full dependencies"
+manual = false
+design = "design/metadata-check.md#linking-consumers"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the package checks"
+action = "resolve their dependency closure to release crate variants"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-METADATA-009"
+title = "Build scripts keep full dependency codegen"
+manual = false
+design = "design/metadata-check.md#build-scripts"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "compile and run the build script of a metadata-only variant against full release crates"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-METADATA-010"
+title = "Proc-macro crates stay fully compiled"
+manual = false
+design = "design/metadata-check.md#proc-macros"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "compile proc-macro crates as full release crates in every check"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-METADATA-011"
+title = "Registry and Git crates have metadata-only variants"
+manual = false
+design = "design/metadata-check.md#registry-and-git-crates"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "produce metadata-only variants for registry and Git dependency crates"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-METADATA-012"
+title = "Metadata-only variants publish rmeta propagation metadata"
+manual = false
+design = "design/metadata-check.md#propagation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder"
+action = "publish the crate name, rmeta path, proc-macro flag, link flags, assets, sys-crate metadata, and dependency closure for a metadata-only variant"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-METADATA-013"
+title = "Check outcomes are unchanged by metadata compilation"
+manual = false
+design = "design/metadata-check.md#check-outcomes"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace checks"
+action = "retain their IDs, selection results, pass/fail outcomes, retained logs, and exit codes when dependency crates compile metadata-only"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-METADATA-014"
+title = "Clippy metadata consumption is covered by builder tests"
+manual = false
+design = "design/metadata-check.md#builder-tests"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder test suite"
+action = "compile a clippy check whose dependency resolves to a metadata-only variant"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-METADATA-015"
+title = "Rustdoc metadata consumption is covered by builder tests"
+manual = false
+design = "design/metadata-check.md#builder-tests"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder test suite"
+action = "compile a rustdoc check whose dependency resolves to a metadata-only variant"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-METADATA-016"
+title = "Metadata-only variants produce no linked library"
+manual = false
+design = "design/metadata-check.md#builder-tests"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder test suite"
+action = "assert that a metadata-only variant output contains no linked library"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-METADATA-017"
+title = "Check entries type-check with metadata"
+manual = false
+design = "design/metadata-check.md#check-entry"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the check builder"
+action = "compile a workspace crate with rustc --emit=metadata for its <crate>:check entry"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-METADATA-018"
+title = "Check entries consume metadata-only dependencies"
+manual = false
+design = "design/metadata-check.md#check-entry"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the check builder"
+action = "resolve the dependency closure of a <crate>:check entry to metadata-only variants"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-METADATA-019"
+title = "Check metadata consumption is covered by builder tests"
+manual = false
+design = "design/metadata-check.md#builder-tests"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder test suite"
+action = "compile a <crate>:check entry whose dependency resolves to a metadata-only variant"

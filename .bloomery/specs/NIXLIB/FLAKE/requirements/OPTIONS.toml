@@ -246,3 +246,14 @@ design = "design/workspace-options.md#development-shell-and-checks"
 type = "ubiquitous"
 system = "the workspace option module"
 action = "default checks.includePackageChecks to false"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-023"
+title = "Crate check defaults to on"
+manual = false
+design = "design/workspace-options.md#development-shell-and-checks"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace option module"
+action = "default checks.crateCheck to true"

@@ -63,7 +63,7 @@ builders.
 ## Check granularity
 
 Each builder runs its idiomatic `nix flake check` suite. Bloomery exposes
-individual per-crate test, clippy, doc, and doctest checks. crane exposes
+individual per-crate check, test, clippy, doc, and doctest checks. crane exposes
 workspace-level clippy and test derivations. cargo2nix, crate2nix, and naersk
 expose the checks their integrations support. The benchmark compares
 total check wall time, not per-crate parity.

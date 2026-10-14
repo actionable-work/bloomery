@@ -437,6 +437,11 @@
           default = false;
           description = "Include package binary/library build checks in the checks output.";
         };
+        crateCheck = lib.mkOption {
+          type = types.bool;
+          default = true;
+          description = "Generate the <crate>:check type-check entries for every workspace crate.";
+        };
         throwOnOutOfDate = lib.mkOption {
           type = types.bool;
           default = false;

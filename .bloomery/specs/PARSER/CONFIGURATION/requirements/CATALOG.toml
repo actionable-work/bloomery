@@ -230,3 +230,14 @@ design = "design/schema-catalog.md#catalog-fields"
 type = "ubiquitous"
 system = "the schema catalog"
 action = "omit a recommended default for specs.enable because its omission auto-detects"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-022"
+title = "Crate check recommends true"
+manual = false
+design = "design/schema-catalog.md#checks"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "recommend true for checks.crateCheck"

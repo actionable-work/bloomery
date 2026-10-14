@@ -314,3 +314,27 @@ design = "design/output-contract.md#packages"
 type = "ubiquitous"
 system = "the workspace builder"
 action = "expose the exact production derivation, including an optimized variant, as each package target"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-028"
+title = "Crate check is gated independently"
+manual = false
+design = "design/output-contract.md#checks"
+
+[requirements.ears]
+type = "event"
+trigger = "checks.crateCheck is disabled"
+system = "the workspace builder"
+action = "omit <crate>:check entries while retaining the remaining checks"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-029"
+title = "Enabled crate check is generated"
+manual = false
+design = "design/output-contract.md#checks"
+
+[requirements.ears]
+type = "event"
+trigger = "checks.crateCheck is enabled"
+system = "the workspace builder"
+action = "expose a <crate>:check entry for every workspace crate"

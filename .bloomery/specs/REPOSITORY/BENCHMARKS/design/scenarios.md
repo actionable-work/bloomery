@@ -62,7 +62,7 @@ report records which preparation steps ran for each scenario.
 
 Check variants run the builder's complete check suite:
 
-- Bloomery runs its individual per-crate test, clippy, doc, doctest, and package
+- Bloomery runs its individual per-crate check, test, clippy, doc, doctest, and package
   checks.
 - crane runs workspace-level clippy and test derivations.
 - Cargo-based and codegen builders run the checks their integration exposes.

@@ -96,6 +96,12 @@
   }:
     import ./clippy.nix {inherit pkgs lib rustc clippy stdenv;};
 
+  checkCrateWith = {
+    rustc ? pkgs.rustc,
+    stdenv ? pkgs.stdenv,
+  }:
+    import ./check.nix {inherit pkgs lib rustc stdenv;};
+
   docCrateWith = {
     rustc ? pkgs.rustc,
     stdenv ? pkgs.stdenv,

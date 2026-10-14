@@ -118,6 +118,7 @@ default because omission delegates to `Cargo.toml` and rustc defaults.
 | --- | --- | --- |
 | `checks.enable` | boolean | `true` |
 | `checks.includePackageChecks` | boolean | `false` |
+| `checks.crateCheck` | boolean | `true` |
 | `checks.throwOnOutOfDate` | boolean | `false` |
 | `checks.workspaceDependencies` | boolean | `true` |
 | `checks.noDefaultFeatures` | boolean | `true` |

@@ -24,6 +24,7 @@ in {
       devShellEnabled = cfg.devShell.enable;
       checksEnabled = cfg.checks.enable;
       includePackageChecks = cfg.checks.includePackageChecks;
+      crateCheck = cfg.checks.crateCheck;
       unify = cfg.build.unify;
       profileOptLevel = cfg.profile.optLevel;
     };
@@ -35,6 +36,7 @@ in {
       devShellEnabled = true;
       checksEnabled = true;
       includePackageChecks = false;
+      crateCheck = true;
       unify = true;
       profileOptLevel = null;
     };
@@ -148,6 +150,7 @@ in {
         checks = {
           enable = false;
           includePackageChecks = false;
+          crateCheck = false;
           throwOnOutOfDate = true;
           workspaceDependencies = false;
           noDefaultFeatures = false;
@@ -165,6 +168,7 @@ in {
       shellHook = cfg.devShell.shellHook;
       checksEnabled = cfg.checks.enable;
       includePackageChecks = cfg.checks.includePackageChecks;
+      crateCheck = cfg.checks.crateCheck;
       throwOnOutOfDate = cfg.checks.throwOnOutOfDate;
       workspaceDependencies = cfg.checks.workspaceDependencies;
       noDefaultFeatures = cfg.checks.noDefaultFeatures;
@@ -177,6 +181,7 @@ in {
       shellHook = "echo hello";
       checksEnabled = false;
       includePackageChecks = false;
+      crateCheck = false;
       throwOnOutOfDate = true;
       workspaceDependencies = false;
       noDefaultFeatures = false;

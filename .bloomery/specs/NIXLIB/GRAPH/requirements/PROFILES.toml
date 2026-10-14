@@ -1,0 +1,90 @@
+group = "PROFILES"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-PROFILES-001"
+title = "Test checks use dev-profile crates"
+manual = false
+design = "design/check-profiles.md#linking-check-crates"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the test builder"
+action = "resolve the crate under test and its workspace dependency closure to dev-profile crate variants"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-PROFILES-002"
+title = "Doctest checks use dev-profile crates"
+manual = false
+design = "design/check-profiles.md#linking-check-crates"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the doctest builder"
+action = "resolve the crate under test and its workspace dependency closure to dev-profile crate variants"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-PROFILES-003"
+title = "Non-workspace check dependencies reuse release crates"
+manual = false
+design = "design/check-profiles.md#linking-check-crates"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the dev-profile check graph"
+action = "resolve non-workspace dependency crates to their release variants"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-PROFILES-004"
+title = "Check profiles ignore dev package visibility"
+manual = false
+design = "design/check-profiles.md#availability"
+
+[requirements.ears]
+type = "event"
+trigger = "build.devPackages is disabled"
+system = "the workspace builder"
+action = "still resolve test and doctest checks to dev-profile workspace crate variants"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-PROFILES-005"
+title = "Package checks keep the release profile"
+manual = false
+design = "design/check-profiles.md#release-consumers"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the package checks"
+action = "resolve their dependency closure to release crate variants"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-PROFILES-006"
+title = "Check artifacts do not mix profiles"
+manual = false
+design = "design/check-profiles.md#release-consumers"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the check builders"
+action = "link crate instances from a single profile inside one artifact"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-PROFILES-007"
+title = "Dev-profile test consumption is covered by builder tests"
+manual = false
+design = "design/check-profiles.md#builder-tests"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder test suite"
+action = "compile a test check whose workspace dependency resolves to a dev-profile variant"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-PROFILES-008"
+title = "Dev-profile doctest consumption is covered by builder tests"
+manual = false
+design = "design/check-profiles.md#builder-tests"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the crate builder test suite"
+action = "compile a doctest check whose workspace dependency resolves to a dev-profile variant"

@@ -21,6 +21,10 @@
     root = ../tests/basic-workspace;
     checks.includePackageChecks = false;
   };
+  workspaceWithoutCrateCheck = mkWorkspace {
+    root = ../tests/basic-workspace;
+    checks.crateCheck = false;
+  };
   workspaceWithChecksDisabled = mkWorkspace {
     root = ../tests/basic-workspace;
     checks.enable = false;
@@ -149,6 +153,21 @@ in {
       hasCheckWithMetadata = false;
       hasCheckWithoutMetadata = false;
       hasLocalBloomeryBinary = false;
+    };
+  };
+
+  testCrateCheckIsGatedIndependently = {
+    expr = {
+      hasCheck = builtins.hasAttr "bin-calc:check" metadataWorkspace.checks;
+      omitsCheckWhenDisabled = !(builtins.hasAttr "bin-calc:check" workspaceWithoutCrateCheck.checks);
+      keepsUnitCheckWhenDisabled = builtins.hasAttr "bin-calc:test" workspaceWithoutCrateCheck.checks;
+      keepsClippyWhenDisabled = builtins.hasAttr "bin-calc:clippy" workspaceWithoutCrateCheck.checks;
+    };
+    expected = {
+      hasCheck = true;
+      omitsCheckWhenDisabled = true;
+      keepsUnitCheckWhenDisabled = true;
+      keepsClippyWhenDisabled = true;
     };
   };
 

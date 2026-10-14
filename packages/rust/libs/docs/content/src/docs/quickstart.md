@@ -64,7 +64,7 @@ All build settings are read from `.bloomery/config.toml`:
 | `[profile.release]`, `[profile.dev]` | Optimization, LTO, codegen units, panic, strip, debug info, CPU target |
 | `[flags]` | Extra `rustc`, `test`, `clippy`, `doc`, and `doctest` flags |
 | `[devShell]` | `enable`, extra `packages`, and `shellHook` |
-| `[checks]` | `enable`, `includePackageChecks`, `throwOnOutOfDate` |
+| `[checks]` | `enable`, `includePackageChecks`, `crateCheck`, `throwOnOutOfDate` |
 | `[features]` | `cratesIoIndex` |
 
 Package-valued settings are written as nixpkgs attribute paths (for example

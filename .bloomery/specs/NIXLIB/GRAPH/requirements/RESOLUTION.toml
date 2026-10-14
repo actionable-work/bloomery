@@ -126,7 +126,7 @@ design = "design/resolution.md#crate-nodes-and-edges"
 
 [requirements.ears]
 type = "event"
-trigger = "dev packages are enabled"
+trigger = "dev packages or checks are enabled"
 system = "the workspace builder"
 action = "expose dev-profile crate nodes for workspace members while sharing non-workspace release nodes"
 

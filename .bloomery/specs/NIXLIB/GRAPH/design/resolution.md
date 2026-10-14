@@ -57,8 +57,8 @@ evaluation fails with guidance to run `bloomery sync`.
 ## Crate nodes and edges
 
 Every package in `Cargo.lock` becomes a release crate node; `cratesDev`
-re-evaluates workspace members with dev flags when dev packages are enabled
-while sharing non-workspace nodes. The global graph exposes one node per package
+re-evaluates workspace members with dev flags when dev packages or checks are
+enabled while sharing non-workspace nodes. The global graph exposes one node per package
 keyed by `<name>-<version>`. Each resolution context exposes one node per package
 in that context, keyed by the context and the package ID, so the same package may
 have distinct derivations in different contexts.
