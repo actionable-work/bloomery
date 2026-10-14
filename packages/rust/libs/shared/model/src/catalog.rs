@@ -12,6 +12,8 @@ pub enum ValueType {
     /// Integer in `0..=max`.
     UnsignedUpTo(u64),
     String,
+    /// A finite integer or floating point number.
+    Number,
     /// Repository-relative or `.bloomery`-relative path encoded as a string.
     Path,
     /// nixpkgs attribute path encoded as a string.
@@ -22,10 +24,11 @@ pub enum ValueType {
 }
 
 /// Documented value applied to an absent key.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DefaultValue {
     Bool(bool),
     Integer(i64),
+    Float(f64),
     String(&'static str),
     StringList(&'static [&'static str]),
 }
@@ -36,6 +39,7 @@ impl DefaultValue {
         match self {
             Self::Bool(value) => Value::Boolean(value),
             Self::Integer(value) => Value::Integer(value),
+            Self::Float(value) => Value::Float(value),
             Self::String(value) => Value::String(value.to_owned()),
             Self::StringList(values) => Value::Array(
                 values
@@ -85,7 +89,7 @@ impl KeySpec {
 }
 
 /// Increment when the catalog changes.
-pub const CATALOG_VERSION: u32 = 8;
+pub const CATALOG_VERSION: u32 = 9;
 
 const OPT_LEVEL: &[ValueType] = &[
     ValueType::UnsignedUpTo(3),
@@ -487,6 +491,84 @@ pub const CATALOG: &[CatalogEntry] = &[
         documentation: "Require default features to be disabled on workspace dependencies.",
     },
     CatalogEntry {
+        path: &["checks", "codeHealth", "enable"],
+        value_type: ValueType::Bool,
+        recommended: Some(DefaultValue::Bool(true)),
+        documentation: "Enable the source-based code health check.",
+    },
+    CatalogEntry {
+        path: &["checks", "codeHealth", "baseline"],
+        value_type: ValueType::Path,
+        recommended: Some(DefaultValue::String(".bloomery/code-health-summary.json")),
+        documentation: "Repository-relative reviewed code health snapshot.",
+    },
+    CatalogEntry {
+        path: &["checks", "codeHealth", "minCrateScore"],
+        value_type: ValueType::Number,
+        recommended: Some(DefaultValue::Integer(80)),
+        documentation: "Minimum passing code health score for each crate (0–100).",
+    },
+    CatalogEntry {
+        path: &["checks", "codeHealth", "minWorkspaceScore"],
+        value_type: ValueType::Number,
+        recommended: Some(DefaultValue::Integer(80)),
+        documentation: "Minimum passing aggregate code health score (0–100).",
+    },
+    CatalogEntry {
+        path: &["checks", "codeHealth", "maxRegression"],
+        value_type: ValueType::Number,
+        recommended: Some(DefaultValue::Integer(0)),
+        documentation: "Maximum allowed decrease from a reviewed score (0–100 points).",
+    },
+    CatalogEntry {
+        path: &["checks", "codeHealth", "cyclomaticLimit"],
+        value_type: ValueType::PositiveInteger,
+        recommended: Some(DefaultValue::Integer(10)),
+        documentation: "Soft cyclomatic complexity limit used by code health scoring.",
+    },
+    CatalogEntry {
+        path: &["checks", "codeHealth", "functionTokensLimit"],
+        value_type: ValueType::PositiveInteger,
+        recommended: Some(DefaultValue::Integer(250)),
+        documentation: "Soft callable body token limit used by code health scoring.",
+    },
+    CatalogEntry {
+        path: &["checks", "codeHealth", "nestingLimit"],
+        value_type: ValueType::PositiveInteger,
+        recommended: Some(DefaultValue::Integer(4)),
+        documentation: "Soft branch nesting limit used by code health scoring.",
+    },
+    CatalogEntry {
+        path: &["checks", "codeHealth", "duplicationFreeRatio"],
+        value_type: ValueType::Number,
+        recommended: Some(DefaultValue::Float(0.02)),
+        documentation: "Duplicate body-token fraction without a scoring penalty (0–1).",
+    },
+    CatalogEntry {
+        path: &["checks", "codeHealth", "duplicateMinTokens"],
+        value_type: ValueType::PositiveInteger,
+        recommended: Some(DefaultValue::Integer(64)),
+        documentation: "Minimum exact token window considered a duplicate (at least 16).",
+    },
+    CatalogEntry {
+        path: &["checks", "codeHealth", "maxCyclomatic"],
+        value_type: ValueType::PositiveInteger,
+        recommended: Some(DefaultValue::Integer(40)),
+        documentation: "Hard per-callable cyclomatic complexity limit.",
+    },
+    CatalogEntry {
+        path: &["checks", "codeHealth", "maxFunctionTokens"],
+        value_type: ValueType::PositiveInteger,
+        recommended: Some(DefaultValue::Integer(1000)),
+        documentation: "Hard per-callable body token limit.",
+    },
+    CatalogEntry {
+        path: &["checks", "codeHealth", "maxNesting"],
+        value_type: ValueType::PositiveInteger,
+        recommended: Some(DefaultValue::Integer(8)),
+        documentation: "Hard per-callable branch nesting limit.",
+    },
+    CatalogEntry {
         path: &["build", "unify"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(true)),
@@ -830,6 +912,7 @@ fn type_name(value_type: &ValueType) -> String {
         ValueType::PositiveInteger => "positive integer".to_owned(),
         ValueType::UnsignedUpTo(max) => format!("integer from 0 to {max}"),
         ValueType::String => "string".to_owned(),
+        ValueType::Number => "number".to_owned(),
         ValueType::Path => "path string".to_owned(),
         ValueType::Package => "nixpkgs attribute-path string".to_owned(),
         ValueType::StringList => "list of strings".to_owned(),
@@ -852,6 +935,9 @@ fn matches(value: &Value, value_type: &ValueType) -> bool {
             .as_integer()
             .is_some_and(|value| value >= 0 && value as u64 <= *max),
         ValueType::String | ValueType::Path | ValueType::Package => value.is_str(),
+        ValueType::Number => {
+            value.as_float().is_some_and(f64::is_finite) || value.as_integer().is_some()
+        }
         ValueType::StringList => value
             .as_array()
             .is_some_and(|items| items.iter().all(Value::is_str)),
@@ -922,7 +1008,10 @@ pub fn validate_raw(raw: &Value) -> Result<(), Diagnostic> {
     }
     match diagnostics.into_iter().next() {
         Some(diagnostic) => Err(diagnostic),
-        None => Ok(()),
+        None => {
+            crate::health::HealthConfig::from_raw(Some(raw))?;
+            Ok(())
+        }
     }
 }
 
@@ -986,11 +1075,50 @@ mod tests {
             "checks.enable",
             "build.unify",
             "formatters.toml-sort.before",
+            "checks.codeHealth.enable",
+            "checks.codeHealth.duplicationFreeRatio",
+            "checks.codeHealth.maxNesting",
         ] {
             assert!(
                 paths.iter().any(|candidate| candidate == expected),
                 "{expected}"
             );
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-HEALTH-001"))]
+    fn health_schema_supplies_all_recommended_defaults() {
+        let health_entries = CATALOG
+            .iter()
+            .filter(|entry| entry.path.starts_with(&["checks", "codeHealth"]))
+            .collect::<Vec<_>>();
+        assert_eq!(health_entries.len(), 13);
+        assert!(
+            health_entries
+                .iter()
+                .all(|entry| entry.recommended.is_some())
+        );
+        assert_eq!(
+            effective_default(&["checks", "codeHealth", "duplicationFreeRatio"]),
+            Some(Value::Float(0.02))
+        );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-HEALTH-002"))]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-HEALTH-003"))]
+    fn health_schema_rejects_invalid_policy_even_when_disabled() {
+        for raw in [
+            "[checks.codeHealth]\nenable=false\nminCrateScore=101\n",
+            "[checks.codeHealth]\nduplicationFreeRatio=1.0\n",
+            "[checks.codeHealth]\nduplicateMinTokens=15\n",
+            "[checks.codeHealth]\ncyclomaticLimit=10\nmaxCyclomatic=9\n",
+            "[checks.codeHealth]\nunknown=true\n",
+            "[checks.codeHealth]\nminCrateScore=nan\n",
+        ] {
+            let value = toml::from_str::<Value>(raw).expect("TOML parses");
+            assert!(validate_raw(&value).is_err(), "accepted {raw}");
         }
     }
 
@@ -1149,7 +1277,7 @@ mod tests {
     #[test]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-005"))]
     fn catalog_version_tracks_the_binary() {
-        assert_eq!(CATALOG_VERSION, 8);
+        assert_eq!(CATALOG_VERSION, 9);
         assert!(!CATALOG.is_empty());
     }
 

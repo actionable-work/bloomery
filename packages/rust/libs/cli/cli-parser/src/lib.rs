@@ -548,6 +548,8 @@ enum RawCheckOperation {
     Failures(RawFailureArgs),
     /// Retrieve the retained details for one failure ID.
     Details(RawDetailsArgs),
+    /// Retrieve retained per-crate code-health scores.
+    Health(RawHealthArgs),
 }
 
 impl From<RawCheckOperation> for CheckOperation {
@@ -556,7 +558,55 @@ impl From<RawCheckOperation> for CheckOperation {
             RawCheckOperation::List(args) => Self::List(args.into()),
             RawCheckOperation::Failures(args) => Self::Failures(args.into()),
             RawCheckOperation::Details(args) => Self::Details(args.into()),
+            RawCheckOperation::Health(args) => match args.operation {
+                Some(RawHealthSubcommand::Update(update)) => Self::HealthUpdate(update.into()),
+                None => Self::Health(args.into()),
+            },
         }
+    }
+}
+
+#[derive(Debug, Args)]
+struct RawHealthArgs {
+    #[command(subcommand)]
+    operation: Option<RawHealthSubcommand>,
+    /// Select a completed run; defaults to the latest completed run.
+    #[arg(long)]
+    run: Option<String>,
+    /// Zero-based crate offset.
+    #[arg(long, default_value_t = 0)]
+    offset: usize,
+    /// Maximum number of crate summaries to return.
+    #[arg(long, default_value_t = DEFAULT_PAGE_LIMIT)]
+    limit: usize,
+}
+
+impl From<RawHealthArgs> for bloomery_cli_types::HealthArgs {
+    fn from(args: RawHealthArgs) -> Self {
+        Self {
+            run: args.run,
+            offset: args.offset,
+            limit: args.limit,
+        }
+    }
+}
+
+#[derive(Debug, Subcommand)]
+enum RawHealthSubcommand {
+    /// Replace the configured baseline with a reviewed current measurement.
+    Update(RawHealthUpdateArgs),
+}
+
+#[derive(Debug, Args)]
+struct RawHealthUpdateArgs {
+    /// Select a completed run; defaults to the latest completed run.
+    #[arg(long)]
+    run: Option<String>,
+}
+
+impl From<RawHealthUpdateArgs> for bloomery_cli_types::HealthUpdateArgs {
+    fn from(args: RawHealthUpdateArgs) -> Self {
+        Self { run: args.run }
     }
 }
 

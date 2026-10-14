@@ -35,37 +35,7 @@ pub async fn page_layout(
                 <link rel="stylesheet" href=(BLOOMERY_CSS) />
             </head>
             <body class="bloomery-shell">
-                <header class="bloomery-top-header">
-                    <div class="header-left">
-                        <a href="/" class="brand-link">
-                            <img src=(BLOOMERY_LOGO) class="brand-logo-img" alt="Bloomery logo" />
-                            <span class="brand-text">"bloomery"</span>
-                        </a>
-                        <span class="brand-version-badge">(CONFIG.default_version)</span>
-                    </div>
-
-                    <div class="header-center">
-                        <div class="quick-search-box">
-                            <span class="material-symbols-outlined" style="font-size: 18px;">"search"</span>
-                            <span>"Quick search documentation..."</span>
-                            <kbd class="search-kbd">"⌘K"</kbd>
-                        </div>
-                    </div>
-
-                    <div class="header-right">
-                        <div class="header-actions">
-                            <a href=(CONFIG.repo_url) target="_blank" rel="noopener noreferrer" class="header-action-btn" title="GitHub Repository & Stars">
-                                <span class="material-symbols-outlined" style="font-size: 16px; color: #f59e0b;">"star"</span>
-                                <span>"GitHub"</span>
-                                <span id="github-stars-count" class="github-stars-badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; padding: 0.15rem 0.45rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; margin-left: 0.2rem;">"★"</span>
-                            </a>
-                            <a href=(CONFIG.discussions_url) target="_blank" rel="noopener noreferrer" class="header-action-btn" title="Discussions">
-                                <span class="material-symbols-outlined" style="font-size: 18px;">"forum"</span>
-                                <span>"Discussions"</span>
-                            </a>
-                        </div>
-                    </div>
-                </header>
+                site_header()
 
                 <div class="bloomery-main-container">
                     sidebar(active_path: active_path)
@@ -75,76 +45,7 @@ pub async fn page_layout(
                     </main>
                 </div>
 
-                <div id="search-modal" class="search-modal-backdrop" style="display: none;">
-                    <div class="search-modal-card">
-                        <div class="search-input-row">
-                            <span class="material-symbols-outlined" style="color: var(--primary); font-size: 20px;">"search"</span>
-                            <input type="text" id="docs-search-input" class="search-modal-input" placeholder="Search documentation, options, architecture..." autocomplete="off" />
-                            <kbd class="search-kbd" id="close-search-btn" style="cursor: pointer;">"ESC"</kbd>
-                        </div>
-                        <div class="search-results-list" id="search-results">
-                            <a href="/" class="search-result-item" data-keywords="overview philosophy nix cargo lock pure rlib">
-                                <span class="material-symbols-outlined result-icon">"home"</span>
-                                <div>
-                                    <div class="result-title">"Introduction & Philosophy"</div>
-                                    <div class="result-desc">"Pure Nix Rust engine, zero Cargo overhead, and core principles"</div>
-                                </div>
-                            </a>
-                            <a href="/quickstart" class="search-result-item" data-keywords="quickstart flake mkflake config toml lock shell">
-                                <span class="material-symbols-outlined result-icon">"rocket_launch"</span>
-                                <div>
-                                    <div class="result-title">"Quickstart & Configuration"</div>
-                                    <div class="result-desc">"Config-driven flake.nix, .bloomery/config.toml, and lock commands"</div>
-                                </div>
-                            </a>
-                            <a href="/architecture" class="search-result-item" data-keywords="architecture dag zero-ifd build.rs assets rlib dependencies">
-                                <span class="material-symbols-outlined result-icon">"account_tree"</span>
-                                <div>
-                                    <div class="result-title">"Architecture & Internals"</div>
-                                    <div class="result-desc">"Zero-IFD resolution, per-crate DAGs, and build script sandboxing"</div>
-                                </div>
-                            </a>
-                            <a href="/profiles" class="search-result-item" data-keywords="profiles lto optlevel panic codegenunits strip debuginfo targetcpu">
-                                <span class="material-symbols-outlined result-icon">"tune"</span>
-                                <div>
-                                    <div class="result-title">"Strongly-Typed Profiles"</div>
-                                    <div class="result-desc">"LTO, codegen units, panic strategies, and profile.dev settings"</div>
-                                </div>
-                            </a>
-                            <a href="/api" class="search-result-item" data-keywords="api schema config toml mkflake toolchain source flags checks">
-                                <span class="material-symbols-outlined result-icon">"menu_book"</span>
-                                <div>
-                                    <div class="result-title">"mkFlake Config API"</div>
-                                    <div class="result-desc">"Categorized config.toml reference for sources, toolchain, flags"</div>
-                                </div>
-                            </a>
-                            <a href="/overrides" class="search-result-item" data-keywords="overrides fileset assets assetdirs openssl sys-crates env">
-                                <span class="material-symbols-outlined result-icon">"settings_input_component"</span>
-                                <div>
-                                    <div class="result-title">"Colocated overrides.nix"</div>
-                                    <div class="result-desc">"overrides.nix, native C libraries, and asset pipelines"</div>
-                                </div>
-                            </a>
-                            <a href="/matrix" class="search-result-item" data-keywords="matrix tests workspaces verification axum mklib edge-cases">
-                                <span class="material-symbols-outlined result-icon">"fact_check"</span>
-                                <div>
-                                    <div class="result-title">"Verification Matrix"</div>
-                                    <div class="result-desc">"6 dedicated test workspaces running automated checks in CI"</div>
-                                </div>
-                            </a>
-                            <a href="/benchmarks" class="search-result-item" data-keywords="benchmarks comparison crane cargo2nix cache ci speed">
-                                <span class="material-symbols-outlined result-icon">"query_stats"</span>
-                                <div>
-                                    <div class="result-title">"Architectural Benchmarks"</div>
-                                    <div class="result-desc">"Performance comparisons with Crane & Cargo2nix"</div>
-                                </div>
-                            </a>
-                            <div id="search-no-results" style="display: none; padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.9rem;">
-                                "No matching documentation pages found."
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                search_modal()
 
                 <script>(Unescaped::new_unchecked(r#"
                     // Dynamically fetch GitHub stars
@@ -290,5 +191,116 @@ pub async fn page_layout(
                 "#))</script>
             </body>
         </html>
+    })
+}
+
+#[component]
+async fn site_header() -> Result<impl View> {
+    Ok(view! {
+        <header class="bloomery-top-header">
+            <div class="header-left">
+                <a href="/" class="brand-link">
+                    <img src=(BLOOMERY_LOGO) class="brand-logo-img" alt="Bloomery logo" />
+                    <span class="brand-text">"bloomery"</span>
+                </a>
+                <span class="brand-version-badge">(CONFIG.default_version)</span>
+            </div>
+            <div class="header-center">
+                <div class="quick-search-box">
+                    <span class="material-symbols-outlined" style="font-size: 18px;">"search"</span>
+                    <span>"Quick search documentation..."</span>
+                    <kbd class="search-kbd">"⌘K"</kbd>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="header-actions">
+                    <a href=(CONFIG.repo_url) target="_blank" rel="noopener noreferrer" class="header-action-btn" title="GitHub Repository & Stars">
+                        <span class="material-symbols-outlined" style="font-size: 16px; color: #f59e0b;">"star"</span>
+                        <span>"GitHub"</span>
+                        <span id="github-stars-count" class="github-stars-badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; padding: 0.15rem 0.45rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; margin-left: 0.2rem;">"★"</span>
+                    </a>
+                    <a href=(CONFIG.discussions_url) target="_blank" rel="noopener noreferrer" class="header-action-btn" title="Discussions">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">"forum"</span>
+                        <span>"Discussions"</span>
+                    </a>
+                </div>
+            </div>
+        </header>
+    })
+}
+
+#[component]
+async fn search_modal() -> Result<impl View> {
+    Ok(view! {
+        <div id="search-modal" class="search-modal-backdrop" style="display: none;">
+            <div class="search-modal-card">
+                <div class="search-input-row">
+                    <span class="material-symbols-outlined" style="color: var(--primary); font-size: 20px;">"search"</span>
+                    <input type="text" id="docs-search-input" class="search-modal-input" placeholder="Search documentation, options, architecture..." autocomplete="off" />
+                    <kbd class="search-kbd" id="close-search-btn" style="cursor: pointer;">"ESC"</kbd>
+                </div>
+                <div class="search-results-list" id="search-results">
+                    <a href="/" class="search-result-item" data-keywords="overview philosophy nix cargo lock pure rlib">
+                        <span class="material-symbols-outlined result-icon">"home"</span>
+                        <div>
+                            <div class="result-title">"Introduction & Philosophy"</div>
+                            <div class="result-desc">"Pure Nix Rust engine, zero Cargo overhead, and core principles"</div>
+                        </div>
+                    </a>
+                    <a href="/quickstart" class="search-result-item" data-keywords="quickstart flake mkflake config toml lock shell">
+                        <span class="material-symbols-outlined result-icon">"rocket_launch"</span>
+                        <div>
+                            <div class="result-title">"Quickstart & Configuration"</div>
+                            <div class="result-desc">"Config-driven flake.nix, .bloomery/config.toml, and lock commands"</div>
+                        </div>
+                    </a>
+                    <a href="/architecture" class="search-result-item" data-keywords="architecture dag zero-ifd build.rs assets rlib dependencies">
+                        <span class="material-symbols-outlined result-icon">"account_tree"</span>
+                        <div>
+                            <div class="result-title">"Architecture & Internals"</div>
+                            <div class="result-desc">"Zero-IFD resolution, per-crate DAGs, and build script sandboxing"</div>
+                        </div>
+                    </a>
+                    <a href="/profiles" class="search-result-item" data-keywords="profiles lto optlevel panic codegenunits strip debuginfo targetcpu">
+                        <span class="material-symbols-outlined result-icon">"tune"</span>
+                        <div>
+                            <div class="result-title">"Strongly-Typed Profiles"</div>
+                            <div class="result-desc">"LTO, codegen units, panic strategies, and profile.dev settings"</div>
+                        </div>
+                    </a>
+                    <a href="/api" class="search-result-item" data-keywords="api schema config toml mkflake toolchain source flags checks">
+                        <span class="material-symbols-outlined result-icon">"menu_book"</span>
+                        <div>
+                            <div class="result-title">"mkFlake Config API"</div>
+                            <div class="result-desc">"Categorized config.toml reference for sources, toolchain, flags"</div>
+                        </div>
+                    </a>
+                    <a href="/overrides" class="search-result-item" data-keywords="overrides fileset assets assetdirs openssl sys-crates env">
+                        <span class="material-symbols-outlined result-icon">"settings_input_component"</span>
+                        <div>
+                            <div class="result-title">"Colocated overrides.nix"</div>
+                            <div class="result-desc">"overrides.nix, native C libraries, and asset pipelines"</div>
+                        </div>
+                    </a>
+                    <a href="/matrix" class="search-result-item" data-keywords="matrix tests workspaces verification axum mklib edge-cases">
+                        <span class="material-symbols-outlined result-icon">"fact_check"</span>
+                        <div>
+                            <div class="result-title">"Verification Matrix"</div>
+                            <div class="result-desc">"6 dedicated test workspaces running automated checks in CI"</div>
+                        </div>
+                    </a>
+                    <a href="/benchmarks" class="search-result-item" data-keywords="benchmarks comparison crane cargo2nix cache ci speed">
+                        <span class="material-symbols-outlined result-icon">"query_stats"</span>
+                        <div>
+                            <div class="result-title">"Architectural Benchmarks"</div>
+                            <div class="result-desc">"Performance comparisons with Crane & Cargo2nix"</div>
+                        </div>
+                    </a>
+                    <div id="search-no-results" style="display: none; padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.9rem;">
+                        "No matching documentation pages found."
+                    </div>
+                </div>
+            </div>
+        </div>
     })
 }

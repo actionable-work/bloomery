@@ -8,6 +8,8 @@ description: |
   validation and Nix check derivations; a formatting failure always stops the
   run. After formatting succeeds, static checks and one batched Nix realization
   run concurrently, with terminal work metrics and seekable retained failures.
+  Code health shares Rust parsing with evidence scanning, reports crate and
+  workspace scores, and compares a reviewed tracked baseline.
   Package build checks are excluded from the generated check set unless
   `checks.includePackageChecks` enables them, so the default check suite stays
   lightweight; [build](../BUILD/README.md) is the production materialization
@@ -26,7 +28,7 @@ certifies only its selection. The shared CLI preflight requires a root
 any selected check starts. Static evidence remains necessary but is not a
 substitute for executing the selected Nix checks. When specification management
 is disabled, the static specification checks are absent and check runs the
-formatter gate and Nix checks only.
+formatter gate, enabled code health, and Nix checks without specification passes.
 
 ## Design documents
 
@@ -36,14 +38,15 @@ formatter gate and Nix checks only.
 - [Failure summaries and diagnostics](design/diagnostics.md)
 - [Retained runs and seekable details](design/details.md)
 - [Nix orchestration and integration removal](design/workspace-check.md)
+- [Code health scores and reviewed snapshots](design/code-health.md)
 
 ## Responsibilities
 
 - Preserve structure, grammar, design-link, scanner, and traceability validation
   from the [PARSER area](../../PARSER/README.md) when specification management
   is enabled.
-- Run the formatter gate and Nix checks without a specification tree when
-  specification management is disabled.
+- Run the formatter gate, enabled code health, and Nix checks without a
+  specification tree when specification management is disabled.
 - Require the shared root-flake preflight for every command.
 - Run `nix fmt` before selected checks and stop on formatting failure.
 - Run independent static and Nix work concurrently with bounded scheduling,
@@ -60,6 +63,10 @@ formatter gate and Nix checks only.
 - Retain immutable results and logs for paginated retrieval without rerunning.
 - Leave formatter changes in the workspace and leave repository lockfiles
   unchanged.
+- Share Rust ingestion between health and traceability without coupling outcomes.
+- Retain explainable crate scores and a SLOC-weighted workspace score.
+- Apply configurable health limits and baseline regression gates.
+- Export reviewed health snapshots only through `check health update`.
 
 ## Boundaries
 
@@ -68,7 +75,10 @@ CLI preflight requires a root `flake.nix` for every command. Check writes a
 private workspace-scoped user cache. `nix fmt` may modify source files; those
 edits are not rolled back if formatting fails. Retained logs can contain
 sensitive build output and are not removed automatically; delete the workspace
-cache to remove them. Check may use the network through Nix but leaves lockfiles unchanged. It
+cache to remove them. The explicit `check health update` command writes the
+configured tracked snapshot; ordinary execution and retrieval leave it unchanged.
+Health uses source facts without compiler, coverage, or artifact measurements.
+Check may use the network through Nix but leaves lockfiles unchanged. It
 does not produce deployable package artifacts; [build](../BUILD/README.md)
 materializes production packages. It
 does not repair specifications, maintain locks, schedule human reviews, or

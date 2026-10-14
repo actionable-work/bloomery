@@ -126,6 +126,30 @@ pub enum CheckOperation {
     List(ListArgs),
     Failures(FailureArgs),
     Details(DetailsArgs),
+    Health(HealthArgs),
+    HealthUpdate(HealthUpdateArgs),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HealthArgs {
+    pub run: Option<String>,
+    pub offset: usize,
+    pub limit: usize,
+}
+
+impl Default for HealthArgs {
+    fn default() -> Self {
+        Self {
+            run: None,
+            offset: 0,
+            limit: DEFAULT_PAGE_LIMIT,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct HealthUpdateArgs {
+    pub run: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

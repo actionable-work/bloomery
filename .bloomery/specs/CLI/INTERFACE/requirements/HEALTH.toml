@@ -1,0 +1,15 @@
+group = "HEALTH"
+
+[[requirements]]
+id = "CLI-INTERFACE-HEALTH-001"
+title = "Check exposes health retrieval"
+manual = false
+design = "design/commands.md"
+ears = { type = "ubiquitous", system = "the CLI", action = "expose bloomery check health with run, offset, limit, and JSON options" }
+
+[[requirements]]
+id = "CLI-INTERFACE-HEALTH-002"
+title = "Check exposes reviewed health export"
+manual = false
+design = "design/commands.md"
+ears = { type = "ubiquitous", system = "the CLI", action = "expose bloomery check health update with run and JSON options" }

@@ -8,7 +8,9 @@ applicable). Namespace by canonical workspace root so results from different
 workspaces cannot be mixed. Use opaque run IDs, not timestamps as the sole
 identity. Retain the selection, system scope, selected check outcomes and the
 `format:workspace` outcome, structured failures, Git revision and working-tree
-state when available, and captured logs.
+state when available, and captured logs. Retain complete health measurements
+and baseline comparisons as structured run data when selected health analysis
+completes; see [health retrieval and export](code-health.md#retained-reports).
 Sample revision and working-tree state after the formatter gate completes or
 fails, so retained metadata describes the source used by check tasks and any
 formatting edits, including partial edits from a failed formatter.

@@ -33,7 +33,7 @@
     ];
     flags = ["rustc" "test" "clippy" "doc" "doctest"];
     devShell = ["enable" "packages" "shellHook"];
-    checks = ["enable" "includePackageChecks" "crateCheck" "throwOnOutOfDate" "workspaceDependencies" "noDefaultFeatures"];
+    checks = ["enable" "includePackageChecks" "crateCheck" "throwOnOutOfDate" "workspaceDependencies" "noDefaultFeatures" "codeHealth"];
     features = ["cratesIoIndex"];
   };
 
@@ -46,6 +46,61 @@
       if unknown != []
       then throw "bloomery: unknown key(s) in [${name}]: ${lib.concatStringsSep ", " unknown}"
       else value;
+
+  checkCodeHealth = value: let
+    keys = ["enable" "baseline" "minCrateScore" "minWorkspaceScore" "maxRegression" "cyclomaticLimit" "functionTokensLimit" "nestingLimit" "duplicationFreeRatio" "duplicateMinTokens" "maxCyclomatic" "maxFunctionTokens" "maxNesting"];
+    config = checkTable "checks.codeHealth" keys value;
+    default = {
+      enable = true;
+      baseline = ".bloomery/code-health-summary.json";
+      minCrateScore = 80;
+      minWorkspaceScore = 80;
+      maxRegression = 0;
+      cyclomaticLimit = 10;
+      functionTokensLimit = 250;
+      nestingLimit = 4;
+      duplicationFreeRatio = 0.02;
+      duplicateMinTokens = 64;
+      maxCyclomatic = 40;
+      maxFunctionTokens = 1000;
+      maxNesting = 8;
+    };
+    effective = default // config;
+    number = value: builtins.isInt value || builtins.isFloat value;
+    score = value: number value && value >= 0 && value <= 100;
+    positive = value: builtins.isInt value && value > 0;
+    healthKeys = builtins.attrNames config;
+    typeValid =
+      builtins.all (
+        key: let
+          candidate = config.${key};
+        in
+          if key == "enable"
+          then builtins.isBool candidate
+          else if key == "baseline"
+          then isString candidate && candidate != ""
+          else if builtins.elem key ["minCrateScore" "minWorkspaceScore"]
+          then score candidate
+          else if key == "maxRegression"
+          then score candidate
+          else if key == "duplicationFreeRatio"
+          then number candidate && candidate >= 0 && candidate < 1
+          else if key == "duplicateMinTokens"
+          then positive candidate && candidate >= 16
+          else positive candidate
+      )
+      healthKeys;
+    softHardValid =
+      effective.maxCyclomatic
+      >= effective.cyclomaticLimit
+      && effective.maxFunctionTokens >= effective.functionTokensLimit
+      && effective.maxNesting >= effective.nestingLimit;
+  in
+    if !typeValid
+    then throw "bloomery: invalid value in [checks.codeHealth]"
+    else if !softHardValid
+    then throw "bloomery: code health hard limits must be at least their corresponding soft limits"
+    else config;
 
   # Formatter sub-tables are keyed by formatter name, so validate the shape of
   # each entry rather than a fixed key list.
@@ -241,7 +296,9 @@
     dev = checkTable "profile.dev" allowedKeys.profileFields (profile.dev or {});
     flags = checkTable "flags" allowedKeys.flags (config.flags or {});
     devShell = checkTable "devShell" allowedKeys.devShell (config.devShell or {});
-    checks = checkTable "checks" allowedKeys.checks (config.checks or {});
+    rawChecks = checkTable "checks" allowedKeys.checks (config.checks or {});
+    checkedHealth = lib.optionalAttrs (rawChecks ? codeHealth) {codeHealth = checkCodeHealth rawChecks.codeHealth;};
+    checks = builtins.deepSeq checkedHealth (builtins.removeAttrs rawChecks ["codeHealth"]);
     features = checkTable "features" allowedKeys.features (config.features or {});
     formatters = checkFormatters (config.formatters or {});
     optimize = checkOptimize root (config.optimize or {});

@@ -25,7 +25,9 @@ parser:
   checks in parallel with terminal work metrics, bounded summaries, and
   seekable failure details. Package checks are excluded unless
   `checks.includePackageChecks` enables them, and static specification checks
-  are present only when specification management is enabled.
+  are present only when specification management is enabled. Code health shares
+  Rust analysis, scores each crate and the workspace, and compares a reviewed
+  baseline independently of specification enablement.
 - [`bloomery build`](BUILD/README.md) materializes the exact production package
   derivations for the selected systems in one batched Nix realization and
   reports their output store paths. `--check` gates realization on the default
@@ -70,7 +72,8 @@ source unchanged. Config documentation edits only the comment layer of the
 configuration file. Spec editing changes only grouped requirement records and
 leaves configuration, design documents, source, and lockfiles unchanged. Check
 executes Nix builds and
-writes a user-cache run store. Build realizes production package derivations
+writes a user-cache run store. Its explicit `check health update` subcommand
+writes the tracked health baseline after verifying retained measurement inputs. Build realizes production package derivations
 and creates no result links or run store. Review remains a read-only catalog.
 Disk
 measures realized store paths without building or mutating anything. Spec
@@ -104,7 +107,7 @@ other Nix checks directly. See [Nix orchestration](CHECK/design/workspace-check.
     ├── `bloomery check` execution
     │   ├── catalog/selection setup
     │   ├── flake formatter ──► `nix fmt`
-    │   └── after formatting: PARSER/static checks + Nix checks
+    │   └── after formatting: PARSER/static checks + code health + Nix checks
     ├── `bloomery build` ──► batched `packages.<system>` realization
     ├── `bloomery disk` ──► realized Nix store closure measurement
     ├── `bloomery review` ──► requirement model

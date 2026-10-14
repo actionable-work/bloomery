@@ -1,12 +1,15 @@
 use super::catalog::{CheckPlan, NixBackend, NixCli, discover_catalog};
 use super::execution::run_checks;
+use super::health::{run_retrieve as run_health, run_update as run_health_update};
 use super::interrupt::InterruptFlag;
 use super::model::{Notice, Outcome, RunStatus, selector_may_match_prefix, valid_system_name};
 use super::output;
 use super::retrieval::{run_details, run_failures, run_list};
 use super::store;
 use crate::output::TerminalFacts;
-pub use bloomery_cli_types::{CheckArgs, CheckOperation, DetailsArgs, FailureArgs, ListArgs};
+pub use bloomery_cli_types::{
+    CheckArgs, CheckOperation, DetailsArgs, FailureArgs, HealthArgs, HealthUpdateArgs, ListArgs,
+};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::{self, Write};
@@ -316,6 +319,10 @@ pub(super) fn run_at_with(
             context.cache_base,
             context.backend,
         ),
+        Some(CheckOperation::Health(health)) => run_health(&context, health, stdout, stderr),
+        Some(CheckOperation::HealthUpdate(update)) => {
+            run_health_update(&context, update, stdout, stderr)
+        }
         None => run_checks(
             CheckArgs {
                 operation: None,
@@ -380,6 +387,10 @@ pub(super) fn validate_args(args: &CheckArgs) -> Result<(), CheckError> {
                 return Err(CheckError::usage("failure ID must not be empty"));
             }
         }
+        Some(CheckOperation::Health(health)) => {
+            validate_page_values(health.offset, health.limit)?;
+        }
+        Some(CheckOperation::HealthUpdate(_)) => {}
         None => {}
     }
     Ok(())
@@ -408,21 +419,22 @@ pub(super) struct PlannedCatalog {
     pub(super) dependencies: BTreeMap<String, Vec<String>>,
 }
 
-pub(super) fn spec_management_enabled(root: &Path) -> Result<bool, CheckError> {
-    bloomery_model::config::load(root)
-        .map(|config| config.spec_management_enabled(root))
-        .map_err(|diagnostic| CheckError::operational(diagnostic.message))
-}
-
-fn static_check_ids(enabled: bool) -> Vec<String> {
-    if enabled {
-        vec![
+fn static_check_ids(root: &Path) -> Result<Vec<String>, CheckError> {
+    let loaded = bloomery_model::config::load_with_raw(root)
+        .map_err(|diagnostic| CheckError::operational(diagnostic.message))?;
+    let mut checks = Vec::new();
+    if loaded.config.spec_management_enabled(root) {
+        checks.extend([
             "static:structure".to_owned(),
             "static:traceability".to_owned(),
-        ]
-    } else {
-        Vec::new()
+        ]);
     }
+    let health = bloomery_model::health::HealthConfig::from_raw(loaded.raw.as_ref())
+        .map_err(|diagnostic| CheckError::operational(diagnostic.message))?;
+    if health.enabled {
+        checks.push("static:code-health".to_owned());
+    }
+    Ok(checks)
 }
 
 pub(super) fn plan_for_selection(
@@ -437,7 +449,7 @@ pub(super) fn plan_for_selection(
             message: crate::output::MISSING_FLAKE_MESSAGE.to_owned(),
         });
     }
-    let spec_management = spec_management_enabled(root)?;
+    let static_ids = static_check_ids(root)?;
 
     if requested_systems.is_empty()
         && !selectors.is_empty()
@@ -446,7 +458,7 @@ pub(super) fn plan_for_selection(
             .all(|selector| !selector_may_match_prefix(selector, "nix:"))
     {
         return Ok(PlannedCatalog {
-            ids: static_check_ids(spec_management),
+            ids: static_ids,
             systems: Vec::new(),
             notices: Vec::new(),
             plans: BTreeMap::new(),
@@ -455,7 +467,7 @@ pub(super) fn plan_for_selection(
     }
 
     let systems = effective_systems(root, requested_systems, backend)?;
-    let mut ids = static_check_ids(spec_management);
+    let mut ids = static_ids;
     let mut notices = Vec::new();
     let mut plans = BTreeMap::new();
     let mut dependencies = BTreeMap::new();
@@ -503,7 +515,7 @@ pub(super) fn discover_for_selection(
             message: crate::output::MISSING_FLAKE_MESSAGE.to_owned(),
         });
     }
-    let spec_management = spec_management_enabled(root)?;
+    let static_ids = static_check_ids(root)?;
 
     if requested_systems.is_empty()
         && !selectors.is_empty()
@@ -512,7 +524,7 @@ pub(super) fn discover_for_selection(
             .all(|selector| !selector_may_match_prefix(selector, "nix:"))
     {
         return Ok(Catalog {
-            ids: static_check_ids(spec_management),
+            ids: static_ids,
             systems: Vec::new(),
             notices: Vec::new(),
         });
@@ -521,7 +533,7 @@ pub(super) fn discover_for_selection(
     let systems = effective_systems(root, requested_systems, backend)?;
     let (mut ids, notices) =
         discover_catalog(root, &systems, backend).map_err(CheckError::operational)?;
-    ids.extend(static_check_ids(spec_management));
+    ids.extend(static_ids);
     ids.sort();
     ids.dedup();
     Ok(Catalog {

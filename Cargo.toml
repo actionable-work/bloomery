@@ -42,6 +42,9 @@ oxc_allocator = { default-features = false, version = "0.30" }
 oxc_ast = { default-features = false, version = "0.30" }
 oxc_parser = { default-features = false, version = "0.30" }
 oxc_span = { default-features = false, version = "0.30" }
+proc-macro2 = { default-features = false, features = [
+  "span-locations",
+], version = "1.0" }
 serde = { default-features = false, features = [
   "derive",
   "std",

@@ -81,6 +81,115 @@ pub fn failure_page(record: &RunRecord, requested_offset: usize, limit: usize) -
     }
 }
 
+pub fn health_page(
+    report: &Value,
+    run: &str,
+    requested_offset: usize,
+    limit: usize,
+) -> Result<BoundedPage, String> {
+    let crates = report
+        .get("crates")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "retained health report has no crate list".to_owned())?;
+    let comparisons = report
+        .get("crate_comparisons")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let comparison_by_path = comparisons
+        .iter()
+        .filter_map(|comparison| {
+            comparison
+                .get("manifest_path")
+                .and_then(Value::as_str)
+                .map(|path| (path.to_owned(), comparison))
+        })
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let window = page_window(crates.len(), requested_offset, limit);
+    let mut count = 0;
+    let mut value = health_page_document(
+        report,
+        run,
+        crates,
+        &comparison_by_path,
+        window.offset,
+        count,
+    );
+    while count < window.end.saturating_sub(window.offset) {
+        let candidate = health_page_document(
+            report,
+            run,
+            crates,
+            &comparison_by_path,
+            window.offset,
+            count + 1,
+        );
+        if envelope_bytes("health", crate::output::Status::Succeeded, &candidate).len()
+            > OUTPUT_BYTE_LIMIT
+        {
+            break;
+        }
+        count += 1;
+        value = candidate;
+    }
+    if window.offset < crates.len() && count == 0 && window.end > window.offset {
+        return Err(format!(
+            "health crate at offset {} cannot fit the bounded response",
+            window.offset
+        ));
+    }
+    let next = (window.offset + count < crates.len()).then_some(window.offset + count);
+    value["next"] = next.map_or(Value::Null, |offset| json!(offset));
+    let bytes = envelope_bytes("health", crate::output::Status::Succeeded, &value);
+    Ok(BoundedPage {
+        value,
+        bytes,
+        offset: window.offset,
+        next,
+    })
+}
+
+fn health_page_document(
+    report: &Value,
+    run: &str,
+    crates: &[Value],
+    comparisons: &std::collections::BTreeMap<String, &Value>,
+    offset: usize,
+    count: usize,
+) -> Value {
+    let end = offset.saturating_add(count).min(crates.len());
+    let entries = crates[offset..end]
+        .iter()
+        .map(|crate_record| {
+            let manifest = crate_record
+                .get("manifest_path")
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            let comparison = comparisons.get(manifest).copied();
+            json!({
+                "manifest_path": truncate_utf8(manifest, 512).0,
+                "name": crate_record.get("name").and_then(Value::as_str).map(|name| truncate_utf8(name, 256).0),
+                "sloc": crate_record.get("sloc"),
+                "score_hundredths": crate_record.get("score_hundredths"),
+                "applicability": crate_record.get("applicability"),
+                "baseline_score_hundredths": comparison.and_then(|value| value.get("baseline_score_hundredths")),
+                "delta_hundredths": comparison.and_then(|value| value.get("delta_hundredths")),
+            })
+        })
+        .collect::<Vec<_>>();
+    json!({
+        "run": run,
+        "workspace_score_hundredths": report.pointer("/workspace/score_hundredths"),
+        "baseline_workspace_score_hundredths": report.get("baseline_workspace_score_hundredths"),
+        "workspace_delta_hundredths": report.get("workspace_delta_hundredths"),
+        "applicability": if report.pointer("/workspace/score_hundredths").is_some_and(Value::is_number) { "applicable" } else { "not_applicable" },
+        "total": crates.len(),
+        "offset": offset,
+        "crates": entries,
+        "next": (end < crates.len()).then_some(end),
+    })
+}
+
 fn failure_page_document(record: &RunRecord, offset: usize, count: usize) -> Value {
     let end = offset.saturating_add(count).min(record.failures.len());
     let failures = record.failures[offset..end]
@@ -324,6 +433,16 @@ fn run_summary_document(record: &RunRecord, failure_count: usize) -> Value {
                 .collect::<Vec<_>>()
         );
     }
+    if record
+        .notices
+        .iter()
+        .any(|notice| notice.code == "HealthReportRetained")
+    {
+        value["health_hint"] = json!({
+            "run": record.id,
+            "command": format!("bloomery check health --run {}", record.id),
+        });
+    }
     value
 }
 
@@ -395,6 +514,16 @@ fn run_summary_text_with_count(record: &RunRecord, shown: usize, metrics: Option
                 ));
             }
         }
+    }
+    if record
+        .notices
+        .iter()
+        .any(|notice| notice.code == "HealthReportRetained")
+    {
+        output.push_str(&format!(
+            "\nhealth report: bloomery check health --run {}",
+            record.id
+        ));
     }
     for notice in record.notices.iter().take(4) {
         output.push_str("\nnotice: ");
@@ -726,7 +855,7 @@ pub fn list_text(ids: &[String], systems: &[String], page: &BoundedPage) -> Stri
 mod tests {
     use super::{
         DetailPage, details_page, details_text, failure_page, failure_summary_json, failures_text,
-        list_page, list_text, run_summary_json, run_summary_text,
+        health_page, list_page, list_text, run_summary_json, run_summary_text,
     };
     use crate::check_command::model::{
         CheckRecord, FailureLocation, FailureRecord, OUTPUT_BYTE_LIMIT, Outcome, RunRecord,
@@ -1021,5 +1150,30 @@ mod tests {
         assert_eq!(location["path"], "failure.rs");
         assert!(location.get("line").is_none());
         assert!(location.get("column").is_none());
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-019"))]
+    fn health_pages_are_seekable_and_stay_within_the_response_ceiling() {
+        let report = serde_json::json!({
+            "workspace": {"score_hundredths": 9500},
+            "baseline_workspace_score_hundredths": 9400,
+            "workspace_delta_hundredths": 100,
+            "crates": [
+                {"manifest_path": "a/Cargo.toml", "name": "a", "sloc": 10, "score_hundredths": 9000, "applicability": "applicable"},
+                {"manifest_path": "b/Cargo.toml", "name": "b", "sloc": 20, "score_hundredths": 9750, "applicability": "applicable"}
+            ],
+            "crate_comparisons": [
+                {"manifest_path": "b/Cargo.toml", "baseline_score_hundredths": 9700, "delta_hundredths": 50}
+            ]
+        });
+        let page = health_page(&report, "r123", 1, 1).expect("health page");
+        assert_eq!(page.value["offset"], 1);
+        assert_eq!(page.value["total"], 2);
+        assert_eq!(page.value["crates"][0]["manifest_path"], "b/Cargo.toml");
+        assert_eq!(page.value["crates"][0]["delta_hundredths"], 50);
+        assert_eq!(page.value["workspace_delta_hundredths"], 100);
+        assert_eq!(page.next, None);
+        assert!(page.bytes.len() <= OUTPUT_BYTE_LIMIT);
     }
 }

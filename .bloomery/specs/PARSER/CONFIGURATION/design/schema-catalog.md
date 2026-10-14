@@ -130,6 +130,14 @@ packages instead. Enabling it adds the release `<bin>:bin` and `<crate>:lib`
 checks back to the check set. See the
 [flake check output](../../../NIXLIB/FLAKE/design/output-contract.md#checks).
 
+### `[checks.codeHealth]`
+
+Owned by [CLI/CHECK](../../../CLI/CHECK/design/code-health.md) and parsed by the
+CLI. The [code health catalog](code-health.md#catalog) enumerates every nested
+key, schema type, constraint, and recommended default. These entries participate
+in config get/set/unset/list/upgrade/document like all other fixed keys. The
+Nix loader validates and accepts the table without creating a health derivation.
+
 ### `[features]`
 
 | Key | Type | Recommended default |

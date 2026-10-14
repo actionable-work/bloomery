@@ -9,6 +9,8 @@ bloomery check [--check ID_OR_GLOB]... [--system SYSTEM]... [--jobs N] [--fail-f
 bloomery check list [--check ID_OR_GLOB]... [--system SYSTEM]... [--offset N] [--limit N] [--json]
 bloomery check failures [--run RUN] [--offset N] [--limit N] [--json]
 bloomery check details FAILURE [--run RUN] [--offset N] [--limit N] [--json]
+bloomery check health [--run RUN] [--offset N] [--limit N] [--json]
+bloomery check health update [--run RUN] [--json]
 bloomery build [--package ID_OR_GLOB]... [--system SYSTEM]... [--check] [--json]
 bloomery disk [DERIVATION] [--scope SCOPE] [--system SYSTEM]... [--json]
 bloomery disk tree [DERIVATION] [--scope SCOPE] [--system SYSTEM]... [--json]
@@ -109,6 +111,9 @@ application subcommand and their nested commands; see the
 [output contract](output.md) and
 [presentation grammar](presentation.md). Check without a nested command executes the
 selected suite; list discovers checks, failures pages retained failures, and
-details seeks within retained failure output. Build realizes the selected
+details seeks within retained failure output. Health retrieves retained crate
+and workspace scores; health update explicitly writes the reviewed baseline
+from a complete, current retained measurement. See
+[code health](../../CHECK/design/code-health.md#reviewed-snapshots). Build realizes the selected
 production packages and reports their output store paths. Retrieval never executes tests or
 builds. Config commands are specified separately by [CONFIG](../../CONFIG/README.md).

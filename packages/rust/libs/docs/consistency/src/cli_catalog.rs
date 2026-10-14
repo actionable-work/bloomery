@@ -1,5 +1,6 @@
 use bloomery_cli_types::{
-    CheckOperation, CliCommand, ConfigArgs, ConfigOperation, DetailsArgs, SpecArgs, SpecOperation,
+    CheckOperation, CliCommand, ConfigArgs, ConfigOperation, DetailsArgs, HealthArgs,
+    HealthUpdateArgs, SpecArgs, SpecOperation,
 };
 use std::collections::BTreeSet;
 
@@ -43,6 +44,8 @@ pub fn command_paths() -> BTreeSet<String> {
             offset: None,
             limit: 0,
         }),
+        CheckOperation::Health(HealthArgs::default()),
+        CheckOperation::HealthUpdate(HealthUpdateArgs::default()),
     ];
     for operation in &check_operations {
         paths.insert(check_operation_path(operation).to_string());
@@ -114,6 +117,8 @@ fn check_operation_path(operation: &CheckOperation) -> &'static str {
         CheckOperation::List(_) => "check list",
         CheckOperation::Failures(_) => "check failures",
         CheckOperation::Details(_) => "check details",
+        CheckOperation::Health(_) => "check health",
+        CheckOperation::HealthUpdate(_) => "check health update",
     }
 }
 
@@ -145,10 +150,14 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-HEALTH-001"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-HEALTH-002"))]
     fn catalog_contains_representative_paths() {
         let paths = command_paths();
         assert!(paths.contains("check"));
         assert!(paths.contains("check list"));
+        assert!(paths.contains("check health"));
+        assert!(paths.contains("check health update"));
         assert!(paths.contains("config document"));
         assert!(paths.contains("spec candidates"));
         assert!(paths.contains("disk tree"));

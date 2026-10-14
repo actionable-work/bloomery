@@ -154,6 +154,7 @@ in
     );
 
     baseOutputs = {
+      healthSources = eachSystem (system: perSystemWorkspace.${system}.healthSources);
       packages = eachSystem (
         system: mergeElevated perSystemWorkspace.${system}.packages elevatedPackages.${system}
       );

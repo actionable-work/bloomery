@@ -1,0 +1,29 @@
+group = "HEALTH"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-HEALTH-001"
+title = "Health policy has catalogued defaults"
+manual = false
+design = "design/code-health.md#catalog"
+ears = { type = "ubiquitous", system = "Bloomery", action = "resolve omitted checks.codeHealth keys to the documented defaults and expose every key through the shared config schema catalog" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-HEALTH-002"
+title = "Health configuration is validated early"
+manual = false
+design = "design/code-health.md#catalog"
+ears = { type = "ubiquitous", system = "Bloomery", action = "reject unknown health keys, invalid types or ranges, nonfinite numbers, unsupported score precision, and hard limits below soft limits before formatting or analysis" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-HEALTH-003"
+title = "Disabled health configuration is still validated"
+manual = false
+design = "design/code-health.md#catalog"
+ears = { type = "ubiquitous", system = "Bloomery", action = "validate the health table even when checks.codeHealth.enable is false" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-HEALTH-004"
+title = "Baseline paths protect managed inputs"
+manual = false
+design = "design/code-health.md#catalog"
+ears = { type = "ubiquitous", system = "Bloomery", action = "reject baseline paths outside the repository through normal paths or symlinks and paths overlapping source inputs, manifests, config, locks, or specifications" }

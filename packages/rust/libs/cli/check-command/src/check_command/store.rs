@@ -198,6 +198,25 @@ impl RunAllocation {
         drop(file);
         Ok(path)
     }
+
+    /// Retain the complete health measurement before the immutable run
+    /// manifest is published. The run directory is private and never reused.
+    pub fn retain_health_report(&self, report: &Value) -> Result<(), String> {
+        let path = self.directory.join("health-report.json");
+        if path.exists() {
+            return Err("health report artifact already exists for this run".to_owned());
+        }
+        let temporary = self.directory.join("health-report.json.tmp");
+        let bytes = serde_json::to_vec(report)
+            .map_err(|error| format!("unable to serialize health report: {error}"))?;
+        write_private_file(&temporary, &bytes)
+            .map_err(|error| format!("unable to write retained health report: {error}"))?;
+        fs::rename(&temporary, &path)
+            .map_err(|error| format!("unable to publish retained health report: {error}"))?;
+        File::open(&self.directory)
+            .and_then(|directory| directory.sync_all())
+            .map_err(|error| format!("unable to sync retained health report: {error}"))
+    }
 }
 
 /// Freeze a derivation's normalized records on first retrieval. The OS lock is

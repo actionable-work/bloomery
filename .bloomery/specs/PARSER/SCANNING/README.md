@@ -1,11 +1,12 @@
 ---
 id: SCANNING
 name: Static Evidence Scanning
-tagline: Extract requirement references and discover test sites from source without executing tests.
+tagline: Extract requirement references and discover test sites from source and derive Rust health metrics without executing tests.
 description: |
   The scanning feature parses configured Rust, Playwright, and Nix inputs and
   emits requirement references with source locations alongside the discovered
-  test sites that carry them. It performs static inspection only and
+  test sites that carry them. Shared Rust ingestion also derives production
+  source metrics for code health. It performs static inspection only and
   deliberately does not run test runners, binaries, or build derivations.
 ---
 
@@ -22,6 +23,7 @@ candidate projection over untagged tests belongs to
 
 - [Scanner architecture](design/overview.md)
 - [Rust scanning](design/rust.md)
+- [Shared Rust health analysis](design/health-analysis.md)
 - [Playwright scanning](design/playwright.md)
 - [Nix scanning](design/nix.md)
 - [Test discovery](design/test-discovery.md)
@@ -47,7 +49,9 @@ and test discovery share one command-scoped parse cache. See the
 
 ## Safety boundary
 
-Static scanning is invoked only when specification management is enabled. The
+Evidence scanning is invoked only when specification management is enabled.
+Rust health analysis is independently enabled and uses production target
+discovery. Both share ingestion, traversal facts, and source diagnostics. The
 scanners may read configured files and, for Nix metadata, invoke the
 configured evaluation operation. They do not execute test functions, launch
 applications, instantiate derivations, fetch dependencies, or open network

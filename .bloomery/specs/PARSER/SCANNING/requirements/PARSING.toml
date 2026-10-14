@@ -13,27 +13,17 @@ action = "parse each source file at most once during one command invocation"
 
 [[requirements]]
 id = "PARSER-SCANNING-PARSING-002"
-title = "Repeated access reuses the cached syntax tree"
+title = "Repeated access reuses derived source facts"
 manual = false
 design = "design/overview.md#parse-once"
-
-[requirements.ears]
-type = "event"
-trigger = "reference extraction and test discovery both require the same source file"
-system = "the scanner pass"
-action = "reuse the single cached syntax tree for both roles"
+ears = { type = "event", trigger = "multiple Rust source consumers require the same file", system = "shared Rust ingestion", action = "reuse the single traversal and cached derived facts without reparsing the source" }
 
 [[requirements]]
 id = "PARSER-SCANNING-PARSING-003"
 title = "Overlapping globs parse a file once"
 manual = false
 design = "design/overview.md#parse-once"
-
-[requirements.ears]
-type = "event"
-trigger = "one source file matches multiple configured or built-in patterns"
-system = "the scanner pass"
-action = "parse the file once and retain a single syntax tree"
+ears = { type = "event", trigger = "one source file matches overlapping scanner patterns or production target discovery", system = "shared source ingestion", action = "parse the file once and retain reusable derived facts" }
 
 [[requirements]]
 id = "PARSER-SCANNING-PARSING-004"

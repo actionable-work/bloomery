@@ -1,0 +1,8 @@
+group = "HEALTH"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-HEALTH-001"
+title = "Flake accepts CLI health configuration"
+manual = false
+design = "design/configuration.md#configuration-source"
+ears = { type = "ubiquitous", system = "mkFlake", action = "accept and validate the checks.codeHealth table without generating a health derivation or using checks.enable to control CLI health analysis" }

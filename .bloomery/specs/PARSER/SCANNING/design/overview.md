@@ -1,6 +1,8 @@
 # Scanner architecture
 
-The scanner stage runs after configuration and requirement parsing. Every
+Evidence scanning runs after configuration and requirement parsing. Rust health
+analysis requires configuration and production source discovery, independently
+of requirements. Both use [shared Rust ingestion](health-analysis.md). Every
 source-specific scanner emits the same logical evidence record:
 
 ```text
@@ -23,7 +25,7 @@ Discovered test sites feed the [spec candidate projection](../../../CLI/SPEC/des
 
 ## Common rules
 
-- Only configured source paths are scanned.
+- Evidence uses configured scanner paths; health uses discovered production targets.
 - Requirement IDs are extracted from syntax nodes or literal metadata, not from
   arbitrary comments or prose.
 - Rust and Playwright parse failures are reported with source context; those
@@ -38,14 +40,15 @@ Playwright, and Nix documents.
 
 ## Parse-once
 
-A single command parses a given source file at most once. Reference extraction
-and test discovery share one command-scoped parse cache keyed by the canonical
-repository-relative path, so a file matched by overlapping globs or used in both
-roles yields one syntax tree. Repeated queries return the cached tree rather
-than reparsing.
+A single command reads and parses a given source file at most once. Reference
+extraction, test discovery, and health share one command-scoped ingestion cache
+keyed by the canonical repository-relative path. Overlapping inputs yield one
+syntax tree and one traversal; later queries reuse derived facts rather than
+reparsing. Trees can be discarded after their reusable facts are extracted.
 
-The cache is created at the start of a scanner pass and discarded when the
-command finishes. It is never persisted, shared between command invocations, or
+The cache is created before admitting source-consuming tasks and discarded when
+the command finishes. It is never persisted, shared between command invocations, or
 used to skip source reads that the command must perform. A parse failure is
-reported once per file per command and contributes neither references nor test
-sites.
+retained once per file per command with affected consumer IDs; it contributes
+neither references, test sites, nor health facts. Consumers retain independent
+outcomes and never publish partial health scores.

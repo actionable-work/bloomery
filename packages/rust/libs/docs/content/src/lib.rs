@@ -127,267 +127,299 @@ pub fn categories() -> Vec<DocCategory> {
 
 /// Render a markdown string into semantic HTML.
 pub fn render_markdown(input: &str) -> String {
-    let mut out = String::with_capacity(input.len() * 2);
-    let mut in_code_block = false;
-    let mut in_list = false;
-    let mut in_table = false;
-    let mut in_blockquote = false;
-
     let lines: Vec<&str> = input.lines().collect();
-    let mut i = 0;
+    MarkdownRenderer::new(input.len() * 2).render(&lines)
+}
 
-    while i < lines.len() {
-        let line = lines[i];
-        let trimmed = line.trim();
+struct MarkdownRenderer {
+    output: String,
+    in_code_block: bool,
+    in_list: bool,
+    in_table: bool,
+    in_blockquote: bool,
+}
 
-        // Fenced code blocks
-        if trimmed.starts_with("```") {
-            if in_code_block {
-                out.push_str("</code></pre></div>\n");
-                in_code_block = false;
-            } else {
-                if in_list {
-                    out.push_str("</ul>\n");
-                    in_list = false;
-                }
-                if in_table {
-                    out.push_str("</tbody></table></div>\n");
-                    in_table = false;
-                }
-                if in_blockquote {
-                    out.push_str("</div>\n");
-                    in_blockquote = false;
-                }
-
-                // Only the first info-string token is the language; any
-                // trailing Bloomery role token is consumed by DOCS/CONSISTENCY
-                // and must not change how the block is labeled.
-                let info = trimmed.trim_start_matches('`').trim();
-                let lang = info.split_whitespace().next().unwrap_or("");
-                let lang = if lang.is_empty() { "code" } else { lang };
-                out.push_str(&format!(
-                    "<div class=\"code-block-wrapper\"><div class=\"code-header\"><span class=\"code-lang\">{lang}</span><button class=\"copy-btn\" onclick=\"navigator.clipboard.writeText(this.closest('.code-block-wrapper').querySelector('code').innerText);this.innerText='Copied!';setTimeout(()=>this.innerText='Copy',2000)\">Copy</button></div><pre><code class=\"language-{lang}\">"
-                ));
-                in_code_block = true;
-            }
-            i += 1;
-            continue;
+impl MarkdownRenderer {
+    fn new(capacity: usize) -> Self {
+        Self {
+            output: String::with_capacity(capacity),
+            in_code_block: false,
+            in_list: false,
+            in_table: false,
+            in_blockquote: false,
         }
+    }
 
-        if in_code_block {
-            let escaped = escape_html(line);
-            out.push_str(&escaped);
-            out.push('\n');
-            i += 1;
-            continue;
+    fn render(mut self, lines: &[&str]) -> String {
+        let mut index = 0;
+        while index < lines.len() {
+            let line = lines[index];
+            let trimmed = line.trim();
+            if self.render_fence(trimmed) {
+                index += 1;
+                continue;
+            }
+            if self.in_code_block {
+                self.render_code_line(line);
+                index += 1;
+                continue;
+            }
+            if self.render_horizontal_rule(trimmed) {
+                index += 1;
+                continue;
+            }
+            if self.render_blockquote(trimmed) || self.render_heading(trimmed) {
+                index += 1;
+                continue;
+            }
+            if self.render_table_line(trimmed, lines, &mut index)
+                || self.render_list_line(line, trimmed, &mut index)
+            {
+                continue;
+            }
+            if trimmed.is_empty() {
+                self.close_for_empty_line();
+                index += 1;
+                continue;
+            }
+            self.render_paragraph(trimmed);
+            index += 1;
         }
+        self.close_all();
+        self.output
+    }
 
-        // Horizontal rules
-        if trimmed == "---" || trimmed == "***" {
-            if in_list {
-                out.push_str("</ul>\n");
-                in_list = false;
-            }
-            if in_table {
-                out.push_str("</tbody></table></div>\n");
-                in_table = false;
-            }
-            if in_blockquote {
-                out.push_str("</div>\n");
-                in_blockquote = false;
-            }
-            out.push_str("<hr class=\"divider\" />\n");
-            i += 1;
-            continue;
+    fn render_fence(&mut self, trimmed: &str) -> bool {
+        if !trimmed.starts_with("```") {
+            return false;
         }
+        if self.in_code_block {
+            self.output.push_str("</code></pre></div>\n");
+            self.in_code_block = false;
+            return true;
+        }
+        self.close_for_fence_or_rule();
+        // Only the first info-string token is the language; any trailing role
+        // token is consumed by DOCS/CONSISTENCY and does not label the block.
+        let info = trimmed.trim_start_matches('`').trim();
+        let lang = info.split_whitespace().next().unwrap_or("");
+        let lang = if lang.is_empty() { "code" } else { lang };
+        self.output.push_str(&format!(
+            "<div class=\"code-block-wrapper\"><div class=\"code-header\"><span class=\"code-lang\">{lang}</span><button class=\"copy-btn\" onclick=\"navigator.clipboard.writeText(this.closest('.code-block-wrapper').querySelector('code').innerText);this.innerText='Copied!';setTimeout(()=>this.innerText='Copy',2000)\">Copy</button></div><pre><code class=\"language-{lang}\">"
+        ));
+        self.in_code_block = true;
+        true
+    }
 
-        // GitHub-style callouts/alerts (> [!NOTE], > [!TIP], etc.)
+    fn render_code_line(&mut self, line: &str) {
+        self.output.push_str(&escape_html(line));
+        self.output.push('\n');
+    }
+
+    fn render_horizontal_rule(&mut self, trimmed: &str) -> bool {
+        if trimmed != "---" && trimmed != "***" {
+            return false;
+        }
+        self.close_for_fence_or_rule();
+        self.output.push_str("<hr class=\"divider\" />\n");
+        true
+    }
+
+    fn render_blockquote(&mut self, trimmed: &str) -> bool {
         if trimmed.starts_with("> [!") {
-            if in_blockquote {
-                out.push_str("</div>\n");
+            if self.in_blockquote {
+                self.output.push_str("</div>\n");
             }
             let alert_tag = trimmed
                 .trim_start_matches("> [!")
                 .trim_end_matches(']')
                 .to_lowercase();
-            let alert_class = match alert_tag.as_str() {
-                "tip" => "alert-tip",
-                "warning" => "alert-warning",
-                "important" => "alert-important",
-                _ => "alert-note",
-            };
-            let alert_title = match alert_tag.as_str() {
-                "tip" => "💡 Tip",
-                "warning" => "⚠️ Warning",
-                "important" => "⚡ Important",
-                _ => "ℹ️ Note",
-            };
-            out.push_str(&format!(
+            let (alert_class, alert_title) = alert_style(&alert_tag);
+            self.output.push_str(&format!(
                 "<div class=\"alert {alert_class}\"><div class=\"alert-title\">{alert_title}</div><div class=\"alert-body\">"
             ));
-            in_blockquote = true;
-            i += 1;
-            continue;
-        } else if trimmed.starts_with(">") {
-            let quote_text = trimmed.trim_start_matches('>').trim();
-            if !in_blockquote {
-                out.push_str("<div class=\"alert alert-note\"><div class=\"alert-body\">");
-                in_blockquote = true;
-            }
-            out.push_str(&render_inline(quote_text));
-            out.push(' ');
-            i += 1;
-            continue;
-        } else if in_blockquote && trimmed.is_empty() {
-            out.push_str("</div></div>\n");
-            in_blockquote = false;
-            i += 1;
-            continue;
+            self.in_blockquote = true;
+            return true;
         }
-
-        // Headings
-        if trimmed.starts_with('#') {
-            if in_list {
-                out.push_str("</ul>\n");
-                in_list = false;
+        if trimmed.starts_with('>') {
+            if !self.in_blockquote {
+                self.output
+                    .push_str("<div class=\"alert alert-note\"><div class=\"alert-body\">");
+                self.in_blockquote = true;
             }
-            if in_table {
-                out.push_str("</tbody></table></div>\n");
-                in_table = false;
-            }
-            if in_blockquote {
-                out.push_str("</div></div>\n");
-                in_blockquote = false;
-            }
-
-            let level = trimmed.chars().take_while(|&c| c == '#').count();
-            let text = trimmed.trim_start_matches('#').trim();
-            let id = slugify(text);
-            let rendered = render_inline(text);
-            out.push_str(&format!(
-                "<h{level} id=\"{id}\" class=\"doc-heading doc-h{level}\"><a href=\"#{id}\" class=\"heading-anchor\">#</a>{rendered}</h{level}>\n"
-            ));
-            i += 1;
-            continue;
+            self.output
+                .push_str(&render_inline(trimmed.trim_start_matches('>').trim()));
+            self.output.push(' ');
+            return true;
         }
-
-        // Tables
-        if trimmed.starts_with('|') && trimmed.ends_with('|') {
-            if !in_table {
-                if in_list {
-                    out.push_str("</ul>\n");
-                    in_list = false;
-                }
-                out.push_str(
-                    "<div class=\"table-container\"><table class=\"data-table\"><thead><tr>",
-                );
-                let headers: Vec<&str> = trimmed
-                    .split('|')
-                    .filter(|s| !s.is_empty())
-                    .map(|s| s.trim())
-                    .collect();
-                for h in headers {
-                    out.push_str(&format!("<th>{}</th>", render_inline(h)));
-                }
-                out.push_str("</tr></thead><tbody>\n");
-
-                // Check for separator line next
-                if i + 1 < lines.len()
-                    && lines[i + 1].trim().starts_with('|')
-                    && lines[i + 1].contains("---")
-                {
-                    i += 1;
-                }
-                in_table = true;
-                i += 1;
-                continue;
-            } else {
-                out.push_str("<tr>");
-                let cells: Vec<&str> = trimmed
-                    .split('|')
-                    .filter(|s| !s.is_empty())
-                    .map(|s| s.trim())
-                    .collect();
-                for c in cells {
-                    out.push_str(&format!("<td>{}</td>", render_inline(c)));
-                }
-                out.push_str("</tr>\n");
-                i += 1;
-                continue;
-            }
-        } else if in_table {
-            out.push_str("</tbody></table></div>\n");
-            in_table = false;
+        if self.in_blockquote && trimmed.is_empty() {
+            self.output.push_str("</div></div>\n");
+            self.in_blockquote = false;
+            return true;
         }
+        false
+    }
 
-        // Unordered lists
-        if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
-            if !in_list {
-                out.push_str("<ul class=\"doc-list\">\n");
-                in_list = true;
+    fn render_heading(&mut self, trimmed: &str) -> bool {
+        if !trimmed.starts_with('#') {
+            return false;
+        }
+        self.close_for_heading_or_empty();
+        let level = trimmed
+            .chars()
+            .take_while(|&character| character == '#')
+            .count();
+        let text = trimmed.trim_start_matches('#').trim();
+        let id = slugify(text);
+        let rendered = render_inline(text);
+        self.output.push_str(&format!(
+            "<h{level} id=\"{id}\" class=\"doc-heading doc-h{level}\"><a href=\"#{id}\" class=\"heading-anchor\">#</a>{rendered}</h{level}>\n"
+        ));
+        true
+    }
+
+    fn render_table_line(&mut self, trimmed: &str, lines: &[&str], index: &mut usize) -> bool {
+        if !trimmed.starts_with('|') || !trimmed.ends_with('|') {
+            if self.in_table {
+                self.output.push_str("</tbody></table></div>\n");
+                self.in_table = false;
             }
-            let item_text = trimmed[2..].trim();
-            out.push_str(&format!("<li>{}</li>\n", render_inline(item_text)));
-            i += 1;
-            continue;
-        } else if in_list
-            && !trimmed.is_empty()
-            && (line.starts_with("  ") || line.starts_with('\t'))
+            return false;
+        }
+        if self.in_table {
+            self.render_table_row(trimmed);
+            *index += 1;
+            return true;
+        }
+        if self.in_list {
+            self.close_list();
+        }
+        self.output
+            .push_str("<div class=\"table-container\"><table class=\"data-table\"><thead><tr>");
+        for header in table_cells(trimmed) {
+            self.output
+                .push_str(&format!("<th>{}</th>", render_inline(header)));
+        }
+        self.output.push_str("</tr></thead><tbody>\n");
+        if *index + 1 < lines.len()
+            && lines[*index + 1].trim().starts_with('|')
+            && lines[*index + 1].contains("---")
         {
-            // Nested or continuation list line
+            *index += 1;
+        }
+        self.in_table = true;
+        *index += 1;
+        true
+    }
+
+    fn render_table_row(&mut self, trimmed: &str) {
+        self.output.push_str("<tr>");
+        for cell in table_cells(trimmed) {
+            self.output
+                .push_str(&format!("<td>{}</td>", render_inline(cell)));
+        }
+        self.output.push_str("</tr>\n");
+    }
+
+    fn render_list_line(&mut self, line: &str, trimmed: &str, index: &mut usize) -> bool {
+        if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
+            if !self.in_list {
+                self.output.push_str("<ul class=\"doc-list\">\n");
+                self.in_list = true;
+            }
+            self.output.push_str(&format!(
+                "<li>{}</li>\n",
+                render_inline(trimmed[2..].trim())
+            ));
+            *index += 1;
+            return true;
+        }
+        if self.in_list && !trimmed.is_empty() && (line.starts_with("  ") || line.starts_with('\t'))
+        {
             let item_text = trimmed.trim_start_matches("- ").trim();
-            out.push_str(&format!(
+            self.output.push_str(&format!(
                 "<li class=\"nested\">{}</li>\n",
                 render_inline(item_text)
             ));
-            i += 1;
-            continue;
-        } else if in_list && trimmed.is_empty() {
-            out.push_str("</ul>\n");
-            in_list = false;
-            i += 1;
-            continue;
+            *index += 1;
+            return true;
         }
-
-        // Empty lines
-        if trimmed.is_empty() {
-            if in_list {
-                out.push_str("</ul>\n");
-                in_list = false;
-            }
-            if in_table {
-                out.push_str("</tbody></table></div>\n");
-                in_table = false;
-            }
-            if in_blockquote {
-                out.push_str("</div></div>\n");
-                in_blockquote = false;
-            }
-            i += 1;
-            continue;
+        if self.in_list && trimmed.is_empty() {
+            self.close_list();
+            *index += 1;
+            return true;
         }
-
-        // Regular paragraph
-        out.push_str("<p class=\"doc-paragraph\">");
-        out.push_str(&render_inline(trimmed));
-        out.push_str("</p>\n");
-        i += 1;
+        false
     }
 
-    if in_code_block {
-        out.push_str("</code></pre></div>\n");
-    }
-    if in_list {
-        out.push_str("</ul>\n");
-    }
-    if in_table {
-        out.push_str("</tbody></table></div>\n");
-    }
-    if in_blockquote {
-        out.push_str("</div></div>\n");
+    fn render_paragraph(&mut self, trimmed: &str) {
+        self.output.push_str("<p class=\"doc-paragraph\">");
+        self.output.push_str(&render_inline(trimmed));
+        self.output.push_str("</p>\n");
     }
 
-    out
+    fn close_for_fence_or_rule(&mut self) {
+        self.close_list();
+        self.close_table();
+        if self.in_blockquote {
+            self.output.push_str("</div>\n");
+            self.in_blockquote = false;
+        }
+    }
+
+    fn close_for_heading_or_empty(&mut self) {
+        self.close_list();
+        self.close_table();
+        if self.in_blockquote {
+            self.output.push_str("</div></div>\n");
+            self.in_blockquote = false;
+        }
+    }
+
+    fn close_for_empty_line(&mut self) {
+        self.close_for_heading_or_empty();
+    }
+
+    fn close_list(&mut self) {
+        if self.in_list {
+            self.output.push_str("</ul>\n");
+            self.in_list = false;
+        }
+    }
+
+    fn close_table(&mut self) {
+        if self.in_table {
+            self.output.push_str("</tbody></table></div>\n");
+            self.in_table = false;
+        }
+    }
+
+    fn close_all(&mut self) {
+        if self.in_code_block {
+            self.output.push_str("</code></pre></div>\n");
+        }
+        self.close_list();
+        self.close_table();
+        if self.in_blockquote {
+            self.output.push_str("</div></div>\n");
+        }
+    }
+}
+
+fn alert_style(tag: &str) -> (&'static str, &'static str) {
+    match tag {
+        "tip" => ("alert-tip", "💡 Tip"),
+        "warning" => ("alert-warning", "⚠️ Warning"),
+        "important" => ("alert-important", "⚡ Important"),
+        _ => ("alert-note", "ℹ️ Note"),
+    }
+}
+
+fn table_cells(line: &str) -> Vec<&str> {
+    line.split('|')
+        .filter(|cell| !cell.is_empty())
+        .map(str::trim)
+        .collect()
 }
 
 fn escape_html(s: &str) -> String {

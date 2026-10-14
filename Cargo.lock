@@ -214,6 +214,7 @@ dependencies = [
  "bloomery-model",
  "bloomery-workspace",
  "serde_json",
+ "sha2 0.10.9",
 ]
 
 [[package]]
@@ -360,6 +361,7 @@ dependencies = [
  "oxc_ast",
  "oxc_parser",
  "oxc_span",
+ "proc-macro2",
  "serde_json",
  "syn 2.0.119",
 ]

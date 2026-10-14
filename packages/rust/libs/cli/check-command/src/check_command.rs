@@ -2,6 +2,7 @@ mod catalog;
 mod command;
 mod details;
 mod execution;
+mod health;
 mod interrupt;
 mod model;
 mod nix_progress;

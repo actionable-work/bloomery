@@ -1,0 +1,162 @@
+group = "HEALTH"
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-001"
+title = "Health reuses workspace discovery"
+manual = false
+design = "design/health-analysis.md#source-selection"
+ears = { type = "ubiquitous", system = "Bloomery", action = "select production targets using existing pure manifest discovery with build.cargoToml and build.members without invoking Cargo or a second manifest resolver" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-002"
+title = "Targets share crate ownership"
+manual = false
+design = "design/health-analysis.md#source-selection"
+ears = { type = "ubiquitous", system = "Bloomery", action = "group library, binary, and proc-macro targets by repository-relative manifest identity and count each shared source once within a crate" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-003"
+title = "Production module sources are discovered"
+manual = false
+design = "design/health-analysis.md#source-selection"
+ears = { type = "ubiquitous", system = "Bloomery", action = "resolve file and inline modules, literal path alternatives, and literal Rust includes while retaining diagnostics for required missing or out-of-repository sources" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-004"
+title = "Test and auxiliary code is excluded"
+manual = false
+design = "design/health-analysis.md#source-selection"
+ears = { type = "ubiquitous", system = "Bloomery", action = "exclude test, example, benchmark, build-script targets, test-attributed functions, and explicit cfg(test) subtrees from health" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-005"
+title = "Lexical analysis boundaries are visible"
+manual = false
+design = "design/health-analysis.md#source-selection"
+ears = { type = "ubiquitous", system = "Bloomery", action = "include other conditional alternatives and report opaque item macros and nonliteral includes without analyzing generated code or macro expansions" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-006"
+title = "Health source selection ignores evidence globs"
+manual = false
+design = "design/health-analysis.md#source-selection"
+ears = { type = "ubiquitous", system = "Bloomery", action = "derive health sources independently of evidence scanner paths and enablement" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-007"
+title = "Rust files are read and parsed once"
+manual = false
+design = "design/health-analysis.md#shared-pass"
+ears = { type = "ubiquitous", system = "Bloomery", action = "read and syn-parse each canonical Rust file at most once per command across module discovery, health, evidence extraction, and test discovery" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-008"
+title = "Rust projections share traversal facts"
+manual = false
+design = "design/health-analysis.md#shared-pass"
+ears = { type = "ubiquitous", system = "Bloomery", action = "derive requested evidence, test-site, metric, and token facts in one traversal and reuse those facts for later consumers without retaining every AST" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-009"
+title = "Shared ingestion supports serial scheduling"
+manual = false
+design = "design/health-analysis.md#shared-pass"
+ears = { type = "ubiquitous", system = "Bloomery", action = "complete shared Rust ingestion with a single task slot without waiting for a different consumer task to start" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-010"
+title = "Source failures remain consumer specific"
+manual = false
+design = "design/health-analysis.md#shared-pass"
+ears = { type = "ubiquitous", system = "Bloomery", action = "retain one source read or parse diagnostic per file with affected consumers and preserve independent outcomes for unrelated evidence and health inputs" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-011"
+title = "Malformed evidence does not corrupt metrics"
+manual = false
+design = "design/health-analysis.md#shared-pass"
+ears = { type = "ubiquitous", system = "Bloomery", action = "keep health metrics valid when only evidence tag validation fails" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-012"
+title = "Incomplete analysis has no complete score"
+manual = false
+design = "design/health-analysis.md#shared-pass"
+ears = { type = "ubiquitous", system = "Bloomery", action = "withhold complete workspace scores and exportable baselines after any health-source read or parse error" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-013"
+title = "Health does not invoke compiler tools"
+manual = false
+design = "design/health-analysis.md#shared-pass"
+ears = { type = "ubiquitous", system = "Bloomery", action = "analyze health without Cargo, rustc, Clippy, external analyzers, test execution, or network requests" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-014"
+title = "Callable units have independent bodies"
+manual = false
+design = "design/health-analysis.md#metrics"
+ears = { type = "ubiquitous", system = "Bloomery", action = "measure free functions, methods, default trait bodies, and closures independently while excluding nested callable bodies from parent metrics" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-015"
+title = "Cyclomatic metrics follow explicit AST rules"
+manual = false
+design = "design/health-analysis.md#metrics"
+ears = { type = "ubiquitous", system = "Bloomery", action = "compute cyclomatic values using the documented branch, loop, boolean, propagation, match-arm, and guard increments" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-016"
+title = "Nesting metrics ignore arbitrary blocks"
+manual = false
+design = "design/health-analysis.md#metrics"
+ears = { type = "ubiquitous", system = "Bloomery", action = "measure branch and loop nesting with sibling else-if depth and fresh closure depth according to the metric contract" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-017"
+title = "Function size counts lexical body tokens"
+manual = false
+design = "design/health-analysis.md#metrics"
+ears = { type = "ubiquitous", system = "Bloomery", action = "count callable body tokens including delimiters and macro arguments while ignoring comments, whitespace, and nested callable bodies" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-018"
+title = "Production SLOC uses source token lines"
+manual = false
+design = "design/health-analysis.md#metrics"
+ears = { type = "ubiquitous", system = "Bloomery", action = "count distinct physical lines occupied by production tokens while excluding test tokens and duplicate target ownership" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-019"
+title = "Duplicate candidates preserve spelling"
+manual = false
+design = "design/health-analysis.md#metrics"
+ears = { type = "ubiquitous", system = "Bloomery", action = "compare minimum-length body-token windows across distinct callables using exact token kinds, identifier spelling, and literal spelling" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-020"
+title = "Hash collisions cannot invent clones"
+manual = false
+design = "design/health-analysis.md#metrics"
+ears = { type = "ubiquitous", system = "Bloomery", action = "confirm duplicate candidate equality using complete token sequences after hashing" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-021"
+title = "Duplicate coverage counts each position once"
+manual = false
+design = "design/health-analysis.md#metrics"
+ears = { type = "ubiquitous", system = "Bloomery", action = "calculate each crate duplication fraction from the union of matched body-token positions over all its callable body tokens" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-022"
+title = "Cross-crate clones affect their owners"
+manual = false
+design = "design/health-analysis.md#metrics"
+ears = { type = "ubiquitous", system = "Bloomery", action = "attribute cross-crate clone coverage to each affected crate while excluding a physical source range compared to itself" }
+
+[[requirements]]
+id = "PARSER-SCANNING-HEALTH-023"
+title = "Metric locations use actual spans"
+manual = false
+design = "design/health-analysis.md#metrics"
+ears = { type = "ubiquitous", system = "Bloomery", action = "identify callables and contributing locations through lexical identities and token spans instead of searching source text for names" }

@@ -4,6 +4,7 @@ pub mod catalog;
 pub mod config;
 pub mod diagnostics;
 mod domain;
+pub mod health;
 
 pub use config::Config;
 pub use diagnostics::{Diagnostic, SourceLocation, render_diagnostics, sort_diagnostics};

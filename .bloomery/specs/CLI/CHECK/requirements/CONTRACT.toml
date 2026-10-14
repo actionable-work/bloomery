@@ -27,12 +27,7 @@ id = "CLI-CHECK-CONTRACT-003"
 title = "Check succeeds without spec management"
 manual = false
 design = "design/pipeline.md#static-validation-pipeline"
-
-[requirements.ears]
-type = "event"
-trigger = "specification management is disabled and the formatter gate and every selected Nix check pass"
-system = "bloomery check"
-action = "return success without a specification tree"
+ears = { type = "event", trigger = "specification management is disabled and formatting and every selected check pass", system = "bloomery check", action = "return success without a specification tree" }
 
 [[requirements]]
 id = "CLI-CHECK-CONTRACT-004"

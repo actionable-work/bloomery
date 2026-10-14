@@ -103,6 +103,15 @@ pub trait NixBackend: Send + Sync {
         outputs: &[String],
     ) -> Result<std::collections::BTreeSet<String>, String>;
     fn read_derivation_log(&self, root: &Path, store_path: &str) -> Result<Vec<u8>, String>;
+    /// Return the pure Rust production target projection exported by the
+    /// workspace flake for the selected host system.
+    fn health_sources(
+        &self,
+        _root: &Path,
+        _system: &str,
+    ) -> Result<Vec<bloomery_check::HealthSourceCrate>, String> {
+        Err("this Nix backend does not provide Rust health source discovery".to_owned())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -366,6 +375,67 @@ impl NixBackend for NixCli {
                     .ok_or_else(|| "Nix check catalog contains a non-string name".to_owned())
             })
             .collect()
+    }
+
+    fn health_sources(
+        &self,
+        root: &Path,
+        system: &str,
+    ) -> Result<Vec<bloomery_check::HealthSourceCrate>, String> {
+        if !valid_system_name(system) {
+            return Err(format!("invalid Nix system name '{system}'"));
+        }
+        let output = self.run_catalog_command(
+            root,
+            &health_sources_args(system),
+            "Rust health source discovery",
+        )?;
+        let value: Value = serde_json::from_slice(&output)
+            .map_err(|error| format!("Nix returned invalid Rust health source JSON: {error}"))?;
+        let object = value
+            .as_object()
+            .ok_or_else(|| "Nix Rust health source projection is not an object".to_owned())?;
+        let mut crates = Vec::with_capacity(object.len());
+        for (name, entry) in object {
+            let manifest_path = entry
+                .get("manifest_path")
+                .and_then(Value::as_str)
+                .ok_or_else(|| format!("health crate '{name}' has no manifest_path"))?;
+            let targets = entry
+                .get("targets")
+                .and_then(Value::as_array)
+                .ok_or_else(|| format!("health crate '{name}' has no target list"))?
+                .iter()
+                .map(|target| {
+                    let kind = target.get("kind").and_then(Value::as_str).ok_or_else(|| {
+                        format!("health crate '{name}' has a target without kind")
+                    })?;
+                    let path = target.get("path").and_then(Value::as_str).ok_or_else(|| {
+                        format!("health crate '{name}' has a target without path")
+                    })?;
+                    if Path::new(path).is_absolute() || Path::new(manifest_path).is_absolute() {
+                        return Err(format!(
+                            "health crate '{name}' contains an absolute source path"
+                        ));
+                    }
+                    Ok(bloomery_check::HealthTarget {
+                        kind: kind.to_owned(),
+                        path: path.to_owned(),
+                    })
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+            crates.push(bloomery_check::HealthSourceCrate {
+                name: entry
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or(name)
+                    .to_owned(),
+                manifest_path: manifest_path.to_owned(),
+                targets,
+            });
+        }
+        crates.sort_by(|left, right| left.manifest_path.cmp(&right.manifest_path));
+        Ok(crates)
     }
 
     fn read_derivation_log(&self, root: &Path, store_path: &str) -> Result<Vec<u8>, String> {
@@ -786,6 +856,15 @@ fn discover_args(system: &str) -> Vec<OsString> {
         OsString::from(format!(".#checks.{system}")),
         OsString::from("--apply"),
         OsString::from("builtins.attrNames"),
+    ]);
+    args
+}
+
+fn health_sources_args(system: &str) -> Vec<OsString> {
+    let mut args = eval_base_args();
+    args.extend([
+        OsString::from("--json"),
+        OsString::from(format!(".#healthSources.{system}")),
     ]);
     args
 }

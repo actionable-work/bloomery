@@ -6,6 +6,7 @@
 | --- | --- | --- |
 | `static:structure` | Configuration, workspace/frontmatter, requirements, design links | none |
 | `static:traceability` | Enabled scanners and relational evidence checks | loaded valid requirement model |
+| `static:code-health` | Rust analysis, health scores, limits, baseline comparison | enabled health policy |
 | `nix:<system>:<attribute>` | One attribute under `checks.<system>` | Catalog evaluation |
 
 Preserve the existing static validations; these IDs group the existing passes,
@@ -19,8 +20,13 @@ specification validity. The formatter gate runs before selected check tasks; a
 failure prevents static validation and Nix check realization. After it passes,
 failures in either pipeline do not suppress the other in default mode.
 
+`static:code-health` exists when `checks.codeHealth.enable` is true, independently
+of specification management and Nix check generation. It has no structure or
+traceability prerequisite. Health and traceability share Rust ingestion without
+coupling outcomes; see [code health](code-health.md#check-integration).
+
 With no selectors, run every available check: both static checks when
-specification management is enabled, plus every check attribute for the host
+specification management is enabled, enabled code health, plus every check attribute for the host
 Nix system. Include generated Rust tests, clippy, documentation, doctests,
 lock validation, formatter checks, and integration-flake checks when present in
 that output. Package checks are included only when
@@ -30,7 +36,8 @@ implicitly build packages outside checks
 or select other architectures. Every check command requires the shared flake
 preflight, including static-only and read-only selections. When specification
 management is disabled, a selector naming a static check matches no catalog
-entry and is rejected like any other unmatched selector.
+entry and is rejected like any other unmatched selector. Code health selectors
+remain valid while specification management is disabled.
 
 ## Formatting gate
 
@@ -82,7 +89,7 @@ with valid empty check sets are distinct from missing system outputs.
 
 ## Scheduler
 
-After the formatter gate passes, run independent static and Nix tasks
+After the formatter gate passes, run independent static, health, and Nix tasks
 concurrently. Admit traceability as soon as structure passes and a task slot is
 available, ahead of queued independent work; do not wait for Nix completion.
 The Nix branch is one batched realization task; Nix realizes independent

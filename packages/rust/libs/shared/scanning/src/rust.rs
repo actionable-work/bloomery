@@ -1,18 +1,16 @@
 use crate::ScanOutput;
+use crate::analysis::AnalysisSession;
 use crate::files::expand_globs;
 use bloomery_model::{Diagnostic, Evidence, SourceLocation, TestSite};
-use std::fs;
 use std::path::Path;
 use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
 
-#[cfg(test)]
-use std::sync::atomic::{AtomicUsize, Ordering};
-
-#[cfg(test)]
-pub(crate) static PARSE_COUNT: AtomicUsize = AtomicUsize::new(0);
-
-pub fn scan(root: &Path, patterns: &[String]) -> Result<ScanOutput, Vec<Diagnostic>> {
+pub fn scan(
+    root: &Path,
+    patterns: &[String],
+    session: &AnalysisSession,
+) -> Result<ScanOutput, Vec<Diagnostic>> {
     let paths = match expand_globs(root, patterns) {
         Ok(paths) => paths,
         Err(error) => return Err(vec![Diagnostic::new("ScannerError", error)]),
@@ -20,39 +18,26 @@ pub fn scan(root: &Path, patterns: &[String]) -> Result<ScanOutput, Vec<Diagnost
     let mut output = ScanOutput::default();
     let mut diagnostics = Vec::new();
     for path in paths {
-        let contents = match fs::read_to_string(&path) {
-            Ok(contents) => contents,
+        let parsed = match session.rust_file(&path) {
+            Ok(parsed) => parsed,
             Err(error) => {
-                diagnostics.push(
-                    Diagnostic::new(
-                        "RustScanError",
-                        format!("Unable to read Rust source: {error}"),
-                    )
-                    .at(path, Some(1)),
-                );
-                continue;
-            }
-        };
-        let syntax = match parse(&contents) {
-            Ok(syntax) => syntax,
-            Err(error) => {
-                diagnostics.push(
-                    Diagnostic::new(
-                        "RustParseError",
-                        format!("Unable to parse Rust source: {error}"),
-                    )
-                    .at(path, Some(1)),
-                );
+                let code = if error.starts_with("Unable to parse")
+                    || error.starts_with("Unable to tokenize")
+                {
+                    "RustParseError"
+                } else {
+                    "RustScanError"
+                };
+                diagnostics.push(Diagnostic::new(code, error).at(path, Some(1)));
                 continue;
             }
         };
         let mut visitor = Visitor {
-            path: &path,
-            contents: &contents,
+            path: &parsed.path,
             output: ScanOutput::default(),
             diagnostics: Vec::new(),
         };
-        visitor.visit_file(&syntax);
+        visitor.visit_file(&parsed.syntax);
         output.absorb(visitor.output);
         diagnostics.extend(visitor.diagnostics);
     }
@@ -63,15 +48,8 @@ pub fn scan(root: &Path, patterns: &[String]) -> Result<ScanOutput, Vec<Diagnost
     }
 }
 
-fn parse(contents: &str) -> syn::Result<syn::File> {
-    #[cfg(test)]
-    PARSE_COUNT.fetch_add(1, Ordering::Relaxed);
-    syn::parse_file(contents)
-}
-
 struct Visitor<'a> {
     path: &'a Path,
-    contents: &'a str,
     output: ScanOutput,
     diagnostics: Vec<Diagnostic>,
 }
@@ -109,7 +87,7 @@ impl<'ast> Visit<'ast> for Visitor<'_> {
                     match list.parse_args::<syn::LitStr>() {
                         Ok(value) => {
                             let id = value.value();
-                            let line = line_for(&format!("bloomery(\"{id}\""), self.contents);
+                            let line = value.span().start().line;
                             self.output.evidence.push(Evidence {
                                 id: id.clone(),
                                 location: SourceLocation::new(self.path, Some(line)),
@@ -129,7 +107,7 @@ impl<'ast> Visit<'ast> for Visitor<'_> {
                     }
                 }
             }
-            let line = line_for(&format!("fn {name}"), self.contents);
+            let line = item.sig.ident.span().start().line;
             self.output.tests.push(TestSite {
                 scanner: "rust",
                 name: Some(name),
@@ -139,17 +117,4 @@ impl<'ast> Visit<'ast> for Visitor<'_> {
         }
         visit::visit_item_fn(self, item);
     }
-}
-
-fn line_for(needle: &str, contents: &str) -> usize {
-    contents
-        .find(needle)
-        .map(|offset| {
-            contents[..offset]
-                .bytes()
-                .filter(|byte| *byte == b'\n')
-                .count()
-                + 1
-        })
-        .unwrap_or(1)
 }

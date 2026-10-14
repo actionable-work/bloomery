@@ -223,6 +223,41 @@ in {
     expected = true;
   };
 
+  testCodeHealthConfigIsValidatedAndNotPassedToNixChecks = {
+    expr = let
+      args = loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.codeHealth = {
+          enable = false;
+          duplicationFreeRatio = 0.25;
+        };
+      };
+    in {
+      cliPolicyRemoved = !(args.checks ? codeHealth);
+      invalidRatio = fails (loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.codeHealth.duplicationFreeRatio = 1.0;
+      });
+      hardBelowSoft = fails (loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.codeHealth = {
+          cyclomaticLimit = 10;
+          maxCyclomatic = 9;
+        };
+      });
+      badWindow = fails (loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.codeHealth.duplicateMinTokens = 15;
+      });
+    };
+    expected = {
+      cliPolicyRemoved = true;
+      invalidRatio = true;
+      hardBelowSoft = true;
+      badWindow = true;
+    };
+  };
+
   testWrongPathTypeFails = {
     expr = fails (loader.toWorkspaceArgs {
       root = ./.;

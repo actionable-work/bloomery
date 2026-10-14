@@ -14,6 +14,21 @@ noDefaultFeatures = true     # Require default features to be disabled on worksp
 throwOnOutOfDate = true      # Fail evaluation when bloomery.lock is out of date.
 workspaceDependencies = true # Validate workspace dependency declarations.
 
+[checks.codeHealth]
+baseline = ".bloomery/code-health-summary.json" # Repository-relative reviewed code health snapshot.
+cyclomaticLimit = 10                            # Soft cyclomatic complexity limit used by code health scoring.
+duplicateMinTokens = 64                         # Minimum exact token window considered a duplicate (at least 16).
+duplicationFreeRatio = 0.02                     # Duplicate body-token fraction without a scoring penalty (0–1).
+enable = true                                   # Enable the source-based code health check.
+functionTokensLimit = 250                       # Soft callable body token limit used by code health scoring.
+maxCyclomatic = 40                              # Hard per-callable cyclomatic complexity limit.
+maxFunctionTokens = 1000                        # Hard per-callable body token limit.
+maxNesting = 8                                  # Hard per-callable branch nesting limit.
+maxRegression = 0                               # Maximum allowed decrease from a reviewed score (0–100 points).
+minCrateScore = 80                              # Minimum passing code health score for each crate (0–100).
+minWorkspaceScore = 80                          # Minimum passing aggregate code health score (0–100).
+nestingLimit = 4                                # Soft branch nesting limit used by code health scoring.
+
 [devShell]
 enable = true  # Generate the default development shell.
 packages = []  # Additional nixpkgs packages in the development shell.

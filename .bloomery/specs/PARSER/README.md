@@ -30,7 +30,9 @@ source inputs. Command-level validation and review behavior remain in the
 ## Implementation boundaries
 
 The reference Rust implementation keeps command dispatch, parsing, domain
-modeling, scanners, validation, and output separable. A single resolved graph is
+modeling, scanners, validation, and output separable. Rust ingestion also supplies
+[code health facts](SCANNING/design/health-analysis.md) without requiring a
+specification model. A single resolved graph is
 shared by check and review. Source-language parsers sit behind scanner
 boundaries, and source locations and structured diagnostics are preserved
 through to presentation. The Nix adapter is likewise isolated behind a scanner

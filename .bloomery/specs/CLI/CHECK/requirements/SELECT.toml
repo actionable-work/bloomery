@@ -246,12 +246,7 @@ id = "CLI-CHECK-SELECT-022"
 title = "Default selection respects spec management enablement"
 manual = false
 design = "design/execution.md#selection"
-
-[requirements.ears]
-type = "event"
-trigger = "no check selectors are supplied while specification management is disabled"
-system = "bloomery check"
-action = "select every available Nix check without selecting static specification checks"
+ears = { type = "event", trigger = "no check selectors are supplied while specification management is disabled", system = "bloomery check", action = "select enabled code health and every available Nix check without selecting static specification checks" }
 
 [[requirements]]
 id = "CLI-CHECK-SELECT-023"

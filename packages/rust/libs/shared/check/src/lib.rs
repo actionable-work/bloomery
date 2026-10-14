@@ -1,9 +1,32 @@
 use bloomery_model::{Context, Diagnostic};
-use bloomery_scanning::scan_all;
+use bloomery_scanning::scan_all_with_session;
 use std::collections::BTreeMap;
 
+pub mod health;
+
+pub use bloomery_scanning::AnalysisSession;
+pub use bloomery_scanning::{HealthCrateMetrics, HealthSourceCrate, HealthTarget};
+
+pub fn analyze_health(
+    root: &std::path::Path,
+    crates: &[HealthSourceCrate],
+    duplicate_min_tokens: usize,
+    session: &AnalysisSession,
+) -> Result<Vec<HealthCrateMetrics>, Vec<Diagnostic>> {
+    bloomery_scanning::analyze_code_health(root, crates, duplicate_min_tokens, session)
+}
+
 pub fn run(context: &Context) -> Result<(), Vec<Diagnostic>> {
-    let evidence = scan_all(context)?.evidence;
+    run_with_session(context, &AnalysisSession::new())
+}
+
+/// Run traceability with the Rust source ingestion cache shared by other
+/// consumers in the same check command.
+pub fn run_with_session(
+    context: &Context,
+    session: &AnalysisSession,
+) -> Result<(), Vec<Diagnostic>> {
+    let evidence = scan_all_with_session(context, session)?.evidence;
     let mut diagnostics = Vec::new();
     let mut declared = BTreeMap::new();
     for (area, feature, requirement) in context.requirements() {

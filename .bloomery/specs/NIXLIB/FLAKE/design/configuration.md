@@ -9,7 +9,10 @@ constructor or in `overrides.nix`.
 Build settings live in top-level tables: `[build]`, `[toolchain]`,
 `[profile.release]`, `[profile.dev]`, `[flags]`, `[devShell]`, `[checks]`,
 `[features]`, `[formatters]`, and `[optimize]`. The `[specs]` and `[scanners.*]`
-tables belong to the CLI; the flake interface ignores them.
+tables belong to the CLI; the flake interface ignores them. The nested
+`[checks.codeHealth]` table is also CLI-owned: the loader accepts and validates
+its [catalogued shape and constraints](../../../PARSER/CONFIGURATION/design/code-health.md)
+without generating a health derivation or applying `checks.enable` to it.
 
 The CLI catalogs and type-validates the build keys before evaluation, using the
 [schema catalog](../../../PARSER/CONFIGURATION/design/schema-catalog.md). The

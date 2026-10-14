@@ -204,7 +204,12 @@ pub fn load_with_raw(root: &Path) -> Result<LoadedConfig, Diagnostic> {
             .at(path, Some(1)));
         }
     };
-    parse_contents(&contents, &path)
+    let loaded = parse_contents(&contents, &path)?;
+    let health = crate::health::HealthConfig::from_raw(loaded.raw.as_ref())?;
+    health
+        .validate_destination(root)
+        .map_err(|diagnostic| diagnostic.at(path, None))?;
+    Ok(loaded)
 }
 
 /// Parse and validate configuration contents without reading or writing a file.

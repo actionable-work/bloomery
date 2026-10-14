@@ -1,0 +1,218 @@
+group = "HEALTH"
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-001"
+title = "Health is independently selectable"
+manual = false
+design = "design/code-health.md#check-integration"
+ears = { type = "ubiquitous", system = "Bloomery", action = "include static:code-health in the catalog exactly when checks.codeHealth.enable is true, independently of specs, scanner, Nix-check enablement, and selected systems" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-002"
+title = "Health has no specification prerequisite"
+manual = false
+design = "design/code-health.md#check-integration"
+ears = { type = "ubiquitous", system = "Bloomery", action = "execute selected health after successful formatting without requiring a valid specification model" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-003"
+title = "Health obeys runner controls"
+manual = false
+design = "design/code-health.md#check-integration"
+ears = { type = "ubiquitous", system = "Bloomery", action = "apply ordinary selector, task-limit, cancellation, failure-retention, and exit-code rules to health" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-004"
+title = "Crate scores use documented penalties"
+manual = false
+design = "design/code-health.md#metrics-and-score"
+ears = { type = "ubiquitous", system = "Bloomery", action = "calculate applicable crate scores from the versioned complexity, size, nesting, and exact-duplication formulas" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-005"
+title = "Workspace score uses SLOC weights"
+manual = false
+design = "design/code-health.md#metrics-and-score"
+ears = { type = "ubiquitous", system = "Bloomery", action = "calculate the workspace score as the production-SLOC-weighted mean of applicable persisted crate scores" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-006"
+title = "Empty crates have no aggregate weight"
+manual = false
+design = "design/code-health.md#metrics-and-score"
+ears = { type = "ubiquitous", system = "Bloomery", action = "report zero-production-SLOC crates with null scores and not_applicable status" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-007"
+title = "Empty workspace is not applicable"
+manual = false
+design = "design/code-health.md#metrics-and-score"
+ears = { type = "ubiquitous", system = "Bloomery", action = "pass health with a null workspace score and no required baseline when all selected crates have zero production SLOC" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-008"
+title = "Score arithmetic is deterministic"
+manual = false
+design = "design/code-health.md#metrics-and-score"
+ears = { type = "ubiquitous", system = "Bloomery", action = "persist scores in integer hundredths using nearest rounding with ties upward and use those values for gates and deltas" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-009"
+title = "Crate score floors are enforced"
+manual = false
+design = "design/code-health.md#policy-gates"
+ears = { type = "ubiquitous", system = "Bloomery", action = "fail each applicable crate whose score is below minCrateScore" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-010"
+title = "Workspace score floor is enforced"
+manual = false
+design = "design/code-health.md#policy-gates"
+ears = { type = "ubiquitous", system = "Bloomery", action = "fail an applicable workspace whose score is below minWorkspaceScore" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-011"
+title = "Function limits prevent dilution"
+manual = false
+design = "design/code-health.md#policy-gates"
+ears = { type = "ubiquitous", system = "Bloomery", action = "fail any callable exceeding maxCyclomatic, maxFunctionTokens, or maxNesting even when aggregate scores pass" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-012"
+title = "Crate regression is bounded"
+manual = false
+design = "design/code-health.md#policy-gates"
+ears = { type = "ubiquitous", system = "Bloomery", action = "fail matching applicable crates whose baseline score decrease exceeds maxRegression" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-013"
+title = "Workspace regression is bounded"
+manual = false
+design = "design/code-health.md#policy-gates"
+ears = { type = "ubiquitous", system = "Bloomery", action = "fail an applicable workspace whose baseline score decrease exceeds maxRegression" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-014"
+title = "Membership changes retain useful comparisons"
+manual = false
+design = "design/code-health.md#policy-gates"
+ears = { type = "ubiquitous", system = "Bloomery", action = "report added and removed manifest-path crate identities and apply absolute gates to added crates without fabricating prior scores" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-015"
+title = "Invalid baselines fail after measurement"
+manual = false
+design = "design/code-health.md#policy-gates"
+ears = { type = "ubiquitous", system = "Bloomery", action = "fail missing, malformed, unsupported, or incompatible baselines while retaining a valid current measurement" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-016"
+title = "Baseline compatibility follows score semantics"
+manual = false
+design = "design/code-health.md#policy-gates"
+ears = { type = "ubiquitous", system = "Bloomery", action = "require matching schema, algorithm, scoring limits, duplicate window size, and source-selection policy before calculating baseline deltas" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-017"
+title = "Completed health measurements are retained"
+manual = false
+design = "design/code-health.md#retained-reports"
+ears = { type = "ubiquitous", system = "Bloomery", action = "retain complete metrics, penalty breakdowns, effective policy, source inventory, input digest, and comparisons even when policy gates fail" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-018"
+title = "Health retrieval is read only"
+manual = false
+design = "design/code-health.md#retained-reports"
+ears = { type = "ubiquitous", system = "Bloomery", action = "retrieve health data from the addressed completed run without formatting, analysis, or builds" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-019"
+title = "Health retrieval is bounded and seekable"
+manual = false
+design = "design/code-health.md#retained-reports"
+ears = { type = "ubiquitous", system = "Bloomery", action = "page crate summaries in manifest-path order with workspace score and delta, offset, total, nullable continuation, and the 8 KiB response ceiling" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-020"
+title = "Health retrieval does not fall back"
+manual = false
+design = "design/code-health.md#retained-reports"
+ears = { type = "ubiquitous", system = "Bloomery", action = "report unavailable health data in the addressed or latest completed run without selecting an older run" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-021"
+title = "Health summary remains bounded"
+manual = false
+design = "design/code-health.md#retained-reports"
+ears = { type = "ubiquitous", system = "Bloomery", action = "provide a health retrieval hint in the bounded normal summary and expose health failures through ordinary failure details" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-022"
+title = "Snapshot update requires complete measurement"
+manual = false
+design = "design/code-health.md#reviewed-snapshots"
+ears = { type = "ubiquitous", system = "Bloomery", action = "allow baseline export only from a finalized uninterrupted run with passed formatting and complete health measurement" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-023"
+title = "Policy failure does not prevent review export"
+manual = false
+design = "design/code-health.md#reviewed-snapshots"
+ears = { type = "ubiquitous", system = "Bloomery", action = "allow explicit export of complete current measurements despite health policy failures or unrelated check failures" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-024"
+title = "Stale measurements cannot be exported"
+manual = false
+design = "design/code-health.md#reviewed-snapshots"
+ears = { type = "ubiquitous", system = "Bloomery", action = "reject snapshot update when current discovery inputs, source inventory, bytes, or effective health configuration differ from the retained input digest" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-025"
+title = "Export freshness avoids AST work"
+manual = false
+design = "design/code-health.md#reviewed-snapshots"
+ears = { type = "ubiquitous", system = "Bloomery", action = "verify export freshness through reads and discovery without AST parsing, formatting, or builds" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-026"
+title = "The summary retains comparison inputs"
+manual = false
+design = "design/code-health.md#reviewed-snapshots"
+ears = { type = "ubiquitous", system = "Bloomery", action = "export one high-level summary and comparison baseline with schema and algorithm versions, scoring and selection policy, input digest, workspace and per-crate SLOC, scores, and category subscores while omitting detailed metrics" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-027"
+title = "Health JSON exports are readable and reproducible"
+manual = false
+design = "design/code-health.md#reviewed-snapshots"
+ears = { type = "ubiquitous", system = "Bloomery", action = "produce identical two-space pretty-printed summary JSON for identical measurements using stable fields, sorted crate identities, and a trailing newline" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-028"
+title = "Snapshot replacement is atomic"
+manual = false
+design = "design/code-health.md#reviewed-snapshots"
+ears = { type = "ubiquitous", system = "Bloomery", action = "replace the configured summary-baseline file through temporary-file creation and atomic rename while preserving its previous contents on failure" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-029"
+title = "Ordinary checks preserve snapshots"
+manual = false
+design = "design/code-health.md#reviewed-snapshots"
+ears = { type = "ubiquitous", system = "Bloomery", action = "leave tracked baselines unchanged during ordinary check execution and report retrieval" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-030"
+title = "Malformed snapshot records are rejected"
+manual = false
+design = "design/code-health.md#reviewed-snapshots"
+ears = { type = "ubiquitous", system = "Bloomery", action = "reject summary baselines containing duplicate crate identities, invalid digests, unsupported values, or inconsistent crate and workspace scores" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-031"
+title = "Review summary reports high-level health metrics"
+manual = false
+design = "design/code-health.md#reviewed-snapshots"
+ears = { type = "ubiquitous", system = "Bloomery", action = "write one compact PR summary and comparison baseline with workspace and per-crate scores, SLOC, and category subscores, and no source locations or run-specific metadata" }

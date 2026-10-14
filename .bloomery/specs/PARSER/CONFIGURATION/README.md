@@ -24,6 +24,7 @@ during loading and passes through for the flake interface.
 
 - [Configuration file](design/config-file.md)
 - [Schema catalog](design/schema-catalog.md)
+- [Code health policy](design/code-health.md)
 - [Scanner targets](design/scanner-targets.md)
 
 ## Responsibilities
@@ -50,6 +51,7 @@ during loading and passes through for the flake interface.
 - Expose a schema catalog spanning every recognized key, with documentation text
   and recommended defaults, consumed by `bloomery config` and sync
   recommendations.
+- Resolve and validate CLI-owned `checks.codeHealth` scoring and baseline policy.
 - Reject malformed or ambiguous configuration before scanning begins.
 
 ## Dependencies

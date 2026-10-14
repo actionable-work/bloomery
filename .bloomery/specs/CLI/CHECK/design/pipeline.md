@@ -9,7 +9,10 @@ whether auto-detected from the specification tree or explicitly configured
 (`specs.enable = true`). When it is disabled, `static:structure` and
 `static:traceability` are absent from the catalog, no workspace or evidence pass
 runs, and a disabled specification tree produces no static diagnostics. The
-formatter gate and Nix checks are unaffected.
+formatter gate, enabled code health, and Nix checks are unaffected. Health is
+an independent static branch without requirement-model prerequisites; see
+[code health](code-health.md). Health can request source ingestion while evidence
+scanning is disabled, without producing specification references.
 
 1. **Configuration ingestion** — require and parse `.bloomery/config.toml`,
    resolve roots, and validate scanner settings. A missing or invalid file is a

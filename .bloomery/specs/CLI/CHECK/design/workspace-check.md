@@ -5,13 +5,13 @@
 The shared CLI preflight requires a root `flake.nix` before every command. See
 [CLI command and workspace requirements](../../INTERFACE/design/commands.md#flake-presence-preflight).
 After that gate, `bloomery check` owns workspace formatting, static verification,
-and test/build orchestration:
+code health, and test/build orchestration:
 
 ```text
 bloomery check
 ├── execution: catalog/selection setup → format:workspace (`nix fmt`)
-│   └── after formatting succeeds: static checks + Nix derivations
-└── list/failures/details: shared flake gate only; no formatting
+│   └── after formatting succeeds: static checks + code health + Nix derivations
+└── list/failures/details/health retrieval and update: shared flake gate; no formatting
 ```
 
 The `mkFlake` integration does not generate a `bloomery:check` output,

@@ -17,7 +17,10 @@ async fn rejects_invalid_credentials() {
 compiles without a proc-macro crate. Evidence tags therefore add no dependency
 to workspace or generated template crates.
 
-The scanner parses configured `.rs` files with `syn`. It visits function
+The shared Rust ingestion service parses the union of evidence and health
+`.rs` inputs with `syn` once per command. The scanner consumes its evidence
+projection; health consumes separate metrics from the same traversal. See
+[shared health analysis](health-analysis.md). It visits function
 declarations, inspects their `cfg_attr` attributes, and extracts the string
 argument of a nested `bloomery(...)` meta item. The tag is intended for test
 functions, including functions carrying `#[test]` or `#[tokio::test]`; a
@@ -26,5 +29,5 @@ malformed nested argument or a non-string value is a source diagnostic.
 ## Static boundary
 
 The scanner never compiles or executes Rust. It does not infer requirement IDs
-from function names, comments, or test bodies. The source span of the
+from function names, comments, or test bodies. The actual token span of the
 `cfg_attr` attribute is retained for orphan and illegal-manual diagnostics.

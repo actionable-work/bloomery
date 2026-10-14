@@ -3,6 +3,7 @@
   pkgs ? null,
 }: let
   discover = import ./discover.nix {inherit lib;};
+  healthSources = import ./health-sources.nix {inherit lib;};
   features = import ./features.nix {inherit lib;};
   parseLock = import ./parse-lock.nix {inherit lib;};
   manifestPolicy = import ./manifest-policy.nix {inherit lib;};
@@ -12,6 +13,7 @@
     then import ./options.nix {inherit pkgs lib;}
     else null;
   discoverTests = import ./discover.test.nix {inherit lib;};
+  healthSourceTests = import ./health-sources.test.nix {inherit lib;};
   featuresTests = import ./features.test.nix {inherit lib;};
   parseLockTests = import ./parse-lock.test.nix {inherit lib;};
   manifestPolicyTests = import ./manifest-policy.test.nix {inherit lib;};
@@ -25,10 +27,11 @@
     else {};
 in {
   inherit (discover) discoverWorkspaceCrates;
+  inherit healthSources;
   inherit (features) extractFeaturesFromToml resolveFeatures;
   inherit (parseLock) parseDepString parseLock;
   inherit manifestPolicy;
   inherit sources;
   inherit options;
-  tests = discoverTests // featuresTests // parseLockTests // manifestPolicyTests // lockCheckTests // optionsTests;
+  tests = discoverTests // healthSourceTests // featuresTests // parseLockTests // manifestPolicyTests // lockCheckTests // optionsTests;
 }

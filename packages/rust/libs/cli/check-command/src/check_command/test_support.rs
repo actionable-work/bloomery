@@ -24,6 +24,7 @@ pub(super) struct FakeNix {
     pub(super) build_commands: AtomicUsize,
     pub(super) built_derivations: Mutex<std::collections::BTreeSet<String>>,
     pub(super) names: Vec<String>,
+    pub(super) health_crates: Vec<bloomery_check::HealthSourceCrate>,
     pub(super) discovery_error: Option<String>,
     pub(super) unique_derivations: bool,
     /// Attributes whose derivation fails during `plan_checks` evaluation.
@@ -354,6 +355,14 @@ impl NixBackend for FakeNix {
             .cloned()
             .unwrap_or_else(|| Err(format!("no fake log configured for {store_path}")))
     }
+
+    fn health_sources(
+        &self,
+        _root: &Path,
+        _system: &str,
+    ) -> Result<Vec<bloomery_check::HealthSourceCrate>, String> {
+        Ok(self.health_crates.clone())
+    }
 }
 
 pub(super) fn fixture(with_flake: bool) -> (PathBuf, PathBuf) {
@@ -373,7 +382,7 @@ pub(super) fn fixture(with_flake: bool) -> (PathBuf, PathBuf) {
     fs::create_dir_all(root.join(".bloomery")).expect("configuration directory");
     fs::write(
         root.join(".bloomery/config.toml"),
-        "[specs]\ndir = \"specs\"\n",
+        "[specs]\ndir = \"specs\"\n\n[checks.codeHealth]\nenable = false\n",
     )
     .expect("configuration");
     let feature = root.join(".bloomery/specs/CLI/CHECK");
@@ -415,6 +424,11 @@ pub(super) fn fixture_without_specs(with_flake: bool, config: &str) -> (PathBuf,
         fs::write(root.join("flake.nix"), "{}\n").expect("flake marker");
     }
     fs::create_dir_all(root.join(".bloomery")).expect("configuration directory");
+    let config = if config.contains("[checks.codeHealth]") {
+        config.to_owned()
+    } else {
+        format!("{config}\n[checks.codeHealth]\nenable = false\n")
+    };
     fs::write(root.join(".bloomery/config.toml"), config).expect("configuration");
     (root, cache)
 }

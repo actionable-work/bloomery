@@ -58,6 +58,9 @@ fn parse_typed(value_type: &ValueType, raw: &str) -> Option<toml::Value> {
             .ok()
             .filter(|value| *value >= 0 && *value as u64 <= *max)
             .map(toml::Value::Integer),
+        ValueType::Number => parse_toml_expression(raw).filter(|value| {
+            value.as_integer().is_some() || value.as_float().is_some_and(f64::is_finite)
+        }),
         ValueType::String | ValueType::Path | ValueType::Package => {
             Some(toml::Value::String(raw.to_owned()))
         }
@@ -97,6 +100,7 @@ fn to_edit(value: &toml::Value) -> Result<EditValue, ConfigError> {
     Ok(match value {
         toml::Value::Boolean(value) => EditValue::from(*value),
         toml::Value::Integer(value) => EditValue::from(*value),
+        toml::Value::Float(value) => EditValue::from(*value),
         toml::Value::String(value) => EditValue::from(value.clone()),
         toml::Value::Array(items) => {
             let mut array = Array::new();

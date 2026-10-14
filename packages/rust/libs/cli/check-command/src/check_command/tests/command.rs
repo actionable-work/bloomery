@@ -53,6 +53,51 @@ fn default_and_explicit_selection_choose_static_and_requested_system_catalogs() 
 }
 
 #[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-001"))]
+#[cfg_attr(any(), bloomery("PARSER-SCANNING-HEALTH-001"))]
+#[cfg_attr(any(), bloomery("PARSER-SCANNING-HEALTH-002"))]
+#[cfg_attr(any(), bloomery("PARSER-SCANNING-HEALTH-006"))]
+fn health_catalog_enablement_ignores_specs_scanners_build_toggle_and_system_count() {
+    let config = "[specs]\nenable = false\n\n[scanners.rust]\nenabled = false\npaths = []\n\n[checks]\nenable = false\n\n[checks.codeHealth]\nenable = true\n";
+    let (root, cache) = fixture_without_specs(true, config);
+    let backend = FakeNix {
+        names: vec!["base".to_owned()],
+        ..FakeNix::default()
+    };
+    let selectors = vec!["static:*".to_owned()];
+    let catalog =
+        discover_for_selection(&root, &selectors, &[], &backend).expect("static-only catalog");
+    assert_eq!(catalog.ids, ["static:code-health"]);
+    let catalog = discover_for_selection(
+        &root,
+        &[],
+        &["aarch64-linux".to_owned(), "x86_64-linux".to_owned()],
+        &backend,
+    )
+    .expect("multi-system catalog");
+    assert_eq!(
+        catalog
+            .ids
+            .iter()
+            .filter(|id| *id == "static:code-health")
+            .count(),
+        1
+    );
+    assert_eq!(backend.systems.lock().unwrap().len(), 2);
+
+    fs::write(
+        root.join(".bloomery/config.toml"),
+        config.replace("enable = true\n", "enable = false\n"),
+    )
+    .expect("disable health");
+    let catalog = discover_for_selection(&root, &selectors, &[], &backend)
+        .expect("disabled static-only catalog");
+    assert!(catalog.ids.is_empty());
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
 #[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-013"))]
 fn default_check_execution_without_a_flake_returns_the_shared_setup_error() {
     let (root, cache) = fixture(false);

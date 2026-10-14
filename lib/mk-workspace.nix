@@ -90,6 +90,11 @@ in
         then throw "bloomery: source.members lists unknown workspace members: ${lib.concatStringsSep ", " missingMembers}"
         else lib.filterAttrs (name: _: builtins.elem name workspaceMembers) discoveredWorkspaceMembers
       else discoveredWorkspaceMembers;
+    healthSources = workspace.healthSources {
+      inherit root;
+      cargoTomlPath = cargoToml;
+      members = workspaceMembers;
+    };
 
     # Support colocated overrides.nix files next to member Cargo.toml files
     loadColocatedOverride = crateDir: let
@@ -1412,6 +1417,7 @@ in
 
     # Standardized CI checks (crate:check, crate:test, crate:clippy, crate:doc, crate:doctest, crate:bin, crate:lib, lock-check)
     inherit checks;
+    inherit healthSources;
 
     # Preconfigured development shell (direnv / nix develop)
     inherit devShell;

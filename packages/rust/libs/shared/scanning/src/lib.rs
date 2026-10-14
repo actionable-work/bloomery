@@ -1,11 +1,18 @@
 #![allow(clippy::result_large_err)]
 
+mod analysis;
 mod files;
+mod health;
 mod nix;
 mod rust;
 mod typescript;
 
+pub use analysis::AnalysisSession;
 use bloomery_model::{Context, Diagnostic, Evidence, TestSite};
+pub use health::{
+    HealthCallable, HealthCrateMetrics, HealthSourceCrate, HealthTarget, HealthToken, OpaqueSource,
+    analyze_code_health,
+};
 
 /// One scanner pass: requirement references plus discovered test sites.
 #[derive(Debug, Default)]
@@ -22,11 +29,19 @@ impl ScanOutput {
 }
 
 pub fn scan_all(context: &Context) -> Result<ScanOutput, Vec<Diagnostic>> {
+    scan_all_with_session(context, &AnalysisSession::new())
+}
+
+/// Scan with an ingestion cache shared with other command-scoped consumers.
+pub fn scan_all_with_session(
+    context: &Context,
+    session: &AnalysisSession,
+) -> Result<ScanOutput, Vec<Diagnostic>> {
     let mut output = ScanOutput::default();
     let mut diagnostics = Vec::new();
     let scanners = &context.config.scanners;
     if scanners.rust.enabled {
-        match rust::scan(&context.root, &scanners.rust.paths) {
+        match rust::scan(&context.root, &scanners.rust.paths, session) {
             Ok(found) => output.absorb(found),
             Err(errors) => diagnostics.extend(errors),
         }
@@ -57,7 +72,11 @@ pub fn scan_all(context: &Context) -> Result<ScanOutput, Vec<Diagnostic>> {
 #[cfg(test)]
 mod tests {
     use super::scan_all;
-    use crate::{nix, rust, typescript};
+    use crate::{
+        AnalysisSession, HealthSourceCrate, HealthTarget, analyze_code_health,
+        scan_all_with_session,
+    };
+    use crate::{nix, typescript};
     use bloomery_model::config::{
         NixScannerConfig, PlaywrightScannerConfig, RustScannerConfig, ScannersConfig, SpecsConfig,
     };
@@ -371,12 +390,56 @@ in builtins.seq (builtins.abort "scanner must not evaluate Nix") {
         )
         .expect("Rust source");
         let context = context(&root, &["tests/**/*.rs", "tests/once.rs"], &[], &[], &[]);
-        let before = rust::PARSE_COUNT.load(Ordering::Relaxed);
-        let output = scan_all(&context).expect("scan");
-        let parsed = rust::PARSE_COUNT.load(Ordering::Relaxed) - before;
+        let session = AnalysisSession::new();
+        let before = session.parse_count();
+        let output = scan_all_with_session(&context, &session).expect("scan");
+        let parsed = session.parse_count() - before;
         assert_eq!(parsed, 1, "overlapping globs and both roles parse once");
         assert_eq!(output.tests.len(), 1);
         assert_eq!(output.evidence.len(), 1);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-SCANNING-HEALTH-007"))]
+    #[cfg_attr(any(), bloomery("PARSER-SCANNING-HEALTH-008"))]
+    #[cfg_attr(any(), bloomery("PARSER-SCANNING-HEALTH-011"))]
+    #[cfg_attr(any(), bloomery("PARSER-SCANNING-HEALTH-009"))]
+    #[cfg_attr(any(), bloomery("PARSER-SCANNING-HEALTH-010"))]
+    fn health_and_evidence_share_one_parse_and_bad_tags_stay_independent() {
+        let _guard = SCAN_LOCK.lock().expect("scan lock");
+        let root = root("health-shared-parse");
+        fs::create_dir_all(root.join("crates/demo/src")).expect("source");
+        fs::write(
+            root.join("crates/demo/src/lib.rs"),
+            "#[cfg_attr(any(), bloomery(not_a_string))]\n#[test]\nfn bad_tag() {}\npub fn production() { if true { let _ = 1; } }\n",
+        )
+        .expect("Rust source");
+        let session = AnalysisSession::new();
+        let before = session.parse_count();
+        let health = analyze_code_health(
+            &root,
+            &[HealthSourceCrate {
+                name: "demo".to_owned(),
+                manifest_path: "crates/demo/Cargo.toml".to_owned(),
+                targets: vec![HealthTarget {
+                    kind: "library".to_owned(),
+                    path: "src/lib.rs".to_owned(),
+                }],
+            }],
+            16,
+            &session,
+        )
+        .expect("health is independent of evidence tag validation");
+        let context = context(&root, &["crates/demo/src/**/*.rs"], &[], &[], &[]);
+        assert!(scan_all_with_session(&context, &session).is_err());
+        let parsed = session.parse_count() - before;
+        assert_eq!(parsed, 1, "both consumers use the same parsed Rust file");
+        assert_eq!(health[0].callables.len(), 1);
+        assert_eq!(
+            health[0].callables[0].identity.split('#').next(),
+            Some("production")
+        );
         let _ = fs::remove_dir_all(root);
     }
 
@@ -410,11 +473,12 @@ in builtins.seq (builtins.abort "scanner must not evaluate Nix") {
         fs::create_dir_all(root.join("tests")).expect("tests");
         fs::write(root.join("tests/once.rs"), "#[test]\nfn once() {}\n").expect("Rust source");
         let context = context(&root, &["tests/**/*.rs"], &[], &[], &[]);
-        let before = rust::PARSE_COUNT.load(Ordering::Relaxed);
-        scan_all(&context).expect("first scan");
-        let first = rust::PARSE_COUNT.load(Ordering::Relaxed) - before;
-        scan_all(&context).expect("second scan");
-        let second = rust::PARSE_COUNT.load(Ordering::Relaxed) - before - first;
+        let first_session = AnalysisSession::new();
+        scan_all_with_session(&context, &first_session).expect("first scan");
+        let first = first_session.parse_count();
+        let second_session = AnalysisSession::new();
+        scan_all_with_session(&context, &second_session).expect("second scan");
+        let second = second_session.parse_count();
         assert_eq!(first, 1);
         assert_eq!(second, 1, "the cache does not persist across commands");
         let _ = fs::remove_dir_all(root);

@@ -16,6 +16,18 @@ Preserve the existing diagnostic semantics and repository-relative locations:
 | `IllegalManualAutomation` | Evidence references a manual requirement. |
 | `MissingAutomatedTest` | Automated requirement has no evidence. |
 | `ParseError` | Configuration, Markdown, TOML, source, or Nix input is invalid. |
+| `HealthScoreBelowMinimum` | A crate or workspace score is below its configured floor. |
+| `HealthFunctionLimitExceeded` | A callable exceeds a configured hard metric limit. |
+| `HealthRegression` | A comparable score decreased beyond the permitted allowance. |
+| `HealthBaselineMissing` | Applicable health has no reviewed baseline file. |
+| `HealthBaselineInvalid` | The baseline is malformed or unsupported. |
+| `HealthBaselineIncompatible` | Baseline and current scoring or selection policy differ. |
+
+Health source read/parse failures retain source diagnostics under
+`static:code-health`; shared failures carry affected consumer IDs. Health policy
+diagnostics include the measured value, configured limit or prior score, crate
+identity, and contributing source spans where applicable. See
+[code health](code-health.md#policy-gates).
 
 Runner failures retain the batched realization output and the failed check's
 derivation store path as seekable task details. A formatter failure is recorded under
@@ -37,7 +49,8 @@ and a closing summary. On eligible user terminals, close the summary with the
 final derivation work metrics from
 [terminal progress](progress.md#final-metrics). Do not print individual
 successes, build logs, durations, repeated headings, or expanded diagnostic notes
-by default. Successful full runs need only counts and run ID. Subset runs
+by default. Successful full runs show counts, run ID, and a health retrieval hint
+when measurement completed. Subset runs
 identify partial scope. Eligible user terminals display one transient stderr
 line for changing check and derivation metrics; CI, non-TTY, and JSON output have
 no progress stream. See [terminal progress](progress.md). Transient updates are
