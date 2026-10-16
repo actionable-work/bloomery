@@ -688,6 +688,7 @@ struct InitialTaskInputs<'a> {
     allocation: &'a store::RunAllocation,
     backend: &'a dyn NixBackend,
     batch_plans: Vec<CheckPlan>,
+    batch_derivations: Vec<String>,
     health_sources: Option<Result<Vec<bloomery_check::HealthSourceCrate>, String>>,
     clippy_policy: Option<bloomery_model::clippy::ClippySuppressionConfig>,
     fail_fast: bool,
@@ -701,6 +702,7 @@ fn build_initial_tasks<'a>(inputs: InitialTaskInputs<'a>) -> Vec<InitialWork<'a>
         allocation,
         backend,
         batch_plans,
+        batch_derivations,
         health_sources,
         clippy_policy,
         fail_fast,
@@ -754,6 +756,7 @@ fn build_initial_tasks<'a>(inputs: InitialTaskInputs<'a>) -> Vec<InitialWork<'a>
             allocation,
             backend,
             batch_plans,
+            batch_derivations,
             fail_fast,
             sink,
         ));
@@ -761,11 +764,34 @@ fn build_initial_tasks<'a>(inputs: InitialTaskInputs<'a>) -> Vec<InitialWork<'a>
     tasks
 }
 
+fn derivation_dependency_closure(
+    plans: &[CheckPlan],
+    dependencies: &BTreeMap<String, Vec<String>>,
+) -> Vec<String> {
+    let mut pending = plans
+        .iter()
+        .filter_map(|plan| plan.derivation.clone())
+        .collect::<Vec<_>>();
+    let mut derivations = BTreeSet::new();
+
+    while let Some(derivation) = pending.pop() {
+        if !derivations.insert(derivation.clone()) {
+            continue;
+        }
+        if let Some(inputs) = dependencies.get(&derivation) {
+            pending.extend(inputs.iter().cloned());
+        }
+    }
+
+    derivations.into_iter().collect()
+}
+
 fn batch_task<'a>(
     root: &Path,
     allocation: &store::RunAllocation,
     backend: &'a dyn NixBackend,
     batch_plans: Vec<CheckPlan>,
+    batch_derivations: Vec<String>,
     fail_fast: bool,
     sink: &ProgressSink,
 ) -> InitialWork<'a> {
@@ -775,6 +801,12 @@ fn batch_task<'a>(
     (
         "nix:batch".to_owned(),
         Box::new(move |cancellation: CancellationToken| {
+            sink.emit(ProgressEvent::DerivationMetadataAvailable);
+            for derivation in &batch_derivations {
+                sink.work(super::progress::DerivationEvent::Discovered {
+                    drv: derivation.clone(),
+                });
+            }
             let log_name = "nix-batch.log";
             let result = match allocation.prepare_log(log_name) {
                 Ok(log_path) => backend.realize_batch(
@@ -825,6 +857,7 @@ fn execute_selected<W: Write>(
         .iter()
         .filter_map(|id| plans.get(id).cloned())
         .collect::<Vec<_>>();
+    let batch_derivations = derivation_dependency_closure(&batch_plans, dependencies);
 
     let (event_sender, event_receiver) = mpsc::channel();
     let sink = ProgressSink::new(event_sender, progress.is_enabled());
@@ -834,6 +867,7 @@ fn execute_selected<W: Write>(
         allocation,
         backend,
         batch_plans,
+        batch_derivations,
         health_sources: health_sources.clone(),
         clippy_policy,
         fail_fast,

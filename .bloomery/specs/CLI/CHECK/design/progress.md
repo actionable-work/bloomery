@@ -57,23 +57,31 @@ do not erase known unfinished work.
 
 Totals describe known work, not a promise that the whole dependency graph has
 been evaluated. Label the total `known total`; it may grow as requests evaluate
-or dynamic dependencies appear. Before work information is available, display
-`?` for unavailable derivation metrics rather than fabricated zeros. Static-only
-runs display zeros. A request that succeeds entirely from existing store outputs
-can finish with zero derivation work and a completed check.
+or dynamic dependencies appear. As soon as evaluation exposes a structured work
+plan, include every distinct derivation assigned to building or substitution in
+the known total and its pending category, even if Nix has not started its
+activity yet. Update the plan as evaluation discovers more work, so the pending
+count reflects large package changes before their builds complete. Display `?`
+only while a metric cannot yet be determined from available structured
+information; lack of a build activity alone does not make a known plan
+unavailable. Static-only runs display zeros. A request that succeeds entirely
+from existing store outputs can finish with zero derivation work and a completed
+check.
 
 ## Event collection
 
-The Nix backend consumes structured Nix activity and work-plan information during
-realization and sends normalized metric events to a run-scoped aggregator. Consume
-per-derivation completion evidence as it arrives; an activity start or stop alone
-does not establish success, and work whose success cannot be proven remains
-outstanding. Resolve output substitution identities to derivation paths using
-structured Nix metadata; store-path download counts are not derivation counts.
-Do not scrape localized human diagnostics, forward raw Nix events to the
-terminal, or sum aggregate totals from overlapping realization scopes.
-Completed derivation work may be reconciled from the post-realization outcome
-validity result when structured completion evidence is unavailable.
+The Nix backend consumes structured evaluation work plans and Nix activity during
+realization and sends normalized metric events to a run-scoped aggregator. Publish
+each plan's distinct build and substitution assignments as soon as they are
+available, then reconcile them with activity and completion evidence as the run
+continues. Consume per-derivation completion evidence as it arrives; an activity
+start or stop alone does not establish success, and work whose success cannot be
+proven remains outstanding. Resolve output substitution identities to derivation
+paths using structured Nix metadata; store-path download counts are not
+derivation counts. Do not scrape localized human diagnostics, forward raw Nix
+events to the terminal, or sum aggregate totals from overlapping realization
+scopes. Completed derivation work may be reconciled from the post-realization
+outcome validity result when structured completion evidence is unavailable.
 
 Execution supplies final-outcome events for selected checks and the formatter
 gate to the same aggregator. One serialized renderer owns terminal writes;

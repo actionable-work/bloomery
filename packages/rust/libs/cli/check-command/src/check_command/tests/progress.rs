@@ -55,7 +55,7 @@ fn eligible_execution_writes_changing_metrics_to_stderr_and_final_metrics_to_std
         names: vec!["alias-a".to_owned(), "alias-b".to_owned()],
         scripted_events: Mutex::new(vec![
             crate::check_command::progress::DerivationEvent::BuildStarted {
-                drv: "/nix/store/shared.drv".to_owned(),
+                drv: "/nix/store/check.drv".to_owned(),
             },
         ]),
         ..FakeNix::default()
@@ -99,6 +99,59 @@ fn eligible_execution_writes_changing_metrics_to_stderr_and_final_metrics_to_std
     assert!(
         stderr.trim_end().ends_with("\u{1b}[K"),
         "stderr: {stderr:?}"
+    );
+
+    let _ = std::fs::remove_dir_all(root);
+    let _ = std::fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-032"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-012"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-014"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-018"))]
+fn evaluated_derivation_closure_is_counted_before_build_activity() {
+    let (root, cache) = fixture(true);
+    let backend = FakeNix {
+        names: vec!["check".to_owned()],
+        unique_derivations: true,
+        derivation_dependencies: vec![("check".to_owned(), "dependency".to_owned())],
+        scripted_events: Mutex::new(vec![
+            crate::check_command::progress::DerivationEvent::BuildStarted {
+                drv: "/nix/store/check.drv".to_owned(),
+            },
+        ]),
+        ..FakeNix::default()
+    };
+    let mut args = request();
+    args.selectors = vec!["nix:*".to_owned()];
+    let mut terminal = tty();
+    terminal.columns = Some("300".to_owned());
+    let (status, _, stderr) = invoke_with_terminal(
+        args,
+        &root,
+        &cache,
+        &backend,
+        false,
+        InterruptFlag::for_test(),
+        terminal,
+    );
+    assert_eq!(status, std::process::ExitCode::SUCCESS);
+    let stderr = stdio_text(&stderr);
+    let pending = stderr
+        .find("to build 2")
+        .unwrap_or_else(|| panic!("expected evaluated work plan in stderr: {stderr:?}"));
+    let activity = stderr
+        .find("built 1")
+        .unwrap_or_else(|| panic!("expected build activity in stderr: {stderr:?}"));
+    assert!(pending < activity, "stderr: {stderr:?}");
+    let pending_snapshot = stderr[pending..]
+        .split("\u{1b}[0m")
+        .next()
+        .unwrap_or_default();
+    assert!(
+        pending_snapshot.contains("known total 2"),
+        "pending snapshot: {pending_snapshot:?}"
     );
 
     let _ = std::fs::remove_dir_all(root);

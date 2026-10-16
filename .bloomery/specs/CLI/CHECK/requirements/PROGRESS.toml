@@ -362,3 +362,10 @@ type = "state"
 state = "the progress eligibility policy suppresses live progress"
 system = "bloomery check"
 action = "omit final metrics from the completion output"
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-032"
+title = "Evaluated build plans show known pending work"
+manual = false
+design = "design/progress.md#derivation-metrics"
+ears = { type = "state", state = "Nix evaluation exposes a structured work plan for selected checks", system = "the check progress aggregator", action = "include each distinct derivation assigned to building or substitution in the known total and its pending category before realization activity starts" }
