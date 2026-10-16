@@ -416,6 +416,7 @@ pub(super) struct PlannedCatalog {
     pub(super) systems: Vec<String>,
     pub(super) notices: Vec<Notice>,
     pub(super) plans: BTreeMap<String, CheckPlan>,
+    pub(super) outputs_by_derivation: BTreeMap<String, Vec<String>>,
     pub(super) dependencies: BTreeMap<String, Vec<String>>,
 }
 
@@ -530,6 +531,7 @@ pub(super) fn plan_for_selection(
             systems: Vec::new(),
             notices: Vec::new(),
             plans: BTreeMap::new(),
+            outputs_by_derivation: BTreeMap::new(),
             dependencies: BTreeMap::new(),
         });
     }
@@ -538,6 +540,7 @@ pub(super) fn plan_for_selection(
     let mut ids = static_ids;
     let mut notices = Vec::new();
     let mut plans = BTreeMap::new();
+    let mut outputs_by_derivation = BTreeMap::new();
     let mut dependencies = BTreeMap::new();
     for system in &systems {
         let planned = backend
@@ -551,6 +554,7 @@ pub(super) fn plan_for_selection(
                 ),
             });
         }
+        outputs_by_derivation.extend(planned.outputs_by_derivation);
         dependencies.extend(planned.dependencies);
         for plan in planned.plans {
             let id = format!("nix:{system}:{}", plan.attribute);
@@ -567,6 +571,7 @@ pub(super) fn plan_for_selection(
         systems,
         notices,
         plans,
+        outputs_by_derivation,
         dependencies,
     })
 }

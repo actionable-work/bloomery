@@ -37,9 +37,6 @@ pub struct PlanError {
     pub message: String,
 }
 
-/// A complete catalog evaluation for one selected system. `dependencies` maps
-/// every known derivation store path to its direct input derivations so the
-/// runner can attribute dependency-only failures without re-evaluating.
 /// Maps derivation store paths to their output paths and direct input
 /// derivations: `(outputs_by_derivation, dependencies_by_derivation)`.
 type PlanMetadata = (BTreeMap<String, Vec<String>>, BTreeMap<String, Vec<String>>);
@@ -48,6 +45,9 @@ type PlanMetadata = (BTreeMap<String, Vec<String>>, BTreeMap<String, Vec<String>
 pub struct PlannedSystem {
     pub legacy: bool,
     pub plans: Vec<CheckPlan>,
+    /// Output paths for selected derivations; recursive metadata is loaded only
+    /// when realization evidence needs dependency identities.
+    pub outputs_by_derivation: BTreeMap<String, Vec<String>>,
     pub dependencies: BTreeMap<String, Vec<String>>,
 }
 
@@ -65,6 +65,7 @@ pub struct FailureBlock {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct BatchRealization {
     pub failures: BTreeMap<String, FailureBlock>,
+    pub dependencies: BTreeMap<String, Vec<String>>,
     pub canceled: bool,
     pub operational_error: Option<String>,
 }
@@ -515,7 +516,7 @@ impl NixBackend for NixCli {
             .iter()
             .filter_map(|plan| plan.derivation.clone())
             .collect::<Vec<_>>();
-        let (outputs, dependencies) = self.load_plan_metadata(root, &relevant)?;
+        let (outputs, dependencies) = self.load_plan_metadata(root, &relevant, false)?;
         for plan in &mut plans {
             if let Some(derivation) = &plan.derivation
                 && let Some(paths) = outputs.get(derivation)
@@ -527,6 +528,7 @@ impl NixBackend for NixCli {
         Ok(PlannedSystem {
             legacy,
             plans,
+            outputs_by_derivation: outputs,
             dependencies,
         })
     }
@@ -539,21 +541,27 @@ impl NixBackend for NixCli {
         if outputs.is_empty() {
             return Ok(BTreeSet::new());
         }
-        let mut args = validity_args();
-        args.extend(outputs.iter().map(OsString::from));
-        let output = self.run_catalog_command(root, &args, "output validity")?;
-        let value: Value = serde_json::from_slice(&output)
-            .map_err(|error| format!("Nix output validity is not JSON: {error}"))?;
-        let map = value
-            .as_object()
-            .ok_or_else(|| "Nix output validity is not an object".to_owned())?;
-        let mut valid = BTreeSet::new();
-        for (path, info) in map {
-            if !info.is_null() {
-                valid.insert(path.clone());
-            }
-        }
-        Ok(valid)
+        let args = validity_args();
+        let mut child = Command::new(&self.executable)
+            .args(args)
+            .current_dir(root)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|error| nix_start_error("output validity", error))?;
+        let mut input = outputs.join("\n");
+        input.push('\n');
+        child
+            .stdin
+            .take()
+            .expect("stdin is piped")
+            .write_all(input.as_bytes())
+            .map_err(|error| format!("could not send output paths to Nix: {error}"))?;
+        let result = child
+            .wait_with_output()
+            .map_err(|error| format!("could not read Nix output validity: {error}"))?;
+        parse_valid_outputs(outputs, &result.stdout)
     }
 
     fn realize_batch(
@@ -575,7 +583,7 @@ impl NixBackend for NixCli {
         let collector = NixProgressCollector::new(progress.clone());
         let active = collector.is_active();
         if active {
-            let mut metadata = BTreeMap::new();
+            let mut metadata = progress.output_metadata();
             for plan in plans {
                 for output in &plan.outputs {
                     if let Some(derivation) = &plan.derivation {
@@ -584,6 +592,7 @@ impl NixBackend for NixCli {
                 }
             }
             collector.set_output_metadata(metadata);
+            collector.defer_unmapped_substitutions();
         }
         let mut args = batch_build_args(&derivations, fail_fast);
         if active {
@@ -600,6 +609,10 @@ impl NixBackend for NixCli {
             failure_description: "batched Nix realization failed",
             progress: active.then_some(&collector),
         });
+        let needs_graph = matches!(result, NixTaskResult::Failed { .. })
+            || (matches!(result, NixTaskResult::Succeeded(_)) && collector.needs_output_metadata());
+        let dependencies =
+            self.reconcile_dependency_metadata(root, &derivations, &collector, needs_graph);
         let retained = fs::read(log_path).unwrap_or_default();
         match result {
             NixTaskResult::Succeeded(_) => {
@@ -614,6 +627,7 @@ impl NixBackend for NixCli {
                         .into_iter()
                         .map(|block| (block.derivation.clone(), block))
                         .collect(),
+                    dependencies,
                     canceled: false,
                     operational_error: None,
                 }
@@ -624,6 +638,7 @@ impl NixBackend for NixCli {
                     failures: BTreeMap::new(),
                     canceled: true,
                     operational_error: None,
+                    ..BatchRealization::default()
                 }
             }
             NixTaskResult::OperationalError(message) => {
@@ -632,24 +647,68 @@ impl NixBackend for NixCli {
                     failures: BTreeMap::new(),
                     canceled: false,
                     operational_error: Some(message),
+                    ..BatchRealization::default()
                 }
             }
         }
     }
 }
 
+fn parse_valid_outputs(outputs: &[String], response: &[u8]) -> Result<BTreeSet<String>, String> {
+    let value: Value = serde_json::from_slice(response)
+        .map_err(|error| format!("Nix output validity is not JSON: {error}"))?;
+    let map = value
+        .as_object()
+        .ok_or_else(|| "Nix output validity is not an object".to_owned())?;
+    let mut valid = BTreeSet::new();
+    for path in outputs {
+        let info = map
+            .get(path)
+            .ok_or_else(|| format!("Nix output validity omitted '{path}'"))?;
+        if !info.is_null() {
+            valid.insert(path.clone());
+        }
+    }
+    Ok(valid)
+}
+
 impl NixCli {
-    /// Resolve each selected derivation's output paths and direct input
-    /// derivations in one recursive metadata query.
+    fn reconcile_dependency_metadata(
+        &self,
+        root: &Path,
+        derivations: &[String],
+        collector: &NixProgressCollector,
+        needed: bool,
+    ) -> BTreeMap<String, Vec<String>> {
+        if !needed {
+            return BTreeMap::new();
+        }
+        let Ok((outputs, dependencies)) = self.load_plan_metadata(root, derivations, true) else {
+            return BTreeMap::new();
+        };
+        let metadata = outputs
+            .into_iter()
+            .flat_map(|(drv, paths)| paths.into_iter().map(move |path| (path, drv.clone())))
+            .collect();
+        collector.set_output_metadata(metadata);
+        dependencies
+    }
+
+    /// Resolve requested output paths and direct inputs. Recursive queries are
+    /// reserved for dependency failure or substitution evidence.
     fn load_plan_metadata(
         &self,
         root: &Path,
         derivations: &[String],
+        recursive: bool,
     ) -> Result<PlanMetadata, String> {
         if derivations.is_empty() {
             return Ok((BTreeMap::new(), BTreeMap::new()));
         }
         let mut args = metadata_args();
+        if recursive {
+            args.push(OsString::from("--recursive"));
+        }
         args.extend(derivations.iter().map(OsString::from));
         let output = self.run_catalog_command(root, &args, "derivation metadata")?;
         let value: Value = serde_json::from_slice(&output)
@@ -660,14 +719,19 @@ impl NixCli {
             .ok_or_else(|| "Nix derivation metadata has no derivations map".to_owned())?;
         let mut outputs = BTreeMap::new();
         let mut dependencies = BTreeMap::new();
+        let mut unresolved_outputs = Vec::new();
         for (drv_name, derivation) in entries {
             let drv = full_store_path(drv_name);
+            let output_map = derivation.get("outputs").and_then(Value::as_object);
             let mut paths = Vec::new();
-            if let Some(output_map) = derivation.get("outputs").and_then(Value::as_object) {
+            if let Some(output_map) = output_map {
                 for output in output_map.values() {
                     if let Some(path) = output.get("path").and_then(Value::as_str) {
                         paths.push(full_store_path(path));
                     }
+                }
+                if paths.len() != output_map.len() {
+                    unresolved_outputs.push((drv.clone(), output_map.len()));
                 }
             }
             paths.sort();
@@ -691,8 +755,64 @@ impl NixCli {
             inputs.sort();
             dependencies.insert(drv, inputs);
         }
+        if let Ok(resolved) = self.resolve_output_paths(root, &unresolved_outputs) {
+            outputs.extend(resolved);
+        }
         Ok((outputs, dependencies))
     }
+
+    /// Nix omits `path` for fixed-output derivations in `nix derivation show`.
+    /// Resolve those paths in one batched store query so cached outputs remain
+    /// measurable across large dependency closures.
+    fn resolve_output_paths(
+        &self,
+        root: &Path,
+        derivations: &[(String, usize)],
+    ) -> Result<BTreeMap<String, Vec<String>>, String> {
+        if derivations.is_empty() {
+            return Ok(BTreeMap::new());
+        }
+        let result = Command::new("nix-store")
+            .arg("--query")
+            .arg("--outputs")
+            .args(derivations.iter().map(|(drv, _)| drv))
+            .current_dir(root)
+            .output()
+            .map_err(|error| nix_start_error("derivation output paths", error))?;
+        if !result.status.success() {
+            return Err(format!(
+                "Nix could not resolve derivation output paths: {}",
+                String::from_utf8_lossy(&result.stderr).trim()
+            ));
+        }
+        let paths = String::from_utf8_lossy(&result.stdout)
+            .lines()
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        group_output_paths(derivations, &paths)
+    }
+}
+
+fn group_output_paths(
+    derivations: &[(String, usize)],
+    paths: &[String],
+) -> Result<BTreeMap<String, Vec<String>>, String> {
+    let expected = derivations.iter().map(|(_, count)| count).sum::<usize>();
+    if paths.len() != expected {
+        return Err(format!(
+            "Nix resolved {} output paths for {expected} declared outputs",
+            paths.len()
+        ));
+    }
+    let mut resolved = BTreeMap::new();
+    let mut offset = 0;
+    for (drv, count) in derivations {
+        let mut outputs = paths[offset..offset + count].to_vec();
+        outputs.sort();
+        resolved.insert(drv.clone(), outputs);
+        offset += count;
+    }
+    Ok(resolved)
 }
 
 fn full_store_path(value: &str) -> String {
@@ -893,7 +1013,7 @@ fn plan_args(system: &str) -> Vec<OsString> {
 }
 
 fn metadata_args() -> Vec<OsString> {
-    ["derivation", "show", "--recursive"]
+    ["derivation", "show"]
         .into_iter()
         .map(OsString::from)
         .collect()
@@ -918,7 +1038,7 @@ fn batch_build_args(derivations: &[String], fail_fast: bool) -> Vec<OsString> {
 }
 
 fn validity_args() -> Vec<OsString> {
-    ["path-info", "--json"]
+    ["path-info", "--json", "--stdin"]
         .into_iter()
         .map(OsString::from)
         .collect()
@@ -1126,14 +1246,16 @@ fn bounded_process_error(bytes: &[u8]) -> String {
 mod tests {
     use super::{
         NixBackend, NixCli, NixTaskResult, PlannedSystem, batch_build_args, discover_catalog,
-        drain_progress_stderr, format_args, host_nix_system, nix_log_store_path,
-        nix_string_literal, parse_nix_id, plan_args, target_nix_system, validity_args,
+        drain_progress_stderr, format_args, group_output_paths, host_nix_system,
+        nix_log_store_path, nix_string_literal, parse_nix_id, parse_valid_outputs, plan_args,
+        target_nix_system, validity_args,
     };
     use crate::check_command::interrupt::{CancellationToken, InterruptFlag};
     use crate::check_command::model::valid_system_name;
     use crate::check_command::nix_progress::NixProgressCollector;
     use crate::check_command::progress::ProgressSink;
     use crate::check_command::test_support::{fixture, nix_is_available};
+    use std::collections::BTreeMap;
     use std::ffi::OsString;
     use std::fs;
     use std::io::{self, Read, Write};
@@ -1243,6 +1365,44 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-019"))]
+    fn output_validity_keeps_valid_paths_when_other_outputs_are_missing() {
+        let outputs = vec![
+            "/nix/store/valid-out".to_owned(),
+            "/nix/store/missing-out".to_owned(),
+        ];
+        let response = br#"{
+          "/nix/store/valid-out": {"narHash":"sha256-example"},
+          "/nix/store/missing-out": null
+        }"#;
+        assert_eq!(
+            parse_valid_outputs(&outputs, response).expect("valid path-info JSON"),
+            std::collections::BTreeSet::from(["/nix/store/valid-out".to_owned()])
+        );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-019"))]
+    fn resolved_output_paths_stay_grouped_by_derivation() {
+        let derivations = vec![("drv-a".to_owned(), 2), ("drv-b".to_owned(), 1)];
+        let paths = vec![
+            "/nix/store/a-out".to_owned(),
+            "/nix/store/a-dev".to_owned(),
+            "/nix/store/b-out".to_owned(),
+        ];
+        assert_eq!(
+            group_output_paths(&derivations, &paths).expect("complete output paths"),
+            BTreeMap::from([
+                (
+                    "drv-a".to_owned(),
+                    vec!["/nix/store/a-dev".to_owned(), "/nix/store/a-out".to_owned()]
+                ),
+                ("drv-b".to_owned(), vec!["/nix/store/b-out".to_owned()]),
+            ])
+        );
+    }
+
+    #[test]
     #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-011"))]
     #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-013"))]
     #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-014"))]
@@ -1274,6 +1434,7 @@ mod tests {
                 .any(|argument| *argument == format!("{derivation}^*"))
         }));
         assert_eq!(validity.first().map(String::as_str), Some("path-info"));
+        assert!(validity.iter().any(|arg| arg == "--stdin"));
         assert_eq!(format.first().map(String::as_str), Some("fmt"));
         assert!(valid_system_name("aarch64-linux"));
     }

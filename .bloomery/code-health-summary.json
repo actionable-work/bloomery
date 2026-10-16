@@ -52,20 +52,20 @@
     {
       "manifest_path": "packages/rust/libs/cli/check-command/Cargo.toml",
       "name": "bloomery-check-command",
-      "overall_score": 98.37,
-      "sloc": 7469,
+      "overall_score": 98.36,
+      "sloc": 7775,
       "subscores": {
         "complexity": 0.58,
-        "duplication": 0.35,
+        "duplication": 0.31,
         "nesting": 0.0,
-        "size": 0.7
+        "size": 0.74
       }
     },
     {
       "manifest_path": "packages/rust/libs/cli/cli-app/Cargo.toml",
       "name": "bloomery-cli-app",
       "overall_score": 93.73,
-      "sloc": 985,
+      "sloc": 991,
       "subscores": {
         "complexity": 2.67,
         "duplication": 0.0,
@@ -233,7 +233,7 @@
       "manifest_path": "packages/rust/libs/shared/check/Cargo.toml",
       "name": "bloomery-check",
       "overall_score": 98.16,
-      "sloc": 267,
+      "sloc": 268,
       "subscores": {
         "complexity": 0.47,
         "duplication": 0.0,
@@ -244,25 +244,25 @@
     {
       "manifest_path": "packages/rust/libs/shared/model/Cargo.toml",
       "name": "bloomery-model",
-      "overall_score": 98.62,
-      "sloc": 1817,
+      "overall_score": 98.73,
+      "sloc": 1932,
       "subscores": {
-        "complexity": 1.02,
+        "complexity": 0.94,
         "duplication": 0.0,
         "nesting": 0.0,
-        "size": 0.36
+        "size": 0.33
       }
     },
     {
       "manifest_path": "packages/rust/libs/shared/scanning/Cargo.toml",
       "name": "bloomery-scanning",
-      "overall_score": 97.76,
-      "sloc": 1894,
+      "overall_score": 97.9,
+      "sloc": 2115,
       "subscores": {
-        "complexity": 1.01,
+        "complexity": 0.93,
         "duplication": 0.0,
         "nesting": 0.04,
-        "size": 1.19
+        "size": 1.14
       }
     },
     {
@@ -290,7 +290,7 @@
       }
     }
   ],
-  "input_digest": "0f12a4895020208f2d725eb961fb701030f3f251c2c48ebe0da4737be06f8dcd",
+  "input_digest": "bb17b9e6e8739ab3952e434bea4f80d72b4a708aba610c855b86afafafe6ed07",
   "policy": {
     "scoring": {
       "cyclomaticLimit": 10,
@@ -307,11 +307,11 @@
   "schema_version": 3,
   "workspace": {
     "crate_count": 24,
-    "overall_score": 97.69,
-    "sloc": 21988,
+    "overall_score": 97.72,
+    "sloc": 22637,
     "subscores": {
-      "complexity": 0.73,
-      "duplication": 0.53,
+      "complexity": 0.72,
+      "duplication": 0.51,
       "nesting": 0.01,
       "size": 1.04
     }

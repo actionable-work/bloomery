@@ -38,6 +38,7 @@ pub(super) enum DerivationEvent {
     SubstituteSucceeded { drv: String },
     SubstituteFallback { drv: String },
     StoreReused { drv: String },
+    OutputsValid { drv: String },
 }
 
 /// Cloneable, thread-safe event sink used by the Nix backend and the scheduler.
@@ -47,6 +48,8 @@ pub(super) enum DerivationEvent {
 pub(super) struct ProgressSink {
     sender: Arc<Mutex<mpsc::Sender<ProgressEvent>>>,
     enabled: bool,
+    checks: Arc<BTreeMap<String, Vec<String>>>,
+    outputs: Arc<BTreeMap<String, String>>,
 }
 
 impl ProgressSink {
@@ -54,7 +57,23 @@ impl ProgressSink {
         Self {
             sender: Arc::new(Mutex::new(sender)),
             enabled,
+            checks: Arc::new(BTreeMap::new()),
+            outputs: Arc::new(BTreeMap::new()),
         }
+    }
+
+    pub(super) fn with_metadata(
+        mut self,
+        checks: BTreeMap<String, Vec<String>>,
+        outputs: BTreeMap<String, String>,
+    ) -> Self {
+        self.checks = Arc::new(checks);
+        self.outputs = Arc::new(outputs);
+        self
+    }
+
+    pub(super) fn output_metadata(&self) -> BTreeMap<String, String> {
+        self.outputs.as_ref().clone()
     }
 
     pub(super) fn is_enabled(&self) -> bool {
@@ -72,14 +91,32 @@ impl ProgressSink {
     }
 
     pub(super) fn work(&self, event: DerivationEvent) {
+        let completed = match &event {
+            DerivationEvent::OutputsValid { drv } => self.checks.get(drv).cloned(),
+            _ => None,
+        };
         self.emit(ProgressEvent::Work(event));
+        for id in completed.into_iter().flatten() {
+            self.emit(ProgressEvent::CheckFinalized {
+                id,
+                outcome: Outcome::Passed,
+            });
+        }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DerivationWork {
-    Build { succeeded: bool },
-    Substitute { outstanding: usize },
+    Pending,
+    /// Outputs became valid during realization, before activity was observed.
+    Validated,
+    Build {
+        succeeded: bool,
+    },
+    Substitute {
+        outstanding: usize,
+    },
+    Cached,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -118,8 +155,7 @@ impl ProgressReducer {
         }
     }
 
-    pub(super) fn apply(&mut self, event: ProgressEvent) -> bool {
-        let before = self.snapshot();
+    pub(super) fn apply(&mut self, event: ProgressEvent) {
         match event {
             ProgressEvent::CheckFinalized { id, outcome } => {
                 // A finalized check counts once. Re-finalization reconciles the
@@ -144,7 +180,6 @@ impl ProgressReducer {
                 self.apply_work(event);
             }
         }
-        self.snapshot() != before
     }
 
     fn apply_work(&mut self, event: DerivationEvent) {
@@ -152,21 +187,34 @@ impl ProgressReducer {
             DerivationEvent::Discovered { drv } => {
                 self.derivations
                     .entry(drv)
-                    .or_insert(DerivationWork::Build { succeeded: false });
+                    .or_insert(DerivationWork::Pending);
             }
             DerivationEvent::BuildStarted { drv } => {
-                if self.derivations.get(&drv) != Some(&DerivationWork::Build { succeeded: true }) {
+                if self.derivations.get(&drv) == Some(&DerivationWork::Validated) {
+                    self.derivations
+                        .insert(drv, DerivationWork::Build { succeeded: true });
+                    return;
+                }
+                if !matches!(
+                    self.derivations.get(&drv),
+                    Some(DerivationWork::Build { succeeded: true } | DerivationWork::Cached)
+                ) {
                     self.derivations
                         .insert(drv, DerivationWork::Build { succeeded: false });
                 }
             }
             DerivationEvent::BuildSucceeded { drv } => {
-                self.derivations
-                    .insert(drv, DerivationWork::Build { succeeded: true });
+                if self.derivations.get(&drv) != Some(&DerivationWork::Cached) {
+                    self.derivations
+                        .insert(drv, DerivationWork::Build { succeeded: true });
+                }
             }
             DerivationEvent::BuildFailed { drv } | DerivationEvent::BuildCanceled { drv } => {
                 // Successful evidence is never downgraded by a stale failure.
-                if self.derivations.get(&drv) != Some(&DerivationWork::Build { succeeded: true }) {
+                if !matches!(
+                    self.derivations.get(&drv),
+                    Some(DerivationWork::Build { succeeded: true } | DerivationWork::Cached)
+                ) {
                     self.derivations
                         .insert(drv, DerivationWork::Build { succeeded: false });
                 }
@@ -184,18 +232,32 @@ impl ProgressReducer {
                 }
             }
             DerivationEvent::SubstituteSucceeded { drv } => {
-                self.derivations
-                    .insert(drv, DerivationWork::Substitute { outstanding: 0 });
+                if self.derivations.get(&drv) != Some(&DerivationWork::Cached) {
+                    self.derivations
+                        .insert(drv, DerivationWork::Substitute { outstanding: 0 });
+                }
             }
             DerivationEvent::SubstituteFallback { drv } => {
-                if self.derivations.get(&drv) != Some(&DerivationWork::Build { succeeded: true }) {
+                if !matches!(
+                    self.derivations.get(&drv),
+                    Some(DerivationWork::Build { succeeded: true } | DerivationWork::Cached)
+                ) {
                     self.derivations
                         .insert(drv, DerivationWork::Build { succeeded: false });
                 }
             }
             DerivationEvent::StoreReused { drv } => {
-                // Existing store outputs require no realization work.
-                self.derivations.remove(&drv);
+                self.derivations.insert(drv, DerivationWork::Cached);
+            }
+            DerivationEvent::OutputsValid { drv } => {
+                let work = match self.derivations.get(&drv) {
+                    Some(DerivationWork::Build { .. }) => DerivationWork::Build { succeeded: true },
+                    Some(DerivationWork::Cached | DerivationWork::Substitute { .. }) => {
+                        DerivationWork::Cached
+                    }
+                    _ => DerivationWork::Validated,
+                };
+                self.derivations.insert(drv, work);
             }
         }
     }
@@ -204,6 +266,8 @@ impl ProgressReducer {
         match self.derivations.get(&drv) {
             // Completed or cached work is never downgraded by a duplicate.
             Some(DerivationWork::Build { succeeded: true })
+            | Some(DerivationWork::Cached)
+            | Some(DerivationWork::Validated)
             | Some(DerivationWork::Substitute { outstanding: 0 }) => {}
             _ => {
                 self.derivations
@@ -221,8 +285,11 @@ impl ProgressReducer {
             for work in self.derivations.values() {
                 match work {
                     DerivationWork::Build { succeeded: true } => built += 1,
-                    DerivationWork::Build { succeeded: false } => to_build += 1,
+                    DerivationWork::Pending | DerivationWork::Build { succeeded: false } => {
+                        to_build += 1
+                    }
                     DerivationWork::Substitute { outstanding: 0 } => cached += 1,
+                    DerivationWork::Cached | DerivationWork::Validated => cached += 1,
                     DerivationWork::Substitute { outstanding } => {
                         let _ = outstanding;
                         to_fetch += 1;
@@ -285,20 +352,24 @@ impl<W: Write> ProgressReporter<W> {
     }
 
     pub(super) fn apply(&mut self, event: ProgressEvent) {
-        if self.reducer.apply(event) {
-            let text = format_progress_snapshot(&self.reducer.snapshot(), self.width);
-            self.line.update(&text);
+        let check_completed = matches!(event, ProgressEvent::CheckFinalized { .. });
+        self.reducer.apply(event);
+        if check_completed {
+            self.refresh();
         }
+    }
+
+    pub(super) fn refresh(&mut self) {
+        let text = format_progress_snapshot(&self.reducer.snapshot(), self.width);
+        self.line.update(&text);
     }
 
     pub(super) fn is_enabled(&self) -> bool {
         self.line.is_enabled()
     }
 
-    /// Final derivation work metrics for the completion summary. The transient
-    /// pending counters (`to build`, `to fetch`) are dropped and check outcome
-    /// counts already appear in the summary, so this is a compact final work
-    /// status rather than another live progress frame.
+    /// Final work metrics. Unfinished work remains visible as pending after
+    /// failure or cancellation; check outcome counts appear in the summary.
     pub(super) fn final_metrics(&self) -> String {
         format_work_metrics(&self.reducer.snapshot(), self.width)
     }
@@ -306,6 +377,7 @@ impl<W: Write> ProgressReporter<W> {
     /// Clear the transient line before any final summary, error, or
     /// interruption report.
     pub(super) fn finish(&mut self) {
+        self.refresh();
         self.line.clear();
     }
 }
@@ -347,18 +419,24 @@ fn format_progress_snapshot(snapshot: &ProgressSnapshot, width: usize) -> String
     candidates.last().cloned().unwrap_or_default()
 }
 
-/// Completed derivation work from a snapshot for the final status line. Pending
-/// build and substitution counters are transient-only, so only successfully
-/// built, substituted, and the known total are reported.
+/// Final work accounting, including unfinished work when it remains.
 fn format_work_metrics(snapshot: &ProgressSnapshot, width: usize) -> String {
     let built = metric(snapshot.built);
     let cached = metric(snapshot.cached);
     let known = metric(snapshot.total);
+    let pending = snapshot
+        .to_build
+        .zip(snapshot.to_fetch)
+        .map(|(build, fetch)| build + fetch);
+    let pending = pending
+        .filter(|count| *count > 0)
+        .map(|count| format!(" · pending {count}"))
+        .unwrap_or_default();
     let candidates = [
-        format!("built {built} \u{b7} cached {cached} \u{b7} total {known}"),
-        format!("built {built} \u{b7} cached {cached} \u{b7} T{known}"),
-        format!("b{built} \u{b7} c{cached} \u{b7} T{known}"),
-        format!("b{built} c{cached} T{known}"),
+        format!("built {built} \u{b7} cached {cached}{pending} \u{b7} total {known}"),
+        format!("built {built} \u{b7} cached {cached}{pending} \u{b7} T{known}"),
+        format!("b{built} \u{b7} c{cached}{pending} \u{b7} T{known}"),
+        format!("b{built} c{cached}{pending} T{known}"),
     ];
     for candidate in &candidates {
         if candidate.chars().count() <= width.max(1) {
@@ -722,7 +800,7 @@ mod tests {
 
     #[test]
     #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-019"))]
-    fn existing_store_reuse_is_excluded_from_work_counts() {
+    fn existing_store_reuse_counts_as_cached_once_and_resists_stale_events() {
         let mut reducer = reducer(1);
         derivation(
             &mut reducer,
@@ -737,10 +815,31 @@ mod tests {
                 drv: "/nix/store/reused.drv".to_owned(),
             },
         );
+        // Duplicate and stale observations for a locally valid derivation
+        // cannot remove it from the total or reclassify it as active work.
+        for event in [
+            DerivationEvent::StoreReused {
+                drv: "/nix/store/reused.drv".to_owned(),
+            },
+            DerivationEvent::BuildStarted {
+                drv: "/nix/store/reused.drv".to_owned(),
+            },
+            DerivationEvent::SubstituteStarted {
+                drv: "/nix/store/reused.drv".to_owned(),
+                outstanding: 1,
+            },
+            DerivationEvent::SubstituteFallback {
+                drv: "/nix/store/reused.drv".to_owned(),
+            },
+        ] {
+            derivation(&mut reducer, event);
+        }
         let snapshot = reducer.snapshot();
-        assert_eq!(snapshot.total, Some(0));
+        assert_eq!(snapshot.total, Some(1));
         assert_eq!(snapshot.built, Some(0));
-        assert_eq!(snapshot.cached, Some(0));
+        assert_eq!(snapshot.to_build, Some(0));
+        assert_eq!(snapshot.cached, Some(1));
+        assert_eq!(snapshot.to_fetch, Some(0));
     }
 
     #[test]
@@ -811,10 +910,64 @@ mod tests {
                 id: "static:structure".to_owned(),
                 outcome: Outcome::Passed,
             });
+            reporter.refresh();
         }
         let text = String::from_utf8(output).expect("UTF-8");
         assert_eq!(text.matches("checks 0/2").count(), 1);
         assert_eq!(text.matches("checks 1/2").count(), 1);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-024"))]
+    fn derivation_event_bursts_are_rendered_once_per_refresh() {
+        let mut output = Vec::new();
+        {
+            let mut reporter =
+                ProgressReporter::new(ProgressReducer::new(1, true), &mut output, true, 200, false);
+            reporter.start();
+            for index in 0..5000 {
+                reporter.apply(ProgressEvent::Work(DerivationEvent::StoreReused {
+                    drv: format!("/nix/store/{index}.drv"),
+                }));
+            }
+            reporter.refresh();
+        }
+        let text = String::from_utf8(output).expect("UTF-8");
+        assert_eq!(text.matches("checks 0/1").count(), 2);
+        assert!(text.contains("cached 5000"));
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-013"))]
+    fn valid_outputs_and_delayed_build_activity_count_as_built() {
+        let mut reducer = reducer(1);
+        let drv = "/nix/store/check.drv".to_owned();
+        derivation(
+            &mut reducer,
+            DerivationEvent::Discovered { drv: drv.clone() },
+        );
+        derivation(
+            &mut reducer,
+            DerivationEvent::OutputsValid { drv: drv.clone() },
+        );
+        derivation(&mut reducer, DerivationEvent::BuildStarted { drv });
+        let snapshot = reducer.snapshot();
+        assert_eq!(snapshot.built, Some(1));
+        assert_eq!(snapshot.cached, Some(0));
+        assert_eq!(snapshot.total, Some(1));
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-030"))]
+    fn final_metrics_explain_unfinished_work_after_failure() {
+        let mut reporter = ProgressReporter::new(reducer(1), Vec::new(), true, 200, false);
+        reporter.apply(ProgressEvent::Work(DerivationEvent::BuildFailed {
+            drv: "/nix/store/failed.drv".to_owned(),
+        }));
+        assert_eq!(
+            reporter.final_metrics(),
+            "built 0 · cached 0 · pending 1 · total 1"
+        );
     }
 
     #[test]

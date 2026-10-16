@@ -36,7 +36,10 @@ pub(super) struct FakeNix {
     /// dependency-failure attribution.
     pub(super) derivation_dependencies: Vec<(String, String)>,
     pub(super) validity_queries: AtomicUsize,
+    pub(super) queried_outputs: Mutex<Vec<Vec<String>>>,
     pub(super) valid_outputs: Mutex<std::collections::BTreeSet<String>>,
+    /// Store outputs present before the fake realization starts.
+    pub(super) preexisting_outputs: Mutex<std::collections::BTreeSet<String>>,
     pub(super) interrupt_on_evaluation: Option<InterruptFlag>,
     pub(super) force_manifest_failure: bool,
     pub(super) wait_for_cancellation: bool,
@@ -156,6 +159,14 @@ impl NixBackend for FakeNix {
                 outputs: vec![output],
             });
         }
+        let mut outputs_by_derivation = plans
+            .iter()
+            .filter_map(|plan| {
+                plan.derivation
+                    .as_ref()
+                    .map(|derivation| (derivation.clone(), plan.outputs.clone()))
+            })
+            .collect::<BTreeMap<_, _>>();
         let mut dependencies = BTreeMap::new();
         for (dependent, dependency) in &self.derivation_dependencies {
             let dependent_drv = if self.unique_derivations {
@@ -169,10 +180,16 @@ impl NixBackend for FakeNix {
                 "/nix/store/check.drv".to_owned()
             };
             dependencies.insert(dependent_drv, vec![dependency_drv]);
+            if self.unique_derivations {
+                outputs_by_derivation
+                    .entry(format!("/nix/store/{dependency}.drv"))
+                    .or_insert_with(|| vec![format!("/nix/store/{dependency}-out")]);
+            }
         }
         Ok(PlannedSystem {
             legacy: false,
             plans,
+            outputs_by_derivation,
             dependencies,
         })
     }
@@ -309,6 +326,7 @@ impl NixBackend for FakeNix {
                 failures: BTreeMap::new(),
                 canceled: true,
                 operational_error: None,
+                ..BatchRealization::default()
             };
         }
         *self.valid_outputs.lock().expect("valid outputs lock") = valid.clone();
@@ -325,6 +343,7 @@ impl NixBackend for FakeNix {
             failures,
             canceled: false,
             operational_error: None,
+            ..BatchRealization::default()
         }
     }
 
@@ -334,11 +353,22 @@ impl NixBackend for FakeNix {
         outputs: &[String],
     ) -> Result<std::collections::BTreeSet<String>, String> {
         self.validity_queries.fetch_add(1, Ordering::SeqCst);
-        let valid = self
+        self.queried_outputs
+            .lock()
+            .expect("query history")
+            .push(outputs.to_vec());
+        let mut valid = self
             .valid_outputs
             .lock()
             .expect("valid outputs lock")
             .clone();
+        valid.extend(
+            self.preexisting_outputs
+                .lock()
+                .expect("preexisting outputs lock")
+                .iter()
+                .cloned(),
+        );
         Ok(outputs
             .iter()
             .filter(|output| valid.contains(*output))

@@ -116,6 +116,8 @@ struct CollectorState {
     saw_activity: bool,
     incomplete: bool,
     incomplete_reported: bool,
+    defer_substitutions: bool,
+    deferred_substitutions: Vec<NixRecord>,
 }
 
 impl NixProgressCollector {
@@ -130,6 +132,8 @@ impl NixProgressCollector {
                 saw_activity: false,
                 incomplete: false,
                 incomplete_reported: false,
+                defer_substitutions: false,
+                deferred_substitutions: Vec::new(),
             })),
         }
     }
@@ -147,8 +151,25 @@ impl NixProgressCollector {
     /// the check.
     pub(super) fn set_output_metadata(&self, metadata: BTreeMap<String, String>) {
         if let Ok(mut state) = self.inner.lock() {
-            state.output_to_drv = metadata;
+            state.output_to_drv.extend(metadata);
+            state.defer_substitutions = false;
+            let deferred = std::mem::take(&mut state.deferred_substitutions);
+            for record in deferred {
+                observe_start(&mut state, record);
+            }
         }
+    }
+
+    pub(super) fn defer_unmapped_substitutions(&self) {
+        if let Ok(mut state) = self.inner.lock() {
+            state.defer_substitutions = true;
+        }
+    }
+
+    pub(super) fn needs_output_metadata(&self) -> bool {
+        self.inner
+            .lock()
+            .is_ok_and(|state| !state.deferred_substitutions.is_empty())
     }
 
     pub(super) fn consume(&self, bytes: &[u8]) {
@@ -227,6 +248,10 @@ fn observe_start(state: &mut CollectorState, record: NixRecord) {
                 return;
             };
             let Some(drv) = state.output_to_drv.get(&path).cloned() else {
+                if state.defer_substitutions {
+                    state.deferred_substitutions.push(record);
+                    return;
+                }
                 // Without structured metadata the substitution cannot be
                 // attributed to a derivation; metrics stay unavailable.
                 mark_incomplete(state);
@@ -332,7 +357,7 @@ fn finish(state: &mut CollectorState, outcome: Finish) {
     if !state.sink.is_enabled() {
         return;
     }
-    if state.incomplete || state.parser.has_pending() {
+    if state.incomplete || state.parser.has_pending() || !state.deferred_substitutions.is_empty() {
         if !state.incomplete_reported {
             state.incomplete_reported = true;
             state.sink.emit(ProgressEvent::DerivationMetricsIncomplete);
@@ -384,6 +409,32 @@ mod tests {
         (ProgressSink::new(sender, true), receiver)
     }
 
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-015"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-033"))]
+    fn dependency_metadata_is_requested_only_after_unmapped_substitution_work() {
+        let (sink, events) = sink();
+        let collector = NixProgressCollector::new(sink);
+        collector.defer_unmapped_substitutions();
+        assert!(!collector.needs_output_metadata());
+        collector.consume(frame(108, "/nix/store/dependency-out").as_bytes());
+        assert!(collector.needs_output_metadata());
+        assert!(events.try_recv().is_err());
+        collector.set_output_metadata(BTreeMap::from([(
+            "/nix/store/dependency-out".to_owned(),
+            "/nix/store/dependency.drv".to_owned(),
+        )]));
+        assert!(!collector.needs_output_metadata());
+        collector.finish_success();
+        let events = events.try_iter().collect::<Vec<_>>();
+        assert!(
+            events.contains(&ProgressEvent::Work(DerivationEvent::SubstituteSucceeded {
+                drv: "/nix/store/dependency.drv".to_owned()
+            }))
+        );
+        assert!(!events.contains(&ProgressEvent::DerivationMetricsIncomplete));
+    }
+
     fn frame(kind: u64, path: &str) -> String {
         format!("@nix {{\"action\":\"start\",\"id\":1,\"type\":{kind},\"fields\":[\"{path}\"]}}\n")
     }
@@ -391,6 +442,12 @@ mod tests {
     fn build_result(id: u64, drv: &str, status: &str) -> String {
         format!(
             "@nix {{\"action\":\"result\",\"id\":{id},\"type\":110,\"payload\":{{\"success\":true,\"status\":\"{status}\",\"builtOutputs\":{{}},\"path\":{{\"drvPath\":\"{drv}\",\"outputs\":[\"out\"]}}}}}}\n"
+        )
+    }
+
+    fn store_reuse_result(id: u64, drv: &str, output: &str, status: &str) -> String {
+        format!(
+            "@nix {{\"action\":\"result\",\"id\":{id},\"type\":110,\"payload\":{{\"success\":true,\"status\":\"{status}\",\"builtOutputs\":{{}},\"path\":{{\"drvPath\":\"{drv}\",\"outputs\":[\"{output}\"]}}}}}}\n"
         )
     }
 
@@ -570,17 +627,26 @@ mod tests {
 
     #[test]
     #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-019"))]
-    fn per_derivation_store_reuse_results_exclude_finished_work() {
+    fn already_valid_results_emit_store_reuse_for_each_output() {
         let (sink, receiver) = sink();
         let collector = NixProgressCollector::new(sink);
         collector.consume(frame(105, "/nix/store/a.drv").as_bytes());
         let _ = collected(&receiver);
-        collector.consume(build_result(1, "/nix/store/a.drv", "AlreadyValid").as_bytes());
+        collector
+            .consume(store_reuse_result(1, "/nix/store/a.drv", "out", "AlreadyValid").as_bytes());
+        collector.consume(
+            store_reuse_result(2, "/nix/store/a.drv", "doc", "ResolvesToAlreadyValid").as_bytes(),
+        );
         assert_eq!(
             collected(&receiver),
-            vec![ProgressEvent::Work(DerivationEvent::StoreReused {
-                drv: "/nix/store/a.drv".to_owned(),
-            })]
+            vec![
+                ProgressEvent::Work(DerivationEvent::StoreReused {
+                    drv: "/nix/store/a.drv".to_owned(),
+                }),
+                ProgressEvent::Work(DerivationEvent::StoreReused {
+                    drv: "/nix/store/a.drv".to_owned(),
+                }),
+            ]
         );
     }
 

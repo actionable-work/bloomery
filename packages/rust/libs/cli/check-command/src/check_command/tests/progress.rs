@@ -110,13 +110,16 @@ fn eligible_execution_writes_changing_metrics_to_stderr_and_final_metrics_to_std
 #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-012"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-014"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-018"))]
-fn evaluated_derivation_closure_is_counted_before_build_activity() {
+fn only_observed_dependency_work_is_added_to_selected_derivations() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
         names: vec!["check".to_owned()],
         unique_derivations: true,
         derivation_dependencies: vec![("check".to_owned(), "dependency".to_owned())],
         scripted_events: Mutex::new(vec![
+            crate::check_command::progress::DerivationEvent::BuildStarted {
+                drv: "/nix/store/actual-dependency.drv".to_owned(),
+            },
             crate::check_command::progress::DerivationEvent::BuildStarted {
                 drv: "/nix/store/check.drv".to_owned(),
             },
@@ -127,7 +130,7 @@ fn evaluated_derivation_closure_is_counted_before_build_activity() {
     args.selectors = vec!["nix:*".to_owned()];
     let mut terminal = tty();
     terminal.columns = Some("300".to_owned());
-    let (status, _, stderr) = invoke_with_terminal(
+    let (status, stdout, stderr) = invoke_with_terminal(
         args,
         &root,
         &cache,
@@ -138,21 +141,11 @@ fn evaluated_derivation_closure_is_counted_before_build_activity() {
     );
     assert_eq!(status, std::process::ExitCode::SUCCESS);
     let stderr = stdio_text(&stderr);
-    let pending = stderr
-        .find("to build 2")
-        .unwrap_or_else(|| panic!("expected evaluated work plan in stderr: {stderr:?}"));
-    let activity = stderr
-        .find("built 1")
-        .unwrap_or_else(|| panic!("expected build activity in stderr: {stderr:?}"));
-    assert!(pending < activity, "stderr: {stderr:?}");
-    let pending_snapshot = stderr[pending..]
-        .split("\u{1b}[0m")
-        .next()
-        .unwrap_or_default();
-    assert!(
-        pending_snapshot.contains("known total 2"),
-        "pending snapshot: {pending_snapshot:?}"
-    );
+    let stdout = stdio_text(&stdout);
+    assert!(stderr.contains("known total 2"), "stderr: {stderr:?}");
+    assert!(stdout.contains("built 2"), "stdout: {stdout:?}");
+    assert!(stdout.contains("total 2"), "stdout: {stdout:?}");
+    assert!(!stdout.contains("pending"), "stdout: {stdout:?}");
 
     let _ = std::fs::remove_dir_all(root);
     let _ = std::fs::remove_dir_all(cache);
@@ -396,14 +389,21 @@ fn catalog_and_retrieval_subcommands_never_start_progress() {
 }
 
 #[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-018"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-019"))]
-fn all_store_hits_report_known_zero_work() {
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-033"))]
+fn warm_selected_outputs_count_once_and_unused_dependencies_are_excluded() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
         names: vec!["check".to_owned()],
+        unique_derivations: true,
+        derivation_dependencies: vec![("check".to_owned(), "dependency".to_owned())],
+        preexisting_outputs: Mutex::new(std::collections::BTreeSet::from([
+            "/nix/store/check-out".to_owned()
+        ])),
         ..FakeNix::default()
     };
-    let (status, _, stderr) = invoke_with_terminal(
+    let (status, stdout, stderr) = invoke_with_terminal(
         request(),
         &root,
         &cache,
@@ -414,8 +414,100 @@ fn all_store_hits_report_known_zero_work() {
     );
     assert_eq!(status, std::process::ExitCode::SUCCESS);
     let stderr = stdio_text(&stderr);
+    let stdout = stdio_text(&stdout);
     assert!(stderr.contains("built 0"), "stderr: {stderr:?}");
-    assert!(stderr.contains("known total 0"), "stderr: {stderr:?}");
+    assert!(stderr.contains("cached 1"), "stderr: {stderr:?}");
+    assert!(stderr.contains("known total 1"), "stderr: {stderr:?}");
+    assert!(stdout.contains("cached 1"), "stdout: {stdout:?}");
+    assert!(stdout.contains("total 1"), "stdout: {stdout:?}");
+    assert!(!stdout.contains("pending"), "stdout: {stdout:?}");
+    assert!(
+        backend
+            .queried_outputs
+            .lock()
+            .expect("query history")
+            .iter()
+            .flatten()
+            .all(|path| path == "/nix/store/check-out")
+    );
+    assert!(
+        backend
+            .queried_outputs
+            .lock()
+            .expect("query history")
+            .iter()
+            .flatten()
+            .all(|path| path == "/nix/store/check-out")
+    );
+    let _ = std::fs::remove_dir_all(root);
+    let _ = std::fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-009"))]
+fn completed_check_outputs_advance_progress_before_the_batch_returns() {
+    let (root, cache) = fixture(true);
+    let release = Arc::new(std::sync::Barrier::new(2));
+    let backend = Arc::new(FakeNix {
+        names: vec!["first".to_owned(), "second".to_owned()],
+        unique_derivations: true,
+        hold_until_released: Some(release.clone()),
+        ..FakeNix::default()
+    });
+    let observed = Arc::new(Mutex::new(Vec::new()));
+    let root_for_run = root.clone();
+    let cache_for_run = cache.clone();
+    let backend_for_run = backend.clone();
+    let buffer = observed.clone();
+    let run = std::thread::spawn(move || {
+        let mut args = request();
+        args.selectors = vec!["nix:*".to_owned()];
+        run_at_with(
+            args,
+            CheckContext {
+                root: &root_for_run,
+                json_mode: false,
+                color: crate::output::ColorMode::Auto,
+                backend: backend_for_run.as_ref(),
+                interrupt: InterruptFlag::for_test(),
+                cache_base: Some(&cache_for_run),
+                terminal: tty(),
+            },
+            &mut Vec::new(),
+            &mut SharedWriter(buffer),
+        )
+    });
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while backend
+        .built_derivations
+        .lock()
+        .expect("built derivations")
+        .len()
+        < 2
+        && Instant::now() < deadline
+    {
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    backend
+        .valid_outputs
+        .lock()
+        .expect("valid outputs")
+        .insert("/nix/store/first-out".to_owned());
+    let mut advanced = false;
+    while Instant::now() < deadline {
+        if stdio_text(&observed.lock().expect("progress output")).contains("checks 2/3") {
+            advanced = true;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    release.wait();
+    let status = run.join().expect("check runner");
+    assert!(
+        advanced,
+        "check completion must be visible while another output is missing"
+    );
+    assert_eq!(status, std::process::ExitCode::SUCCESS);
     let _ = std::fs::remove_dir_all(root);
     let _ = std::fs::remove_dir_all(cache);
 }

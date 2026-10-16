@@ -217,6 +217,7 @@ fn execute_after_formatter(
             &prepared.allocation,
             context.backend,
             &prepared.planned.plans,
+            &prepared.planned.outputs_by_derivation,
             &prepared.planned.dependencies,
             prepared.health_sources.clone(),
             prepared.clippy_policy.clone(),
@@ -689,6 +690,7 @@ struct InitialTaskInputs<'a> {
     backend: &'a dyn NixBackend,
     batch_plans: Vec<CheckPlan>,
     batch_derivations: Vec<String>,
+    batch_outputs: BTreeMap<String, Vec<String>>,
     health_sources: Option<Result<Vec<bloomery_check::HealthSourceCrate>, String>>,
     clippy_policy: Option<bloomery_model::clippy::ClippySuppressionConfig>,
     fail_fast: bool,
@@ -703,6 +705,7 @@ fn build_initial_tasks<'a>(inputs: InitialTaskInputs<'a>) -> Vec<InitialWork<'a>
         backend,
         batch_plans,
         batch_derivations,
+        batch_outputs,
         health_sources,
         clippy_policy,
         fail_fast,
@@ -757,6 +760,7 @@ fn build_initial_tasks<'a>(inputs: InitialTaskInputs<'a>) -> Vec<InitialWork<'a>
             backend,
             batch_plans,
             batch_derivations,
+            batch_outputs,
             fail_fast,
             sink,
         ));
@@ -764,34 +768,23 @@ fn build_initial_tasks<'a>(inputs: InitialTaskInputs<'a>) -> Vec<InitialWork<'a>
     tasks
 }
 
-fn derivation_dependency_closure(
-    plans: &[CheckPlan],
-    dependencies: &BTreeMap<String, Vec<String>>,
-) -> Vec<String> {
-    let mut pending = plans
+fn selected_derivations(plans: &[CheckPlan]) -> Vec<String> {
+    plans
         .iter()
         .filter_map(|plan| plan.derivation.clone())
-        .collect::<Vec<_>>();
-    let mut derivations = BTreeSet::new();
-
-    while let Some(derivation) = pending.pop() {
-        if !derivations.insert(derivation.clone()) {
-            continue;
-        }
-        if let Some(inputs) = dependencies.get(&derivation) {
-            pending.extend(inputs.iter().cloned());
-        }
-    }
-
-    derivations.into_iter().collect()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn batch_task<'a>(
     root: &Path,
     allocation: &store::RunAllocation,
     backend: &'a dyn NixBackend,
     batch_plans: Vec<CheckPlan>,
     batch_derivations: Vec<String>,
+    batch_outputs: BTreeMap<String, Vec<String>>,
     fail_fast: bool,
     sink: &ProgressSink,
 ) -> InitialWork<'a> {
@@ -807,9 +800,42 @@ fn batch_task<'a>(
                     drv: derivation.clone(),
                 });
             }
+            if sink.is_enabled() {
+                let output_metadata_complete = batch_outputs.len() == batch_derivations.len()
+                    && batch_outputs.values().all(|outputs| !outputs.is_empty());
+                if !output_metadata_complete {
+                    sink.emit(ProgressEvent::DerivationMetricsIncomplete);
+                } else {
+                    let outputs = batch_outputs
+                        .values()
+                        .flatten()
+                        .cloned()
+                        .collect::<BTreeSet<_>>()
+                        .into_iter()
+                        .collect::<Vec<_>>();
+                    match backend.validate_outputs(&root, &outputs) {
+                        Ok(valid) => {
+                            for (derivation, required) in &batch_outputs {
+                                if !required.is_empty()
+                                    && required.iter().all(|output| valid.contains(output))
+                                {
+                                    sink.work(super::progress::DerivationEvent::StoreReused {
+                                        drv: derivation.clone(),
+                                    });
+                                    sink.work(super::progress::DerivationEvent::OutputsValid {
+                                        drv: derivation.clone(),
+                                    });
+                                }
+                            }
+                        }
+                        Err(_) => sink.emit(ProgressEvent::DerivationMetricsIncomplete),
+                    }
+                }
+            }
             let log_name = "nix-batch.log";
             let result = match allocation.prepare_log(log_name) {
-                Ok(log_path) => backend.realize_batch(
+                Ok(log_path) => realize_observing_checks(
+                    backend,
                     &root,
                     &batch_plans,
                     fail_fast,
@@ -832,6 +858,75 @@ fn batch_task<'a>(
     )
 }
 
+fn publish_valid_checks(plans: &[CheckPlan], valid: &BTreeSet<String>, sink: &ProgressSink) {
+    for plan in plans {
+        if !plan.outputs.is_empty()
+            && plan.outputs.iter().all(|path| valid.contains(path))
+            && let Some(drv) = &plan.derivation
+        {
+            sink.work(super::progress::DerivationEvent::OutputsValid { drv: drv.clone() });
+        }
+    }
+}
+
+fn observe_pending_checks(
+    backend: &dyn NixBackend,
+    root: &Path,
+    pending: &mut Vec<CheckPlan>,
+    sink: &ProgressSink,
+) {
+    let outputs = pending
+        .iter()
+        .flat_map(|plan| plan.outputs.iter().cloned())
+        .collect::<Vec<_>>();
+    if outputs.is_empty() {
+        return;
+    }
+    if let Ok(valid) = backend.validate_outputs(root, &outputs) {
+        publish_valid_checks(pending, &valid, sink);
+        pending.retain(|plan| !plan.outputs.iter().all(|path| valid.contains(path)));
+    }
+}
+
+/// Observe only selected check outputs while Nix owns dependency scheduling.
+/// Polling runs alongside realization and stops as soon as the batch returns.
+fn realize_observing_checks(
+    backend: &dyn NixBackend,
+    root: &Path,
+    plans: &[CheckPlan],
+    fail_fast: bool,
+    log_path: &Path,
+    cancellation: CancellationToken,
+    sink: &ProgressSink,
+) -> BatchRealization {
+    if !sink.is_enabled() {
+        return backend.realize_batch(root, plans, fail_fast, log_path, cancellation, sink);
+    }
+    std::thread::scope(|scope| {
+        let (sender, receiver) = mpsc::channel();
+        scope.spawn(move || {
+            let result =
+                backend.realize_batch(root, plans, fail_fast, log_path, cancellation, sink);
+            let _ = sender.send(result);
+        });
+        let mut pending = plans.to_vec();
+        loop {
+            match receiver.recv_timeout(Duration::from_millis(250)) {
+                Ok(result) => return result,
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    return BatchRealization {
+                        operational_error: Some("Nix realization worker disconnected".to_owned()),
+                        ..BatchRealization::default()
+                    };
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    observe_pending_checks(backend, root, &mut pending, sink);
+                }
+            }
+        }
+    })
+}
+
 #[allow(clippy::too_many_arguments)]
 fn execute_selected<W: Write>(
     root: &Path,
@@ -839,6 +934,7 @@ fn execute_selected<W: Write>(
     allocation: &store::RunAllocation,
     backend: &dyn NixBackend,
     plans: &BTreeMap<String, CheckPlan>,
+    outputs_by_derivation: &BTreeMap<String, Vec<String>>,
     dependencies: &BTreeMap<String, Vec<String>>,
     health_sources: Option<Result<Vec<bloomery_check::HealthSourceCrate>, String>>,
     clippy_policy: Option<bloomery_model::clippy::ClippySuppressionConfig>,
@@ -857,17 +953,37 @@ fn execute_selected<W: Write>(
         .iter()
         .filter_map(|id| plans.get(id).cloned())
         .collect::<Vec<_>>();
-    let batch_derivations = derivation_dependency_closure(&batch_plans, dependencies);
+    let batch_derivations = selected_derivations(&batch_plans);
+    let batch_outputs = batch_plans
+        .iter()
+        .filter_map(|plan| {
+            plan.derivation
+                .as_ref()
+                .map(|drv| (drv.clone(), plan.outputs.clone()))
+        })
+        .collect::<BTreeMap<_, _>>();
 
     let (event_sender, event_receiver) = mpsc::channel();
-    let sink = ProgressSink::new(event_sender, progress.is_enabled());
+    let mut checks = BTreeMap::<String, Vec<String>>::new();
+    for id in &nix_checks {
+        if let Some(drv) = plans.get(id).and_then(|plan| plan.derivation.as_ref()) {
+            checks.entry(drv.clone()).or_default().push(id.clone());
+        }
+    }
+    let output_metadata = outputs_by_derivation
+        .iter()
+        .flat_map(|(drv, paths)| paths.iter().map(move |path| (path.clone(), drv.clone())))
+        .collect();
+    let sink = ProgressSink::new(event_sender, progress.is_enabled())
+        .with_metadata(checks, output_metadata);
     let initial_tasks = build_initial_tasks(InitialTaskInputs {
         root,
         selected,
         allocation,
         backend,
-        batch_plans,
+        batch_plans: batch_plans.clone(),
         batch_derivations,
+        batch_outputs,
         health_sources: health_sources.clone(),
         clippy_policy,
         fail_fast,
@@ -894,6 +1010,7 @@ fn execute_selected<W: Write>(
     reduction.batch_canceled |= reduction.batch.canceled;
     let valid =
         validate_selected_outputs(root, &nix_checks, plans, backend, &mut operational_error);
+    publish_valid_checks(&batch_plans, &valid, &sink);
     apply_initial_states(
         root,
         reduction.states,
@@ -901,9 +1018,11 @@ fn execute_selected<W: Write>(
         &mut failures,
         &mut health_report,
     );
+    let mut dependencies = dependencies.clone();
+    dependencies.extend(reduction.batch.dependencies.clone());
     let nix_inputs = NixOutcomeInputs {
         plans,
-        dependencies,
+        dependencies: &dependencies,
         batch: &reduction.batch,
         batch_log: &reduction.batch_log,
         batch_canceled: reduction.batch_canceled,
@@ -949,6 +1068,7 @@ fn finalize_selected_outcomes<W: Write>(
     while let Ok(event) = event_receiver.try_recv() {
         progress.apply(event);
     }
+    progress.refresh();
 }
 
 fn ensure_selected_outcomes(
@@ -1195,10 +1315,12 @@ fn drain_progress_events<W: Write>(
         while let Ok(event) = event_receiver.try_recv() {
             progress.apply(event);
         }
+        progress.refresh();
     }
     while let Ok(event) = event_receiver.try_recv() {
         progress.apply(event);
     }
+    progress.refresh();
 }
 
 fn initial_task_stops_admission(task: &InitialTask, fail_fast: bool) -> bool {

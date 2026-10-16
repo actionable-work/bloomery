@@ -166,14 +166,14 @@ action = "count as to build every known derivation assigned to building without 
 
 [[requirements]]
 id = "CLI-CHECK-PROGRESS-015"
-title = "Cache counts require completed substitution"
+title = "Substitution counts require completed fetch"
 manual = false
 design = "design/progress.md#derivation-metrics"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "the check progress aggregator"
-action = "count as cached a derivation only after all its required missing outputs have been successfully substituted during the run"
+action = "count as cached a derivation after all its required missing outputs have been successfully substituted during the run"
 
 [[requirements]]
 id = "CLI-CHECK-PROGRESS-016"
@@ -207,11 +207,11 @@ design = "design/progress.md#derivation-metrics"
 [requirements.ears]
 type = "ubiquitous"
 system = "the check progress aggregator"
-action = "report known total as the distinct known derivations requiring build or substitution, equal to the four work category counts when those counts are fully known"
+action = "report known total as distinct selected derivations and dependency work observed during realization, excluding unused transitive dependencies and equaling built plus cached when the run succeeds with fully known metrics"
 
 [[requirements]]
 id = "CLI-CHECK-PROGRESS-019"
-title = "Existing store reuse is not cache work"
+title = "Existing store reuse counts as cached work"
 manual = false
 design = "design/progress.md#derivation-metrics"
 
@@ -219,7 +219,7 @@ design = "design/progress.md#derivation-metrics"
 type = "event"
 trigger = "a selected check reuses outputs already present in the store"
 system = "the check progress aggregator"
-action = "exclude that reuse from derivation build and substitution work counts"
+action = "count the derivation once as cached work and include it in the known total"
 
 [[requirements]]
 id = "CLI-CHECK-PROGRESS-020"
@@ -277,7 +277,7 @@ design = "design/progress.md#rendering"
 [requirements.ears]
 type = "complex"
 state = "terminal progress is eligible"
-trigger = "the displayed metric tuple differs from the last rendered tuple or no tuple has yet been rendered"
+trigger = "queued work events have been coalesced and the displayed metric tuple differs from the last rendered tuple or no tuple has yet been rendered"
 system = "the check progress renderer"
 action = "render the new metric snapshot"
 
@@ -349,7 +349,7 @@ design = "design/progress.md#final-metrics"
 type = "state"
 state = "check execution completes under the eligible user-terminal progress policy"
 system = "bloomery check"
-action = "close the completion summary with the built, cached, and total derivation work metrics"
+action = "close the completion summary with built, cached, and total derivation work metrics, including a pending count when unfinished work remains"
 
 [[requirements]]
 id = "CLI-CHECK-PROGRESS-031"
@@ -365,7 +365,14 @@ action = "omit final metrics from the completion output"
 
 [[requirements]]
 id = "CLI-CHECK-PROGRESS-032"
-title = "Evaluated build plans show known pending work"
+title = "Selected derivations show known pending work"
 manual = false
 design = "design/progress.md#derivation-metrics"
-ears = { type = "state", state = "Nix evaluation exposes a structured work plan for selected checks", system = "the check progress aggregator", action = "include each distinct derivation assigned to building or substitution in the known total and its pending category before realization activity starts" }
+ears = { type = "state", state = "Nix evaluation identifies selected check derivations", system = "the check progress aggregator", action = "include distinct selected derivations in the known total before realization starts and add dependency derivations when Nix reports their realization work" }
+
+[[requirements]]
+id = "CLI-CHECK-PROGRESS-033"
+title = "Progress validity probes stay bounded to selected outputs"
+manual = false
+design = "design/progress.md#event-collection"
+ears = { type = "ubiquitous", system = "the check progress collector", action = "query store validity only for selected check outputs and avoid recursively loading dependency metadata on warm runs" }
