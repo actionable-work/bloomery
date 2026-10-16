@@ -29,9 +29,9 @@ in {
       hasCargoToml = true;
       hasCargoLock = true;
       devShellEnabled = true;
-      checksEnabled = true;
+      checksEnabled = false;
       includePackageChecks = false;
-      crateCheck = true;
+      crateCheck = false;
       unifyFeatures = true;
       linker =
         if pkgs.stdenv.hostPlatform.isLinux
@@ -39,8 +39,8 @@ in {
         else null;
       libPackages = false;
       devPackages = false;
-      workspaceDependencies = true;
-      noDefaultFeatures = true;
+      workspaceDependencies = false;
+      noDefaultFeatures = false;
     };
   };
 
@@ -66,15 +66,15 @@ in {
       defaultCfg = options.evalWorkspaceOptions {root = ./.;};
       disabledCfg = options.evalWorkspaceOptions {
         root = ./.;
-        checks.crateCheck = false;
+        checks.crateCheck = true;
       };
     in {
       defaultValue = defaultCfg.checks.crateCheck;
       overridden = disabledCfg.checks.crateCheck;
     };
     expected = {
-      defaultValue = true;
-      overridden = false;
+      defaultValue = false;
+      overridden = true;
     };
   };
 

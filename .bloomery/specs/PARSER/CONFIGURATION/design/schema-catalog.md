@@ -8,16 +8,18 @@ over build-table semantics and evaluation-time resolution.
 ## Catalog fields
 
 Each catalog entry carries an exact dotted key path, a schema type, an owning
-feature, documentation text, and an optional recommended default. A recommended
-default is present only when omitting the key has a single fixed
-Bloomery-defined effective value. Keys whose omission is semantic are
-addressable but have no recommendation:
+feature, documentation text, an effective default when omission has a fixed
+meaning, and an optional upgrade recommendation. Usually the recommendation
+equals the effective default. Check control keys default to `false` but
+recommend `true`, so an existing configuration keeps checks opt-in while
+`config upgrade` explicitly sets supported check controls. Keys whose omission
+is semantic are addressable but have no recommendation:
 `build.bloomeryLock` auto-detects, `build.members` means all members,
 `toolchain.linker` is host-dependent, `features.cratesIoIndex` means none,
 `specs.enable` auto-detects from the specification tree, and
 the `profile.*` fields inherit from `Cargo.toml` and rustc.
 
-`bloomery config upgrade` materializes recommended keys only. Keys without a
+`bloomery config upgrade` materializes recommended values only. Keys without a
 recommendation remain absent unless the user sets them. `bloomery config
 document` renders each entry's documentation text as a TOML comment on the
 configured key, falling back to the line above when the value already carries a
@@ -114,29 +116,57 @@ default because omission delegates to `Cargo.toml` and rustc defaults.
 
 ### `[checks]`
 
-| Key | Type | Recommended default |
+| Key | Type | Upgrade recommendation |
 | --- | --- | --- |
 | `checks.enable` | boolean | `true` |
-| `checks.includePackageChecks` | boolean | `false` |
+| `checks.includePackageChecks` | boolean | `true` |
 | `checks.crateCheck` | boolean | `true` |
-| `checks.throwOnOutOfDate` | boolean | `false` |
+| `checks.throwOnOutOfDate` | boolean | `true` |
 | `checks.workspaceDependencies` | boolean | `true` |
 | `checks.noDefaultFeatures` | boolean | `true` |
 
-`checks.includePackageChecks` is off by default, so the default generated check
-set omits package build checks; the
+When omitted, every boolean check control in this table is effectively `false`
+and has an upgrade recommendation of `true`.
+
+`checks.specifications`, `checks.codeHealth`, and
+`checks.clippySuppressions` are CLI-owned nested tables. Their `enable` keys
+default to `false` and have upgrade recommendations of `true`; their policy
+designs define their scope. The Nix loader validates and accepts these tables
+without generating corresponding Nix checks.
+
+An unupgraded configuration generates no Nix checks by default. `config upgrade`
+sets each missing check control to `true` unless a value was already configured.
+The
 [CLI build command](../../../CLI/BUILD/README.md) materializes production
-packages instead. Enabling it adds the release `<bin>:bin` and `<crate>:lib`
-checks back to the check set. See the
+packages instead. Setting `checks.includePackageChecks = true` adds the release
+`<bin>:bin` and `<crate>:lib` checks to the check set. See the
 [flake check output](../../../NIXLIB/FLAKE/design/output-contract.md#checks).
+
+### `[checks.specifications]`
+
+Owned by [CLI/CHECK](../../../CLI/CHECK/design/pipeline.md) and parsed by the
+CLI. Its `enable` key defaults to `false` and has an upgrade recommendation of
+`true`. It gates specification structure and traceability checks when
+specification management is active. The Nix loader accepts the table without
+generating a corresponding Nix check.
 
 ### `[checks.codeHealth]`
 
 Owned by [CLI/CHECK](../../../CLI/CHECK/design/code-health.md) and parsed by the
 CLI. The [code health catalog](code-health.md#catalog) enumerates every nested
 key, schema type, constraint, and recommended default. These entries participate
-in config get/set/unset/list/upgrade/document like all other fixed keys. The
-Nix loader validates and accepts the table without creating a health derivation.
+in config get/set/unset/list/upgrade/document like all other fixed keys. Its
+`enable` key defaults to `false` and has an upgrade recommendation of `true`.
+The Nix loader validates and accepts the table without creating a health
+derivation.
+
+### `[checks.clippySuppressions]`
+
+Owned by [CLI/CHECK](../../../CLI/CHECK/design/clippy-suppressions.md) and
+parsed by the CLI. The table enables the inline Clippy suppression check and
+lists the exact Clippy lint names permitted as exceptions. Its `enable` key
+defaults to `false` and has an upgrade recommendation of `true`. The Nix loader
+accepts the table without creating a Clippy suppression derivation.
 
 ### `[features]`
 

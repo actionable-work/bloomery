@@ -32,8 +32,8 @@ the user's trailing note while still documenting the key.
 `config document` writes one catalog documentation comment for each key
 explicitly present in the raw file. It does not add, remove, or rewrite keys:
 absent catalog keys stay absent, and `config upgrade` remains the command that
-materializes recommended defaults. A present value is never changed, including a
-value that differs from its recommended default. A table header is not itself
+materializes upgrade recommendations. A present value is never changed,
+including a value that differs from its recommendation. A table header is not itself
 documented; only leaves receive a documentation comment.
 
 Existing comments are preserved. The command does not remove or rewrite

@@ -32,10 +32,10 @@ When checks are enabled, `checks` contains `<crate>:check`, `<crate>:test`,
 `<crate>:check`, clippy, and documentation checks compile their dependency
 crates metadata-only; test and doctest compile workspace crates with the dev
 profile; package checks use full release crates. `<crate>:check` is generated
-when `checks.crateCheck` is enabled, which is the default; disabling it omits
-the `<crate>:check` entries while retaining the rest. Package checks `<bin>:bin`
-and `<crate>:lib` are included when package checks are enabled, which is off by
-default; enabling them reuses the release crate and binary derivations.
+only when `checks.crateCheck` is enabled; it is off by default. Package checks
+`<bin>:bin` and `<crate>:lib` are included only when
+`checks.includePackageChecks` is enabled; it is also off by default. Enabling
+package checks reuses the release crate and binary derivations.
 `workspace:lock` validates lock consistency, `workspace:dependencies`
 validates dependency inheritance, and `workspace:default-features` validates
 disabled default features; each manifest check is omitted when its `[checks]`

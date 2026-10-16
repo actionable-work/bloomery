@@ -1,6 +1,7 @@
 #![allow(clippy::result_large_err)]
 
 mod analysis;
+mod clippy;
 mod files;
 mod health;
 mod nix;
@@ -9,6 +10,7 @@ mod typescript;
 
 pub use analysis::AnalysisSession;
 use bloomery_model::{Context, Diagnostic, Evidence, TestSite};
+pub use clippy::find_clippy_suppressions;
 pub use health::{
     HealthCallable, HealthCrateMetrics, HealthSourceCrate, HealthTarget, HealthToken, OpaqueSource,
     analyze_code_health,

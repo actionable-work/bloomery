@@ -4,16 +4,18 @@
 
 | ID | Responsibility | Prerequisite |
 | --- | --- | --- |
-| `static:structure` | Configuration, workspace/frontmatter, requirements, design links | none |
-| `static:traceability` | Enabled scanners and relational evidence checks | loaded valid requirement model |
+| `static:structure` | Configuration, workspace/frontmatter, requirements, design links | specification management and enabled specification checks |
+| `static:traceability` | Enabled scanners and relational evidence checks | enabled specification checks and loaded valid requirement model |
 | `static:code-health` | Rust analysis, health scores, limits, baseline comparison | enabled health policy |
+| `static:clippy-suppressions` | Inline Clippy suppression policy | enabled suppression policy |
 | `nix:<system>:<attribute>` | One attribute under `checks.<system>` | Catalog evaluation |
 
 Preserve the existing static validations; these IDs group the existing passes,
 not new independent validation semantics. Static structure is a prerequisite
 of traceability. `static:structure` and `static:traceability` exist in the
-catalog only when specification management is enabled; when it is disabled they
-are absent and cannot be selected. The shared CLI preflight requires
+catalog only when specification management is enabled and
+`checks.specifications.enable` is true; otherwise they are absent and cannot
+be selected. The shared CLI preflight requires
 a root `flake.nix` before any
 check operation. Nix catalog discovery is setup and does not depend on
 specification validity. The formatter gate runs before selected check tasks; a
@@ -24,13 +26,36 @@ failures in either pipeline do not suppress the other in default mode.
 of specification management and Nix check generation. It has no structure or
 traceability prerequisite. Health and traceability share Rust ingestion without
 coupling outcomes; see [code health](code-health.md#check-integration).
+`static:clippy-suppressions` follows its independent enablement and does not
+require specification management or Nix check generation; see
+[Clippy suppressions](clippy-suppressions.md#check-integration).
 
-With no selectors, run every available check: both static checks when
-specification management is enabled, enabled code health, plus every check attribute for the host
-Nix system. Include generated Rust tests, clippy, documentation, doctests,
-lock validation, formatter checks, and integration-flake checks when present in
-that output. Package checks are included only when
-`checks.includePackageChecks` enables them; the default suite omits them and
+## Check enablement warnings
+
+Each configurable check category has a boolean check-control key in the raw
+`.bloomery/config.toml` checks table. Omitted keys have an effective value of
+`false`; check loading retains their raw absence so `bloomery check` can emit a
+warning-level tracing event for each supported check whose check-control key is
+missing. Warnings identify the check and missing key, and recommend
+`bloomery config upgrade`, which materializes the key as `true`. An explicitly
+configured `false` is intentional: it
+produces no warning and remains disabled. Static structure and traceability
+checks require both `specs.enable` and `checks.specifications.enable`.
+Specification-check warnings are absent when specification management is
+disabled and those checks are unavailable.
+An explicit `checks.enable = false` suppresses warnings for its Nix check
+controls. Explicitly disabling a check group suppresses warnings for checks in
+that group. Independently configured CLI checks such as code health and Clippy
+suppression policy retain their own warning behavior.
+
+With no selectors, run every available check: static specification checks when
+specification management and `checks.specifications.enable` are enabled,
+enabled code health and Clippy suppression policy, plus every check attribute
+for the host Nix system. Include generated
+Rust tests, clippy, documentation, doctests, lock validation, formatter checks,
+and integration-flake checks when present in that output. Package checks are
+included only when `checks.includePackageChecks` enables them; an omitted key
+leaves them out and
 [build](../../BUILD/README.md) materializes production packages instead. Do not
 implicitly build packages outside checks
 or select other architectures. Every check command requires the shared flake
@@ -89,9 +114,10 @@ with valid empty check sets are distinct from missing system outputs.
 
 ## Scheduler
 
-After the formatter gate passes, run independent static, health, and Nix tasks
-concurrently. Admit traceability as soon as structure passes and a task slot is
-available, ahead of queued independent work; do not wait for Nix completion.
+After the formatter gate passes, run independent specification static checks,
+health, Clippy suppression policy, and Nix tasks concurrently. Admit
+traceability as soon as structure passes and a task slot is available, ahead of
+queued independent work; do not wait for Nix completion.
 The Nix branch is one batched realization task; Nix realizes independent
 derivations concurrently within it. All tasks share admission and cancellation.
 `--jobs N` is positive, defaults to the available logical CPU count, and has a

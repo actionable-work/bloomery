@@ -429,7 +429,7 @@
       checks = {
         enable = lib.mkOption {
           type = types.bool;
-          default = true;
+          default = false;
           description = "Generate workspace check derivations for unit tests, clippy, docs, doctests, lock validation, and optional package builds.";
         };
         includePackageChecks = lib.mkOption {
@@ -439,7 +439,7 @@
         };
         crateCheck = lib.mkOption {
           type = types.bool;
-          default = true;
+          default = false;
           description = "Generate the <crate>:check type-check entries for every workspace crate.";
         };
         throwOnOutOfDate = lib.mkOption {
@@ -449,12 +449,12 @@
         };
         workspaceDependencies = lib.mkOption {
           type = types.bool;
-          default = true;
+          default = false;
           description = "Require every workspace member dependency to inherit from [workspace.dependencies] using workspace = true.";
         };
         noDefaultFeatures = lib.mkOption {
           type = types.bool;
-          default = true;
+          default = false;
           description = "Require every dependency consumed by a workspace member to disable default features.";
         };
       };

@@ -3,6 +3,6 @@ devPackages = true
 libPackages = true
 
 [checks]
+crateCheck = true
+enable = true
 includePackageChecks = true
-noDefaultFeatures = false
-workspaceDependencies = false

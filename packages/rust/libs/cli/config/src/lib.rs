@@ -525,7 +525,7 @@ mod tests {
             ConfigOutcome::Get { key } => {
                 assert!(!key.configured);
                 assert!(key.recommended);
-                assert_eq!(key.value, Some(toml::Value::Boolean(true)));
+                assert_eq!(key.value, Some(toml::Value::Boolean(false)));
             }
             other => panic!("unexpected outcome: {other:?}"),
         }
@@ -773,6 +773,7 @@ mod tests {
     #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-004"))]
     #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-009"))]
     #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-010"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-021"))]
     fn upgrade_adds_absent_recommended_keys_in_sorted_order() {
         let root = temp_root();
         seed(&root, "");
@@ -792,6 +793,9 @@ mod tests {
                 sorted.sort();
                 assert_eq!(added, sorted);
                 assert!(added.contains(&"checks.enable".to_owned()));
+                assert!(added.contains(&"checks.crateCheck".to_owned()));
+                assert!(added.contains(&"checks.specifications.enable".to_owned()));
+                assert!(added.contains(&"checks.clippySuppressions.enable".to_owned()));
                 assert!(added.contains(&"toolchain.rustc".to_owned()));
                 assert!(!added.contains(&"toolchain.linker".to_owned()));
             }
@@ -799,17 +803,29 @@ mod tests {
         }
         let after = contents(&root);
         assert!(after.contains("enable = true"));
-        assert!(after.contains("throwOnOutOfDate = false"));
+        assert!(after.contains("crateCheck = true"));
+        assert!(after.contains("[checks.specifications]\nenable = true"));
+        assert!(
+            after.contains("[checks.clippySuppressions]\nallow = []\nenable = true")
+                || (after.contains("[checks.clippySuppressions]")
+                    && after.contains("enable = true")
+                    && after.contains("allow = []"))
+        );
+        assert!(after.contains("throwOnOutOfDate = true"));
         let _ = fs::remove_dir_all(root);
     }
 
     #[test]
     #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-002"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-022"))]
     #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-005"))]
     #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-007"))]
     fn upgrade_preserves_present_values_and_complete_files() {
         let root = temp_root();
-        seed(&root, "checks.enable = false\n# note\n");
+        seed(
+            &root,
+            "checks.enable = false\n[checks.clippySuppressions]\nenable = false\nallow = []\n# note\n",
+        );
         let report = run(
             &root,
             &operation(ConfigOperation::Upgrade {
@@ -821,11 +837,13 @@ mod tests {
         match report.outcome {
             ConfigOutcome::Upgrade { added, .. } => {
                 assert!(!added.contains(&"checks.enable".to_owned()));
+                assert!(!added.contains(&"checks.clippySuppressions.enable".to_owned()));
             }
             other => panic!("unexpected outcome: {other:?}"),
         }
         let after = contents(&root);
         assert!(after.contains("checks.enable = false"));
+        assert!(after.contains("enable = false"));
         assert!(after.contains("# note"));
 
         let before_second = contents(&root);

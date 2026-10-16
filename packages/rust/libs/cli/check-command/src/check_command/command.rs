@@ -423,7 +423,14 @@ fn static_check_ids(root: &Path) -> Result<Vec<String>, CheckError> {
     let loaded = bloomery_model::config::load_with_raw(root)
         .map_err(|diagnostic| CheckError::operational(diagnostic.message))?;
     let mut checks = Vec::new();
-    if loaded.config.spec_management_enabled(root) {
+    if loaded.config.spec_management_enabled(root)
+        && bloomery_model::catalog::effective_value(
+            loaded.raw.as_ref(),
+            &["checks", "specifications", "enable"],
+        )
+        .and_then(|value| value.as_bool())
+        .unwrap_or(false)
+    {
         checks.extend([
             "static:structure".to_owned(),
             "static:traceability".to_owned(),
@@ -434,7 +441,68 @@ fn static_check_ids(root: &Path) -> Result<Vec<String>, CheckError> {
     if health.enabled {
         checks.push("static:code-health".to_owned());
     }
+    let clippy = bloomery_model::clippy::ClippySuppressionConfig::from_raw(loaded.raw.as_ref())
+        .map_err(|diagnostic| CheckError::operational(diagnostic.message))?;
+    if clippy.enabled {
+        checks.push("static:clippy-suppressions".to_owned());
+    }
     Ok(checks)
+}
+
+pub(super) fn warn_missing_check_controls(root: &Path) {
+    let Ok(loaded) = bloomery_model::config::load_with_raw(root) else {
+        return;
+    };
+    let Some(raw) = loaded.raw.as_ref() else {
+        return;
+    };
+    for (key, check) in missing_check_controls(raw, loaded.config.spec_management_enabled(root)) {
+        tracing::warn!(
+            check = %check,
+            key = %key,
+            "missing check control; run `bloomery config upgrade` to explicitly enable supported checks"
+        );
+    }
+}
+
+pub(super) fn missing_check_controls(
+    raw: &toml::Value,
+    specifications_available: bool,
+) -> Vec<(String, String)> {
+    let nix_checks_explicitly_disabled =
+        bloomery_model::catalog::raw_at(raw, &["checks", "enable"]).and_then(toml::Value::as_bool)
+            == Some(false);
+    let mut controls = vec![
+        ("checks.enable", "nix:*"),
+        ("checks.includePackageChecks", "nix:package"),
+        ("checks.crateCheck", "nix:crate-check"),
+        ("checks.throwOnOutOfDate", "nix:lock-validation"),
+        ("checks.workspaceDependencies", "nix:workspace-dependencies"),
+        ("checks.noDefaultFeatures", "nix:no-default-features"),
+        ("checks.codeHealth.enable", "static:code-health"),
+        (
+            "checks.clippySuppressions.enable",
+            "static:clippy-suppressions",
+        ),
+    ];
+    if specifications_available {
+        controls.push(("checks.specifications.enable", "static:structure"));
+    }
+    controls
+        .into_iter()
+        .filter(|(key, _)| {
+            !(nix_checks_explicitly_disabled
+                && *key != "checks.enable"
+                && *key != "checks.codeHealth.enable"
+                && *key != "checks.clippySuppressions.enable"
+                && *key != "checks.specifications.enable")
+        })
+        .filter(|(key, _)| {
+            let path = key.split('.').collect::<Vec<_>>();
+            bloomery_model::catalog::raw_at(raw, &path).is_none()
+        })
+        .map(|(key, check)| (key.to_owned(), check.to_owned()))
+        .collect()
 }
 
 pub(super) fn plan_for_selection(

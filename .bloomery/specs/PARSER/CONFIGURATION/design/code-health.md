@@ -2,30 +2,30 @@
 
 `[checks.codeHealth]` is CLI-owned configuration consumed by
 [`static:code-health`](../../../CLI/CHECK/design/code-health.md). The parent
-`[checks]` retains its Nix build keys. The flake loader accepts and validates
-the nested table but does not generate a health derivation or interpret its
-enablement as a Nix check toggle.
+`[checks]` retains its Nix build keys alongside CLI-owned policy subtables. The
+flake loader accepts and validates the nested table but does not generate a
+health derivation or interpret its enablement as a Nix check toggle.
 
 ## Catalog
 
-Every key is addressable through `bloomery config`, documented by the shared
-schema catalog, and has the following recommended default:
+Every key is addressable through `bloomery config` and documented by the shared
+schema catalog, with these effective defaults and upgrade recommendations:
 
-| Key under `checks.codeHealth` | Type | Default |
-| --- | --- | --- |
-| `enable` | boolean | `true` |
-| `baseline` | repository-relative file path | `".bloomery/code-health-summary.json"` |
-| `minCrateScore` | number in 0–100 | `80` |
-| `minWorkspaceScore` | number in 0–100 | `80` |
-| `maxRegression` | number in 0–100 | `0` |
-| `cyclomaticLimit` | positive integer | `10` |
-| `functionTokensLimit` | positive integer | `250` |
-| `nestingLimit` | positive integer | `4` |
-| `duplicationFreeRatio` | number in [0,1) | `0.02` |
-| `duplicateMinTokens` | integer at least 16 | `64` |
-| `maxCyclomatic` | positive integer | `40` |
-| `maxFunctionTokens` | positive integer | `1000` |
-| `maxNesting` | positive integer | `8` |
+| Key under `checks.codeHealth` | Type | Effective default | Upgrade recommendation |
+| --- | --- | --- | --- |
+| `enable` | boolean | `false` | `true` |
+| `baseline` | repository-relative file path | `".bloomery/code-health-summary.json"` | `".bloomery/code-health-summary.json"` |
+| `minCrateScore` | number in 0–100 | `80` | `80` |
+| `minWorkspaceScore` | number in 0–100 | `80` | `80` |
+| `maxRegression` | number in 0–100 | `0` | `0` |
+| `cyclomaticLimit` | positive integer | `10` | `10` |
+| `functionTokensLimit` | positive integer | `250` | `250` |
+| `nestingLimit` | positive integer | `4` | `4` |
+| `duplicationFreeRatio` | number in [0,1) | `0.02` | `0.02` |
+| `duplicateMinTokens` | integer at least 16 | `64` | `64` |
+| `maxCyclomatic` | positive integer | `40` | `40` |
+| `maxFunctionTokens` | positive integer | `1000` | `1000` |
+| `maxNesting` | positive integer | `8` | `8` |
 
 Thresholds apply uniformly to selected crates. No per-crate exceptions,
 suppression attributes, or customizable weights are part of the policy.
@@ -45,5 +45,6 @@ through symlinks. The default filename makes the reviewed artifact suitable
 for version control. Ordinary checks read it without writing it.
 
 Enablement is independent of `specs.enable`, evidence-scanner switches, and
-`checks.enable`. An omitted table applies all defaults. Configuration upgrade
-materializes those same defaults without changing effective behavior.
+`checks.enable`. An omitted table applies the effective defaults. The check is
+off when its `enable` key is omitted; configuration upgrade recommends `true`
+to explicitly opt into it and preserves any configured value.

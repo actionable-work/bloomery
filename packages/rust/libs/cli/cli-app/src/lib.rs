@@ -16,6 +16,12 @@ use std::process::ExitCode;
 
 /// Parse and execute the CLI request using the current process environment.
 pub fn run() -> ExitCode {
+    let _ = tracing_subscriber::fmt()
+        .with_max_level(tracing_subscriber::filter::LevelFilter::WARN)
+        .with_target(false)
+        .without_time()
+        .with_writer(io::stderr)
+        .try_init();
     let mut stdout = io::stdout().lock();
     let mut stderr = io::stderr().lock();
     let root = match std::env::current_dir() {

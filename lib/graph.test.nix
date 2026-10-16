@@ -2,7 +2,21 @@
   pkgs,
   lib ? pkgs.lib,
 }: let
-  mkWorkspace = import ./mk-workspace.nix {inherit pkgs lib;};
+  rawMkWorkspace = import ./mk-workspace.nix {inherit pkgs lib;};
+  mkWorkspace = args:
+    rawMkWorkspace (args
+      // {
+        checks =
+          {
+            enable = true;
+            includePackageChecks = true;
+            crateCheck = true;
+            throwOnOutOfDate = true;
+            workspaceDependencies = true;
+            noDefaultFeatures = true;
+          }
+          // (args.checks or {});
+      });
   parseLock = import ./workspace/parse-lock.nix {inherit lib;};
   metadataWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;

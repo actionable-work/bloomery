@@ -183,25 +183,25 @@ action = "accept build.unify and features.cratesIoIndex"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-OPTIONS-017"
-title = "Workspace dependency check defaults to on"
+title = "Workspace dependency check defaults off"
 manual = false
 design = "design/workspace-options.md#development-shell-and-checks"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "the workspace option module"
-action = "default checks.workspaceDependencies to true"
+action = "default checks.workspaceDependencies to false"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-OPTIONS-018"
-title = "Default features check defaults to on"
+title = "Default features check defaults off"
 manual = false
 design = "design/workspace-options.md#development-shell-and-checks"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "the workspace option module"
-action = "default checks.noDefaultFeatures to true"
+action = "default checks.noDefaultFeatures to false"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-OPTIONS-019"
@@ -249,11 +249,22 @@ action = "default checks.includePackageChecks to false"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-OPTIONS-023"
-title = "Crate check defaults to on"
+title = "Crate check defaults off"
 manual = false
 design = "design/workspace-options.md#development-shell-and-checks"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "the workspace option module"
-action = "default checks.crateCheck to true"
+action = "default checks.crateCheck to false"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-024"
+title = "Generated checks default off"
+manual = false
+design = "design/workspace-options.md#development-shell-and-checks"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace option module"
+action = "default checks.enable to false"

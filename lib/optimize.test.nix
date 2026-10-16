@@ -2,7 +2,21 @@
   pkgs,
   lib ? pkgs.lib,
 }: let
-  mkWorkspace = import ./mk-workspace.nix {inherit pkgs lib;};
+  rawMkWorkspace = import ./mk-workspace.nix {inherit pkgs lib;};
+  mkWorkspace = args:
+    rawMkWorkspace (args
+      // {
+        checks =
+          {
+            enable = true;
+            includePackageChecks = true;
+            crateCheck = true;
+            throwOnOutOfDate = true;
+            workspaceDependencies = true;
+            noDefaultFeatures = true;
+          }
+          // (args.checks or {});
+      });
   buildConfig = import ./build-config.nix {inherit pkgs lib;};
 
   optRoot = ../tests/optimize-workspace;

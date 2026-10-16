@@ -133,18 +133,18 @@ checks = "individual"
 The [schema catalog](schema-catalog.md) is the single enumerated description of
 every recognized configuration key. It spans both the CLI-owned tables and the
 Nix build tables, and pairs each key with a schema type, documentation text,
-and, when omission has a single fixed effective value, a recommended default.
-The documentation text is the source for the
+an effective default, and an optional upgrade recommendation. The documentation
+text is the source for the
 [`config document`](../../../CLI/CONFIG/design/documenting.md) comments.
 
 The catalog is the source of truth for `bloomery config upgrade`, which
-materializes absent recommended keys, for `bloomery config` type validation, and
-for the advisory
+materializes absent upgrade recommendations, for `bloomery config` type
+validation, and for the advisory
 [SYNC recommendations](../../../CLI/SYNC/design/sync.md#recommendations), which
-report a subset of absent keys without writing. Catalog values equal the
-defaults applied to an absent key, so materializing them does not change the
-effective configuration. Explicit values, including materialized ones, always
-take precedence.
+report a subset of absent keys without writing. Upgrade recommendations usually
+equal the defaults applied to absent keys. Check-control keys are an
+exception: they default to `false`, while upgrade recommends `true` to opt in.
+Explicit values, including `false`, always take precedence over an upgrade.
 
 ## Error handling
 

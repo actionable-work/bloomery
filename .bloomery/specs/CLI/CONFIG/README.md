@@ -5,7 +5,7 @@ tagline: Schema-typed CRUD, diff, and upgrade commands for .bloomery/config.toml
 description: |
   The config feature owns the `bloomery config` command tree. It reads and
   edits every key of `.bloomery/config.toml` through schema-typed dotted keys,
-  provides `config upgrade` to materialize absent recommended keys and
+  provides `config upgrade` to materialize absent upgrade recommendations and
   `config upgrade --diff` to compare the recommended configuration with the
   current one without changing anything, and provides `config document` to
   annotate configured keys with their schema-catalog documentation.

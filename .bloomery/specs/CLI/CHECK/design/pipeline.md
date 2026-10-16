@@ -1,16 +1,19 @@
 # Static validation pipeline
 
-The static branch retains ordered passes so each check operates on a known model.
+The specification static branch retains ordered passes so each check operates
+on a known model.
 The independent Nix branch runs concurrently; see [execution](execution.md).
 `static:structure` covers passes 1–3, and `static:traceability` covers passes 4–5:
 
-Static validation is available only when specification management is enabled,
-whether auto-detected from the specification tree or explicitly configured
-(`specs.enable = true`). When it is disabled, `static:structure` and
-`static:traceability` are absent from the catalog, no workspace or evidence pass
-runs, and a disabled specification tree produces no static diagnostics. The
-formatter gate, enabled code health, and Nix checks are unaffected. Health is
-an independent static branch without requirement-model prerequisites; see
+Specification static validation requires specification management and
+`checks.specifications.enable = true`. Specification management is enabled when
+auto-detected from the specification tree or explicitly configured
+(`specs.enable = true`). When either gate is off, `static:structure` and
+`static:traceability` are absent from the catalog and no specification workspace
+or evidence pass runs. The
+formatter gate, enabled code health, enabled Clippy suppression policy, and
+Nix checks are unaffected. Health and suppression policy are independent static
+branches without requirement-model prerequisites; see
 [code health](code-health.md). Health can request source ingestion while evidence
 scanning is disabled, without producing specification references.
 

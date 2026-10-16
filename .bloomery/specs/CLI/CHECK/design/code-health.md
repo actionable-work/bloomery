@@ -4,7 +4,8 @@
 
 `static:code-health` measures first-party Rust source, calculates crate and
 workspace scores, and checks configured limits and a reviewed baseline. It is
-enabled by default through `checks.codeHealth.enable`, independently of
+opt-in through `checks.codeHealth.enable`, which defaults to `false`,
+independently of
 `specs.enable`, `scanners.rust.enabled`, and the Nix generation toggle
 `checks.enable`. It appears once in the catalog, regardless of selected systems.
 Normal selectors, formatting, scheduling, cancellation, failure retention, and
@@ -17,6 +18,9 @@ in [shared analysis](../../../PARSER/SCANNING/design/health-analysis.md).
 Each consumer receives only its requested projections and diagnostics. The
 shared service publishes completed file facts without requiring simultaneous
 task slots, including with `--jobs 1`.
+
+Inline Clippy suppression policy is a separate static check described in
+[Clippy suppressions](clippy-suppressions.md). It does not affect health scores.
 
 The health index summarizes source maintainability. Existing Clippy checks
 remain independent gates. Coverage, compiler diagnostics, unsafe frequency,

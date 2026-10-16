@@ -56,10 +56,22 @@ impl DefaultValue {
 pub struct CatalogEntry {
     pub path: &'static [&'static str],
     pub value_type: ValueType,
-    /// Present only when omitting the key has a single fixed effective value.
+    /// Value recommended by `config upgrade`; may differ from omission behavior.
     pub recommended: Option<DefaultValue>,
     /// Documentation text rendered by `bloomery config document`.
     pub documentation: &'static str,
+}
+
+impl CatalogEntry {
+    /// Value applied when this key is omitted. Check controls are opt-in even
+    /// though config upgrade recommends explicitly enabling them.
+    pub fn effective_default(&self) -> Option<DefaultValue> {
+        if is_check_control(self.path) {
+            Some(DefaultValue::Bool(false))
+        } else {
+            self.recommended
+        }
+    }
 }
 
 /// A resolved key, including parameterized formatter names that have no static
@@ -89,7 +101,22 @@ impl KeySpec {
 }
 
 /// Increment when the catalog changes.
-pub const CATALOG_VERSION: u32 = 9;
+pub const CATALOG_VERSION: u32 = 10;
+
+fn is_check_control(path: &[&str]) -> bool {
+    matches!(
+        path,
+        ["checks", "enable"]
+            | ["checks", "includePackageChecks"]
+            | ["checks", "crateCheck"]
+            | ["checks", "throwOnOutOfDate"]
+            | ["checks", "workspaceDependencies"]
+            | ["checks", "noDefaultFeatures"]
+            | ["checks", "specifications", "enable"]
+            | ["checks", "codeHealth", "enable"]
+            | ["checks", "clippySuppressions", "enable"]
+    )
+}
 
 const OPT_LEVEL: &[ValueType] = &[
     ValueType::UnsignedUpTo(3),
@@ -463,7 +490,7 @@ pub const CATALOG: &[CatalogEntry] = &[
     CatalogEntry {
         path: &["checks", "includePackageChecks"],
         value_type: ValueType::Bool,
-        recommended: Some(DefaultValue::Bool(false)),
+        recommended: Some(DefaultValue::Bool(true)),
         documentation: "Include binary and library build checks.",
     },
     CatalogEntry {
@@ -475,7 +502,7 @@ pub const CATALOG: &[CatalogEntry] = &[
     CatalogEntry {
         path: &["checks", "throwOnOutOfDate"],
         value_type: ValueType::Bool,
-        recommended: Some(DefaultValue::Bool(false)),
+        recommended: Some(DefaultValue::Bool(true)),
         documentation: "Fail evaluation when bloomery.lock is out of date.",
     },
     CatalogEntry {
@@ -495,6 +522,24 @@ pub const CATALOG: &[CatalogEntry] = &[
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(true)),
         documentation: "Enable the source-based code health check.",
+    },
+    CatalogEntry {
+        path: &["checks", "specifications", "enable"],
+        value_type: ValueType::Bool,
+        recommended: Some(DefaultValue::Bool(true)),
+        documentation: "Enable static specification validation checks.",
+    },
+    CatalogEntry {
+        path: &["checks", "clippySuppressions", "enable"],
+        value_type: ValueType::Bool,
+        recommended: Some(DefaultValue::Bool(true)),
+        documentation: "Enable the inline Clippy suppression policy check.",
+    },
+    CatalogEntry {
+        path: &["checks", "clippySuppressions", "allow"],
+        value_type: ValueType::StringList,
+        recommended: Some(DefaultValue::StringList(&[])),
+        documentation: "Exact Clippy lint names permitted in inline allow attributes.",
     },
     CatalogEntry {
         path: &["checks", "codeHealth", "baseline"],
@@ -1006,6 +1051,26 @@ pub fn validate_raw(raw: &Value) -> Result<(), Diagnostic> {
             path.pop();
         }
     }
+    if let Some(allow) =
+        raw_at(raw, &["checks", "clippySuppressions", "allow"]).and_then(Value::as_array)
+    {
+        let mut seen = std::collections::BTreeSet::new();
+        for lint in allow.iter().filter_map(Value::as_str) {
+            if !valid_clippy_lint_name(lint) {
+                diagnostics.push(Diagnostic::new(
+                    "ConfigurationError",
+                    format!(
+                        "checks.clippySuppressions.allow entries must be qualified Clippy lint names; found '{lint}'"
+                    ),
+                ));
+            } else if !seen.insert(lint) {
+                diagnostics.push(Diagnostic::new(
+                    "ConfigurationError",
+                    format!("checks.clippySuppressions.allow contains duplicate lint '{lint}'"),
+                ));
+            }
+        }
+    }
     match diagnostics.into_iter().next() {
         Some(diagnostic) => Err(diagnostic),
         None => {
@@ -1015,10 +1080,21 @@ pub fn validate_raw(raw: &Value) -> Result<(), Diagnostic> {
     }
 }
 
+fn valid_clippy_lint_name(name: &str) -> bool {
+    let Some(lint) = name.strip_prefix("clippy::") else {
+        return false;
+    };
+    let mut chars = lint.chars();
+    chars.next().is_some_and(|first| first.is_ascii_lowercase())
+        && chars.all(|character| {
+            character.is_ascii_lowercase() || character.is_ascii_digit() || character == '_'
+        })
+}
+
 /// Recommended default for a path, if any.
 pub fn effective_default(path: &[&str]) -> Option<Value> {
     lookup(path)
-        .and_then(|entry| entry.recommended)
+        .and_then(CatalogEntry::effective_default)
         .map(DefaultValue::to_toml)
 }
 
@@ -1056,6 +1132,7 @@ mod tests {
 
     #[test]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-001"))]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-023"))]
     fn catalog_enumerates_every_recognized_key() {
         let mut paths = CATALOG.iter().map(path).collect::<Vec<_>>();
         let count = paths.len();
@@ -1076,6 +1153,9 @@ mod tests {
             "build.unify",
             "formatters.toml-sort.before",
             "checks.codeHealth.enable",
+            "checks.specifications.enable",
+            "checks.clippySuppressions.enable",
+            "checks.clippySuppressions.allow",
             "checks.codeHealth.duplicationFreeRatio",
             "checks.codeHealth.maxNesting",
         ] {
@@ -1123,6 +1203,36 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-SUPPRESSIONS-001"))]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-SUPPRESSIONS-003"))]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-SUPPRESSIONS-004"))]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-SUPPRESSIONS-005"))]
+    fn clippy_suppression_policy_is_catalogued_and_validated_even_when_disabled() {
+        assert_eq!(
+            effective_default(&["checks", "clippySuppressions", "enable"]),
+            Some(Value::Boolean(false))
+        );
+        assert_eq!(
+            effective_default(&["checks", "clippySuppressions", "allow"]),
+            Some(Value::Array(Vec::new()))
+        );
+        for raw in [
+            "[checks.clippySuppressions]\nenable = false\nunknown = true\n",
+            "[checks.clippySuppressions]\nenable = false\nallow = [\"unwrap_used\"]\n",
+            "[checks.clippySuppressions]\nenable = false\nallow = [\"clippy::unwrap_used\", \"clippy::unwrap_used\"]\n",
+            "[checks.clippySuppressions]\nenable = \"false\"\n",
+        ] {
+            let value = toml::from_str::<Value>(raw).expect("TOML parses");
+            assert!(validate_raw(&value).is_err(), "accepted {raw}");
+        }
+        let valid = toml::from_str::<Value>(
+            "[checks.clippySuppressions]\nenable = false\nallow = [\"clippy::unwrap_used\"]\n",
+        )
+        .expect("TOML parses");
+        assert!(validate_raw(&valid).is_ok());
+    }
+
+    #[test]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-002"))]
     fn catalog_entries_pair_paths_with_types() {
         assert_eq!(
@@ -1160,7 +1270,9 @@ mod tests {
     #[test]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-003"))]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-019"))]
-    fn recommended_defaults_match_applied_defaults() {
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-024"))]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-025"))]
+    fn effective_defaults_are_distinct_from_upgrade_recommendations() {
         assert_eq!(
             effective_default(&["specs", "dir"]),
             Some(Value::String("specs".into()))
@@ -1185,20 +1297,43 @@ mod tests {
         );
         assert_eq!(
             effective_default(&["checks", "workspaceDependencies"]),
-            Some(Value::Boolean(true))
+            Some(Value::Boolean(false))
         );
         assert_eq!(
             effective_default(&["checks", "noDefaultFeatures"]),
-            Some(Value::Boolean(true))
+            Some(Value::Boolean(false))
+        );
+        for path in [
+            &["checks", "enable"][..],
+            &["checks", "includePackageChecks"][..],
+            &["checks", "crateCheck"][..],
+            &["checks", "throwOnOutOfDate"][..],
+            &["checks", "workspaceDependencies"][..],
+            &["checks", "noDefaultFeatures"][..],
+            &["checks", "codeHealth", "enable"][..],
+            &["checks", "specifications", "enable"][..],
+            &["checks", "clippySuppressions", "enable"][..],
+        ] {
+            let entry = lookup(path).expect("check control is catalogued");
+            assert_eq!(entry.recommended, Some(DefaultValue::Bool(true)));
+            assert_eq!(effective_default(path), Some(Value::Boolean(false)));
+        }
+        assert_eq!(
+            effective_default(&["checks", "clippySuppressions", "allow"]),
+            Some(Value::Array(Vec::new()))
         );
     }
 
     #[test]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-022"))]
-    fn crate_check_is_recommended_on() {
+    fn crate_check_recommends_on_while_defaulting_off() {
+        assert_eq!(
+            lookup(&["checks", "crateCheck"]).unwrap().recommended,
+            Some(DefaultValue::Bool(true))
+        );
         assert_eq!(
             effective_default(&["checks", "crateCheck"]),
-            Some(Value::Boolean(true))
+            Some(Value::Boolean(false))
         );
     }
 
@@ -1277,7 +1412,7 @@ mod tests {
     #[test]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-005"))]
     fn catalog_version_tracks_the_binary() {
-        assert_eq!(CATALOG_VERSION, 9);
+        assert_eq!(CATALOG_VERSION, 10);
         assert!(!CATALOG.is_empty());
     }
 

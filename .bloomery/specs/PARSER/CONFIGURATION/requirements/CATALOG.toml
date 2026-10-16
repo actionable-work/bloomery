@@ -24,14 +24,14 @@ action = "pair each key path with its schema type and owning table"
 
 [[requirements]]
 id = "PARSER-CONFIGURATION-CATALOG-003"
-title = "Recommended defaults equal applied defaults"
+title = "Effective defaults and upgrade recommendations are distinct"
 manual = false
 design = "design/schema-catalog.md#catalog-fields"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "the schema catalog"
-action = "use the same value that partial configuration applies to an absent key"
+action = "record effective defaults independently from optional values recommended by config upgrade"
 
 [[requirements]]
 id = "PARSER-CONFIGURATION-CATALOG-004"
@@ -200,14 +200,14 @@ action = "omit a recommended default for every optimize key because the binary n
 
 [[requirements]]
 id = "PARSER-CONFIGURATION-CATALOG-019"
-title = "Package check inclusion recommends false"
+title = "Package check inclusion recommends true"
 manual = false
 design = "design/schema-catalog.md#checks"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "the schema catalog"
-action = "recommend false for checks.includePackageChecks"
+action = "recommend true for checks.includePackageChecks while its omitted effective value remains false"
 
 [[requirements]]
 id = "PARSER-CONFIGURATION-CATALOG-020"
@@ -233,11 +233,44 @@ action = "omit a recommended default for specs.enable because its omission auto-
 
 [[requirements]]
 id = "PARSER-CONFIGURATION-CATALOG-022"
-title = "Crate check recommends true"
+title = "Crate check recommends true while defaulting off"
 manual = false
 design = "design/schema-catalog.md#checks"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "the schema catalog"
-action = "recommend true for checks.crateCheck"
+action = "recommend true for checks.crateCheck while its omitted effective value remains false"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-023"
+title = "CLI check policies are catalogued"
+manual = false
+design = "design/schema-catalog.md#checks"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "include checks.specifications, checks.codeHealth, and checks.clippySuppressions as CLI-owned nested policy tables with documented catalog entries"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-024"
+title = "Check controls default off and upgrade on"
+manual = false
+design = "design/schema-catalog.md#checks"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "give every boolean check-control key an effective default of false and an upgrade recommendation of true"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-025"
+title = "Specification check control is catalogued"
+manual = false
+design = "design/schema-catalog.md#checks"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "catalogue checks.specifications.enable as a boolean with an effective default of false and an upgrade recommendation of true"

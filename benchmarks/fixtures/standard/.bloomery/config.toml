@@ -1,6 +1,3 @@
-[build]
-devPackages = true
-
 [checks]
-noDefaultFeatures = false
-workspaceDependencies = false
+crateCheck = true
+enable = true

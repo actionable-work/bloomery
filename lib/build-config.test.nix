@@ -25,6 +25,8 @@ in {
       checksEnabled = cfg.checks.enable;
       includePackageChecks = cfg.checks.includePackageChecks;
       crateCheck = cfg.checks.crateCheck;
+      workspaceDependencies = cfg.checks.workspaceDependencies;
+      noDefaultFeatures = cfg.checks.noDefaultFeatures;
       unify = cfg.build.unify;
       profileOptLevel = cfg.profile.optLevel;
     };
@@ -34,9 +36,11 @@ in {
       libPackages = false;
       devPackages = false;
       devShellEnabled = true;
-      checksEnabled = true;
+      checksEnabled = false;
       includePackageChecks = false;
-      crateCheck = true;
+      crateCheck = false;
+      workspaceDependencies = false;
+      noDefaultFeatures = false;
       unify = true;
       profileOptLevel = null;
     };
@@ -255,6 +259,39 @@ in {
       invalidRatio = true;
       hardBelowSoft = true;
       badWindow = true;
+    };
+  };
+
+  testCliCheckPolicyTablesAreValidatedAndNotPassedToNix = {
+    expr = let
+      args = loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.specifications.enable = true;
+        config.checks.clippySuppressions = {
+          enable = true;
+          allow = ["clippy::unwrap_used"];
+        };
+      };
+    in {
+      policiesRemoved = !(args.checks ? specifications) && !(args.checks ? clippySuppressions);
+      badSpecType = fails (loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.specifications.enable = "true";
+      });
+      badLintName = fails (loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.clippySuppressions.allow = ["unwrap_used"];
+      });
+      duplicateLint = fails (loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.clippySuppressions.allow = ["clippy::unwrap_used" "clippy::unwrap_used"];
+      });
+    };
+    expected = {
+      policiesRemoved = true;
+      badSpecType = true;
+      badLintName = true;
+      duplicateLint = true;
     };
   };
 

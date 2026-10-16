@@ -14,6 +14,8 @@ in {
           root = fixtures + "/${name}";
           createLibPackages = true;
           createDevPackages = true;
+          checks.enable = true;
+          checks.includePackageChecks = true;
         };
       workspace = perSystemWorkspace.${system};
       base = mkFixture "base";
@@ -36,6 +38,8 @@ in {
         root = ../../tests/single-crate-workspace;
         createLibPackages = true;
         createDevPackages = true;
+        checks.enable = true;
+        checks.includePackageChecks = true;
         overrides.single-crate-app.src = ./fixtures/explicit-library;
       };
       cliAppOverride = import ../../packages/rust/libs/cli/cli-app/overrides.nix {inherit pkgs lib;};
@@ -62,6 +66,7 @@ in {
           root = fixtures + "/base";
           createLibPackages = true;
           createDevPackages = true;
+          checks.enable = true;
           overrides.app.test.env = {
             BLOOMERY_REPOSITORY_ROOT = (repositorySupport name).layout;
             BLOOMERY_SOURCE_ROOT = (repositorySupport name).migration;

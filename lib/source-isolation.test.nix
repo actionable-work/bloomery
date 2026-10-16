@@ -2,7 +2,21 @@
   pkgs,
   lib ? pkgs.lib,
 }: let
-  mkWorkspace = import ./mk-workspace.nix {inherit pkgs lib;};
+  rawMkWorkspace = import ./mk-workspace.nix {inherit pkgs lib;};
+  mkWorkspace = args:
+    rawMkWorkspace (args
+      // {
+        checks =
+          {
+            enable = true;
+            includePackageChecks = true;
+            crateCheck = true;
+            throwOnOutOfDate = true;
+            workspaceDependencies = true;
+            noDefaultFeatures = true;
+          }
+          // (args.checks or {});
+      });
   sources = import ./workspace/sources.nix {inherit pkgs lib;};
   fixtures = ../tests/source-isolation-workspace/fixtures;
 
@@ -19,6 +33,14 @@
       gitFetch = _: gitRepoFixture;
     }) {
       inherit root;
+      checks = {
+        enable = true;
+        includePackageChecks = true;
+        crateCheck = true;
+        throwOnOutOfDate = true;
+        workspaceDependencies = true;
+        noDefaultFeatures = true;
+      };
       createLibPackages = true;
       createDevPackages = true;
       source.cargoLock = fixtures + "/git.Cargo.lock";
@@ -126,6 +148,14 @@
               root = fixtures + "/${name}";
               createLibPackages = true;
               createDevPackages = true;
+              checks = {
+                enable = true;
+                includePackageChecks = true;
+                crateCheck = true;
+                throwOnOutOfDate = true;
+                workspaceDependencies = true;
+                noDefaultFeatures = true;
+              };
             };
           };
         }

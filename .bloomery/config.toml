@@ -14,6 +14,10 @@ noDefaultFeatures = true     # Require default features to be disabled on worksp
 throwOnOutOfDate = true      # Fail evaluation when bloomery.lock is out of date.
 workspaceDependencies = true # Validate workspace dependency declarations.
 
+[checks.clippySuppressions]
+allow = []     # Exact Clippy lint names permitted in inline allow attributes.
+enable = false # Enable the inline Clippy suppression policy check.
+
 [checks.codeHealth]
 baseline = ".bloomery/code-health-summary.json" # Repository-relative reviewed code health snapshot.
 cyclomaticLimit = 10                            # Soft cyclomatic complexity limit used by code health scoring.
@@ -28,6 +32,9 @@ maxRegression = 0                               # Maximum allowed decrease from 
 minCrateScore = 80                              # Minimum passing code health score for each crate (0–100).
 minWorkspaceScore = 80                          # Minimum passing aggregate code health score (0–100).
 nestingLimit = 4                                # Soft branch nesting limit used by code health scoring.
+
+[checks.specifications]
+enable = true # Enable static specification validation checks.
 
 [devShell]
 enable = true  # Generate the default development shell.

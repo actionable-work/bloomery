@@ -50,7 +50,11 @@
     if defaultLinker != null
     then ["-Clink-arg=-fuse-ld=${defaultLinker}"]
     else [];
-  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc pkgs.zstd] ++ lib.optional (linkerPackage != null) linkerPackage;
+  nativeBuildInputs =
+    (override.nativeBuildInputs or [])
+    ++ [rustc pkgs.stdenv.cc pkgs.zstd]
+    ++ lib.optional (pname == "bloomery-check-command") pkgs.cargo
+    ++ lib.optional (linkerPackage != null) linkerPackage;
   buildInputs = override.buildInputs or [];
   extraRustcFlags = (override.rustcFlags or []) ++ defaultRustcFlags ++ linkerFlags;
   userEnv = override.env or {};

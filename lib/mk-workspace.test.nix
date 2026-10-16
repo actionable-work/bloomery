@@ -2,7 +2,20 @@
   pkgs,
   lib ? pkgs.lib,
 }: let
-  mkWorkspace = import ./mk-workspace.nix {inherit pkgs lib;};
+  rawMkWorkspace = import ./mk-workspace.nix {inherit pkgs lib;};
+  mkWorkspace = args:
+    rawMkWorkspace (args
+      // {
+        checks =
+          {
+            enable = true;
+            crateCheck = true;
+            includePackageChecks = false;
+            workspaceDependencies = true;
+            noDefaultFeatures = true;
+          }
+          // (args.checks or {});
+      });
   library = import ./default.nix {inherit pkgs lib;};
   lockCheckSource = builtins.readFile ./workspace/lock-check.nix;
   manifestCheckSource = builtins.readFile ./workspace/manifest-check.nix;
@@ -10,6 +23,8 @@
   metadataWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
     checks.includePackageChecks = true;
+    checks.workspaceDependencies = true;
+    checks.noDefaultFeatures = true;
   };
   defaultPackageChecksWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
@@ -137,6 +152,7 @@
   staleLaxWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
     source.bloomeryLock = staleLock;
+    checks.throwOnOutOfDate = false;
   };
   missingLockWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;

@@ -1,3 +1,8 @@
 [build]
 devPackages = true
 libPackages = true
+
+[checks]
+enable = true
+noDefaultFeatures = true
+workspaceDependencies = true

@@ -26,7 +26,7 @@ pub struct HealthConfig {
 impl Default for HealthConfig {
     fn default() -> Self {
         Self {
-            enabled: true,
+            enabled: false,
             baseline: DEFAULT_BASELINE.to_owned(),
             min_crate_score: 8_000,
             min_workspace_score: 8_000,
@@ -236,6 +236,7 @@ mod tests {
     #[test]
     fn defaults_are_available_without_a_health_table() {
         let config = HealthConfig::from_raw(None).expect("defaults");
+        assert!(!config.enabled);
         assert_eq!(config.baseline, DEFAULT_BASELINE);
         assert_eq!(config.min_crate_score, 8_000);
         assert_eq!(config.duplication_free_ratio, 0.02);

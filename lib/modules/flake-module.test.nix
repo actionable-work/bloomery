@@ -40,6 +40,7 @@
         perSystem = {
           bloomery.workspace = {
             root = ../../tests/basic-workspace;
+            checks.enable = true;
             checks.includePackageChecks = true;
           };
         };

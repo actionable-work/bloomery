@@ -7,7 +7,8 @@ manual = false
 design = "design/pipeline.md"
 
 [requirements.ears]
-type = "ubiquitous"
+type = "event"
+trigger = "specification management and checks.specifications.enable are enabled and workspace structure invariants are invalid"
 system = "bloomery check"
 action = "return failure when workspace structure invariants are invalid"
 
@@ -18,7 +19,8 @@ manual = false
 design = "design/pipeline.md"
 
 [requirements.ears]
-type = "ubiquitous"
+type = "event"
+trigger = "specification management and checks.specifications.enable are enabled and traceability invariants are invalid"
 system = "bloomery check"
 action = "return failure when traceability invariants are invalid"
 
@@ -31,13 +33,13 @@ ears = { type = "event", trigger = "specification management is disabled and for
 
 [[requirements]]
 id = "CLI-CHECK-CONTRACT-004"
-title = "Disabled spec management omits static specification checks"
+title = "Disabled specification validation omits static checks"
 manual = false
 design = "design/execution.md#check-catalog"
 
 [requirements.ears]
 type = "event"
-trigger = "specification management is disabled"
+trigger = "specification management is disabled or checks.specifications.enable resolves to false"
 system = "bloomery check"
 action = "exclude static:structure and static:traceability from the check catalog"
 

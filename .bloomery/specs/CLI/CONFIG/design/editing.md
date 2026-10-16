@@ -28,8 +28,9 @@ the specification tree, scan source, or edit lockfiles.
 `checks.enable` or `scanners.rust.paths`. The path resolves against the
 [schema catalog](../../PARSER/CONFIGURATION/design/schema-catalog.md), which
 assigns every recognized key a type and, when omission has a single fixed
-effective value, a recommended default. An unknown path, including an unknown
-key in a build table, is a usage error before any read or write.
+effective value, an effective default. The catalog may also carry an upgrade
+recommendation that differs from that value. An unknown path, including an
+unknown key in a build table, is a usage error before any read or write.
 
 `VALUE` is parsed according to the addressed key's schema type:
 
@@ -51,7 +52,7 @@ When `.bloomery/config.toml` is absent, the mutating commands `config set`,
 `config unset`, a writing `config upgrade`, and `config document` create the
 `.bloomery/` directory and an empty configuration file, emit an advisory
 warning naming the created path, and continue. The effective configuration
-before the mutation is the documented defaults, and the newly created file is
+before the mutation uses the documented defaults, and the newly created file is
 an empty TOML document; the command's own keys are then added in the same
 invocation. `config document` has no present keys to annotate in the new file.
 
@@ -67,7 +68,7 @@ its documented default and is marked as not explicitly configured; a key with
 no recommended default reports that it is unset.
 
 `config list` enumerates every catalogued key with its effective value,
-configured status, and whether a recommended default exists. `--prefix`
+configured status, and whether an upgrade recommendation exists. `--prefix`
 restricts the listing to keys whose dotted path starts with the supplied
 prefix; an unknown prefix yields an empty listing rather than an error.
 

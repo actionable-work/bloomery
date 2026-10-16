@@ -1,0 +1,43 @@
+group = "SUPPRESSIONS"
+
+[[requirements]]
+id = "CLI-CHECK-SUPPRESSIONS-001"
+title = "Suppression policy is independently selectable"
+manual = false
+design = "design/clippy-suppressions.md#check-integration"
+ears = { type = "ubiquitous", system = "Bloomery", action = "include static:clippy-suppressions in the catalog exactly when checks.clippySuppressions.enable is true, independently of specs, Rust scanning, Nix checks, and selected systems" }
+
+[[requirements]]
+id = "CLI-CHECK-SUPPRESSIONS-002"
+title = "Suppression policy scans workspace Rust sources"
+manual = false
+design = "design/clippy-suppressions.md#check-integration"
+ears = { type = "ubiquitous", system = "Bloomery", action = "inspect Rust library, binary, example, test, benchmark, and build-script sources in the configured Cargo workspace" }
+
+[[requirements]]
+id = "CLI-CHECK-SUPPRESSIONS-003"
+title = "Unapproved Clippy suppressions fail"
+manual = false
+design = "design/clippy-suppressions.md#suppression-policy"
+ears = { type = "ubiquitous", system = "Bloomery", action = "report each inline Clippy lint disabled by allow or cfg_attr-wrapped allow when its exact lint name is absent from checks.clippySuppressions.allow" }
+
+[[requirements]]
+id = "CLI-CHECK-SUPPRESSIONS-004"
+title = "Configured exceptions match exact lint names"
+manual = false
+design = "design/clippy-suppressions.md#suppression-policy"
+ears = { type = "ubiquitous", system = "Bloomery", action = "permit a configured Clippy lint name at every source location without implicitly permitting related lint names or group members" }
+
+[[requirements]]
+id = "CLI-CHECK-SUPPRESSIONS-005"
+title = "Suppression diagnostics identify the source"
+manual = false
+design = "design/clippy-suppressions.md#suppression-policy"
+ears = { type = "ubiquitous", system = "Bloomery", action = "identify each disallowed Clippy suppression by repository-relative source path, attribute line, and lint name" }
+
+[[requirements]]
+id = "CLI-CHECK-SUPPRESSIONS-006"
+title = "Suppression policy follows check controls"
+manual = false
+design = "design/clippy-suppressions.md#check-integration"
+ears = { type = "ubiquitous", system = "Bloomery", action = "apply ordinary check selection, scheduling, cancellation, failure-retention, and exit-code behavior to suppression policy" }

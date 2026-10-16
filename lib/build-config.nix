@@ -33,7 +33,7 @@
     ];
     flags = ["rustc" "test" "clippy" "doc" "doctest"];
     devShell = ["enable" "packages" "shellHook"];
-    checks = ["enable" "includePackageChecks" "crateCheck" "throwOnOutOfDate" "workspaceDependencies" "noDefaultFeatures" "codeHealth"];
+    checks = ["enable" "includePackageChecks" "crateCheck" "throwOnOutOfDate" "workspaceDependencies" "noDefaultFeatures" "codeHealth" "specifications" "clippySuppressions"];
     features = ["cratesIoIndex"];
   };
 
@@ -51,7 +51,7 @@
     keys = ["enable" "baseline" "minCrateScore" "minWorkspaceScore" "maxRegression" "cyclomaticLimit" "functionTokensLimit" "nestingLimit" "duplicationFreeRatio" "duplicateMinTokens" "maxCyclomatic" "maxFunctionTokens" "maxNesting"];
     config = checkTable "checks.codeHealth" keys value;
     default = {
-      enable = true;
+      enable = false;
       baseline = ".bloomery/code-health-summary.json";
       minCrateScore = 80;
       minWorkspaceScore = 80;
@@ -100,6 +100,26 @@
     then throw "bloomery: invalid value in [checks.codeHealth]"
     else if !softHardValid
     then throw "bloomery: code health hard limits must be at least their corresponding soft limits"
+    else config;
+
+  checkSpecifications = value: let
+    config = checkTable "checks.specifications" ["enable"] value;
+  in
+    if (config ? enable && !builtins.isBool config.enable)
+    then throw "bloomery: checks.specifications.enable must be a boolean"
+    else config;
+
+  checkClippySuppressions = value: let
+    config = checkTable "checks.clippySuppressions" ["enable" "allow"] value;
+    allow = config.allow or [];
+    validLint = lint: isString lint && builtins.match "clippy::[a-z][a-z0-9_]*" lint != null;
+  in
+    if (config ? enable && !builtins.isBool config.enable)
+    then throw "bloomery: checks.clippySuppressions.enable must be a boolean"
+    else if !(isList allow) || !(builtins.all validLint allow)
+    then throw "bloomery: checks.clippySuppressions.allow must contain qualified Clippy lint names"
+    else if builtins.length allow != builtins.length (lib.unique allow)
+    then throw "bloomery: checks.clippySuppressions.allow must not contain duplicate lint names"
     else config;
 
   # Formatter sub-tables are keyed by formatter name, so validate the shape of
@@ -298,7 +318,9 @@
     devShell = checkTable "devShell" allowedKeys.devShell (config.devShell or {});
     rawChecks = checkTable "checks" allowedKeys.checks (config.checks or {});
     checkedHealth = lib.optionalAttrs (rawChecks ? codeHealth) {codeHealth = checkCodeHealth rawChecks.codeHealth;};
-    checks = builtins.deepSeq checkedHealth (builtins.removeAttrs rawChecks ["codeHealth"]);
+    checkedSpecifications = lib.optionalAttrs (rawChecks ? specifications) {specifications = checkSpecifications rawChecks.specifications;};
+    checkedClippySuppressions = lib.optionalAttrs (rawChecks ? clippySuppressions) {clippySuppressions = checkClippySuppressions rawChecks.clippySuppressions;};
+    checks = builtins.deepSeq [checkedHealth checkedSpecifications checkedClippySuppressions] (builtins.removeAttrs rawChecks ["codeHealth" "specifications" "clippySuppressions"]);
     features = checkTable "features" allowedKeys.features (config.features or {});
     formatters = checkFormatters (config.formatters or {});
     optimize = checkOptimize root (config.optimize or {});

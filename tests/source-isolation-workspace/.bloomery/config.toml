@@ -1,3 +1,11 @@
 [build]
 devPackages = true
 libPackages = true
+
+[checks]
+crateCheck = true
+enable = true
+includePackageChecks = true
+noDefaultFeatures = true
+throwOnOutOfDate = true
+workspaceDependencies = true

@@ -25,9 +25,12 @@ parser:
   checks in parallel with terminal work metrics, bounded summaries, and
   seekable failure details. Package checks are excluded unless
   `checks.includePackageChecks` enables them, and static specification checks
-  are present only when specification management is enabled. Code health shares
+  require both specification management and `checks.specifications.enable`.
+  Code health shares
   Rust analysis, scores each crate and the workspace, and compares a reviewed
   baseline independently of specification enablement.
+  Inline Clippy suppressions are checked against configured exact-name
+  exceptions independently of specification enablement.
 - [`bloomery build`](BUILD/README.md) materializes the exact production package
   derivations for the selected systems in one batched Nix realization and
   reports their output store paths. `--check` gates realization on the default
@@ -107,7 +110,7 @@ other Nix checks directly. See [Nix orchestration](CHECK/design/workspace-check.
     ├── `bloomery check` execution
     │   ├── catalog/selection setup
     │   ├── flake formatter ──► `nix fmt`
-    │   └── after formatting: PARSER/static checks + code health + Nix checks
+    │   └── after formatting: PARSER/static checks + code health + Clippy suppression policy + Nix checks
     ├── `bloomery build` ──► batched `packages.<system>` realization
     ├── `bloomery disk` ──► realized Nix store closure measurement
     ├── `bloomery review` ──► requirement model

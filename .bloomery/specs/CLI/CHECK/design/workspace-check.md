@@ -10,16 +10,16 @@ code health, and test/build orchestration:
 ```text
 bloomery check
 ├── execution: catalog/selection setup → format:workspace (`nix fmt`)
-│   └── after formatting succeeds: static checks + code health + Nix derivations
+│   └── after formatting succeeds: static checks + code health + Clippy suppression policy + Nix derivations
 └── list/failures/details/health retrieval and update: shared flake gate; no formatting
 ```
 
 The `mkFlake` integration does not generate a `bloomery:check` output,
 irrespective of `.bloomery/` presence. Other generated checks retain their
-enable/include-package gates. Package checks are omitted unless
-`checks.includePackageChecks` enables them, so the default generated check set
-contains no release package build; [build](../../BUILD/README.md) realizes the
-production package derivations. Nix check generation does not
+enable/include-package gates. Unconfigured check categories remain off;
+`bloomery config upgrade` recommends enabling them, including release package
+checks, unless the user has configured a value. [Build](../../BUILD/README.md)
+realizes the production package derivations. Nix check generation does not
 depend on the input Bloomery CLI package for specification validation and has no
 builder for the recursive check.
 

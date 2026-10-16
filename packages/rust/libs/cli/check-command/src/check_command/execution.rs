@@ -17,7 +17,8 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::process::ExitCode;
 use std::sync::mpsc;
 use std::time::Duration;
@@ -43,6 +44,7 @@ pub(super) fn run_checks(
         Ok(prepared) => prepared,
         Err(error) => return report_error(context.json_mode, &error, None, stdout, stderr),
     };
+    super::command::warn_missing_check_controls(context.root);
     run_prepared_checks(args, context, prepared, stdout, stderr)
 }
 
@@ -50,6 +52,7 @@ struct PreparedCheckRun {
     planned: super::command::PlannedCatalog,
     selected: BTreeSet<String>,
     health_sources: Option<Result<Vec<bloomery_check::HealthSourceCrate>, String>>,
+    clippy_policy: Option<bloomery_model::clippy::ClippySuppressionConfig>,
     selection: RunSelection,
     store: store::RunStore,
     allocation: store::RunAllocation,
@@ -69,6 +72,16 @@ fn prepare_check_run(
     )?;
     let (selected, selection) = prepare_selection(args, &planned)?;
     let health_sources = prepare_health_sources(context.root, context.backend, &selected)?;
+    let clippy_policy = if selected.contains("static:clippy-suppressions") {
+        let loaded = bloomery_model::config::load_with_raw(context.root)
+            .map_err(|diagnostic| CheckError::operational(diagnostic.message))?;
+        Some(
+            bloomery_model::clippy::ClippySuppressionConfig::from_raw(loaded.raw.as_ref())
+                .map_err(|diagnostic| CheckError::operational(diagnostic.message))?,
+        )
+    } else {
+        None
+    };
     let store =
         store::RunStore::open(context.root, context.cache_base).map_err(CheckError::operational)?;
     let allocation = store.allocate().map_err(CheckError::operational)?;
@@ -76,6 +89,7 @@ fn prepare_check_run(
         planned,
         selected,
         health_sources,
+        clippy_policy,
         selection,
         store,
         allocation,
@@ -205,6 +219,7 @@ fn execute_after_formatter(
             &prepared.planned.plans,
             &prepared.planned.dependencies,
             prepared.health_sources.clone(),
+            prepared.clippy_policy.clone(),
             context.interrupt.clone(),
             prepared.jobs,
             args.fail_fast,
@@ -621,6 +636,8 @@ enum InitialTaskResult {
     Traceability(Result<(), Vec<Diagnostic>>),
     Health(Result<HealthOutcome, Vec<Diagnostic>>),
     HealthCanceled,
+    Clippy(Result<(), Vec<Diagnostic>>),
+    ClippyCanceled,
     SharedAnalysis {
         traceability: Result<(), Vec<Diagnostic>>,
         health: Result<HealthOutcome, Vec<Diagnostic>>,
@@ -638,6 +655,7 @@ enum InitialState {
     HealthFailed(HealthOutcome),
     HealthDiagnosticFailed(Vec<Diagnostic>),
     HealthCanceled,
+    ClippyCanceled,
     Canceled,
     NotRun,
 }
@@ -671,6 +689,7 @@ struct InitialTaskInputs<'a> {
     backend: &'a dyn NixBackend,
     batch_plans: Vec<CheckPlan>,
     health_sources: Option<Result<Vec<bloomery_check::HealthSourceCrate>, String>>,
+    clippy_policy: Option<bloomery_model::clippy::ClippySuppressionConfig>,
     fail_fast: bool,
     sink: &'a ProgressSink,
 }
@@ -683,10 +702,26 @@ fn build_initial_tasks<'a>(inputs: InitialTaskInputs<'a>) -> Vec<InitialWork<'a>
         backend,
         batch_plans,
         health_sources,
+        clippy_policy,
         fail_fast,
         sink,
     } = inputs;
     let mut tasks = Vec::new();
+    if selected.contains("static:clippy-suppressions") {
+        let root = root.to_path_buf();
+        let allow = clippy_policy.unwrap_or_default().allow;
+        tasks.push((
+            "static:clippy-suppressions".to_owned(),
+            Box::new(move |cancellation: CancellationToken| {
+                let result = if cancellation.is_canceled() {
+                    InitialTaskResult::ClippyCanceled
+                } else {
+                    InitialTaskResult::Clippy(run_clippy_suppression_check(&root, &allow))
+                };
+                InitialTask { result }
+            }) as _,
+        ));
+    }
     if selected.contains("static:structure") {
         let root = root.to_path_buf();
         tasks.push((
@@ -774,6 +809,7 @@ fn execute_selected<W: Write>(
     plans: &BTreeMap<String, CheckPlan>,
     dependencies: &BTreeMap<String, Vec<String>>,
     health_sources: Option<Result<Vec<bloomery_check::HealthSourceCrate>, String>>,
+    clippy_policy: Option<bloomery_model::clippy::ClippySuppressionConfig>,
     interrupt: InterruptFlag,
     jobs: usize,
     fail_fast: bool,
@@ -799,6 +835,7 @@ fn execute_selected<W: Write>(
         backend,
         batch_plans,
         health_sources: health_sources.clone(),
+        clippy_policy,
         fail_fast,
         sink: &sink,
     });
@@ -911,6 +948,9 @@ fn completed_outcome(task: &InitialTask) -> Option<Outcome> {
         }),
         InitialTaskResult::Health(Err(_)) => Some(Outcome::Failed),
         InitialTaskResult::HealthCanceled => Some(Outcome::Canceled),
+        InitialTaskResult::Clippy(Ok(())) => Some(Outcome::Passed),
+        InitialTaskResult::Clippy(Err(_)) => Some(Outcome::Failed),
+        InitialTaskResult::ClippyCanceled => Some(Outcome::Canceled),
         InitialTaskResult::SharedAnalysis { .. } => None,
         InitialTaskResult::NixBatch { .. } => None,
     }
@@ -1131,14 +1171,17 @@ fn initial_task_stops_admission(task: &InitialTask, fail_fast: bool) -> bool {
     match &task.result {
         InitialTaskResult::Structure(Err(_))
         | InitialTaskResult::Traceability(Err(_))
-        | InitialTaskResult::Health(Err(_)) => fail_fast,
+        | InitialTaskResult::Health(Err(_))
+        | InitialTaskResult::Clippy(Err(_)) => fail_fast,
         InitialTaskResult::Health(Ok(health)) => fail_fast && !health.failures.is_empty(),
         InitialTaskResult::NixBatch { result, .. } => {
             result.operational_error.is_some() || (fail_fast && !result.failures.is_empty())
         }
         InitialTaskResult::Structure(Ok(_))
         | InitialTaskResult::Traceability(Ok(()))
-        | InitialTaskResult::HealthCanceled => false,
+        | InitialTaskResult::HealthCanceled
+        | InitialTaskResult::Clippy(Ok(()))
+        | InitialTaskResult::ClippyCanceled => false,
         InitialTaskResult::SharedAnalysis {
             traceability,
             health,
@@ -1257,7 +1300,10 @@ fn reduce_task_state(state: ScheduledState<InitialTask>) -> Option<InitialState>
                 Some(static_state(Err(diagnostics)))
             }
             InitialTaskResult::Health(result) => Some(health_state(result)),
+            InitialTaskResult::Clippy(Ok(())) => Some(InitialState::StaticPassed),
+            InitialTaskResult::Clippy(Err(diagnostics)) => Some(static_state(Err(diagnostics))),
             InitialTaskResult::HealthCanceled => Some(InitialState::HealthCanceled),
+            InitialTaskResult::ClippyCanceled => Some(InitialState::ClippyCanceled),
             InitialTaskResult::SharedAnalysis { .. } | InitialTaskResult::NixBatch { .. } => None,
         },
         ScheduledState::Canceled => Some(InitialState::Canceled),
@@ -1317,6 +1363,7 @@ fn apply_initial_states(
                 failures.extend(diagnostic_failures(root, &id, diagnostics, None));
             }
             InitialState::HealthCanceled => set_outcome(outcomes, &id, Outcome::Canceled),
+            InitialState::ClippyCanceled => set_outcome(outcomes, &id, Outcome::Canceled),
             InitialState::Canceled => set_outcome(outcomes, &id, Outcome::Canceled),
             InitialState::NotRun => set_outcome(outcomes, &id, Outcome::NotRun),
         }
@@ -1437,6 +1484,100 @@ fn nix_plan_failure(
         focus_tail: false,
         occurrence,
     }
+}
+
+fn run_clippy_suppression_check(root: &Path, allow: &[String]) -> Result<(), Vec<Diagnostic>> {
+    let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+    let output = Command::new(cargo)
+        .args([
+            "metadata",
+            "--offline",
+            "--no-deps",
+            "--format-version=1",
+            "--manifest-path",
+        ])
+        .arg(root.join("Cargo.toml"))
+        .current_dir(root)
+        .output()
+        .map_err(|error| {
+            vec![Diagnostic::new(
+                "ClippySourceError",
+                format!("Unable to discover Cargo workspace targets: {error}"),
+            )]
+        })?;
+    if !output.status.success() {
+        return Err(vec![Diagnostic::new(
+            "ClippySourceError",
+            format!(
+                "Cargo target discovery failed: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ),
+        )]);
+    }
+    let metadata: Value = serde_json::from_slice(&output.stdout).map_err(|error| {
+        vec![Diagnostic::new(
+            "ClippySourceError",
+            format!("Cargo returned invalid target metadata: {error}"),
+        )]
+    })?;
+    let workspace_members = metadata
+        .get("workspace_members")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            vec![Diagnostic::new(
+                "ClippySourceError",
+                "Cargo metadata omitted workspace members",
+            )]
+        })?
+        .iter()
+        .filter_map(Value::as_str)
+        .collect::<BTreeSet<_>>();
+    let packages = metadata
+        .get("packages")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            vec![Diagnostic::new(
+                "ClippySourceError",
+                "Cargo metadata omitted packages",
+            )]
+        })?;
+    let target_kinds = [
+        "lib",
+        "bin",
+        "example",
+        "test",
+        "bench",
+        "custom-build",
+        "proc-macro",
+    ];
+    let mut source_paths = Vec::new();
+    for package in packages {
+        if !package
+            .get("id")
+            .and_then(Value::as_str)
+            .is_some_and(|id| workspace_members.contains(id))
+        {
+            continue;
+        }
+        let Some(targets) = package.get("targets").and_then(Value::as_array) else {
+            continue;
+        };
+        for target in targets {
+            let included = target
+                .get("kind")
+                .and_then(Value::as_array)
+                .is_some_and(|kinds| {
+                    kinds
+                        .iter()
+                        .filter_map(Value::as_str)
+                        .any(|kind| target_kinds.contains(&kind))
+                });
+            if included && let Some(path) = target.get("src_path").and_then(Value::as_str) {
+                source_paths.push(PathBuf::from(path));
+            }
+        }
+    }
+    bloomery_check::find_clippy_suppressions(root, &source_paths, allow, &AnalysisSession::new())
 }
 
 fn collect_health_report(

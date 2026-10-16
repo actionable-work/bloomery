@@ -231,3 +231,27 @@ type = "event"
 trigger = "a writing config upgrade runs without .bloomery/config.toml"
 system = "bloomery config upgrade"
 action = "create the file and add every recommended catalog key"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-021"
+title = "Upgrade enables missing check controls"
+manual = false
+design = "design/upgrade.md#upgrade-semantics"
+
+[requirements.ears]
+type = "event"
+trigger = "config upgrade encounters an absent supported check-control key"
+system = "bloomery config upgrade"
+action = "materialize the missing check-control key as true"
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-022"
+title = "Upgrade preserves explicit check controls"
+manual = false
+design = "design/upgrade.md#upgrade-semantics"
+
+[requirements.ears]
+type = "event"
+trigger = "a supported check-control key is explicitly false"
+system = "bloomery config upgrade"
+action = "preserve the false value without rewriting it"

@@ -10,7 +10,7 @@ design = "design/execution.md#selection"
 type = "event"
 trigger = "no check selectors are supplied"
 system = "bloomery check"
-action = "select every available check for the default system, including both static checks when specification management is enabled"
+action = "select every available check for the default system, including both specification static checks only when specification management and checks.specifications.enable are enabled, plus enabled code health and Clippy suppression policy"
 
 [[requirements]]
 id = "CLI-CHECK-SELECT-002"
@@ -246,7 +246,7 @@ id = "CLI-CHECK-SELECT-022"
 title = "Default selection respects spec management enablement"
 manual = false
 design = "design/execution.md#selection"
-ears = { type = "event", trigger = "no check selectors are supplied while specification management is disabled", system = "bloomery check", action = "select enabled code health and every available Nix check without selecting static specification checks" }
+ears = { type = "event", trigger = "no check selectors are supplied while specification management is disabled", system = "bloomery check", action = "select enabled code health, enabled Clippy suppression policy, and every available Nix check without selecting static specification checks" }
 
 [[requirements]]
 id = "CLI-CHECK-SELECT-023"
@@ -257,5 +257,72 @@ design = "design/execution.md#selection"
 [requirements.ears]
 type = "unwanted_behavior"
 trigger = "a selector names static:structure or static:traceability while specification management is disabled"
+system = "bloomery check"
+action = "report an unmatched-selector usage error"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-029"
+title = "Unavailable specification checks do not warn"
+manual = false
+design = "design/execution.md#check-enablement-warnings"
+
+[requirements.ears]
+type = "event"
+trigger = "specification management is disabled"
+system = "bloomery check"
+action = "omit missing-key warnings for specification check controls"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-024"
+title = "Missing check control is warned"
+manual = false
+design = "design/execution.md#check-enablement-warnings"
+
+[requirements.ears]
+type = "event"
+trigger = "bloomery check loads a supported check whose control key is absent from the raw configuration"
+system = "bloomery check"
+action = "emit a tracing warning naming the missing key and recommending config upgrade while leaving its effective control value false"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-025"
+title = "Explicit check controls do not warn"
+manual = false
+design = "design/execution.md#check-enablement-warnings"
+
+[requirements.ears]
+type = "event"
+trigger = "a supported check control key is explicitly false"
+system = "bloomery check"
+action = "honor the configured false value without emitting a missing-key warning"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-026"
+title = "Disabled Nix checks suppress child warnings"
+manual = false
+design = "design/execution.md#check-enablement-warnings"
+
+[requirements.ears]
+type = "event"
+trigger = "checks.enable is explicitly false"
+system = "bloomery check"
+action = "suppress missing-control warnings for Nix check categories governed by checks.enable"
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-027"
+title = "Specification checks follow their enablement key"
+manual = false
+design = "design/execution.md#check-catalog"
+ears = { type = "ubiquitous", system = "Bloomery", action = "include static:structure and static:traceability in the catalog exactly when specification management and checks.specifications.enable are enabled" }
+
+[[requirements]]
+id = "CLI-CHECK-SELECT-028"
+title = "Disabled specification checks cannot be selected"
+manual = false
+design = "design/execution.md#selection"
+
+[requirements.ears]
+type = "unwanted_behavior"
+trigger = "a selector names static:structure or static:traceability while checks.specifications.enable is false"
 system = "bloomery check"
 action = "report an unmatched-selector usage error"

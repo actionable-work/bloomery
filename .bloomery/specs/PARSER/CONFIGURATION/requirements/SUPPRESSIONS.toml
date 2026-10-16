@@ -1,0 +1,36 @@
+group = "SUPPRESSIONS"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-SUPPRESSIONS-001"
+title = "Suppression policy is catalogued"
+manual = false
+design = "design/clippy-suppressions.md"
+ears = { type = "ubiquitous", system = "the configuration schema", action = "catalogue checks.clippySuppressions.enable and checks.clippySuppressions.allow with their types, documentation, and recommended defaults" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-SUPPRESSIONS-002"
+title = "Suppression policy defaults are applied"
+manual = false
+design = "design/clippy-suppressions.md"
+ears = { type = "ubiquitous", system = "configuration loading", action = "default checks.clippySuppressions.enable to false and checks.clippySuppressions.allow to an empty list when omitted" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-SUPPRESSIONS-003"
+title = "Suppression exceptions use qualified lint names"
+manual = false
+design = "design/clippy-suppressions.md"
+ears = { type = "ubiquitous", system = "configuration loading", action = "accept only unique qualified Clippy lint names in checks.clippySuppressions.allow" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-SUPPRESSIONS-004"
+title = "Invalid suppression policy is rejected"
+manual = false
+design = "design/clippy-suppressions.md"
+ears = { type = "ubiquitous", system = "configuration loading", action = "reject unknown suppression policy keys, malformed lint names, and values of invalid types as ConfigurationError before formatting or analysis" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-SUPPRESSIONS-005"
+title = "Suppression policy validates when disabled"
+manual = false
+design = "design/clippy-suppressions.md"
+ears = { type = "ubiquitous", system = "configuration loading", action = "validate checks.clippySuppressions configuration even when checks.clippySuppressions.enable is false" }

@@ -53,6 +53,107 @@ fn default_and_explicit_selection_choose_static_and_requested_system_catalogs() 
 }
 
 #[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-024"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-025"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-026"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-029"))]
+fn missing_check_control_warnings_respect_explicit_values_and_available_groups() {
+    let config: toml::Value = toml::from_str(
+        "[checks]\nincludePackageChecks = false\n\n[checks.codeHealth]\nenable = false\n",
+    )
+    .expect("TOML");
+    let missing = crate::check_command::command::missing_check_controls(&config, false);
+    let keys = missing
+        .iter()
+        .map(|(key, _)| key.as_str())
+        .collect::<Vec<_>>();
+    assert!(keys.contains(&"checks.enable"));
+    assert!(keys.contains(&"checks.crateCheck"));
+    assert!(keys.contains(&"checks.clippySuppressions.enable"));
+    assert!(!keys.contains(&"checks.includePackageChecks"));
+    assert!(!keys.contains(&"checks.codeHealth.enable"));
+    assert!(!keys.contains(&"checks.specifications.enable"));
+
+    let disabled: toml::Value = toml::from_str("[checks]\nenable = false\n").expect("TOML");
+    let missing = crate::check_command::command::missing_check_controls(&disabled, true);
+    let keys = missing
+        .iter()
+        .map(|(key, _)| key.as_str())
+        .collect::<Vec<_>>();
+    assert!(!keys.contains(&"checks.crateCheck"));
+    assert!(!keys.contains(&"checks.includePackageChecks"));
+    assert!(!keys.contains(&"checks.workspaceDependencies"));
+    assert!(keys.contains(&"checks.codeHealth.enable"));
+    assert!(keys.contains(&"checks.clippySuppressions.enable"));
+    assert!(keys.contains(&"checks.specifications.enable"));
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-027"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-028"))]
+fn specification_checks_require_their_explicit_enable_control() {
+    let config = "[specs]\nenable = true\n";
+    let (root, cache) = fixture_without_specs(true, config);
+    let backend = FakeNix::default();
+    let selectors = vec!["static:*".to_owned()];
+    let catalog = discover_for_selection(&root, &selectors, &[], &backend)
+        .expect("catalog should contain no disabled spec checks");
+    assert!(catalog.ids.is_empty());
+    let mut args = request();
+    args.selectors = vec!["static:structure".to_owned()];
+    let (status, _, _) = invoke(args, &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::from(2));
+    assert_eq!(backend.formatter_runs.load(Ordering::SeqCst), 0);
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SUPPRESSIONS-001"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SUPPRESSIONS-002"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SUPPRESSIONS-003"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SUPPRESSIONS-005"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-SUPPRESSIONS-006"))]
+fn clippy_suppression_check_scans_each_cargo_target_kind() {
+    let config =
+        "[specs]\nenable = false\n\n[checks.clippySuppressions]\nenable = true\nallow = []\n";
+    let (root, cache) = fixture_without_specs(true, config);
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"suppression-fixture\"\nversion = \"0.1.0\"\nedition = \"2024\"\nbuild = \"build.rs\"\n\n[lib]\npath = \"src/lib.rs\"\n\n[[bin]]\nname = \"fixture-bin\"\npath = \"src/main.rs\"\n\n[[example]]\nname = \"fixture-example\"\npath = \"examples/example.rs\"\n\n[[test]]\nname = \"fixture-test\"\npath = \"tests/integration.rs\"\n\n[[bench]]\nname = \"fixture-bench\"\npath = \"benches/bench.rs\"\n",
+    )
+    .expect("manifest");
+    let targets = [
+        "src/lib.rs",
+        "src/main.rs",
+        "build.rs",
+        "examples/example.rs",
+        "tests/integration.rs",
+        "benches/bench.rs",
+    ];
+    for target in targets {
+        let path = root.join(target);
+        fs::create_dir_all(path.parent().expect("target parent")).expect("target directory");
+        fs::write(path, "#![allow(clippy::all)]\npub fn fixture() {}\n").expect("target source");
+    }
+
+    let backend = FakeNix::default();
+    let mut args = request();
+    args.selectors = vec!["static:clippy-suppressions".to_owned()];
+    let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::FAILURE);
+    let output = String::from_utf8_lossy(&stdout);
+    for target in targets {
+        assert!(
+            output.contains(target),
+            "missing diagnostic for {target}: {output}"
+        );
+    }
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
 #[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-001"))]
 #[cfg_attr(any(), bloomery("PARSER-SCANNING-HEALTH-001"))]
 #[cfg_attr(any(), bloomery("PARSER-SCANNING-HEALTH-002"))]

@@ -10,13 +10,16 @@ description: |
   run concurrently, with terminal work metrics and seekable retained failures.
   Code health shares Rust parsing with evidence scanning, reports crate and
   workspace scores, and compares a reviewed tracked baseline.
-  Package build checks are excluded from the generated check set unless
-  `checks.includePackageChecks` enables them, so the default check suite stays
-  lightweight; [build](../BUILD/README.md) is the production materialization
+  Clippy suppression policy checks inline Rust attributes and rejects disabled
+  Clippy lints unless their exact lint names are configured as exceptions.
+  Unconfigured check controls default to off; `bloomery config upgrade` sets
+  missing supported check controls to `true` and preserves configured values.
+  Check warns through tracing when a supported check key is missing.
+  [Build](../BUILD/README.md) is the production materialization
   gate, and `bloomery build --check` composes this suite as its prerequisite.
-  Static specification validation is part of the suite only when
-  specification management is enabled, so check also runs without
-  specifications.
+  Static specification validation runs only when specification management and
+  `checks.specifications.enable` are enabled, so check also runs without
+  specification checks.
 ---
 
 # `bloomery check`
@@ -26,9 +29,11 @@ certifies only its selection. The shared CLI preflight requires a root
 `flake.nix` for every command. For every valid check execution, the mandatory
 `nix fmt` preflight runs, including partial selections, and must succeed before
 any selected check starts. Static evidence remains necessary but is not a
-substitute for executing the selected Nix checks. When specification management
-is disabled, the static specification checks are absent and check runs the
-formatter gate, enabled code health, and Nix checks without specification passes.
+substitute for executing the selected Nix checks. Static specification checks
+run only when specification management and `checks.specifications.enable` are
+enabled. If either is disabled, check runs the formatter gate, independently
+enabled code health and Clippy suppression policy, and Nix checks without
+specification passes.
 
 ## Design documents
 
@@ -39,14 +44,16 @@ formatter gate, enabled code health, and Nix checks without specification passes
 - [Retained runs and seekable details](design/details.md)
 - [Nix orchestration and integration removal](design/workspace-check.md)
 - [Code health scores and reviewed snapshots](design/code-health.md)
+- [Inline Clippy suppression policy](design/clippy-suppressions.md)
 
 ## Responsibilities
 
 - Preserve structure, grammar, design-link, scanner, and traceability validation
   from the [PARSER area](../../PARSER/README.md) when specification management
-  is enabled.
-- Run the formatter gate, enabled code health, and Nix checks without a
-  specification tree when specification management is disabled.
+  and `checks.specifications.enable` are enabled.
+- Run the formatter gate, enabled code health, enabled Clippy suppression
+  policy, and Nix checks without a specification tree when specification
+  management is disabled.
 - Require the shared root-flake preflight for every command.
 - Run `nix fmt` before selected checks and stop on formatting failure.
 - Run independent static and Nix work concurrently with bounded scheduling,
@@ -64,6 +71,8 @@ formatter gate, enabled code health, and Nix checks without specification passes
 - Leave formatter changes in the workspace and leave repository lockfiles
   unchanged.
 - Share Rust ingestion between health and traceability without coupling outcomes.
+- Check inline Clippy lint suppressions against configured exceptions.
+- Warn through tracing when a supported check-control key is absent.
 - Retain explainable crate scores and a SLOC-weighted workspace score.
 - Apply configurable health limits and baseline regression gates.
 - Export reviewed health snapshots only through `check health update`.

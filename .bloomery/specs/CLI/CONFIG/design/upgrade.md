@@ -4,8 +4,11 @@
 
 `config upgrade` is driven by the
 [schema catalog](../../PARSER/CONFIGURATION/design/schema-catalog.md), which
-enumerates every recognized configuration key with its type and, when omission
-has a single fixed effective value, a recommended default. The catalog spans the
+enumerates every recognized configuration key with its type, effective default,
+and an optional upgrade recommendation. Recommendations can differ from
+effective defaults for check control keys: omission leaves checks disabled or
+applies a false check-policy value, while upgrade recommends `true`. The
+catalog spans the
 CLI-owned `[specs]`/`[scanners.*]` tables and the Nix build tables, and ships
 with the Bloomery binary so a newer release exposes keys added since the user's
 configuration was written.
@@ -18,26 +21,28 @@ none, and the `profile.*` fields inherit from `Cargo.toml` and rustc.
 ## Upgrade semantics
 
 `config upgrade` reads the raw file before defaults are inserted and adds every
-recommended catalog key that is absent. An absent parent table and an absent
-leaf inside a present table both count as missing. Adding a key with its
-recommended default does not change the effective configuration, because the
-same value would have been applied as a default.
+catalog key with an upgrade recommendation that is absent. An absent parent
+table and an absent leaf inside a present table both count as missing. Adding a
+key with its recommended value is written explicitly. For ordinary keys it
+matches the effective default; for check control keys it enables the check or
+its associated strict policy.
 
 Keys already present are preserved exactly: value, comments, and formatting are
-not rewritten even when the present value differs from the recommended default.
-The command never enables or disables a feature, deletes a key, or reorders
-existing entries. Tables that are not catalogued pass through unchanged.
+not rewritten even when the present value differs from the recommendation. In
+particular, an explicitly configured `false` check value is never changed. The
+command never disables a configured check, deletes a key, or
+reorders existing entries. Tables that are not catalogued pass through unchanged.
 
 `--dry-run` reports the keys that would be added without writing. The report is
 sorted by full key path.
 
 ## Recommendation diff
 
-`config upgrade --diff` is a read-only comparison between the recommended
-configuration and the current effective configuration. For every catalogued key
-that has a recommended default it reports the recommended value and the current
-value, marking each as equal, differing, or absent and would-be-added. Keys
-without a recommendation are reported as unset. The diff includes enabled-state
+`config upgrade --diff` is a read-only comparison between upgrade
+recommendations and the current effective configuration. For every catalogued
+key that has an upgrade recommendation it reports the recommended value and the
+current value, marking each as equal, differing, or absent and would-be-added.
+Keys without a recommendation are reported as unset. The diff includes enabled-state
 differences such as `checks.enable`, `devShell.enable`, `build.unify`, and
 scanner `enabled` flags.
 

@@ -84,3 +84,9 @@ topcoat = { default-features = false, features = [
   "serve",
   "view",
 ], version = "0.9.0" }
+tracing = { default-features = false, features = ["std"], version = "0.1" }
+tracing-subscriber = { default-features = false, features = [
+  "fmt",
+  "registry",
+  "std",
+], version = "0.3" }

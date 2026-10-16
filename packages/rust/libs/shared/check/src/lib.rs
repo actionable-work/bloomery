@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 pub mod health;
 
 pub use bloomery_scanning::AnalysisSession;
+pub use bloomery_scanning::find_clippy_suppressions;
 pub use bloomery_scanning::{HealthCrateMetrics, HealthSourceCrate, HealthTarget};
 
 pub fn analyze_health(

@@ -14,6 +14,7 @@ bloomery-sync = { workspace = true }
 bloomery-workspace = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }
+tracing-subscriber = { workspace = true }
 
 [dev-dependencies]
 

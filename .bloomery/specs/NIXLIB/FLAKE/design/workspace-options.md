@@ -76,15 +76,16 @@ supplies a local crates.io index for the no-lock fallback.
 ## Development shell and checks
 
 `devShell` controls shell generation, extra packages, and the shell hook.
-`checks` enables or disables generated checks. `checks.crateCheck` defaults to
-on and generates the `<crate>:check` type-check entries; disabling it omits
-them. `checks.includePackageChecks` defaults to off, so generated checks omit
-package build checks unless enabled;
-when enabled, package checks reuse the release crate and binary derivations
-while [build](../../../CLI/BUILD/README.md) realizes the exported production
-packages. `checks` also optionally fails evaluation on an out-of-date lock, and
-independently enables the workspace dependency and no default features
-manifest checks.
+`checks` enables or disables generated checks and defaults to off. The
+`checks.crateCheck`, `checks.includePackageChecks`,
+`checks.workspaceDependencies`, and `checks.noDefaultFeatures` categories also
+default to off. Each category contributes its check entries only when both the
+global toggle and its category toggle are enabled. `checks.throwOnOutOfDate`
+defaults to off and controls the stale-lock policy independently. Enabled
+package checks reuse the release crate and binary derivations, while
+[build](../../../CLI/BUILD/README.md) realizes the exported production
+packages. The workspace dependency and no default features manifest checks are
+available when their category toggles are enabled.
 
 ## Formatter ordering
 
