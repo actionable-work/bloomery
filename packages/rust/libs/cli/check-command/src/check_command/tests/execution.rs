@@ -1,4 +1,4 @@
-use crate::check_command::catalog::{NixBackend, NixCli, NixTaskResult};
+use crate::check_command::catalog::NixTaskResult;
 use crate::check_command::command::{
     CheckContext, CheckOperation, DetailsArgs, FailureArgs, ListArgs, run_at_with,
     run_gate_at_with_backend,
@@ -8,8 +8,7 @@ use crate::check_command::interrupt::InterruptFlag;
 use crate::check_command::model::{Outcome, RunStatus};
 use crate::check_command::store::RunStore;
 use crate::check_command::test_support::{
-    FakeNix, fixture, fixture_without_specs, invoke, invoke_with_interrupt, lock_fixture_flake,
-    nix_is_available, request,
+    FakeNix, fixture, fixture_without_specs, invoke, invoke_with_interrupt, request,
 };
 use serde_json::Value;
 use std::fs;
@@ -146,99 +145,6 @@ fn aggregate_sub_flake_check_is_realized_as_one_check() {
         .find(|outcome| outcome.id == "nix:x86_64-linux:aggregate:checks")
         .expect("aggregate outcome");
     assert_eq!(aggregate.outcome, Outcome::Passed);
-    let _ = fs::remove_dir_all(root);
-    let _ = fs::remove_dir_all(cache);
-}
-
-#[test]
-#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-007"))]
-#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-008"))]
-#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-009"))]
-fn real_nix_runner_builds_two_aliases_of_one_low_storage_derivation() {
-    if !nix_is_available() {
-        eprintln!("skipping real-Nix alias test: Nix store is unavailable");
-        return;
-    }
-
-    let (root, cache) = fixture(true);
-    let backend = NixCli::default();
-    let system = backend.host_system(&root).expect("host Nix system");
-    let flake = format!(
-        r#"{{
-  description = "bloomery alias fixture";
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-  outputs = {{ self, nixpkgs }}:
-    let
-      pkgs = nixpkgs.legacyPackages."{system}";
-      formatter = pkgs.writeShellScriptBin "noop-formatter" "exit 0";
-      shared = builtins.derivation {{
-        name = "bloomery-aliased-check";
-        system = "{system}";
-        builder = "/bin/sh";
-        args = [ "-c" "echo passed > $out" ];
-      }};
-    in {{
-      formatter."{system}" = formatter;
-      checks."{system}" = {{
-        alias-a = shared;
-        alias-b = shared;
-      }};
-    }};
-}}"#
-    );
-    fs::write(root.join("flake.nix"), flake).expect("write alias fixture");
-    lock_fixture_flake(&root);
-    let flake_lock_before = fs::read(root.join("flake.lock")).expect("fixture lock");
-
-    let derivation_path = |attribute: &str| {
-        let installable = format!(".#checks.{system}.{attribute}.drvPath");
-        let output = Command::new("nix")
-            .args([
-                "eval",
-                "--raw",
-                "--no-write-lock-file",
-                "--no-update-lock-file",
-            ])
-            .arg(installable)
-            .current_dir(&root)
-            .output()
-            .expect("evaluate derivation path");
-        assert!(
-            output.status.success(),
-            "unable to evaluate {attribute} derivation: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-        String::from_utf8(output.stdout)
-            .expect("derivation path UTF-8")
-            .trim()
-            .to_owned()
-    };
-    assert_eq!(derivation_path("alias-a"), derivation_path("alias-b"));
-
-    let mut args = request();
-    args.selectors = vec!["nix:*".to_owned()];
-    let (status, stdout, stderr) = invoke(args, &root, &cache, &backend, true);
-    assert_eq!(
-        status,
-        std::process::ExitCode::SUCCESS,
-        "runner stderr: {}",
-        String::from_utf8_lossy(&stderr)
-    );
-    let summary: Value = serde_json::from_slice(&stdout).expect("runner summary");
-    assert_eq!(summary["result"]["counts"]["passed"], 3);
-
-    let store = RunStore::open(&root, Some(&cache)).expect("retained store");
-    let retained = store.latest().expect("retained run").0;
-    for attribute in ["alias-a", "alias-b"] {
-        assert!(retained.outcomes.iter().any(|outcome| {
-            outcome.id == format!("nix:{system}:{attribute}") && outcome.outcome == Outcome::Passed
-        }));
-    }
-    assert_eq!(
-        fs::read(root.join("flake.lock")).expect("fixture lock"),
-        flake_lock_before
-    );
-
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
 }
@@ -966,90 +872,6 @@ fn dependency_failure_retains_a_causal_derivation_log() {
         dependent.nix_log.as_deref(),
         Some("/nix/store/dependency.drv")
     );
-    let _ = fs::remove_dir_all(root);
-    let _ = fs::remove_dir_all(cache);
-}
-
-#[test]
-#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-023"))]
-#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-025"))]
-fn real_nix_batched_failures_resolve_per_check_and_causal_logs() {
-    if !nix_is_available() {
-        eprintln!("skipping real-Nix batched failure test: Nix store is unavailable");
-        return;
-    }
-
-    let (root, cache) = fixture(true);
-    let backend = NixCli::default();
-    let system = backend.host_system(&root).expect("host Nix system");
-    let flake = format!(
-        r#"{{
-  description = "bloomery batched failure fixture";
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-  outputs = {{ self, nixpkgs }}:
-    let
-      pkgs = nixpkgs.legacyPackages."{system}";
-      formatter = pkgs.writeShellScriptBin "noop-formatter" "exit 0";
-      pass = builtins.derivation {{
-        name = "bloomery-batch-pass";
-        system = "{system}";
-        builder = "/bin/sh";
-        args = [ "-c" "echo ok > $out" ];
-      }};
-      fail = builtins.derivation {{
-        name = "bloomery-batch-fail";
-        system = "{system}";
-        builder = "/bin/sh";
-        args = [ "-c" "echo bad >&2; exit 1" ];
-      }};
-      dependent = builtins.derivation {{
-        name = "bloomery-batch-dependent";
-        system = "{system}";
-        builder = "/bin/sh";
-        args = [ "-c" "echo ${{fail}} > /dev/null; echo dep > $out" ];
-      }};
-    in {{
-      formatter."{system}" = formatter;
-      checks."{system}" = {{
-        pass = pass;
-        fail = fail;
-        dependent = dependent;
-      }};
-    }};
-}}"#
-    );
-    fs::write(root.join("flake.nix"), flake).expect("write batched failure fixture");
-    lock_fixture_flake(&root);
-
-    let mut args = request();
-    args.selectors = vec!["nix:*".to_owned()];
-    let (status, stdout, stderr) = invoke(args, &root, &cache, &backend, true);
-    assert_eq!(
-        status,
-        std::process::ExitCode::FAILURE,
-        "runner stderr: {}",
-        String::from_utf8_lossy(&stderr)
-    );
-    let summary: Value = serde_json::from_slice(&stdout).expect("runner summary");
-    assert_eq!(summary["result"]["counts"]["failed"], 2);
-    assert_eq!(summary["result"]["counts"]["passed"], 2);
-
-    let store = RunStore::open(&root, Some(&cache)).expect("retained store");
-    let (record, _) = store.latest().expect("retained run");
-    assert!(record.outcomes.iter().any(|outcome| {
-        outcome.id == format!("nix:{system}:pass") && outcome.outcome == Outcome::Passed
-    }));
-    let dependent = record
-        .failures
-        .iter()
-        .find(|failure| failure.check == format!("nix:{system}:dependent"))
-        .expect("dependent failure record");
-    let causal = dependent.nix_log.as_deref().expect("causal derivation");
-    assert!(
-        causal.contains("bloomery-batch-fail"),
-        "expected the causal failed derivation, got {causal}"
-    );
-
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
 }

@@ -43,6 +43,7 @@ specification passes.
 - [Failure summaries and diagnostics](design/diagnostics.md)
 - [Retained runs and seekable details](design/details.md)
 - [Nix orchestration and integration removal](design/workspace-check.md)
+- [Hermetic Nix boundary tests](design/testing.md)
 - [Code health scores and reviewed snapshots](design/code-health.md)
 - [Inline Clippy suppression policy](design/clippy-suppressions.md)
 
@@ -76,6 +77,8 @@ specification passes.
 - Retain explainable crate scores and a SLOC-weighted workspace score.
 - Apply configurable health limits and baseline regression gates.
 - Export reviewed health snapshots only through `check health update`.
+- Exercise runner behavior, the Nix subprocess adapter, and shared Nix catalog
+  expressions through unconditional checks in the default workspace suite.
 
 ## Boundaries
 

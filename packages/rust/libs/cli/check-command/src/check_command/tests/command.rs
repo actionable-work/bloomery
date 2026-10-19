@@ -1,10 +1,9 @@
-use crate::check_command::catalog::{NixBackend, NixCli};
 use crate::check_command::command::{
     CheckArgs, CheckOperation, FailureArgs, ListArgs, discover_for_selection, validate_args,
 };
 use crate::check_command::execution::validate_execution_selection;
 use crate::check_command::test_support::{
-    FakeNix, fixture, fixture_without_specs, invoke, lock_fixture_flake, nix_is_available, request,
+    FakeNix, fixture, fixture_without_specs, invoke, request,
 };
 use serde_json::Value;
 use std::fs;
@@ -283,57 +282,6 @@ fn explicitly_selected_system_with_empty_checks_is_a_valid_static_only_run() {
     );
     assert_eq!(backend.evaluations.load(Ordering::SeqCst), 1);
     let result: Value = serde_json::from_slice(&stdout).expect("summary JSON");
-    assert_eq!(result["result"]["counts"]["passed"], 3);
-    assert_eq!(result["result"]["scope"]["systems"][0], "aarch64-linux");
-
-    let _ = fs::remove_dir_all(root);
-    let _ = fs::remove_dir_all(cache);
-}
-
-#[test]
-#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-011"))]
-#[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-020"))]
-fn real_nix_distinguishes_missing_system_outputs_from_empty_check_sets() {
-    if !nix_is_available() {
-        eprintln!("skipping real-Nix selected-system test: Nix store is unavailable");
-        return;
-    }
-
-    let (root, cache) = fixture(true);
-    let backend = NixCli::default();
-    let system = backend.host_system(&root).expect("host Nix system");
-    fs::write(
-        root.join("flake.nix"),
-        format!(
-            r#"{{
-  description = "selected-system fixture";
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-  outputs = {{ self, nixpkgs }}: let
-    pkgs = nixpkgs.legacyPackages."{system}";
-    formatter = pkgs.writeShellScriptBin "noop-formatter" "exit 0";
-  in {{
-    formatter."{system}" = formatter;
-    checks.aarch64-linux = {{}};
-  }};
-}}
-"#
-        ),
-    )
-    .expect("write fixture flake");
-    lock_fixture_flake(&root);
-
-    let mut missing = request();
-    missing.systems = vec!["aarch64-darwin".to_owned()];
-    let (status, stdout, _) = invoke(missing, &root, &cache, &backend, true);
-    assert_eq!(status, std::process::ExitCode::from(2));
-    let error: Value = serde_json::from_slice(&stdout).expect("missing-system error");
-    assert_eq!(error["error"]["code"], "OperationalError");
-
-    let mut empty = request();
-    empty.systems = vec!["aarch64-linux".to_owned()];
-    let (status, stdout, _) = invoke(empty, &root, &cache, &backend, true);
-    assert_eq!(status, std::process::ExitCode::SUCCESS);
-    let result: Value = serde_json::from_slice(&stdout).expect("empty-system summary");
     assert_eq!(result["result"]["counts"]["passed"], 3);
     assert_eq!(result["result"]["scope"]["systems"][0], "aarch64-linux");
 

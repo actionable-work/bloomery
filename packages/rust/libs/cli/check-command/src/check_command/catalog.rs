@@ -118,12 +118,14 @@ pub trait NixBackend: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct NixCli {
     executable: OsString,
+    store_executable: OsString,
 }
 
 impl Default for NixCli {
     fn default() -> Self {
         Self {
             executable: OsString::from("nix"),
+            store_executable: OsString::from("nix-store"),
         }
     }
 }
@@ -142,8 +144,17 @@ struct LoggedCommand<'a> {
 impl NixCli {
     #[cfg(test)]
     pub fn with_executable(executable: impl Into<OsString>) -> Self {
+        Self::with_executables(executable, "/missing/bloomery-nix-store-cli")
+    }
+
+    #[cfg(test)]
+    pub(super) fn with_executables(
+        executable: impl Into<OsString>,
+        store_executable: impl Into<OsString>,
+    ) -> Self {
         Self {
             executable: executable.into(),
+            store_executable: store_executable.into(),
         }
     }
 
@@ -772,7 +783,7 @@ impl NixCli {
         if derivations.is_empty() {
             return Ok(BTreeMap::new());
         }
-        let result = Command::new("nix-store")
+        let result = Command::new(&self.store_executable)
             .arg("--query")
             .arg("--outputs")
             .args(derivations.iter().map(|(drv, _)| drv))
@@ -975,7 +986,7 @@ fn discover_args(system: &str) -> Vec<OsString> {
         OsString::from("--json"),
         OsString::from(format!(".#checks.{system}")),
         OsString::from("--apply"),
-        OsString::from("builtins.attrNames"),
+        OsString::from(include_str!("nix/discover.nix")),
     ]);
     args
 }
@@ -995,19 +1006,7 @@ fn plan_args(system: &str) -> Vec<OsString> {
         OsString::from("--json"),
         OsString::from(format!(".#checks.{system}")),
         OsString::from("--apply"),
-        OsString::from(
-            r#"checks:
-  let
-    legacy = builtins.hasAttr "bloomery:check" checks;
-    filtered = builtins.removeAttrs checks [ "bloomery:check" ];
-    plan = builtins.mapAttrs (name: value:
-      let attempt = builtins.tryEval value.drvPath;
-      in if attempt.success
-         then { success = true; drvPath = attempt.value; }
-         else { success = false; }
-    ) filtered;
-  in { inherit legacy plan; }"#,
-        ),
+        OsString::from(include_str!("nix/plan.nix")),
     ]);
     args
 }
@@ -1032,6 +1031,8 @@ fn batch_build_args(derivations: &[String], fail_fast: bool) -> Vec<OsString> {
     args.extend(
         derivations
             .iter()
+            .collect::<BTreeSet<_>>()
+            .into_iter()
             .map(|derivation| OsString::from(format!("{derivation}^*"))),
     );
     args
@@ -1132,25 +1133,6 @@ fn target_nix_system(architecture: &str, operating_system: &str) -> Option<Strin
     Some(format!("{architecture}-{platform}"))
 }
 
-#[cfg(test)]
-fn nix_string_literal(value: &str) -> String {
-    let mut literal = String::from("\"");
-    let mut characters = value.chars().peekable();
-    while let Some(character) = characters.next() {
-        match character {
-            '\\' => literal.push_str("\\\\"),
-            '\"' => literal.push_str("\\\""),
-            '$' if characters.peek() == Some(&'{') => literal.push_str("\\$"),
-            '\n' => literal.push_str("\\n"),
-            '\r' => literal.push_str("\\r"),
-            '\t' => literal.push_str("\\t"),
-            value => literal.push(value),
-        }
-    }
-    literal.push('"');
-    literal
-}
-
 fn open_private_log(path: &Path) -> io::Result<File> {
     let mut options = OpenOptions::new();
     options.create(true).truncate(true).write(true);
@@ -1247,14 +1229,13 @@ mod tests {
     use super::{
         NixBackend, NixCli, NixTaskResult, PlannedSystem, batch_build_args, discover_catalog,
         drain_progress_stderr, format_args, group_output_paths, host_nix_system,
-        nix_log_store_path, nix_string_literal, parse_nix_id, parse_valid_outputs, plan_args,
-        target_nix_system, validity_args,
+        nix_log_store_path, parse_nix_id, parse_valid_outputs, plan_args, target_nix_system,
+        validity_args,
     };
     use crate::check_command::interrupt::{CancellationToken, InterruptFlag};
     use crate::check_command::model::valid_system_name;
     use crate::check_command::nix_progress::NixProgressCollector;
     use crate::check_command::progress::ProgressSink;
-    use crate::check_command::test_support::{fixture, nix_is_available};
     use std::collections::BTreeMap;
     use std::ffi::OsString;
     use std::fs;
@@ -1437,103 +1418,6 @@ mod tests {
         assert!(validity.iter().any(|arg| arg == "--stdin"));
         assert_eq!(format.first().map(String::as_str), Some("fmt"));
         assert!(valid_system_name("aarch64-linux"));
-    }
-
-    #[test]
-    #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-016"))]
-    fn real_nix_parses_unicode_control_and_quoted_check_attribute_names() {
-        if !nix_is_available() {
-            eprintln!("skipping real-Nix attribute parser test: Nix store is unavailable");
-            return;
-        }
-
-        let (root, cache) = fixture(true);
-        let system = host_nix_system().expect("host Nix system");
-        let attributes = vec![
-            "quoted attribute name with spaces".to_owned(),
-            "Unicode ☃".to_owned(),
-            "line\nbreak".to_owned(),
-            "tab\tcharacter".to_owned(),
-            format!("control-{}-character", char::from(1)),
-            "percent-%0A-and-fragment-#".to_owned(),
-        ];
-        let names_json = serde_json::to_string(&attributes).expect("JSON attribute names");
-        let names_expression = nix_string_literal(&names_json);
-        let flake = format!(
-            r#"{{
-  description = "bloomery unusual attribute fixture";
-  outputs = {{ self }}:
-    let
-      names = builtins.fromJSON {names_expression};
-      shared = builtins.derivation {{
-        name = "bloomery-unusual-attribute-check";
-        system = "{system}";
-        builder = "/bin/sh";
-        args = [ "-c" "echo passed > $out" ];
-      }};
-    in {{
-      checks."{system}" = builtins.listToAttrs (
-        map (name: {{ inherit name; value = shared; }}) names
-      );
-    }};
-}}"#
-        );
-        fs::write(root.join("flake.nix"), flake).expect("write unusual attribute fixture");
-
-        let backend = NixCli::default();
-        let discovered = backend
-            .discover(&root, &system)
-            .expect("discover unusual Nix attributes");
-        let mut sorted_attributes = attributes.clone();
-        sorted_attributes.sort();
-        assert_eq!(discovered, sorted_attributes);
-
-        let planned = backend
-            .plan_checks(&root, &system)
-            .expect("plan unusual attributes");
-        let mut planned_attributes = planned
-            .plans
-            .iter()
-            .map(|plan| plan.attribute.clone())
-            .collect::<Vec<_>>();
-        planned_attributes.sort();
-        assert_eq!(planned_attributes, sorted_attributes);
-        assert!(
-            planned
-                .plans
-                .iter()
-                .all(|plan| plan.derivation.is_some() && !plan.outputs.is_empty()),
-            "every unusual attribute must evaluate to a derivation with outputs"
-        );
-        let (event_sender, _event_receiver) = std::sync::mpsc::channel();
-        let progress = super::super::progress::ProgressSink::new(event_sender, false);
-        let batch = backend.realize_batch(
-            &root,
-            &planned.plans,
-            false,
-            &root.join("unusual-batch.log"),
-            CancellationToken::new(InterruptFlag::for_test()),
-            &progress,
-        );
-        assert!(
-            batch.failures.is_empty(),
-            "unexpected realization failures: {:?}",
-            batch.failures
-        );
-        assert!(batch.operational_error.is_none());
-        let outputs = planned
-            .plans
-            .iter()
-            .flat_map(|plan| plan.outputs.iter().cloned())
-            .collect::<std::collections::BTreeSet<_>>();
-        let valid = backend
-            .validate_outputs(&root, &outputs.iter().cloned().collect::<Vec<_>>())
-            .expect("output validity");
-        assert_eq!(valid, outputs);
-        assert!(!root.join("flake.lock").exists());
-
-        let _ = fs::remove_dir_all(root);
-        let _ = fs::remove_dir_all(cache);
     }
 
     #[test]

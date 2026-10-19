@@ -112,6 +112,10 @@ Honor the user's Nix configuration for stores, substitution, builders, and
 parallelism. The batched realization is one Bloomery-owned task and does not
 impose a global process bound or terminate unrelated Nix clients.
 
+The [boundary test suite](testing.md) verifies orchestration, subprocess
+protocols, and shared catalog expressions through the default check workflow.
+Test derivations require no nested Nix invocation or host store access.
+
 The structured realization stream and the post-realization validity result feed
 run-scoped [derivation metrics](progress.md#derivation-metrics) and are not
 forwarded to terminal output. Never create per-attribute build requests. A failed check

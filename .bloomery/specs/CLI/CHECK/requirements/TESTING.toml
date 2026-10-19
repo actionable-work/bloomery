@@ -1,0 +1,43 @@
+group = "TESTING"
+
+[[requirements]]
+id = "CLI-CHECK-TESTING-001"
+title = "Default check executes Nix boundary coverage"
+manual = false
+design = "design/testing.md#default-suite"
+ears = { type = "ubiquitous", system = "the default Bloomery repository check suite", action = "execute the runner, production Nix adapter, and shared catalog-expression tests as ordinary selected check outputs" }
+
+[[requirements]]
+id = "CLI-CHECK-TESTING-002"
+title = "Nix boundary scenarios never skip assertions"
+manual = false
+design = "design/testing.md#default-suite"
+ears = { type = "ubiquitous", system = "the CLI/CHECK automated test suite", action = "execute every Nix boundary scenario's assertions without availability-based early success or ignored tests" }
+
+[[requirements]]
+id = "CLI-CHECK-TESTING-003"
+title = "Production Nix adapter uses strict subprocess tests"
+manual = false
+design = "design/testing.md#test-boundaries"
+ears = { type = "ubiquitous", system = "the Nix adapter test suite", action = "exercise production NixCli methods against scripted subprocesses that reject unexpected calls and fail when expected calls are absent" }
+
+[[requirements]]
+id = "CLI-CHECK-TESTING-004"
+title = "Nix catalog tests share production expressions"
+manual = false
+design = "design/testing.md#test-boundaries"
+ears = { type = "ubiquitous", system = "the catalog-expression test suite", action = "evaluate the same catalog projection sources embedded in the production Nix adapter" }
+
+[[requirements]]
+id = "CLI-CHECK-TESTING-005"
+title = "Catalog evaluation failures fail the default suite"
+manual = false
+design = "design/testing.md#test-boundaries"
+ears = { type = "unwanted_behavior", trigger = "a catalog-expression fixture result differs from its expected value", system = "the catalog-expression check", action = "fail its default-selected check derivation" }
+
+[[requirements]]
+id = "CLI-CHECK-TESTING-006"
+title = "Boundary tests are independent of host Nix access"
+manual = false
+design = "design/testing.md#test-boundaries"
+ears = { type = "ubiquitous", system = "the CLI/CHECK test derivations", action = "run with declared fixture executables and data without starting Nix clients or accessing a host daemon or writable host store" }

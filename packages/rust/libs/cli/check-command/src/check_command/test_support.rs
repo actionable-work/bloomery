@@ -9,10 +9,11 @@ use crate::output::TerminalFacts;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::time::Duration;
+
+pub(super) mod subprocess;
 
 static FIXTURE: AtomicU64 = AtomicU64::new(0);
 
@@ -465,36 +466,6 @@ pub(super) fn fixture_without_specs(with_flake: bool, config: &str) -> (PathBuf,
 
 pub(super) fn request() -> CheckArgs {
     CheckArgs::default()
-}
-
-pub(super) fn nix_is_available() -> bool {
-    Command::new("nix")
-        .args(["store", "ping", "--json"])
-        .output()
-        .is_ok_and(|output| output.status.success())
-}
-
-/// Repository root, used to reference the checked-in `flake.lock` when locking
-/// real-Nix fixture flakes offline.
-pub(super) fn repository_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../../..")
-}
-
-/// Generate a `flake.lock` for a real-Nix fixture flake using the repository's
-/// locked nixpkgs, so `nix fmt` can build the fixture formatter offline.
-pub(super) fn lock_fixture_flake(root: &Path) {
-    let reference = repository_root().join("flake.lock");
-    let status = Command::new("nix")
-        .args(["flake", "lock", "--reference-lock-file"])
-        .arg(&reference)
-        .current_dir(root)
-        .status()
-        .expect("run nix flake lock");
-    assert!(
-        status.success(),
-        "nix flake lock failed for {}",
-        root.display()
-    );
 }
 
 pub(super) fn invoke(
