@@ -34,7 +34,7 @@ bloomery.mkFlake {
 Package-valued settings are written as nixpkgs attribute paths. Path-valued settings are relative to the workspace root.
 
 ```toml bloomery-config
-version = 1
+version = 2
 
 [build]
 cargoToml = "Cargo.toml"        # defaults to root + "/Cargo.toml"
@@ -46,7 +46,7 @@ libPackages = false             # expose <crate>:lib packages
 devPackages = true              # generate dev-profile apps (<bin>:dev)
 unify = true                    # Cargo-style feature unification
 
-[toolchain]
+[build.toolchain]
 rustc = "rustc"                 # nixpkgs attribute path
 clippy = "clippy"
 cargo = "cargo"
@@ -55,7 +55,7 @@ lld = "lld"
 mold = "mold"
 stdenv = "stdenv"
 
-[profile.release]
+[build.profile.release]
 optLevel = 3                    # 0, 1, 2, 3, "s", "z"
 lto = "thin"                    # "fat", "thin", "off", "full", "none", "yes", "no", bool
 codegenUnits = 1                # positive integer
@@ -67,13 +67,13 @@ overflowChecks = false          # bool
 linker = "cc"                   # custom linker executable
 linkArgs = ["-Clink-arg=-fuse-ld=lld"]
 
-[profile.dev]
+[build.profile.dev]
 optLevel = 0
 lto = "off"
 codegenUnits = 256
 debuginfo = 2
 
-[flags]
+[build.flags]
 rustc = ["-Copt-level=3"]       # base rustc flags applied to all crates
 test = []                       # extra flags for test runner compilation
 clippy = []                     # extra flags when running clippy-driver
@@ -86,10 +86,22 @@ packages = ["rust-analyzer"]    # extra shell packages
 shellHook = ""                  # bash setup hook
 
 [checks]
-enable = true                   # generate crate checks and lock validation
-includePackageChecks = true     # build final packages as CI checks
-crateCheck = true               # generate per-crate type-check entries
-throwOnOutOfDate = false        # error evaluation if bloomery.lock is out of date
+enable = true                   # generate Nix checks
+
+[checks.crates]
+enable = true                   # generate per-crate type-check entries
+
+[checks.packages]
+enable = true                   # build final packages as checks
+
+[checks.lockFreshness]
+enable = false                  # error evaluation if bloomery.lock is out of date
+
+[checks.workspaceDependencies]
+enable = true                   # validate workspace dependency declarations
+
+[checks.noDefaultFeatures]
+enable = true                   # require default features to be disabled
 
 [features]
 cratesIoIndex = "crates-io-index"

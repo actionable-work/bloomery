@@ -1281,7 +1281,7 @@ mod tests {
         fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
         fs::write(
             root.join(".bloomery/config.toml"),
-            "version = 1\n[specs]\ndir = \"specs\"\n",
+            "version = 2\n[specs]\ndir = \"specs\"\n",
         )
         .expect("config");
         fs::write(
@@ -1493,7 +1493,7 @@ mod tests {
         fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
         fs::write(
             root.join(".bloomery/config.toml"),
-            "version = 1\n[specs]\ndir = \"specs\"\n",
+            "version = 2\n[specs]\ndir = \"specs\"\n",
         )
         .expect("config");
         let previous = std::env::current_dir().expect("original working directory");
@@ -1752,7 +1752,7 @@ mod tests {
         fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
         fs::write(
             root.join(".bloomery/config.toml"),
-            "version = 1\n[specs]\ndir = \"specs\"\n",
+            "version = 2\n[specs]\ndir = \"specs\"\n",
         )
         .expect("config");
 
@@ -1917,7 +1917,7 @@ mod tests {
         fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
         fs::write(
             root.join(".bloomery/config.toml"),
-            "version = 1\n[specs]\nenable = false\n",
+            "version = 2\n[specs]\nenable = false\n",
         )
         .expect("configuration");
         let mut stdout = Vec::new();
@@ -2675,7 +2675,7 @@ mod tests {
         fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
         fs::write(
             root.join(".bloomery/config.toml"),
-            "version = 1\nchecks.enable = false\n",
+            "version = 2\nchecks.enable = false\n",
         )
         .expect("config");
 
@@ -2718,7 +2718,7 @@ mod tests {
                 "bloomery",
                 "config",
                 "set",
-                "checks.throwOnOutOfDate",
+                "checks.lockFreshness.enable",
                 "true",
                 "--json",
             ],
@@ -2737,7 +2737,7 @@ mod tests {
                 "bloomery",
                 "config",
                 "unset",
-                "checks.throwOnOutOfDate",
+                "checks.lockFreshness.enable",
                 "--json",
             ],
             &root,
@@ -2822,7 +2822,7 @@ mod tests {
         fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
         fs::write(
             root.join(".bloomery/config.toml"),
-            "version = 1\nchecks.enable = true\n",
+            "version = 2\nchecks.enable = true\n",
         )
         .expect("config");
 

@@ -6,13 +6,16 @@ constructor or in `overrides.nix`.
 
 ## Configuration source
 
-Build settings live in top-level tables: `[build]`, `[toolchain]`,
-`[profile.release]`, `[profile.dev]`, `[flags]`, `[devShell]`, `[checks]`,
-`[features]`, `[formatters]`, and `[optimize]`. The `[specs]` and `[scanners.*]`
+Build settings live in `[build]` and its `[build.toolchain]`,
+`[build.profile.release]`, `[build.profile.dev]`, and `[build.flags]` subtables,
+plus `[devShell]`, `[checks]`, `[features]`, `[formatters]`, and `[optimize]`.
+The `[specs]` and `[scanners.*]`
 tables belong to the CLI; the flake interface ignores them. The nested
-`[checks.codeHealth]` table is also CLI-owned: the loader accepts and validates
-its [catalogued shape and constraints](../../../PARSER/CONFIGURATION/design/code-health.md)
-without generating a health derivation or applying `checks.enable` to it.
+`[checks.specifications]`, `[checks.codeHealth]`, and
+`[checks.clippySuppressions]` tables are also CLI-owned. The loader accepts and
+validates them without generating corresponding Nix checks or applying the
+global `checks.enable` switch to them. Code health uses its
+[catalogued shape and constraints](../../../PARSER/CONFIGURATION/design/code-health.md).
 
 The CLI catalogs and type-validates the build keys before evaluation, using the
 [schema catalog](../../../PARSER/CONFIGURATION/design/schema-catalog.md). The
@@ -29,10 +32,10 @@ with a warning. When
 the file is missing, `mkFlake` fails evaluation with a `bloomery:`-prefixed
 message naming the missing path.
 
-The top-level integer `version` is required. Format `1` is the only supported
-format; a missing, malformed, or unsupported version fails evaluation before
-the build settings are consumed. The `version` field is format metadata and is
-not a build option.
+The top-level integer `version` is required. Format `2` is current. A missing,
+malformed, or unsupported version fails evaluation before the build settings
+are consumed; format `1` must first be migrated with `bloomery config upgrade`.
+The `version` field is format metadata and is not a build option.
 
 ## Value encoding
 
@@ -67,11 +70,11 @@ unify = true
 
 ## Toolchain
 
-`[toolchain]` carries package references plus the linker selector. Package
-references use the nixpkgs attribute-path encoding.
+`[build.toolchain]` carries package references plus the linker selector.
+Package references use the nixpkgs attribute-path encoding.
 
 ```toml
-[toolchain]
+[build.toolchain]
 rustc = "rustc"
 clippy = "clippy"
 cargo = "cargo"
@@ -83,27 +86,27 @@ linker = "lld"                   # "lld", "mold", "system", or omit
 
 ## Profiles
 
-`[profile.release]` and `[profile.dev]` carry the scalar profile settings
-`optLevel`, `lto`, `codegenUnits`, `panic`, `strip`, `debuginfo`, `targetCpu`,
-`overflowChecks`, `linker`, and `linkArgs`.
+`[build.profile.release]` and `[build.profile.dev]` carry the scalar profile
+settings `optLevel`, `lto`, `codegenUnits`, `panic`, `strip`, `debuginfo`,
+`targetCpu`, `overflowChecks`, `linker`, and `linkArgs`.
 
 ```toml
-[profile.release]
+[build.profile.release]
 optLevel = 3
 lto = "fat"
 codegenUnits = 1
 
-[profile.dev]
+[build.profile.dev]
 optLevel = 0
 ```
 
 ## Flags
 
-`[flags]` carries the per-phase flag lists `rustc`, `test`, `clippy`, `doc`, and
-`doctest`.
+`[build.flags]` carries the per-phase flag lists `rustc`, `test`, `clippy`,
+`doc`, and `doctest`.
 
 ```toml
-[flags]
+[build.flags]
 rustc = ["-Copt-level=3"]
 test = []
 clippy = []
@@ -125,22 +128,33 @@ shellHook = "echo ready"
 
 ## Checks
 
-`[checks]` carries `enable`, `includePackageChecks`, `crateCheck`,
-`throwOnOutOfDate`, `workspaceDependencies`, and `noDefaultFeatures`.
-Check control keys default to `false`, so an unconfigured flake generates no
-checks. This includes `enable`, `includePackageChecks`, `crateCheck`,
-`throwOnOutOfDate`, `workspaceDependencies`, and `noDefaultFeatures`. The
+`[checks]` carries the global `enable` switch. Each check has a subtable with an
+`enable` switch: `[checks.crates]`, `[checks.packages]`,
+`[checks.lockFreshness]`, `[checks.workspaceDependencies]`, and
+`[checks.noDefaultFeatures]`. Every check switch defaults to `false`, so an
+unconfigured flake generates no checks. `checks.enable` gates generated Nix
+checks; the `lockFreshness` policy applies independently. The
 [CLI build command](../../../CLI/BUILD/README.md) remains the production
 package path; package checks are available when explicitly enabled.
 
 ```toml
 [checks]
 enable = false
-includePackageChecks = false
-crateCheck = false
-throwOnOutOfDate = false
-workspaceDependencies = false
-noDefaultFeatures = false
+
+[checks.crates]
+enable = false
+
+[checks.packages]
+enable = false
+
+[checks.lockFreshness]
+enable = false
+
+[checks.workspaceDependencies]
+enable = false
+
+[checks.noDefaultFeatures]
+enable = false
 ```
 
 ## Features

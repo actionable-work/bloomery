@@ -110,7 +110,7 @@ package checks consume full release crates. See
 [Metadata-only check compilation](metadata-check.md) and
 [Check profile selection](check-profiles.md). Package checks reuse the release
 crate and binary derivations and are generated only
-when `checks.includePackageChecks` enables them. The exported package
+when `checks.packages.enable` enables them. The exported package
 derivations are the production build targets that the
 [CLI build command](../../../CLI/BUILD/design/execution.md) materializes; an
 optimized binary's package is its optimized derivation while its package check

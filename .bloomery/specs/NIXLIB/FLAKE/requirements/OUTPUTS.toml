@@ -101,7 +101,7 @@ design = "design/output-contract.md#checks"
 
 [requirements.ears]
 type = "event"
-trigger = "checks.includePackageChecks is disabled"
+trigger = "checks.packages.enable is disabled"
 system = "the workspace builder"
 action = "omit <bin>:bin and <crate>:lib checks while retaining the remaining checks"
 
@@ -217,7 +217,7 @@ design = "design/output-contract.md#checks"
 
 [requirements.ears]
 type = "event"
-trigger = "checks are enabled and checks.workspaceDependencies is disabled"
+trigger = "checks are enabled and checks.workspaceDependencies.enable is disabled"
 system = "the workspace builder"
 action = "omit the workspace:dependencies check while retaining the remaining checks"
 
@@ -229,7 +229,7 @@ design = "design/output-contract.md#checks"
 
 [requirements.ears]
 type = "event"
-trigger = "checks are enabled and checks.workspaceDependencies is enabled"
+trigger = "checks are enabled and checks.workspaceDependencies.enable is enabled"
 system = "the workspace builder"
 action = "expose a workspace:dependencies check"
 
@@ -241,7 +241,7 @@ design = "design/output-contract.md#checks"
 
 [requirements.ears]
 type = "event"
-trigger = "checks are enabled and checks.noDefaultFeatures is disabled"
+trigger = "checks are enabled and checks.noDefaultFeatures.enable is disabled"
 system = "the workspace builder"
 action = "omit the workspace:default-features check while retaining the remaining checks"
 
@@ -253,7 +253,7 @@ design = "design/output-contract.md#checks"
 
 [requirements.ears]
 type = "event"
-trigger = "checks are enabled and checks.noDefaultFeatures is enabled"
+trigger = "checks are enabled and checks.noDefaultFeatures.enable is enabled"
 system = "the workspace builder"
 action = "expose a workspace:default-features check"
 
@@ -300,7 +300,7 @@ design = "design/output-contract.md#checks"
 
 [requirements.ears]
 type = "event"
-trigger = "checks are enabled and checks.includePackageChecks is omitted"
+trigger = "checks are enabled and checks.packages.enable is omitted"
 system = "the workspace builder"
 action = "omit <bin>:bin and <crate>:lib checks while retaining the remaining checks"
 
@@ -323,7 +323,7 @@ design = "design/output-contract.md#checks"
 
 [requirements.ears]
 type = "event"
-trigger = "checks.crateCheck is disabled"
+trigger = "checks.crates.enable is disabled"
 system = "the workspace builder"
 action = "omit <crate>:check entries while retaining the remaining checks"
 
@@ -335,6 +335,6 @@ design = "design/output-contract.md#checks"
 
 [requirements.ears]
 type = "event"
-trigger = "checks.crateCheck is enabled"
+trigger = "checks.crates.enable is enabled"
 system = "the workspace builder"
 action = "expose a <crate>:check entry for every workspace crate"

@@ -7,19 +7,19 @@ design tree.
 ## Format versioning
 
 The top-level integer `version` identifies the configuration's structural
-layout. Format `1` is the current and only supported format. Every configuration
-must declare `version = 1`; Bloomery does not infer a version for an unversioned
-file or accept format `0`. A missing version produces a `ConfigurationError`
-that asks the user to set `version = 1`. The `version` field is format metadata,
-not a configurable schema-catalog key.
+layout. Format `2` is current, and every new or upgraded configuration declares
+`version = 2`. Bloomery does not infer a version for an unversioned file or
+accept format `0`. A missing version produces a `ConfigurationError` that asks
+the user to set `version = 2`. `bloomery config upgrade` accepts format `1` and
+migrates it to format `2`; other configuration readers require the current
+format. The `version` field is format metadata, not a configurable
+schema-catalog key.
 
 The format version describes the structure of existing keys, not the set of
 keys supported by the schema catalog. Adding a key does not require a format
 version increase. Renaming, moving, nesting, or changing the representation of
-an existing key requires a new format version. When a later numbered format is
-defined, its migration upgrades supported earlier numbered formats, which
-remain readable. A migration from unversioned files or format `0` is not
-defined.
+an existing key requires a new format version. A migration from unversioned
+files or format `0` is not defined.
 
 ## Required file
 
@@ -40,7 +40,7 @@ values.
 The scanner and spec configuration shape begins with the required format key:
 
 ```toml
-version = 1
+version = 2
 
 [specs]
 dir = "specs"
@@ -98,9 +98,10 @@ configurable but produce no references without a requirement model.
 
 ## Build tables
 
-The same file carries the Nix build tables `[build]`, `[toolchain]`,
-`[profile.release]`, `[profile.dev]`, `[flags]`, `[devShell]`, `[checks]`,
-`[features]`, and `[formatters]`, plus the parameterized `[optimize]` family.
+The same file carries Nix build tables `[build]`, `[build.toolchain]`,
+`[build.profile.release]`, `[build.profile.dev]`, and `[build.flags]`, plus
+`[devShell]`, `[checks]`, `[features]`, and `[formatters]`, and the
+parameterized `[optimize]` family.
 Their semantics and evaluation-time resolution are owned by
 [NIXLIB/FLAKE](../../../NIXLIB/FLAKE/design/configuration.md). The CLI catalogs
 the same keys and validates their types and enum value sets during
@@ -169,17 +170,20 @@ Explicit values, including `false`, always take precedence over an upgrade.
 
 A missing, unreadable, unparsable, or invalid configuration file produces a
 `ConfigurationError`. A missing format version produces an error that asks the
-user to add `version = 1` to `.bloomery/config.toml`. A malformed, negative, or
-unsupported version, including `0`, is also a `ConfigurationError`. Bloomery
-must not silently replace a broken file with defaults. Parser help, `init`, and
-`config` are the only commands that succeed without the file; `config` creates
-it rather than treating its absence as an error.
+user to add `version = 2` to `.bloomery/config.toml`. A malformed, negative, or
+unsupported version, including `0` or `1` outside `config upgrade`, is also a
+`ConfigurationError`; a version `1` error directs the user to
+`bloomery config upgrade`. Bloomery must not silently replace a broken file
+with defaults. Parser help, `init`, and `config` are the only commands that
+succeed without the file; `config` creates it rather than treating its absence
+as an error.
 
 ## Loading order
 
-Configuration parsing happens before workspace and source scanning and
-normalizes the declared format version, then validates the full schema catalog,
-including the build tables. The parsed configuration is immutable for the
-duration of a command so every pipeline stage observes one consistent set of
-targets. The `[build]`-family tables are type-validated and then carried through
-for the flake interface; they do not change scanner behavior.
+Configuration parsing requires format `2` and validates the full schema
+catalog, including the build tables, before workspace and source scanning.
+`config upgrade` migrates format `1` before validation and publication. The
+parsed configuration is immutable for the duration of a command so every
+pipeline stage observes one consistent set of targets. The `[build]`-family
+tables are type-validated and then carried through for the flake interface;
+they do not change scanner behavior.

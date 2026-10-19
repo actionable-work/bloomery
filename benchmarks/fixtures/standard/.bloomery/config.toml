@@ -1,5 +1,7 @@
-version = 1
+version = 2
 
 [checks]
-crateCheck = true
+enable = true
+
+[checks.crates]
 enable = true

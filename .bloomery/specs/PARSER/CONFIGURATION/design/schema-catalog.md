@@ -18,9 +18,9 @@ recommend `true`, so an existing configuration keeps checks opt-in while
 `config upgrade` explicitly sets supported check controls. Keys whose omission
 is semantic are addressable but have no recommendation:
 `build.bloomeryLock` auto-detects, `build.members` means all members,
-`toolchain.linker` is host-dependent, `features.cratesIoIndex` means none,
-`specs.enable` auto-detects from the specification tree, and
-the `profile.*` fields inherit from `Cargo.toml` and rustc.
+`build.toolchain.linker` is host-dependent, `features.cratesIoIndex` means
+none, `specs.enable` auto-detects from the specification tree, and the
+`build.profile.*` fields inherit from `Cargo.toml` and rustc.
 
 `bloomery config upgrade` materializes recommended values only. Keys without a
 recommendation remain absent unless the user sets them. `bloomery config
@@ -69,45 +69,45 @@ editing and validation.
 | `build.devPackages` | boolean | `false` |
 | `build.unify` | boolean | `true` |
 
-### `[toolchain]`
+### `[build.toolchain]`
 
 | Key | Type | Recommended default |
 | --- | --- | --- |
-| `toolchain.rustc` | nixpkgs attribute path | `"rustc"` |
-| `toolchain.clippy` | nixpkgs attribute path | `"clippy"` |
-| `toolchain.cargo` | nixpkgs attribute path | `"cargo"` |
-| `toolchain.lld` | nixpkgs attribute path | `"lld"` |
-| `toolchain.mold` | nixpkgs attribute path | `"mold"` |
-| `toolchain.stdenv` | nixpkgs attribute path | `"stdenv"` |
-| `toolchain.linker` | `"lld"`, `"mold"`, `"system"`, or absent | none |
+| `build.toolchain.rustc` | nixpkgs attribute path | `"rustc"` |
+| `build.toolchain.clippy` | nixpkgs attribute path | `"clippy"` |
+| `build.toolchain.cargo` | nixpkgs attribute path | `"cargo"` |
+| `build.toolchain.lld` | nixpkgs attribute path | `"lld"` |
+| `build.toolchain.mold` | nixpkgs attribute path | `"mold"` |
+| `build.toolchain.stdenv` | nixpkgs attribute path | `"stdenv"` |
+| `build.toolchain.linker` | `"lld"`, `"mold"`, `"system"`, or absent | none |
 
-### `[profile.release]` and `[profile.dev]`
+### `[build.profile.release]` and `[build.profile.dev]`
 
 Both sub-tables share the same ten keys. Every profile key has no recommended
 default because omission delegates to `Cargo.toml` and rustc defaults.
 
 | Key | Type |
 | --- | --- |
-| `profile.<name>.optLevel` | integer `0`-`3` or `"0"`, `"1"`, `"2"`, `"3"`, `"s"`, `"z"` |
-| `profile.<name>.lto` | boolean or `"fat"`, `"thin"`, `"off"`, `"full"`, `"none"`, `"yes"`, `"no"` |
-| `profile.<name>.codegenUnits` | positive integer |
-| `profile.<name>.panic` | `"unwind"` or `"abort"` |
-| `profile.<name>.strip` | boolean or `"none"`, `"debuginfo"`, `"symbols"` |
-| `profile.<name>.linker` | string |
-| `profile.<name>.linkArgs` | list of strings |
-| `profile.<name>.targetCpu` | string |
-| `profile.<name>.debuginfo` | boolean, integer `0`-`2`, or `"0"`, `"1"`, `"2"`, `"none"`, `"line-directives-only"`, `"line-tables-only"`, `"limited"`, `"full"` |
-| `profile.<name>.overflowChecks` | boolean |
+| `build.profile.<name>.optLevel` | integer `0`-`3` or `"0"`, `"1"`, `"2"`, `"3"`, `"s"`, `"z"` |
+| `build.profile.<name>.lto` | boolean or `"fat"`, `"thin"`, `"off"`, `"full"`, `"none"`, `"yes"`, `"no"` |
+| `build.profile.<name>.codegenUnits` | positive integer |
+| `build.profile.<name>.panic` | `"unwind"` or `"abort"` |
+| `build.profile.<name>.strip` | boolean or `"none"`, `"debuginfo"`, `"symbols"` |
+| `build.profile.<name>.linker` | string |
+| `build.profile.<name>.linkArgs` | list of strings |
+| `build.profile.<name>.targetCpu` | string |
+| `build.profile.<name>.debuginfo` | boolean, integer `0`-`2`, or `"0"`, `"1"`, `"2"`, `"none"`, `"line-directives-only"`, `"line-tables-only"`, `"limited"`, `"full"` |
+| `build.profile.<name>.overflowChecks` | boolean |
 
-### `[flags]`
+### `[build.flags]`
 
 | Key | Type | Recommended default |
 | --- | --- | --- |
-| `flags.rustc` | list of strings | `["-Copt-level=3"]` |
-| `flags.test` | list of strings | `[]` |
-| `flags.clippy` | list of strings | `[]` |
-| `flags.doc` | list of strings | `["-Dwarnings"]` |
-| `flags.doctest` | list of strings | `[]` |
+| `build.flags.rustc` | list of strings | `["-Copt-level=3"]` |
+| `build.flags.test` | list of strings | `[]` |
+| `build.flags.clippy` | list of strings | `[]` |
+| `build.flags.doc` | list of strings | `["-Dwarnings"]` |
+| `build.flags.doctest` | list of strings | `[]` |
 
 ### `[devShell]`
 
@@ -122,14 +122,16 @@ default because omission delegates to `Cargo.toml` and rustc defaults.
 | Key | Type | Upgrade recommendation |
 | --- | --- | --- |
 | `checks.enable` | boolean | `true` |
-| `checks.includePackageChecks` | boolean | `true` |
-| `checks.crateCheck` | boolean | `true` |
-| `checks.throwOnOutOfDate` | boolean | `true` |
-| `checks.workspaceDependencies` | boolean | `true` |
-| `checks.noDefaultFeatures` | boolean | `true` |
+| `checks.crates.enable` | boolean | `true` |
+| `checks.packages.enable` | boolean | `true` |
+| `checks.lockFreshness.enable` | boolean | `true` |
+| `checks.workspaceDependencies.enable` | boolean | `true` |
+| `checks.noDefaultFeatures.enable` | boolean | `true` |
 
-When omitted, every boolean check control in this table is effectively `false`
-and has an upgrade recommendation of `true`.
+When omitted, every check `enable` setting in this table is effectively
+`false` and has an upgrade recommendation of `true`. `checks.enable` gates
+generated Nix checks. `checks.lockFreshness.enable` controls the stale-lock
+policy independently.
 
 `checks.specifications`, `checks.codeHealth`, and
 `checks.clippySuppressions` are CLI-owned nested tables. Their `enable` keys
@@ -138,10 +140,11 @@ designs define their scope. The Nix loader validates and accepts these tables
 without generating corresponding Nix checks.
 
 An unupgraded configuration generates no Nix checks by default. `config upgrade`
-sets each missing check control to `true` unless a value was already configured.
+sets each missing check enable setting to `true` unless a value was already
+configured.
 The
 [CLI build command](../../../CLI/BUILD/README.md) materializes production
-packages instead. Setting `checks.includePackageChecks = true` adds the release
+packages instead. Setting `checks.packages.enable = true` adds the release
 `<bin>:bin` and `<crate>:lib` checks to the check set. See the
 [flake check output](../../../NIXLIB/FLAKE/design/output-contract.md#checks).
 

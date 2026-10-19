@@ -58,7 +58,7 @@ fn default_and_explicit_selection_choose_static_and_requested_system_catalogs() 
 #[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-029"))]
 fn missing_check_control_warnings_respect_explicit_values_and_available_groups() {
     let config: toml::Value = toml::from_str(
-        "[checks]\nincludePackageChecks = false\n\n[checks.codeHealth]\nenable = false\n",
+        "[checks.packages]\nenable = false\n\n[checks.codeHealth]\nenable = false\n",
     )
     .expect("TOML");
     let missing = crate::check_command::command::missing_check_controls(&config, false);
@@ -67,9 +67,12 @@ fn missing_check_control_warnings_respect_explicit_values_and_available_groups()
         .map(|(key, _)| key.as_str())
         .collect::<Vec<_>>();
     assert!(keys.contains(&"checks.enable"));
-    assert!(keys.contains(&"checks.crateCheck"));
+    assert!(keys.contains(&"checks.crates.enable"));
+    assert!(keys.contains(&"checks.lockFreshness.enable"));
+    assert!(keys.contains(&"checks.workspaceDependencies.enable"));
+    assert!(keys.contains(&"checks.noDefaultFeatures.enable"));
     assert!(keys.contains(&"checks.clippySuppressions.enable"));
-    assert!(!keys.contains(&"checks.includePackageChecks"));
+    assert!(!keys.contains(&"checks.packages.enable"));
     assert!(!keys.contains(&"checks.codeHealth.enable"));
     assert!(!keys.contains(&"checks.specifications.enable"));
 
@@ -79,9 +82,9 @@ fn missing_check_control_warnings_respect_explicit_values_and_available_groups()
         .iter()
         .map(|(key, _)| key.as_str())
         .collect::<Vec<_>>();
-    assert!(!keys.contains(&"checks.crateCheck"));
-    assert!(!keys.contains(&"checks.includePackageChecks"));
-    assert!(!keys.contains(&"checks.workspaceDependencies"));
+    assert!(!keys.contains(&"checks.crates.enable"));
+    assert!(!keys.contains(&"checks.packages.enable"));
+    assert!(!keys.contains(&"checks.workspaceDependencies.enable"));
     assert!(keys.contains(&"checks.codeHealth.enable"));
     assert!(keys.contains(&"checks.clippySuppressions.enable"));
     assert!(keys.contains(&"checks.specifications.enable"));
@@ -188,7 +191,7 @@ fn health_catalog_enablement_ignores_specs_scanners_build_toggle_and_system_coun
     fs::write(
         root.join(".bloomery/config.toml"),
         format!(
-            "version = 1\n{}",
+            "version = 2\n{}",
             config.replace("enable = true\n", "enable = false\n")
         ),
     )

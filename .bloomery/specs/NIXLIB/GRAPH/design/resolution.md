@@ -25,7 +25,7 @@ member's fully-unified dependency closure. The lock also records proc-macro and
 edition metadata per package and a SHA-256 digest of `Cargo.lock`. Contexts are
 independent of `build.unify`, so changing that setting neither invalidates the
 lock nor changes its bytes. `workspace:lock` reports a digest mismatch, and
-`checks.throwOnOutOfDate` turns it into an evaluation error.
+`checks.lockFreshness.enable` turns it into an evaluation error.
 
 ## Feature unification modes
 

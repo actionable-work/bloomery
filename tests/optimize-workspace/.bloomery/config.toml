@@ -1,4 +1,4 @@
-version = 1
+version = 2
 
 [build]
 devPackages = true
@@ -6,9 +6,15 @@ libPackages = false
 
 [checks]
 enable = true
-includePackageChecks = true
-noDefaultFeatures = false
-workspaceDependencies = false
+
+[checks.noDefaultFeatures]
+enable = false
+
+[checks.packages]
+enable = true
+
+[checks.workspaceDependencies]
+enable = false
 
 [optimize.opt-app]
 enable = true

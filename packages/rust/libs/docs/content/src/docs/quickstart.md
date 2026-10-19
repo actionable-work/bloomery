@@ -31,21 +31,24 @@ For standard workspaces, `bloomery.mkFlake` sets up complete packages, runnable 
 > `mkFlake` requires `.bloomery/config.toml`. Create it next to `flake.nix`:
 >
 > ```toml
-> version = 1
+> version = 2
 >
 > [build]
 > libPackages = false
 > devPackages = true
 >
-> [profile.release]
+> [build.profile.release]
 > optLevel = 3
 > lto = "thin"
 > codegenUnits = 1
 >
-> [toolchain]
+> [build.toolchain]
 > linker = "lld"
 >
 > [checks]
+> enable = true
+>
+> [checks.crates]
 > enable = true
 > ```
 >
@@ -62,11 +65,11 @@ All build settings are read from `.bloomery/config.toml`:
 | Table | Purpose |
 | --- | --- |
 | `[build]` | Source paths, member selection, `profileName`, `libPackages`, `devPackages`, `unify` |
-| `[toolchain]` | `rustc`, `clippy`, `cargo`, `lld`, `mold`, `stdenv`, and `linker` |
-| `[profile.release]`, `[profile.dev]` | Optimization, LTO, codegen units, panic, strip, debug info, CPU target |
-| `[flags]` | Extra `rustc`, `test`, `clippy`, `doc`, and `doctest` flags |
+| `[build.toolchain]` | `rustc`, `clippy`, `cargo`, `lld`, `mold`, `stdenv`, and `linker` |
+| `[build.profile.release]`, `[build.profile.dev]` | Optimization, LTO, codegen units, panic, strip, debug info, CPU target |
+| `[build.flags]` | Extra `rustc`, `test`, `clippy`, `doc`, and `doctest` flags |
 | `[devShell]` | `enable`, extra `packages`, and `shellHook` |
-| `[checks]` | `enable`, `includePackageChecks`, `crateCheck`, `throwOnOutOfDate` |
+| `[checks]` | Global `enable`; generated check families use `[checks.<name>].enable` |
 | `[features]` | `cratesIoIndex` |
 
 Package-valued settings are written as nixpkgs attribute paths (for example

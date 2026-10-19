@@ -27,7 +27,7 @@ parser:
   It runs independent
   checks in parallel with terminal work metrics, bounded summaries, and seekable
   failure details. Package checks are excluded unless
-  `checks.includePackageChecks` enables them, and static specification checks
+  `checks.packages.enable` enables them, and static specification checks
   require both specification management and `checks.specifications.enable`.
   Code health shares
   Rust analysis, scores each crate and the workspace, and refreshes the

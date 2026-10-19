@@ -534,11 +534,14 @@ pub(super) fn missing_check_controls(
             == Some(false);
     let mut controls = vec![
         ("checks.enable", "nix:*"),
-        ("checks.includePackageChecks", "nix:package"),
-        ("checks.crateCheck", "nix:crate-check"),
-        ("checks.throwOnOutOfDate", "nix:lock-validation"),
-        ("checks.workspaceDependencies", "nix:workspace-dependencies"),
-        ("checks.noDefaultFeatures", "nix:no-default-features"),
+        ("checks.packages.enable", "nix:package"),
+        ("checks.crates.enable", "nix:crate-check"),
+        ("checks.lockFreshness.enable", "nix:lock-validation"),
+        (
+            "checks.workspaceDependencies.enable",
+            "nix:workspace-dependencies",
+        ),
+        ("checks.noDefaultFeatures.enable", "nix:no-default-features"),
         ("checks.codeHealth.enable", "static:code-health"),
         (
             "checks.clippySuppressions.enable",

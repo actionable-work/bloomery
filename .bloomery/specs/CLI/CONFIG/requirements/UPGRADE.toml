@@ -60,7 +60,7 @@ id = "CLI-CONFIG-UPGRADE-007"
 title = "Upgrade rejects invalid configurations"
 manual = false
 design = "design/upgrade.md#validation-and-publication"
-ears = { type = "unwanted_behavior", trigger = "the configuration is malformed, unreadable, invalid, lacks a version, or uses an unsupported format", system = "bloomery config upgrade", action = "report a ConfigurationError without writing and ask the user to set version = 1 when it is missing" }
+ears = { type = "unwanted_behavior", trigger = "the configuration is malformed, unreadable, invalid, lacks a version, or uses an unsupported format", system = "bloomery config upgrade", action = "report a ConfigurationError without writing and ask the user to set version = 2 when it is missing" }
 
 [[requirements]]
 id = "CLI-CONFIG-UPGRADE-008"
@@ -229,31 +229,31 @@ action = "preserve the false value without rewriting it"
 
 [[requirements]]
 id = "CLI-CONFIG-UPGRADE-023"
-title = "Upgrade migrates supported numbered formats"
-manual = true
+title = "Upgrade migrates format 1 to format 2"
+manual = false
 design = "design/upgrade.md#format-migrations"
-ears = { type = "event", trigger = "config upgrade runs on an older supported numbered format", system = "bloomery config upgrade", action = "apply every intervening migration and write the current format version" }
+ears = { type = "event", trigger = "config upgrade reads a format 1 configuration", system = "bloomery config upgrade", action = "move toolchain, profile, flag, and flat check settings to their format 2 paths and write version = 2" }
 
 [[requirements]]
 id = "CLI-CONFIG-UPGRADE-024"
 title = "Format migration preserves configured values"
-manual = true
+manual = false
 design = "design/upgrade.md#format-migrations"
 ears = { type = "ubiquitous", system = "configuration format migration", action = "preserve the meaning and value of every explicitly configured key while changing its structure" }
 
 [[requirements]]
 id = "CLI-CONFIG-UPGRADE-025"
 title = "Dry-run reports pending format migration"
-manual = true
+manual = false
 design = "design/upgrade.md#format-migrations"
-ears = { type = "event", trigger = "config upgrade --dry-run runs on an older supported numbered format", system = "bloomery config upgrade", action = "report the source and target format versions without writing" }
+ears = { type = "event", trigger = "config upgrade --dry-run reads a format 1 configuration", system = "bloomery config upgrade", action = "report the source and target format versions without writing" }
 
 [[requirements]]
 id = "CLI-CONFIG-UPGRADE-026"
 title = "Diff reports pending format migration"
-manual = true
+manual = false
 design = "design/upgrade.md#format-migrations"
-ears = { type = "event", trigger = "config upgrade --diff runs on an older supported numbered format", system = "bloomery config upgrade", action = "report the source and target format versions without writing" }
+ears = { type = "event", trigger = "config upgrade --diff reads a format 1 configuration", system = "bloomery config upgrade", action = "report the source and target format versions without writing" }
 
 [[requirements]]
 id = "CLI-CONFIG-UPGRADE-027"

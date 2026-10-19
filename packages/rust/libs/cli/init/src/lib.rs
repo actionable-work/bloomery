@@ -654,14 +654,14 @@ mod tests {
             assert!(manifest.contains("[workspace]"), "{name} workspace");
             assert!(manifest.contains("resolver = \"2\""), "{name} resolver");
             let config = files.get(".bloomery/config.toml").expect("config");
-            assert!(config.contains("version = 1"), "{name} config version");
+            assert!(config.contains("version = 2"), "{name} config version");
             assert!(config.contains("[build]"), "{name} build table");
             assert!(
-                config.contains("workspaceDependencies = false"),
+                config.contains("[checks.workspaceDependencies]\nenable = false"),
                 "{name} workspace dependency opt-out"
             );
             assert!(
-                config.contains("noDefaultFeatures = false"),
+                config.contains("[checks.noDefaultFeatures]\nenable = false"),
                 "{name} default feature opt-out"
             );
             assert!(files.contains_key(".gitignore"), "{name} gitignore");

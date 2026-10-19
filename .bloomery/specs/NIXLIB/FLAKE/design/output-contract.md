@@ -39,14 +39,14 @@ When checks are enabled, `checks` contains `<crate>:check`, `<crate>:test`,
 `<crate>:check`, clippy, and documentation checks compile their dependency
 crates metadata-only; test and doctest compile workspace crates with the dev
 profile; package checks use full release crates. `<crate>:check` is generated
-only when `checks.crateCheck` is enabled; it is off by default. Package checks
+only when `checks.crates.enable` is enabled; it is off by default. Package checks
 `<bin>:bin` and `<crate>:lib` are included only when
-`checks.includePackageChecks` is enabled; it is also off by default. Enabling
+`checks.packages.enable` is enabled; it is also off by default. Enabling
 package checks reuses the release crate and binary derivations.
 `workspace:lock` validates lock consistency, `workspace:dependencies`
 validates dependency inheritance, and `workspace:default-features` validates
-disabled default features; each manifest check is omitted when its `[checks]`
-toggle is disabled. Bloomery never generates a recursive `bloomery:check`
+disabled default features; each manifest check follows its own check table's
+`enable` switch. Bloomery never generates a recursive `bloomery:check`
 output.
 
 ## Derivation and metadata outputs

@@ -1,11 +1,11 @@
-version = 1
+version = 2
 
 [build]
 devPackages = true
 libPackages = true
 
-[profile.release]
+[build.profile.release]
 optLevel = 2
 
-[toolchain]
+[build.toolchain]
 linker = "mold"

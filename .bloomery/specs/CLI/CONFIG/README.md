@@ -20,8 +20,9 @@ catalog documentation comments to configured keys.
 
 The [schema catalog](../../PARSER/CONFIGURATION/design/schema-catalog.md) spans
 the CLI-owned `[specs]`/`[scanners.*]` tables and the Nix build tables
-`[build]`, `[toolchain]`, `[profile.*]`, `[flags]`, `[devShell]`, `[checks]`,
-and `[features]`. The CLI validates and edits all of them;
+`[build]`, `[build.toolchain]`, `[build.profile.*]`, `[build.flags]`,
+`[devShell]`, `[checks]`, and `[features]`. The CLI validates and edits all of
+them;
 [NIXLIB/FLAKE](../../NIXLIB/FLAKE/README.md) retains authority over build-table
 semantics and evaluation-time resolution. Command syntax is owned by
 [CLI/INTERFACE](../INTERFACE/README.md). Config editing does not load the
@@ -44,10 +45,8 @@ specification tree, scan evidence, run checks, or touch lockfiles.
 - Validate the complete resulting configuration and publish it atomically.
 - Add only absent recommended keys during `config upgrade` and report
   recommendation differences with `--diff`.
-- Require an explicit supported configuration format version; format `1` is
-  currently the only supported version.
-- Migrate supported older numbered layouts to the current format during a
-  writing `config upgrade` when a later format is defined.
+- Require an explicit supported configuration format version; format `2` is
+  current, and a writing `config upgrade` migrates format `1` to format `2`.
 - Annotate every configured key with its schema-catalog documentation during
   `config document` without changing values or materializing absent keys.
 - Warn, without failing, when a config command runs outside a Bloomery flake

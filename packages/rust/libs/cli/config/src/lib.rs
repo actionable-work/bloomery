@@ -8,7 +8,7 @@ pub use error::{ConfigError, ConfigErrorKind};
 
 use bloomery_cli_types::ConfigOperation;
 use bloomery_model::catalog::{self, KeySpec};
-use bloomery_model::config::{LoadedConfig, parse_contents};
+use bloomery_model::config::parse_contents;
 use serde::Serialize;
 use std::fs;
 use std::path::Path;
@@ -195,28 +195,48 @@ fn config_upgrade_outcome(
     diff: bool,
 ) -> Result<ConfigOutcome, ConfigError> {
     let migration = upgrade::migration(raw)?;
+    let mut document = match contents {
+        Some(contents) => document::parse_document(contents)?,
+        None => document::new_config_document(),
+    };
+    upgrade::apply_migration(&mut document, migration)?;
+    let migrated_contents = document.to_string();
+    let migrated_raw = if exists {
+        Some(
+            toml::from_str::<toml::Value>(&migrated_contents).map_err(|error| {
+                ConfigError::failure(format!("Unable to parse migrated configuration: {error}"))
+            })?,
+        )
+    } else {
+        None
+    };
+
+    // Validate the migrated layout before reporting or publishing it.
+    parse_contents(&migrated_contents, config_path).map_err(ConfigError::from_diagnostic)?;
+
     if diff {
         return Ok(ConfigOutcome::Upgrade {
             source_version: migration.map(|migration| migration.source_version),
             target_version: migration.map(|migration| migration.target_version),
             added: Vec::new(),
             written: false,
-            differences: upgrade::diff(raw),
+            differences: upgrade::diff(migrated_raw.as_ref()),
         });
     }
 
-    let mut added = upgrade::missing_entries(raw)
+    let mut added = upgrade::missing_entries(migrated_raw.as_ref())
         .into_iter()
         .map(|entry| entry.path.join("."))
         .collect::<Vec<_>>();
     added.sort();
     let created = !exists;
-    let written = if !dry_run && (!added.is_empty() || created) {
-        let mut document = editable_document(contents)?;
-        upgrade::apply(&mut document, raw)?;
+    let written = if !dry_run && (!added.is_empty() || created || migration.is_some()) {
+        upgrade::apply(&mut document, migrated_raw.as_ref())?;
         publish_checked(config_path, &document)?;
         true
     } else {
+        upgrade::apply(&mut document, migrated_raw.as_ref())?;
+        parse_contents(&document.to_string(), config_path).map_err(ConfigError::from_diagnostic)?;
         false
     };
 
@@ -243,13 +263,20 @@ pub fn run(root: &Path, operation: &ConfigOperation) -> Result<ConfigReport, Con
     } else {
         None
     };
-    let loaded: Option<LoadedConfig> = match &contents {
-        Some(contents) => {
-            Some(parse_contents(contents, &config_path).map_err(ConfigError::from_diagnostic)?)
+    let raw = match (&contents, &resolved) {
+        (Some(contents), Resolved::Upgrade { .. }) => {
+            Some(toml::from_str::<toml::Value>(contents).map_err(|error| {
+                ConfigError::failure(format!("Unable to parse configuration: {error}"))
+            })?)
         }
-        None => None,
+        (Some(contents), _) => Some(
+            parse_contents(contents, &config_path)
+                .map_err(ConfigError::from_diagnostic)?
+                .raw
+                .expect("a parsed file retains its raw configuration"),
+        ),
+        (None, _) => None,
     };
-    let raw = loaded.as_ref().and_then(|loaded| loaded.raw.as_ref());
 
     if !exists {
         if resolved.is_mutating() {
@@ -265,7 +292,7 @@ pub fn run(root: &Path, operation: &ConfigOperation) -> Result<ConfigReport, Con
 
     let outcome = match &resolved {
         Resolved::Get(entry) => ConfigOutcome::Get {
-            key: record(entry, raw),
+            key: record(entry, raw.as_ref()),
         },
         Resolved::List(prefix) => {
             let mut keys = catalog::CATALOG
@@ -275,7 +302,7 @@ pub fn run(root: &Path, operation: &ConfigOperation) -> Result<ConfigReport, Con
                         .as_deref()
                         .is_none_or(|prefix| entry.path.join(".").starts_with(prefix))
                 })
-                .map(|entry| record(&KeySpec::from_entry(entry), raw))
+                .map(|entry| record(&KeySpec::from_entry(entry), raw.as_ref()))
                 .collect::<Vec<_>>();
             keys.sort_by(|left, right| left.key.cmp(&right.key));
             ConfigOutcome::List { keys }
@@ -309,14 +336,14 @@ pub fn run(root: &Path, operation: &ConfigOperation) -> Result<ConfigReport, Con
         Resolved::Upgrade { dry_run, diff } => config_upgrade_outcome(
             &config_path,
             contents.as_deref(),
-            raw,
+            raw.as_ref(),
             exists,
             *dry_run,
             *diff,
         )?,
         Resolved::Document => {
             let mut document = editable_document(contents.as_deref())?;
-            let documented = match raw {
+            let documented = match raw.as_ref() {
                 Some(raw) => document::document_values(&mut document, raw)?,
                 None => Vec::new(),
             };
@@ -354,7 +381,7 @@ mod tests {
     }
 
     fn seed(root: &Path, contents: &str) {
-        seed_raw(root, &format!("version = 1\n{contents}"));
+        seed_raw(root, &format!("version = 2\n{contents}"));
     }
 
     fn seed_raw(root: &Path, contents: &str) {
@@ -387,7 +414,7 @@ mod tests {
         assert!(report.warnings.contains(&ConfigWarning::CreatedConfig {
             path: CONFIG_RELATIVE_PATH.to_owned()
         }));
-        assert!(contents(&root).contains("version = 1"));
+        assert!(contents(&root).contains("version = 2"));
         assert!(contents(&root).contains("enable = false"));
         let _ = fs::remove_dir_all(root);
     }
@@ -403,7 +430,7 @@ mod tests {
         ] {
             let root = temp_root();
             run(&root, &operation).expect("mutator creates configuration");
-            assert_eq!(contents(&root), "version = 1\n", "{operation:?}");
+            assert_eq!(contents(&root), "version = 2\n", "{operation:?}");
             let _ = fs::remove_dir_all(root);
         }
     }
@@ -433,7 +460,7 @@ mod tests {
             let original = "checks.enable = true\n";
             seed_raw(&root, original);
             let error = run(&root, &operation).expect_err("missing version is rejected");
-            assert!(error.message().contains("version = 1"), "{error}");
+            assert!(error.message().contains("version = 2"), "{error}");
             assert_eq!(contents(&root), original);
             let _ = fs::remove_dir_all(root);
         }
@@ -464,7 +491,7 @@ mod tests {
         let root = temp_root();
         seed_raw(
             &root,
-            "version = 1 # preserve format comment\nchecks.enable = true\n",
+            "version = 2 # preserve format comment\nchecks.enable = true\n",
         );
 
         let error = run(
@@ -486,7 +513,7 @@ mod tests {
         .expect("set");
         run(&root, &ConfigOperation::Document).expect("document");
         let after_edit = contents(&root);
-        assert!(after_edit.contains("version = 1"), "{after_edit}");
+        assert!(after_edit.contains("version = 2"), "{after_edit}");
         assert!(
             after_edit.contains("# preserve format comment"),
             "{after_edit}"
@@ -501,7 +528,7 @@ mod tests {
         )
         .expect("unset");
         let after_unset = contents(&root);
-        assert!(after_unset.contains("version = 1"), "{after_unset}");
+        assert!(after_unset.contains("version = 2"), "{after_unset}");
         assert!(
             after_unset.contains("# preserve format comment"),
             "{after_unset}"
@@ -544,8 +571,8 @@ mod tests {
         let root = temp_root();
         for key in [
             "checks.enable",
-            "profile.release.optLevel",
-            "toolchain.rustc",
+            "build.profile.release.optLevel",
+            "build.toolchain.rustc",
             "flakes.tests-basic.path",
             "flakes.tests-basic.packages",
             "flakes.tests-basic.apps",
@@ -619,7 +646,7 @@ mod tests {
         for (key, value) in [
             ("checks.enable", "yes"),
             ("scanners.rust.paths", "not-a-list"),
-            ("profile.release.codegenUnits", "0"),
+            ("build.profile.release.codegenUnits", "0"),
         ] {
             let error = run(
                 &root,
@@ -768,12 +795,12 @@ mod tests {
         let root = temp_root();
         seed(
             &root,
-            "# keep me\n\n[checks]\nenable = true   # trailing\nthrowOnOutOfDate = false\n",
+            "# keep me\n\n[checks]\nenable = true   # trailing\n\n[checks.lockFreshness]\nenable = false\n",
         );
         run(
             &root,
             &operation(ConfigOperation::Set {
-                key: "checks.includePackageChecks".to_owned(),
+                key: "checks.packages.enable".to_owned(),
                 value: "false".to_owned(),
             }),
         )
@@ -781,8 +808,8 @@ mod tests {
         let after = contents(&root);
         assert!(after.contains("# keep me"));
         assert!(after.contains("# trailing"));
-        assert!(after.contains("throwOnOutOfDate = false"));
-        assert!(after.contains("includePackageChecks = false"));
+        assert!(after.contains("enable = false"));
+        assert!(after.contains("[checks.packages]\nenable = false"));
         let _ = fs::remove_dir_all(root);
     }
 
@@ -823,7 +850,7 @@ mod tests {
         let report = run(
             &root,
             &operation(ConfigOperation::Unset {
-                key: "checks.includePackageChecks".to_owned(),
+                key: "checks.packages.enable".to_owned(),
             }),
         )
         .expect("unset absent");
@@ -868,7 +895,7 @@ mod tests {
         run(
             &root,
             &operation(ConfigOperation::Set {
-                key: "checks.throwOnOutOfDate".to_owned(),
+                key: "checks.lockFreshness.enable".to_owned(),
                 value: "true".to_owned(),
             }),
         )
@@ -880,7 +907,7 @@ mod tests {
             .filter(|entry| entry.file_name().to_string_lossy().contains(".tmp"))
             .count();
         assert_eq!(leftovers, 0);
-        assert!(contents(&root).contains("throwOnOutOfDate = true"));
+        assert!(contents(&root).contains("[checks.lockFreshness]\nenable = true"));
         let _ = fs::remove_dir_all(root);
     }
 
@@ -949,18 +976,18 @@ mod tests {
                 sorted.sort();
                 assert_eq!(added, sorted);
                 assert!(added.contains(&"checks.enable".to_owned()));
-                assert!(added.contains(&"checks.crateCheck".to_owned()));
+                assert!(added.contains(&"checks.crates.enable".to_owned()));
                 assert!(added.contains(&"checks.specifications.enable".to_owned()));
                 assert!(added.contains(&"checks.clippySuppressions.enable".to_owned()));
-                assert!(added.contains(&"toolchain.rustc".to_owned()));
-                assert!(!added.contains(&"toolchain.linker".to_owned()));
+                assert!(added.contains(&"build.toolchain.rustc".to_owned()));
+                assert!(!added.contains(&"build.toolchain.linker".to_owned()));
             }
             other => panic!("unexpected outcome: {other:?}"),
         }
         let after = contents(&root);
-        assert!(after.contains("version = 1"));
+        assert!(after.contains("version = 2"));
         assert!(after.contains("enable = true"));
-        assert!(after.contains("crateCheck = true"));
+        assert!(after.contains("[checks.crates]\nenable = true"));
         assert!(after.contains("[checks.specifications]\nenable = true"));
         assert!(
             after.contains("[checks.clippySuppressions]\nallow = []\nenable = true")
@@ -968,7 +995,7 @@ mod tests {
                     && after.contains("enable = true")
                     && after.contains("allow = []"))
         );
-        assert!(after.contains("throwOnOutOfDate = true"));
+        assert!(after.contains("[checks.lockFreshness]\nenable = true"));
         let _ = fs::remove_dir_all(root);
     }
 
@@ -1069,6 +1096,190 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-023"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-024"))]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-VERSION-006"))]
+    fn upgrade_migrates_v1_tables_and_preserves_values() {
+        let root = temp_root();
+        seed_raw(
+            &root,
+            "version = 1\n\
+             [build]\ncargoToml = \"workspace/Cargo.toml\"\n\
+             [toolchain]\nrustc = \"llvmPackages.rustc\"\nlinker = \"mold\"\n\
+             [profile.release]\noptLevel = 2\n\
+             [profile.dev]\noptLevel = 1\n\
+             [flags]\nrustc = [\"-Cdebuginfo=0\"]\n\
+             [checks]\nenable = false\ncrateCheck = false\nincludePackageChecks = true\n\
+             throwOnOutOfDate = false\nworkspaceDependencies = true\nnoDefaultFeatures = false\n\
+             [checks.codeHealth]\nenable = false\n",
+        );
+
+        let report = run(
+            &root,
+            &operation(ConfigOperation::Upgrade {
+                dry_run: false,
+                diff: false,
+            }),
+        )
+        .expect("v1 upgrade");
+        match report.outcome {
+            ConfigOutcome::Upgrade {
+                source_version,
+                target_version,
+                written,
+                ..
+            } => {
+                assert_eq!(source_version, Some(1));
+                assert_eq!(target_version, Some(2));
+                assert!(written);
+            }
+            other => panic!("unexpected outcome: {other:?}"),
+        }
+
+        let after = contents(&root);
+        let parsed = toml::from_str::<toml::Value>(&after).expect("migrated TOML");
+        assert_eq!(parsed["version"].as_integer(), Some(2));
+        assert_eq!(
+            parsed["build"]["cargoToml"].as_str(),
+            Some("workspace/Cargo.toml")
+        );
+        assert_eq!(
+            parsed["build"]["toolchain"]["rustc"].as_str(),
+            Some("llvmPackages.rustc")
+        );
+        assert_eq!(
+            parsed["build"]["toolchain"]["linker"].as_str(),
+            Some("mold")
+        );
+        assert_eq!(
+            parsed["build"]["profile"]["release"]["optLevel"].as_integer(),
+            Some(2)
+        );
+        assert_eq!(
+            parsed["build"]["profile"]["dev"]["optLevel"].as_integer(),
+            Some(1)
+        );
+        assert_eq!(
+            parsed["build"]["flags"]["rustc"][0].as_str(),
+            Some("-Cdebuginfo=0")
+        );
+        assert_eq!(parsed["checks"]["enable"].as_bool(), Some(false));
+        assert_eq!(parsed["checks"]["crates"]["enable"].as_bool(), Some(false));
+        assert_eq!(parsed["checks"]["packages"]["enable"].as_bool(), Some(true));
+        assert_eq!(
+            parsed["checks"]["lockFreshness"]["enable"].as_bool(),
+            Some(false)
+        );
+        assert_eq!(
+            parsed["checks"]["workspaceDependencies"]["enable"].as_bool(),
+            Some(true)
+        );
+        assert_eq!(
+            parsed["checks"]["noDefaultFeatures"]["enable"].as_bool(),
+            Some(false)
+        );
+        assert_eq!(
+            parsed["checks"]["codeHealth"]["enable"].as_bool(),
+            Some(false)
+        );
+        assert!(!after.contains("[toolchain]"));
+        assert!(!after.contains("[profile.release]"));
+        assert!(!after.contains("[flags]"));
+        assert!(!after.contains("crateCheck ="));
+
+        let second = run(
+            &root,
+            &operation(ConfigOperation::Upgrade {
+                dry_run: false,
+                diff: false,
+            }),
+        )
+        .expect("second v2 upgrade");
+        match second.outcome {
+            ConfigOutcome::Upgrade { written, added, .. } => {
+                assert!(!written);
+                assert!(added.is_empty());
+            }
+            other => panic!("unexpected outcome: {other:?}"),
+        }
+        assert_eq!(contents(&root), after);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-025"))]
+    fn v1_dry_run_reports_migration_without_writing() {
+        let root = temp_root();
+        let original =
+            "version = 1\n[toolchain]\nrustc = \"rustc\"\n[checks]\ncrateCheck = false\n";
+        seed_raw(&root, original);
+
+        let report = run(
+            &root,
+            &operation(ConfigOperation::Upgrade {
+                dry_run: true,
+                diff: false,
+            }),
+        )
+        .expect("v1 dry-run");
+        match report.outcome {
+            ConfigOutcome::Upgrade {
+                source_version,
+                target_version,
+                added,
+                written,
+                ..
+            } => {
+                assert_eq!(source_version, Some(1));
+                assert_eq!(target_version, Some(2));
+                assert!(added.contains(&"checks.enable".to_owned()));
+                assert!(!written);
+            }
+            other => panic!("unexpected outcome: {other:?}"),
+        }
+        assert_eq!(contents(&root), original);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-026"))]
+    fn v1_diff_reports_migrated_paths_without_writing() {
+        let root = temp_root();
+        let original = "version = 1\n[checks]\ncrateCheck = false\n";
+        seed_raw(&root, original);
+
+        let report = run(
+            &root,
+            &operation(ConfigOperation::Upgrade {
+                dry_run: false,
+                diff: true,
+            }),
+        )
+        .expect("v1 diff");
+        match report.outcome {
+            ConfigOutcome::Upgrade {
+                source_version,
+                target_version,
+                differences,
+                written,
+                ..
+            } => {
+                assert_eq!(source_version, Some(1));
+                assert_eq!(target_version, Some(2));
+                assert!(!written);
+                assert!(differences.iter().any(|record| {
+                    record.key == "checks.crates.enable"
+                        && record.current == Some(toml::Value::Boolean(false))
+                        && record.status == DiffStatus::Differing
+                }));
+            }
+            other => panic!("unexpected outcome: {other:?}"),
+        }
+        assert_eq!(contents(&root), original);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-011"))]
     fn dry_run_reports_without_writing() {
         let root = temp_root();
@@ -1156,7 +1367,7 @@ mod tests {
                 assert_eq!(absent.status, DiffStatus::Absent);
                 let optional = differences
                     .iter()
-                    .find(|record| record.key == "toolchain.linker")
+                    .find(|record| record.key == "build.toolchain.linker")
                     .expect("linker diff");
                 assert_eq!(optional.status, DiffStatus::Unset);
             }
@@ -1198,7 +1409,7 @@ mod tests {
         assert!(report.warnings.contains(&ConfigWarning::CreatedConfig {
             path: CONFIG_RELATIVE_PATH.to_owned()
         }));
-        assert!(contents(&root).contains("version = 1"));
+        assert!(contents(&root).contains("version = 2"));
         assert!(contents(&root).contains("enable = true"));
         let _ = fs::remove_dir_all(root);
     }
@@ -1344,7 +1555,10 @@ mod tests {
     #[cfg_attr(any(), bloomery("CLI-CONFIG-DOCUMENT-010"))]
     fn document_reports_sorted_paths() {
         let root = temp_root();
-        seed(&root, "[checks]\nenable = true\nthrowOnOutOfDate = false\n");
+        seed(
+            &root,
+            "[checks]\nenable = true\n[checks.lockFreshness]\nenable = false\n",
+        );
         let report = run(&root, &operation(ConfigOperation::Document)).expect("document");
         match report.outcome {
             ConfigOutcome::Document { documented, .. } => {
@@ -1352,7 +1566,7 @@ mod tests {
                 sorted.sort();
                 assert_eq!(documented, sorted);
                 assert!(documented.contains(&"checks.enable".to_owned()));
-                assert!(documented.contains(&"checks.throwOnOutOfDate".to_owned()));
+                assert!(documented.contains(&"checks.lockFreshness.enable".to_owned()));
             }
             other => panic!("unexpected outcome: {other:?}"),
         }

@@ -539,7 +539,7 @@ mod tests {
             fs::create_dir_all(&directory).expect("config directory");
             fs::write(
                 directory.join("config.toml"),
-                format!("version = 1\n{config}"),
+                format!("version = 2\n{config}"),
             )
             .expect("config");
         }

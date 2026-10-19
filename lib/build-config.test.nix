@@ -9,7 +9,7 @@
       toWorkspaceArgs = request: let
         config = request.config or {};
       in
-        rawLoader.toWorkspaceArgs (request // {config = {version = 1;} // config;});
+        rawLoader.toWorkspaceArgs (request // {config = {version = 2;} // config;});
     };
   options = import ./workspace/options.nix {inherit pkgs lib;};
 
@@ -33,6 +33,7 @@ in {
       checksEnabled = cfg.checks.enable;
       includePackageChecks = cfg.checks.includePackageChecks;
       crateCheck = cfg.checks.crateCheck;
+      lockFreshness = cfg.checks.throwOnOutOfDate;
       workspaceDependencies = cfg.checks.workspaceDependencies;
       noDefaultFeatures = cfg.checks.noDefaultFeatures;
       unify = cfg.build.unify;
@@ -47,6 +48,7 @@ in {
       checksEnabled = false;
       includePackageChecks = false;
       crateCheck = false;
+      lockFreshness = false;
       workspaceDependencies = false;
       noDefaultFeatures = false;
       unify = true;
@@ -90,7 +92,7 @@ in {
   testToolchainPackagesResolve = {
     expr = let
       cfg = eval {
-        toolchain = {
+        build.toolchain = {
           rustc = "rustc";
           clippy = "clippy";
           cargo = "cargo";
@@ -123,14 +125,14 @@ in {
   testProfilesAndFlagsAreMapped = {
     expr = let
       cfg = eval {
-        profile = {
+        build.profile = {
           release = {
             optLevel = 2;
             lto = "thin";
           };
           dev.optLevel = 1;
         };
-        flags = {
+        build.flags = {
           rustc = ["-Copt-level=2"];
           doc = ["-Dwarnings"];
         };
@@ -161,11 +163,11 @@ in {
         };
         checks = {
           enable = false;
-          includePackageChecks = false;
-          crateCheck = false;
-          throwOnOutOfDate = true;
-          workspaceDependencies = false;
-          noDefaultFeatures = false;
+          packages.enable = false;
+          crates.enable = false;
+          lockFreshness.enable = true;
+          workspaceDependencies.enable = false;
+          noDefaultFeatures.enable = false;
         };
         build = {
           unify = false;
@@ -225,6 +227,42 @@ in {
       config.build.bogus = true;
     });
     expected = true;
+  };
+
+  testRemovedRootBuildTablesFail = {
+    expr = map fails [
+      (loader.toWorkspaceArgs {
+        root = ./.;
+        config.toolchain.rustc = "rustc";
+      })
+      (loader.toWorkspaceArgs {
+        root = ./.;
+        config.profile.release.optLevel = 2;
+      })
+      (loader.toWorkspaceArgs {
+        root = ./.;
+        config.flags.rustc = ["-Dwarnings"];
+      })
+    ];
+    expected = [true true true];
+  };
+
+  testCheckFamiliesRequireTheirOwnEnableTables = {
+    expr = map fails [
+      (loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.crates = true;
+      })
+      (loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.packages.unknown = true;
+      })
+      (loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.crateCheck = false;
+      })
+    ];
+    expected = [true true true];
   };
 
   testWrongTableTypeFails = {
@@ -314,7 +352,7 @@ in {
   testUnresolvablePackageFails = {
     expr = fails (loader.toWorkspaceArgs {
       root = ./.;
-      config.toolchain.rustc = "definitely-not-a-real-package";
+      config.build.toolchain.rustc = "definitely-not-a-real-package";
     });
     expected = true;
   };
@@ -345,11 +383,11 @@ in {
       });
       float = fails (rawLoader.toWorkspaceArgs {
         root = ./.;
-        config.version = 1.0;
+        config.version = 2.0;
       });
       string = fails (rawLoader.toWorkspaceArgs {
         root = ./.;
-        config.version = "1";
+        config.version = "2";
       });
       boolean = fails (rawLoader.toWorkspaceArgs {
         root = ./.;
@@ -357,12 +395,16 @@ in {
       });
       future = fails (rawLoader.toWorkspaceArgs {
         root = ./.;
-        config.version = 2;
+        config.version = 3;
+      });
+      old = fails (rawLoader.toWorkspaceArgs {
+        root = ./.;
+        config.version = 1;
       });
       current =
         !fails (rawLoader.toWorkspaceArgs {
           root = ./.;
-          config.version = 1;
+          config.version = 2;
         });
     };
     expected = {
@@ -373,6 +415,7 @@ in {
       string = true;
       boolean = true;
       future = true;
+      old = true;
       current = true;
     };
   };
@@ -392,7 +435,7 @@ in {
       profileOptLevel = cfg.profile.optLevel;
     };
     expected = {
-      version = 1;
+      version = 2;
       libPackages = true;
       devPackages = true;
       linker = "mold";

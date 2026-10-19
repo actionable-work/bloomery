@@ -3,15 +3,17 @@
   lib ? pkgs.lib,
 }: let
   inherit (builtins) attrNames elem filter isAttrs isInt isList isString;
-  currentConfigVersion = 1;
+  currentConfigVersion = 2;
 
   validateConfigVersion = config:
     if !(isAttrs config)
-    then throw "bloomery: .bloomery/config.toml must contain a top-level version = 1"
+    then throw "bloomery: .bloomery/config.toml must contain a top-level version = 2"
     else if !(config ? version)
-    then throw "bloomery: .bloomery/config.toml has no top-level version; set version = 1"
+    then throw "bloomery: .bloomery/config.toml has no top-level version; set version = 2"
     else if isInt config.version && config.version == currentConfigVersion
     then config
+    else if isInt config.version && config.version == 1
+    then throw "bloomery: config format version 1 must be migrated with bloomery config upgrade"
     else throw "bloomery: unsupported or malformed config format version; expected integer ${toString currentConfigVersion}";
 
   # Recognized keys for each build table. Unknown keys are evaluation errors so
@@ -26,6 +28,9 @@
       "libPackages"
       "devPackages"
       "unify"
+      "toolchain"
+      "profile"
+      "flags"
     ];
     toolchain = ["rustc" "clippy" "cargo" "lld" "mold" "stdenv" "linker"];
     profile = ["release" "dev"];
@@ -43,7 +48,7 @@
     ];
     flags = ["rustc" "test" "clippy" "doc" "doctest"];
     devShell = ["enable" "packages" "shellHook"];
-    checks = ["enable" "includePackageChecks" "crateCheck" "throwOnOutOfDate" "workspaceDependencies" "noDefaultFeatures" "codeHealth" "specifications" "clippySuppressions"];
+    checks = ["enable" "crates" "packages" "lockFreshness" "workspaceDependencies" "noDefaultFeatures" "codeHealth" "specifications" "clippySuppressions"];
     features = ["cratesIoIndex"];
   };
 
@@ -56,6 +61,21 @@
       if unknown != []
       then throw "bloomery: unknown key(s) in [${name}]: ${lib.concatStringsSep ", " unknown}"
       else value;
+
+  checkEnableTable = name: value: let
+    config = checkTable name ["enable"] value;
+  in
+    if (config ? enable && !builtins.isBool config.enable)
+    then throw "bloomery: ${name}.enable must be a boolean"
+    else config;
+
+  checkRootKeys = config: let
+    known = ["version" "specs" "scanners" "build" "devShell" "checks" "features" "formatters" "optimize" "flakes"];
+    unknown = filter (key: !(elem key known)) (attrNames config);
+  in
+    if unknown != []
+    then throw "bloomery: unknown top-level configuration key(s): ${lib.concatStringsSep ", " unknown}"
+    else config;
 
   checkCodeHealth = value: let
     keys = ["enable" "baseline" "minCrateScore" "minWorkspaceScore" "maxRegression" "cyclomaticLimit" "functionTokensLimit" "nestingLimit" "duplicationFreeRatio" "duplicateMinTokens" "maxCyclomatic" "maxFunctionTokens" "maxNesting"];
@@ -319,19 +339,40 @@
     config ? readConfig root,
     overrides ? {},
   }: let
-    validatedConfig = validateConfigVersion config;
+    validatedConfig = checkRootKeys (validateConfigVersion config);
     build = checkTable "build" allowedKeys.build (config.build or {});
-    toolchain = checkTable "toolchain" allowedKeys.toolchain (config.toolchain or {});
-    profile = checkTable "profile" allowedKeys.profile (config.profile or {});
-    release = checkTable "profile.release" allowedKeys.profileFields (profile.release or {});
-    dev = checkTable "profile.dev" allowedKeys.profileFields (profile.dev or {});
-    flags = checkTable "flags" allowedKeys.flags (config.flags or {});
+    toolchain = checkTable "build.toolchain" allowedKeys.toolchain (build.toolchain or {});
+    profile = checkTable "build.profile" allowedKeys.profile (build.profile or {});
+    release = checkTable "build.profile.release" allowedKeys.profileFields (profile.release or {});
+    dev = checkTable "build.profile.dev" allowedKeys.profileFields (profile.dev or {});
+    flags = checkTable "build.flags" allowedKeys.flags (build.flags or {});
     devShell = checkTable "devShell" allowedKeys.devShell (config.devShell or {});
     rawChecks = checkTable "checks" allowedKeys.checks (config.checks or {});
+    checkedCrates = checkEnableTable "checks.crates" (rawChecks.crates or {});
+    checkedPackages = checkEnableTable "checks.packages" (rawChecks.packages or {});
+    checkedLockFreshness = checkEnableTable "checks.lockFreshness" (rawChecks.lockFreshness or {});
+    checkedWorkspaceDependencies = checkEnableTable "checks.workspaceDependencies" (rawChecks.workspaceDependencies or {});
+    checkedNoDefaultFeatures = checkEnableTable "checks.noDefaultFeatures" (rawChecks.noDefaultFeatures or {});
     checkedHealth = lib.optionalAttrs (rawChecks ? codeHealth) {codeHealth = checkCodeHealth rawChecks.codeHealth;};
     checkedSpecifications = lib.optionalAttrs (rawChecks ? specifications) {specifications = checkSpecifications rawChecks.specifications;};
     checkedClippySuppressions = lib.optionalAttrs (rawChecks ? clippySuppressions) {clippySuppressions = checkClippySuppressions rawChecks.clippySuppressions;};
-    checks = builtins.deepSeq [checkedHealth checkedSpecifications checkedClippySuppressions] (builtins.removeAttrs rawChecks ["codeHealth" "specifications" "clippySuppressions"]);
+    checks = builtins.deepSeq [checkedCrates checkedPackages checkedLockFreshness checkedWorkspaceDependencies checkedNoDefaultFeatures checkedHealth checkedSpecifications checkedClippySuppressions] (
+      builtins.removeAttrs rawChecks [
+        "crates"
+        "packages"
+        "lockFreshness"
+        "workspaceDependencies"
+        "noDefaultFeatures"
+        "codeHealth"
+        "specifications"
+        "clippySuppressions"
+      ]
+      // (lib.optionalAttrs (checkedCrates ? enable) {crateCheck = checkedCrates.enable;})
+      // (lib.optionalAttrs (checkedPackages ? enable) {includePackageChecks = checkedPackages.enable;})
+      // (lib.optionalAttrs (checkedLockFreshness ? enable) {throwOnOutOfDate = checkedLockFreshness.enable;})
+      // (lib.optionalAttrs (checkedWorkspaceDependencies ? enable) {workspaceDependencies = checkedWorkspaceDependencies.enable;})
+      // (lib.optionalAttrs (checkedNoDefaultFeatures ? enable) {noDefaultFeatures = checkedNoDefaultFeatures.enable;})
+    );
     features = checkTable "features" allowedKeys.features (config.features or {});
     formatters = checkFormatters (config.formatters or {});
     optimize = checkOptimize root (config.optimize or {});

@@ -15,28 +15,35 @@ configuration was written.
 
 Keys whose omission is semantic have no recommendation and are never
 materialized: `build.bloomeryLock` auto-detects, `build.members` means all
-members, `toolchain.linker` is host-dependent, `features.cratesIoIndex` means
-none, and the `profile.*` fields inherit from `Cargo.toml` and rustc.
+members, `build.toolchain.linker` is host-dependent,
+`features.cratesIoIndex` means none, and the `build.profile.*` fields inherit
+from `Cargo.toml` and rustc.
 
 ## Format migrations
 
-The top-level integer `version` is required. Format `1` is the current and only
-supported format. An existing file without a version is rejected with an error
-that asks the user to set `version = 1`; `config upgrade` does not infer or add a
-version to that file. Format `0` is unsupported.
+The top-level integer `version` is required. Format `2` is current. An existing
+file without a version is rejected with an error that asks the user to set
+`version = 2`; `config upgrade` does not infer or add a version to that file.
+Format `0` is unsupported.
 
-A future structural format increments the version and defines migrations from
-supported earlier numbered formats. `config upgrade` applies those migrations
-in order, preserves configured values and their meaning, then writes the current
-format version. At present, version `1` is the only supported format, so there
-is no format migration from `0` or from unversioned files. Adding recommended
-keys does not itself change the format version.
+`config upgrade` migrates format `1` to format `2` before adding recommended
+keys. The migration moves top-level `toolchain`, `profile`, and `flags` tables
+under `build`, then moves the flat Nix check controls into their check
+subtables: `checks.crateCheck` to `checks.crates.enable`,
+`checks.includePackageChecks` to `checks.packages.enable`,
+`checks.throwOnOutOfDate` to `checks.lockFreshness.enable`,
+`checks.workspaceDependencies` to `checks.workspaceDependencies.enable`, and
+`checks.noDefaultFeatures` to `checks.noDefaultFeatures.enable`. The global
+`checks.enable` and existing CLI-owned check tables retain their paths. The
+migration preserves configured values and their meaning, then writes
+`version = 2`. No migration from format `0` or unversioned files is defined.
+Adding recommended keys does not itself change the format version.
 
 `--dry-run` reports source and target versions when a supported older numbered
 format needs migration, along with catalog keys that would be added, without
 writing. `--diff` compares recommendations against the normalized configuration
 and reports any applicable format migration without writing. A version `1`
-configuration still receives newly recommended keys, if any.
+configuration is migrated before it receives newly recommended keys.
 
 ## Upgrade semantics
 
@@ -76,15 +83,14 @@ by `config upgrade`, because explicit configuration always wins.
 
 Upgrade is idempotent. After a successful upgrade the current format version
 and every recommended catalog key are present, so a second invocation makes no
-change and leaves the file byte-for-byte unchanged. A version `1` configuration
-that already contains every recommended key is not modified.
+change and leaves the file byte-for-byte unchanged.
 
 ## Validation and publication
 
 Upgrade requires a readable configuration with an explicitly supported
 version. A malformed, unreadable, invalid, missing, or unsupported version
 yields a `ConfigurationError` and no write; a missing version error asks the
-user to set `version = 1`. An absent file is not an error: a writing upgrade
+user to set `version = 2`. An absent file is not an error: a writing upgrade
 creates it at the current format version and materializes every recommended
 key, warning while doing so, while `--dry-run` and `--diff` report against
 defaults without creating it. The upgraded candidate is revalidated as a

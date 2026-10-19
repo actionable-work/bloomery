@@ -211,7 +211,7 @@ fn unselected_health_does_not_refresh_the_configured_baseline() {
     let (root, cache) = crate::check_command::test_support::fixture(true);
     fs::write(
         root.join(".bloomery/config.toml"),
-        "version = 1\n[specs]\ndir = \"specs\"\n\n[checks.specifications]\nenable = true\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\n",
+        "version = 2\n[specs]\ndir = \"specs\"\n\n[checks.specifications]\nenable = true\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\n",
     )
     .expect("enable health beside structure check");
     let backend = FakeNix::default();
@@ -425,7 +425,7 @@ fn health_regressions_compare_crate_and_workspace_scores_after_export() {
     let (root, cache, backend) = health_fixture();
     fs::write(
         root.join(".bloomery/config.toml"),
-        "version = 1\n[specs]\nenable = false\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\ncyclomaticLimit = 2\n",
+        "version = 2\n[specs]\nenable = false\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\ncyclomaticLimit = 2\n",
     )
     .expect("health policy");
     let mut args = request();
@@ -566,7 +566,7 @@ fn health_rejects_baselines_when_scoring_semantics_change() {
 
     fs::write(
         root.join(".bloomery/config.toml"),
-        "version = 1\n[specs]\nenable = false\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\ncyclomaticLimit = 9\n",
+        "version = 2\n[specs]\nenable = false\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\ncyclomaticLimit = 9\n",
     )
     .expect("changed scoring policy");
     let mut args = request();

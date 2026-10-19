@@ -1,7 +1,9 @@
-version = 1
+version = 2
 
 [build]
 
-[checks]
-noDefaultFeatures = false
-workspaceDependencies = false
+[checks.noDefaultFeatures]
+enable = false
+
+[checks.workspaceDependencies]
+enable = false

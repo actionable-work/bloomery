@@ -101,17 +101,17 @@ impl KeySpec {
 }
 
 /// Increment when the catalog changes.
-pub const CATALOG_VERSION: u32 = 10;
+pub const CATALOG_VERSION: u32 = 11;
 
 fn is_check_control(path: &[&str]) -> bool {
     matches!(
         path,
         ["checks", "enable"]
-            | ["checks", "includePackageChecks"]
-            | ["checks", "crateCheck"]
-            | ["checks", "throwOnOutOfDate"]
-            | ["checks", "workspaceDependencies"]
-            | ["checks", "noDefaultFeatures"]
+            | ["checks", "crates", "enable"]
+            | ["checks", "packages", "enable"]
+            | ["checks", "lockFreshness", "enable"]
+            | ["checks", "workspaceDependencies", "enable"]
+            | ["checks", "noDefaultFeatures", "enable"]
             | ["checks", "specifications", "enable"]
             | ["checks", "codeHealth", "enable"]
             | ["checks", "clippySuppressions", "enable"]
@@ -162,7 +162,7 @@ pub const BUILTIN_FORMATTERS: &[&str] = &[
 macro_rules! profile_field {
     ($flavor:literal, $field:literal, $ty:expr, $doc:literal) => {
         CatalogEntry {
-            path: &["profile", $flavor, $field],
+            path: &["build", "profile", $flavor, $field],
             value_type: $ty,
             recommended: None,
             documentation: concat!($flavor, " profile: ", $doc),
@@ -296,43 +296,43 @@ pub const CATALOG: &[CatalogEntry] = &[
         documentation: "Generate dev-profile apps for workspace binaries.",
     },
     CatalogEntry {
-        path: &["toolchain", "rustc"],
+        path: &["build", "toolchain", "rustc"],
         value_type: ValueType::Package,
         recommended: Some(DefaultValue::String("rustc")),
         documentation: "nixpkgs attribute path for rustc.",
     },
     CatalogEntry {
-        path: &["toolchain", "clippy"],
+        path: &["build", "toolchain", "clippy"],
         value_type: ValueType::Package,
         recommended: Some(DefaultValue::String("clippy")),
         documentation: "nixpkgs attribute path for clippy.",
     },
     CatalogEntry {
-        path: &["toolchain", "cargo"],
+        path: &["build", "toolchain", "cargo"],
         value_type: ValueType::Package,
         recommended: Some(DefaultValue::String("cargo")),
         documentation: "nixpkgs attribute path for cargo.",
     },
     CatalogEntry {
-        path: &["toolchain", "lld"],
+        path: &["build", "toolchain", "lld"],
         value_type: ValueType::Package,
         recommended: Some(DefaultValue::String("lld")),
         documentation: "nixpkgs attribute path for lld.",
     },
     CatalogEntry {
-        path: &["toolchain", "mold"],
+        path: &["build", "toolchain", "mold"],
         value_type: ValueType::Package,
         recommended: Some(DefaultValue::String("mold")),
         documentation: "nixpkgs attribute path for mold.",
     },
     CatalogEntry {
-        path: &["toolchain", "stdenv"],
+        path: &["build", "toolchain", "stdenv"],
         value_type: ValueType::Package,
         recommended: Some(DefaultValue::String("stdenv")),
         documentation: "nixpkgs attribute path for the C toolchain.",
     },
     CatalogEntry {
-        path: &["toolchain", "linker"],
+        path: &["build", "toolchain", "linker"],
         value_type: ValueType::Union(LINKER),
         recommended: None,
         documentation: "Linker strategy: lld, mold, system, or omit for the platform default.",
@@ -434,31 +434,31 @@ pub const CATALOG: &[CatalogEntry] = &[
         "enable integer overflow checks"
     ),
     CatalogEntry {
-        path: &["flags", "rustc"],
+        path: &["build", "flags", "rustc"],
         value_type: ValueType::StringList,
         recommended: Some(DefaultValue::StringList(&["-Copt-level=3"])),
         documentation: "Extra rustc flags for release compilation.",
     },
     CatalogEntry {
-        path: &["flags", "test"],
+        path: &["build", "flags", "test"],
         value_type: ValueType::StringList,
         recommended: Some(DefaultValue::StringList(&[])),
         documentation: "Extra rustc flags for test compilation.",
     },
     CatalogEntry {
-        path: &["flags", "clippy"],
+        path: &["build", "flags", "clippy"],
         value_type: ValueType::StringList,
         recommended: Some(DefaultValue::StringList(&[])),
         documentation: "Extra rustc flags for clippy runs.",
     },
     CatalogEntry {
-        path: &["flags", "doc"],
+        path: &["build", "flags", "doc"],
         value_type: ValueType::StringList,
         recommended: Some(DefaultValue::StringList(&["-Dwarnings"])),
         documentation: "Extra rustdoc flags for documentation builds.",
     },
     CatalogEntry {
-        path: &["flags", "doctest"],
+        path: &["build", "flags", "doctest"],
         value_type: ValueType::StringList,
         recommended: Some(DefaultValue::StringList(&[])),
         documentation: "Extra rustdoc flags for doctests.",
@@ -488,31 +488,31 @@ pub const CATALOG: &[CatalogEntry] = &[
         documentation: "Generate workspace checks.",
     },
     CatalogEntry {
-        path: &["checks", "includePackageChecks"],
+        path: &["checks", "packages", "enable"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(true)),
         documentation: "Include binary and library build checks.",
     },
     CatalogEntry {
-        path: &["checks", "crateCheck"],
+        path: &["checks", "crates", "enable"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(true)),
         documentation: "Generate per-crate type-check entries.",
     },
     CatalogEntry {
-        path: &["checks", "throwOnOutOfDate"],
+        path: &["checks", "lockFreshness", "enable"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(true)),
         documentation: "Fail evaluation when bloomery.lock is out of date.",
     },
     CatalogEntry {
-        path: &["checks", "workspaceDependencies"],
+        path: &["checks", "workspaceDependencies", "enable"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(true)),
         documentation: "Validate workspace dependency declarations.",
     },
     CatalogEntry {
-        path: &["checks", "noDefaultFeatures"],
+        path: &["checks", "noDefaultFeatures", "enable"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(true)),
         documentation: "Require default features to be disabled on workspace dependencies.",
@@ -1147,10 +1147,10 @@ mod tests {
             "specs.dir",
             "scanners.rust.enabled",
             "build.cargoToml",
-            "toolchain.rustc",
-            "profile.release.optLevel",
-            "profile.dev.debuginfo",
-            "flags.rustc",
+            "build.toolchain.rustc",
+            "build.profile.release.optLevel",
+            "build.profile.dev.debuginfo",
+            "build.flags.rustc",
             "devShell.shellHook",
             "checks.enable",
             "build.unify",
@@ -1172,7 +1172,7 @@ mod tests {
             "format metadata is not catalogued"
         );
         let versioned: Value =
-            toml::from_str("version = 1\n[checks]\nenable = true\n").expect("versioned TOML");
+            toml::from_str("version = 2\n[checks]\nenable = true\n").expect("versioned TOML");
         assert!(
             validate_raw(&versioned).is_ok(),
             "format metadata is ignored by the catalog"
@@ -1257,13 +1257,15 @@ mod tests {
             ValueType::Bool
         );
         assert_eq!(
-            lookup(&["checks", "workspaceDependencies"])
+            lookup(&["checks", "workspaceDependencies", "enable"])
                 .unwrap()
                 .value_type,
             ValueType::Bool
         );
         assert_eq!(
-            lookup(&["checks", "noDefaultFeatures"]).unwrap().value_type,
+            lookup(&["checks", "noDefaultFeatures", "enable"])
+                .unwrap()
+                .value_type,
             ValueType::Bool
         );
         assert_eq!(
@@ -1271,11 +1273,13 @@ mod tests {
             ValueType::StringList
         );
         assert_eq!(
-            lookup(&["toolchain", "rustc"]).unwrap().value_type,
+            lookup(&["build", "toolchain", "rustc"]).unwrap().value_type,
             ValueType::Package
         );
         assert_eq!(
-            lookup(&["toolchain", "linker"]).unwrap().value_type,
+            lookup(&["build", "toolchain", "linker"])
+                .unwrap()
+                .value_type,
             ValueType::Union(&[ValueType::StringEnum(&["lld", "mold", "system"])])
         );
     }
@@ -1285,6 +1289,7 @@ mod tests {
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-019"))]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-024"))]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-025"))]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-026"))]
     fn effective_defaults_are_distinct_from_upgrade_recommendations() {
         assert_eq!(
             effective_default(&["specs", "dir"]),
@@ -1301,28 +1306,28 @@ mod tests {
             )]))
         );
         assert_eq!(
-            effective_default(&["flags", "rustc"]),
+            effective_default(&["build", "flags", "rustc"]),
             Some(Value::Array(vec![Value::String("-Copt-level=3".into())]))
         );
         assert_eq!(
-            effective_default(&["checks", "includePackageChecks"]),
+            effective_default(&["checks", "packages", "enable"]),
             Some(Value::Boolean(false))
         );
         assert_eq!(
-            effective_default(&["checks", "workspaceDependencies"]),
+            effective_default(&["checks", "workspaceDependencies", "enable"]),
             Some(Value::Boolean(false))
         );
         assert_eq!(
-            effective_default(&["checks", "noDefaultFeatures"]),
+            effective_default(&["checks", "noDefaultFeatures", "enable"]),
             Some(Value::Boolean(false))
         );
         for path in [
             &["checks", "enable"][..],
-            &["checks", "includePackageChecks"][..],
-            &["checks", "crateCheck"][..],
-            &["checks", "throwOnOutOfDate"][..],
-            &["checks", "workspaceDependencies"][..],
-            &["checks", "noDefaultFeatures"][..],
+            &["checks", "packages", "enable"][..],
+            &["checks", "crates", "enable"][..],
+            &["checks", "lockFreshness", "enable"][..],
+            &["checks", "workspaceDependencies", "enable"][..],
+            &["checks", "noDefaultFeatures", "enable"][..],
             &["checks", "codeHealth", "enable"][..],
             &["checks", "specifications", "enable"][..],
             &["checks", "clippySuppressions", "enable"][..],
@@ -1341,11 +1346,11 @@ mod tests {
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-022"))]
     fn crate_check_recommends_on_while_defaulting_off() {
         assert_eq!(
-            lookup(&["checks", "crateCheck"]).unwrap().recommended,
+            lookup(&["checks", "crates", "enable"]).unwrap().recommended,
             Some(DefaultValue::Bool(true))
         );
         assert_eq!(
-            effective_default(&["checks", "crateCheck"]),
+            effective_default(&["checks", "crates", "enable"]),
             Some(Value::Boolean(false))
         );
     }
@@ -1353,20 +1358,18 @@ mod tests {
     #[test]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-004"))]
     fn catalog_covers_the_build_tables() {
-        for prefix in [
-            "build",
-            "toolchain",
-            "profile",
-            "flags",
-            "devShell",
-            "checks",
-            "features",
-            "formatters",
-        ] {
+        for prefix in ["build", "devShell", "checks", "features", "formatters"] {
             assert!(
                 CATALOG.iter().any(|entry| entry.path[0] == prefix),
                 "missing {prefix}"
             );
+        }
+        for path in [
+            &["build", "toolchain", "rustc"][..],
+            &["build", "profile", "release", "optLevel"][..],
+            &["build", "flags", "rustc"][..],
+        ] {
+            assert!(lookup(path).is_some(), "missing {}", path.join("."));
         }
     }
 
@@ -1425,7 +1428,7 @@ mod tests {
     #[test]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-005"))]
     fn catalog_version_tracks_the_binary() {
-        assert_eq!(CATALOG_VERSION, 10);
+        assert_eq!(CATALOG_VERSION, 11);
         assert!(!CATALOG.is_empty());
     }
 
@@ -1450,10 +1453,10 @@ mod tests {
         for path in [
             "build.bloomeryLock",
             "build.members",
-            "toolchain.linker",
+            "build.toolchain.linker",
             "features.cratesIoIndex",
-            "profile.release.optLevel",
-            "profile.dev.linkArgs",
+            "build.profile.release.optLevel",
+            "build.profile.dev.linkArgs",
             "specs.enable",
         ] {
             let parts = path.split('.').collect::<Vec<_>>();
@@ -1470,7 +1473,7 @@ mod tests {
         assert!(
             !recommended
                 .iter()
-                .any(|entry| path(entry) == "profile.release.optLevel")
+                .any(|entry| path(entry) == "build.profile.release.optLevel")
         );
     }
 
@@ -1483,7 +1486,7 @@ mod tests {
             Some(Value::Boolean(false))
         );
         assert_eq!(
-            effective_value(Some(&raw), &["checks", "throwOnOutOfDate"]),
+            effective_value(Some(&raw), &["checks", "lockFreshness", "enable"]),
             Some(Value::Boolean(false))
         );
     }
@@ -1651,8 +1654,10 @@ mod tests {
         for contents in [
             "[checks]\nbogus = true\n",
             "[checks]\nenable = \"yes\"\n",
-            "[toolchain]\nlinker = \"gold\"\n",
-            "[profile]\nrelease = { optLevel = 9 }\n",
+            "[build.toolchain]\nlinker = \"gold\"\n",
+            "[build.profile]\nrelease = { optLevel = 9 }\n",
+            "[toolchain]\nrustc = \"rustc\"\n",
+            "[checks]\nincludePackageChecks = true\n",
         ] {
             let raw: Value = toml::from_str(contents).expect("toml");
             assert!(validate_raw(&raw).is_err(), "{contents}");
@@ -1662,8 +1667,8 @@ mod tests {
     #[test]
     fn validation_accepts_valid_build_tables() {
         let raw: Value = toml::from_str(
-            "[toolchain]\nrustc = \"llvmPackages.lld\"\n\
-             [profile.release]\nlto = \"fat\"\ncodegenUnits = 1\n\
+            "[build.toolchain]\nrustc = \"llvmPackages.lld\"\n\
+             [build.profile.release]\nlto = \"fat\"\ncodegenUnits = 1\n\
              [checks]\nenable = true\n",
         )
         .expect("toml");

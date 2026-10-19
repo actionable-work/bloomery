@@ -14,17 +14,19 @@ crate names; omitting it builds every discovered member.
 
 ## Toolchain and linker
 
-`toolchain` selects `rustc`, `clippy`, `cargo`, `lld`, `mold`, `stdenv`, and
-the linker strategy. The default linker is `lld` on Linux and the system linker
-elsewhere; `lld`, `mold`, or the system linker may be selected explicitly.
+`build.toolchain` selects `rustc`, `clippy`, `cargo`, `lld`, `mold`, `stdenv`,
+and the linker strategy. The default linker is `lld` on Linux and the system
+linker elsewhere; `lld`, `mold`, or the system linker may be selected
+explicitly.
 
 ## Compilation profiles
 
-`profile.release` and `profile.dev` accept `optLevel`, `lto`, `codegenUnits`,
-`panic`, `strip`, `debuginfo`, `targetCpu`, `overflowChecks`, `linker`, and
-`linkArgs`. Values are type-checked and lowered to `rustc` flags. `Cargo.toml`
-`[profile.release]` and `[profile.dev]` values provide the base; explicit
-options override them. `build.profileName` selects the active package profile.
+`build.profile.release` and `build.profile.dev` accept `optLevel`, `lto`,
+`codegenUnits`, `panic`, `strip`, `debuginfo`, `targetCpu`, `overflowChecks`,
+`linker`, and `linkArgs`. Values are type-checked and lowered to `rustc` flags.
+`Cargo.toml` `[profile.release]` and `[profile.dev]` values provide the base;
+explicit options override them. `build.profileName` selects the active package
+profile.
 
 ## Package visibility
 
@@ -33,8 +35,8 @@ produces dev-profile apps.
 
 ## Flags
 
-`flags` supplies extra `rustc`, `test`, `clippy`, `doc`, and `doctest` flag
-lists applied per build phase.
+`build.flags` supplies extra `rustc`, `test`, `clippy`, `doc`, and `doctest`
+flag lists applied per build phase.
 
 ## Overrides
 
@@ -76,11 +78,11 @@ supplies a local crates.io index for the no-lock fallback.
 ## Development shell and checks
 
 `devShell` controls shell generation, extra packages, and the shell hook.
-`checks` enables or disables generated checks and defaults to off. The
-`checks.crateCheck`, `checks.includePackageChecks`,
-`checks.workspaceDependencies`, and `checks.noDefaultFeatures` categories also
-default to off. Each category contributes its check entries only when both the
-global toggle and its category toggle are enabled. `checks.throwOnOutOfDate`
+`checks.enable` enables or disables generated Nix checks and defaults to off.
+Each Nix check has its own table and `enable` setting: `checks.crates`,
+`checks.packages`, `checks.workspaceDependencies`, and
+`checks.noDefaultFeatures`. Each category contributes its entries only when
+both its switch and the global switch are enabled. `checks.lockFreshness.enable`
 defaults to off and controls the stale-lock policy independently. Enabled
 package checks reuse the release crate and binary derivations, while
 [build](../../../CLI/BUILD/README.md) realizes the exported production

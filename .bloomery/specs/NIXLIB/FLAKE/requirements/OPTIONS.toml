@@ -54,7 +54,7 @@ design = "design/workspace-options.md#compilation-profiles"
 [requirements.ears]
 type = "ubiquitous"
 system = "the workspace option module"
-action = "type-check profile.release and profile.dev settings for optimization, LTO, codegen units, panic strategy, stripping, debug info, target CPU, overflow checks, linker, and link arguments"
+action = "type-check build.profile.release and build.profile.dev settings for optimization, LTO, codegen units, panic strategy, stripping, debug info, target CPU, overflow checks, linker, and link arguments"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-OPTIONS-006"
@@ -168,7 +168,7 @@ design = "design/workspace-options.md#development-shell-and-checks"
 [requirements.ears]
 type = "ubiquitous"
 system = "the workspace option module"
-action = "accept checks.enable, checks.includePackageChecks, and checks.throwOnOutOfDate"
+action = "accept checks.enable, checks.packages.enable, and checks.lockFreshness.enable"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-OPTIONS-016"
@@ -190,7 +190,7 @@ design = "design/workspace-options.md#development-shell-and-checks"
 [requirements.ears]
 type = "ubiquitous"
 system = "the workspace option module"
-action = "default checks.workspaceDependencies to false"
+action = "default checks.workspaceDependencies.enable to false"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-OPTIONS-018"
@@ -201,7 +201,7 @@ design = "design/workspace-options.md#development-shell-and-checks"
 [requirements.ears]
 type = "ubiquitous"
 system = "the workspace option module"
-action = "default checks.noDefaultFeatures to false"
+action = "default checks.noDefaultFeatures.enable to false"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-OPTIONS-019"
@@ -245,7 +245,7 @@ design = "design/workspace-options.md#development-shell-and-checks"
 [requirements.ears]
 type = "ubiquitous"
 system = "the workspace option module"
-action = "default checks.includePackageChecks to false"
+action = "default checks.packages.enable to false"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-OPTIONS-023"
@@ -256,7 +256,7 @@ design = "design/workspace-options.md#development-shell-and-checks"
 [requirements.ears]
 type = "ubiquitous"
 system = "the workspace option module"
-action = "default checks.crateCheck to false"
+action = "default checks.crates.enable to false"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-OPTIONS-024"
@@ -268,3 +268,10 @@ design = "design/workspace-options.md#development-shell-and-checks"
 type = "ubiquitous"
 system = "the workspace option module"
 action = "default checks.enable to false"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-025"
+title = "Lock freshness check defaults off"
+manual = false
+design = "design/workspace-options.md#development-shell-and-checks"
+ears = { type = "ubiquitous", system = "the workspace option module", action = "default checks.lockFreshness.enable to false" }

@@ -43,7 +43,7 @@ arguments.
 
 ```toml bloomery-config
 # .bloomery/config.toml (required)
-version = 1
+version = 2
 
 [build]
 libPackages = false
@@ -51,15 +51,15 @@ devPackages = true
 profileName = "release"
 unify = true
 
-[toolchain]
+[build.toolchain]
 linker = "lld"
 
-[profile.release]
+[build.profile.release]
 optLevel = 3
 lto = "thin"
 codegenUnits = 1
 
-[flags]
+[build.flags]
 doc = ["-Dwarnings"]
 
 [devShell]
@@ -67,7 +67,9 @@ enable = true
 
 [checks]
 enable = true
-includePackageChecks = true
+
+[checks.packages]
+enable = true
 ```
 
 Package-valued settings are nixpkgs attribute paths; path-valued settings are

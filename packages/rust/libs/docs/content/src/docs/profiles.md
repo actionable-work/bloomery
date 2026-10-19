@@ -21,12 +21,12 @@ Bloomery features a strongly-typed profile evaluation system. Compiler optimizat
 
 ## Configuring Release and Dev Profiles
 
-You can configure release (`[profile.release]`) and dev (`[profile.dev]`) profile settings in `.bloomery/config.toml`:
+You can configure release (`[build.profile.release]`) and dev (`[build.profile.dev]`) profile settings in `.bloomery/config.toml`:
 
 ```toml bloomery-config
-version = 1
+version = 2
 
-[profile.release]
+[build.profile.release]
 optLevel = 3
 lto = "thin"
 codegenUnits = 1
@@ -34,7 +34,7 @@ panic = "abort"
 strip = true
 targetCpu = "x86-64-v3"
 
-[profile.dev]
+[build.profile.dev]
 optLevel = 0
 lto = "off"
 codegenUnits = 256

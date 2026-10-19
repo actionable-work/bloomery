@@ -16,12 +16,6 @@ pub struct Config {
     // to the CLI so a shared config file parses without interpreting them.
     #[serde(default)]
     pub build: Option<toml::Value>,
-    #[serde(default)]
-    pub toolchain: Option<toml::Value>,
-    #[serde(default)]
-    pub profile: Option<toml::Value>,
-    #[serde(default)]
-    pub flags: Option<toml::Value>,
     #[serde(default, rename = "devShell")]
     pub dev_shell: Option<toml::Value>,
     #[serde(default)]
@@ -41,7 +35,7 @@ pub struct Config {
     pub flakes: Option<toml::Value>,
 }
 
-pub const CURRENT_CONFIG_VERSION: u32 = 1;
+pub const CURRENT_CONFIG_VERSION: u32 = 2;
 
 impl Default for Config {
     fn default() -> Self {
@@ -50,9 +44,6 @@ impl Default for Config {
             specs: SpecsConfig::default(),
             scanners: ScannersConfig::default(),
             build: None,
-            toolchain: None,
-            profile: None,
-            flags: None,
             dev_shell: None,
             checks: None,
             features: None,
@@ -275,7 +266,9 @@ fn validate_config_version(raw: &toml::Value, path: &Path) -> Result<(), Diagnos
     match version {
         None => Err(Diagnostic::new(
             "ConfigurationError",
-            "config.toml has no top-level version; add `version = 1` to .bloomery/config.toml",
+            format!(
+                "config.toml has no top-level version; add `version = {CURRENT_CONFIG_VERSION}` to .bloomery/config.toml"
+            ),
         )
         .at(path.to_path_buf(), Some(1))),
         Some(toml::Value::Integer(version)) if *version == i64::from(CURRENT_CONFIG_VERSION) => {
@@ -458,7 +451,7 @@ mod tests {
     }
 
     fn write_versioned_config(path: &Path, contents: &str) {
-        fs::write(path, format!("version = 1\n{contents}")).expect("config contents");
+        fs::write(path, format!("version = 2\n{contents}")).expect("config contents");
     }
 
     #[test]
@@ -610,10 +603,10 @@ mod tests {
         write_versioned_config(
             &config_path,
             "[build]\ncargoToml = \"Cargo.toml\"\nlibPackages = true\nunify = true\n\
-             [toolchain]\nlinker = \"lld\"\n\
-             [profile.release]\noptLevel = 3\n\
-             [profile.dev]\noptLevel = 0\n\
-             [flags]\ndoc = [\"-Dwarnings\"]\n\
+             [build.toolchain]\nlinker = \"lld\"\n\
+             [build.profile.release]\noptLevel = 3\n\
+             [build.profile.dev]\noptLevel = 0\n\
+             [build.flags]\ndoc = [\"-Dwarnings\"]\n\
              [devShell]\nenable = false\n\
              [checks]\nenable = true\n\
              [features]\ncratesIoIndex = \"crates-io-index\"\n",
@@ -626,9 +619,6 @@ mod tests {
             &config.scanners.nix,
         );
         assert!(config.build.is_some());
-        assert!(config.toolchain.is_some());
-        assert!(config.profile.is_some());
-        assert!(config.flags.is_some());
         assert!(config.dev_shell.is_some());
         assert!(config.checks.is_some());
         assert!(config.features.is_some());
@@ -698,7 +688,7 @@ mod tests {
 
     #[test]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-VERSION-001"))]
-    fn missing_version_asks_user_to_set_version_one() {
+    fn missing_version_asks_user_to_set_version_two() {
         let root = root();
         let config_path = root.join(".bloomery/config.toml");
         fs::create_dir_all(config_path.parent().expect("config parent")).expect("config dir");
@@ -706,15 +696,15 @@ mod tests {
 
         let diagnostic = load(&root).expect_err("missing version should be rejected");
         assert_eq!(diagnostic.code, "ConfigurationError");
-        assert!(diagnostic.message.contains("version = 1"));
+        assert!(diagnostic.message.contains("version = 2"));
         let _ = fs::remove_dir_all(root);
     }
 
     #[test]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-VERSION-002"))]
-    fn version_one_is_accepted_as_current_format() {
+    fn version_two_is_accepted_as_current_format() {
         let root = write_config("");
-        let config = load(&root).expect("version one should load");
+        let config = load(&root).expect("version two should load");
         assert_eq!(config.version, CURRENT_CONFIG_VERSION);
         let _ = fs::remove_dir_all(root);
     }
@@ -724,11 +714,12 @@ mod tests {
     fn malformed_and_unsupported_versions_are_rejected() {
         for contents in [
             "version = 0\n",
+            "version = 1\n",
             "version = -1\n",
-            "version = 1.0\n",
-            "version = \"1\"\n",
+            "version = 2.0\n",
+            "version = \"2\"\n",
             "version = true\n",
-            "version = 2\n",
+            "version = 3\n",
         ] {
             let root = root();
             let config_path = root.join(".bloomery/config.toml");
@@ -747,7 +738,7 @@ mod tests {
             "[checks]\nenable = \"yes\"\n",
             "[build]\nprofileName = 5\n",
             "[devShell]\npackages = [\"a\", 1]\n",
-            "[profile.release]\ncodegenUnits = 0\n",
+            "[build.profile.release]\ncodegenUnits = 0\n",
         ] {
             let root = write_config(contents);
             assert_configuration_error(&root);
@@ -760,8 +751,9 @@ mod tests {
     fn unknown_build_keys_are_rejected() {
         for contents in [
             "[checks]\nbogus = true\n",
-            "[profile.release]\nbogus = true\n",
-            "[toolchain]\nbogus = \"rustc\"\n",
+            "[build.profile.release]\nbogus = true\n",
+            "[build.toolchain]\nbogus = \"rustc\"\n",
+            "[toolchain]\nrustc = \"rustc\"\n",
             "[wat]\nenable = true\n",
         ] {
             let root = write_config(contents);
@@ -774,10 +766,10 @@ mod tests {
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-VALIDATION-003"))]
     fn enum_and_union_values_are_enforced() {
         for contents in [
-            "[toolchain]\nlinker = \"gold\"\n",
-            "[profile.release]\npanic = \"crash\"\n",
-            "[profile.release]\nlto = \"fast\"\n",
-            "[profile.release]\noptLevel = 9\n",
+            "[build.toolchain]\nlinker = \"gold\"\n",
+            "[build.profile.release]\npanic = \"crash\"\n",
+            "[build.profile.release]\nlto = \"fast\"\n",
+            "[build.profile.release]\noptLevel = 9\n",
         ] {
             let root = write_config(contents);
             assert_configuration_error(&root);
@@ -789,11 +781,11 @@ mod tests {
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-VALIDATION-004"))]
     fn package_strings_are_accepted_without_resolution() {
         let root = write_config(
-            "[toolchain]\nrustc = \"llvmPackages.lld\"\n\
+            "[build.toolchain]\nrustc = \"llvmPackages.lld\"\n\
              [devShell]\npackages = [\"rust-analyzer\", \"bacon\"]\n",
         );
         let config = load(&root).expect("package strings are valid configuration");
-        assert!(config.toolchain.is_some());
+        assert!(config.build.is_some());
         let _ = fs::remove_dir_all(root);
     }
 

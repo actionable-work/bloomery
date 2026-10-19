@@ -28,12 +28,12 @@ The global `--no-write` option rejects `config set`, `config unset`, a writing
 idempotent. Config reads and the read-only `upgrade --dry-run` and `upgrade
 --diff` operations remain available.
 
-Every config command requires an explicit supported format version; format `1`
-is currently the only supported version. Dotted keys address the normalized
-configuration model; the top-level format `version` is metadata and is not a
-catalogued key. Only `config upgrade` changes the file's format version. Other
-config mutations write changes using the file's existing format and retain its
-version.
+Every config command requires an explicit format version. Format `2` is
+current; `config upgrade` also accepts format `1` and migrates it. Dotted keys
+address the normalized configuration model; the top-level format `version` is
+metadata and is not a catalogued key. Only `config upgrade` changes the file's
+format version. Other config mutations write changes using the file's existing
+format and retain its version.
 
 ## Key addressing and type safety
 
@@ -53,7 +53,7 @@ unknown key in a build table, is a usage error before any read or write.
 | integer | a decimal integer |
 | string | a literal argument value |
 | list of strings | a TOML array literal such as `["*.rs", "src/**/*.rs"]` |
-| enum or union | one of the catalogued literals, such as `"fat"` or `true` for `profile.release.lto` |
+| enum or union | one of the catalogued literals, such as `"fat"` or `true` for `build.profile.release.lto` |
 
 A value that does not parse as the schema type, an enum value outside the
 catalogued set, or an empty array where the schema forbids one is a usage error

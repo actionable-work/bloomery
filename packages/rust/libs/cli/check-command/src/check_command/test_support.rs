@@ -431,7 +431,7 @@ pub(super) fn fixture(with_flake: bool) -> (PathBuf, PathBuf) {
     fs::create_dir_all(root.join(".bloomery")).expect("configuration directory");
     fs::write(
         root.join(".bloomery/config.toml"),
-        "version = 1\n[specs]\ndir = \"specs\"\n\n[checks.specifications]\nenable = true\n\n[checks.codeHealth]\nenable = false\n",
+        "version = 2\n[specs]\ndir = \"specs\"\n\n[checks.specifications]\nenable = true\n\n[checks.codeHealth]\nenable = false\n",
     )
     .expect("configuration");
     let feature = root.join(".bloomery/specs/CLI/CHECK");
@@ -475,9 +475,9 @@ pub(super) fn fixture_without_specs(with_flake: bool, config: &str) -> (PathBuf,
     }
     fs::create_dir_all(root.join(".bloomery")).expect("configuration directory");
     let config = if config.contains("[checks.codeHealth]") {
-        format!("version = 1\n{config}")
+        format!("version = 2\n{config}")
     } else {
-        format!("version = 1\n{config}\n[checks.codeHealth]\nenable = false\n")
+        format!("version = 2\n{config}\n[checks.codeHealth]\nenable = false\n")
     };
     fs::write(root.join(".bloomery/config.toml"), config).expect("configuration");
     (root, cache)

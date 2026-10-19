@@ -1,4 +1,4 @@
-version = 1
+version = 2
 
 [build]
 cargoLock = "Cargo.lock" # Repository-relative path to Cargo.lock.
@@ -8,13 +8,28 @@ libPackages = false      # Expose <crate>:lib packages for workspace libraries.
 profileName = "release"  # Active Cargo profile name for release builds.
 unify = false            # Unify workspace features like Cargo's resolver.
 
+[build.flags]
+clippy = ["-Dwarnings"]   # Extra rustc flags for clippy runs.
+doc = ["-Dwarnings"]      # Extra rustdoc flags for documentation builds.
+doctest = []              # Extra rustdoc flags for doctests.
+rustc = ["-Copt-level=3"] # Extra rustc flags for release compilation.
+test = []                 # Extra rustc flags for test compilation.
+
+[build.profile.release]
+codegenUnits = 1 # release profile: number of codegen units
+lto = "fat"      # release profile: link-time optimization mode
+optLevel = 3     # release profile: optimization level (0-3, s, z)
+
+[build.toolchain]
+cargo = "cargo"   # nixpkgs attribute path for cargo.
+clippy = "clippy" # nixpkgs attribute path for clippy.
+lld = "lld"       # nixpkgs attribute path for lld.
+mold = "mold"     # nixpkgs attribute path for mold.
+rustc = "rustc"   # nixpkgs attribute path for rustc.
+stdenv = "stdenv" # nixpkgs attribute path for the C toolchain.
+
 [checks]
-crateCheck = true            # Generate per-crate type-check entries.
-enable = true                # Generate workspace checks.
-includePackageChecks = false # Include binary and library build checks.
-noDefaultFeatures = true     # Require default features to be disabled on workspace dependencies.
-throwOnOutOfDate = true      # Fail evaluation when bloomery.lock is out of date.
-workspaceDependencies = true # Validate workspace dependency declarations.
+enable = true # Generate workspace checks.
 
 [checks.clippySuppressions]
 allow = []     # Exact Clippy lint names permitted in inline allow attributes.
@@ -35,20 +50,28 @@ minCrateScore = 80                              # Minimum passing code health sc
 minWorkspaceScore = 80                          # Minimum passing aggregate code health score (0–100).
 nestingLimit = 4                                # Soft branch nesting limit used by code health scoring.
 
+[checks.crates]
+enable = true # Generate per-crate type-check entries.
+
+[checks.lockFreshness]
+enable = true # Fail evaluation when bloomery.lock is out of date.
+
+[checks.noDefaultFeatures]
+enable = true # Require default features to be disabled on workspace dependencies.
+
+[checks.packages]
+enable = false # Include binary and library build checks.
+
 [checks.specifications]
 enable = true # Enable static specification validation checks.
+
+[checks.workspaceDependencies]
+enable = true # Validate workspace dependency declarations.
 
 [devShell]
 enable = true  # Generate the default development shell.
 packages = []  # Additional nixpkgs packages in the development shell.
 shellHook = "" # Shell hook run when entering the development shell.
-
-[flags]
-clippy = ["-Dwarnings"]   # Extra rustc flags for clippy runs.
-doc = ["-Dwarnings"]      # Extra rustdoc flags for documentation builds.
-doctest = []              # Extra rustdoc flags for doctests.
-rustc = ["-Copt-level=3"] # Extra rustc flags for release compilation.
-test = []                 # Extra rustc flags for test compilation.
 
 [flakes.axum-workspace]
 checks = "aggregate"
@@ -132,11 +155,6 @@ after = []    # Formatters that must run before the yamlfmt formatter.
 before = []   # Formatters that must run after the yamlfmt formatter.
 enable = true # Enable the yamlfmt formatter.
 
-[profile.release]
-codegenUnits = 1 # release profile: number of codegen units
-lto = "fat"      # release profile: link-time optimization mode
-optLevel = 3     # release profile: optimization level (0-3, s, z)
-
 [scanners.nix]
 enabled = true # Enable the static Nix evidence scanner.
 paths = [
@@ -162,11 +180,3 @@ paths = [
 
 [specs]
 dir = "specs" # Directory inside .bloomery/ that holds the specification tree.
-
-[toolchain]
-cargo = "cargo"   # nixpkgs attribute path for cargo.
-clippy = "clippy" # nixpkgs attribute path for clippy.
-lld = "lld"       # nixpkgs attribute path for lld.
-mold = "mold"     # nixpkgs attribute path for mold.
-rustc = "rustc"   # nixpkgs attribute path for rustc.
-stdenv = "stdenv" # nixpkgs attribute path for the C toolchain.

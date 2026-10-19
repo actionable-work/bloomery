@@ -273,7 +273,7 @@ mod tests {
         write(&root.join("flake.nix"), "{ }\n");
         write(
             &root.join(".bloomery/config.toml"),
-            "version = 1\n[specs]\ndir = \"specs\"\n",
+            "version = 2\n[specs]\ndir = \"specs\"\n",
         );
         write(&root.join(".bloomery/specs/CLI/README.md"), AREA_README);
         write(
@@ -767,7 +767,7 @@ mod tests {
         write(&root.join("flake.nix"), "{ }\n");
         write(
             &root.join(".bloomery/config.toml"),
-            "version = 1\n[specs]\ndir = \"custom\"\n",
+            "version = 2\n[specs]\ndir = \"custom\"\n",
         );
         write(&root.join(".bloomery/custom/CLI/README.md"), AREA_README);
         write(
@@ -866,7 +866,7 @@ mod tests {
             write(&root.join("flake.nix"), "{ }\n");
             write(
                 &root.join(".bloomery/config.toml"),
-                &format!("version = 1\n{config}"),
+                &format!("version = 2\n{config}"),
             );
             let error = run(
                 SpecOperation::List {

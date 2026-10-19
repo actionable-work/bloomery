@@ -188,7 +188,7 @@ mod tests {
         let fixture = TempRoot::new("excerpts-config");
         fixture.write(
             "README.md",
-            "```toml bloomery-config\nversion = 1\n[build]\nprofileName = \"release\"\n```\n",
+            "```toml bloomery-config\nversion = 2\n[build]\nprofileName = \"release\"\n```\n",
         );
         let diagnostics = check(fixture.path(), &manifest("README.md"));
         assert!(diagnostics.is_empty(), "{diagnostics:?}");

@@ -65,7 +65,7 @@ without specification passes.
   derivation in no-write Nix check work for every selected system.
 - Run independent static and Nix work concurrently with bounded scheduling,
   realizing the selected Nix derivations in one batched invocation.
-- Include package checks only when `checks.includePackageChecks` enables them;
+- Include package checks only when `checks.packages.enable` enables them;
   the default suite omits them.
 - Discover and realize checks elevated from configured sub-flakes as ordinary
   check attributes of the main flake.

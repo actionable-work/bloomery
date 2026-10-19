@@ -137,7 +137,7 @@ mod tests {
         let fixture = TempRoot::new("check-violation");
         fixture.write(
             ".bloomery/config.toml",
-            "version = 1\n[specs]\ndir = \"specs\"\n",
+            "version = 2\n[specs]\ndir = \"specs\"\n",
         );
         fixture.write(
             ".bloomery/specs/EXAMPLE/FEATURE/README.md",

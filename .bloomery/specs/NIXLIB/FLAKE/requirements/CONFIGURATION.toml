@@ -54,7 +54,7 @@ design = "design/configuration.md#toolchain"
 [requirements.ears]
 type = "ubiquitous"
 system = "the build configuration"
-action = "accept toolchain.rustc, toolchain.clippy, toolchain.cargo, toolchain.lld, toolchain.mold, toolchain.stdenv, and toolchain.linker"
+action = "accept build.toolchain.rustc, build.toolchain.clippy, build.toolchain.cargo, build.toolchain.lld, build.toolchain.mold, build.toolchain.stdenv, and build.toolchain.linker"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-CONFIGURATION-006"
@@ -65,7 +65,7 @@ design = "design/configuration.md#profiles"
 [requirements.ears]
 type = "ubiquitous"
 system = "the build configuration"
-action = "accept optLevel, lto, codegenUnits, panic, strip, debuginfo, targetCpu, overflowChecks, linker, and linkArgs under profile.release and profile.dev"
+action = "accept optLevel, lto, codegenUnits, panic, strip, debuginfo, targetCpu, overflowChecks, linker, and linkArgs under build.profile.release and build.profile.dev"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-CONFIGURATION-007"
@@ -76,7 +76,7 @@ design = "design/configuration.md#flags"
 [requirements.ears]
 type = "ubiquitous"
 system = "the build configuration"
-action = "accept rustc, test, clippy, doc, and doctest lists under flags"
+action = "accept rustc, test, clippy, doc, and doctest lists under build.flags"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-CONFIGURATION-008"
@@ -91,14 +91,14 @@ action = "accept devShell.enable, devShell.packages, and devShell.shellHook"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-CONFIGURATION-009"
-title = "Check options are exposed"
+title = "Global check switch is exposed"
 manual = false
 design = "design/configuration.md#checks"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "the build configuration"
-action = "accept checks.enable, checks.includePackageChecks, and checks.throwOnOutOfDate"
+action = "accept checks.enable as the global generated-check switch"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-CONFIGURATION-010"
@@ -191,7 +191,7 @@ design = "design/configuration.md#checks"
 [requirements.ears]
 type = "ubiquitous"
 system = "the build configuration"
-action = "accept checks.workspaceDependencies"
+action = "accept checks.workspaceDependencies.enable"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-CONFIGURATION-018"
@@ -202,7 +202,7 @@ design = "design/configuration.md#checks"
 [requirements.ears]
 type = "ubiquitous"
 system = "the build configuration"
-action = "accept checks.noDefaultFeatures"
+action = "accept checks.noDefaultFeatures.enable"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-CONFIGURATION-019"
@@ -224,7 +224,7 @@ design = "design/configuration.md#checks"
 [requirements.ears]
 type = "ubiquitous"
 system = "the build configuration"
-action = "default checks.includePackageChecks to false when the key is omitted"
+action = "default checks.packages.enable to false when the key is omitted"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-CONFIGURATION-021"
@@ -235,11 +235,25 @@ design = "design/configuration.md#checks"
 [requirements.ears]
 type = "ubiquitous"
 system = "the build configuration"
-action = "accept checks.crateCheck"
+action = "accept checks.crates.enable"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-CONFIGURATION-022"
 title = "Configuration format versions are validated"
 manual = false
 design = "design/configuration.md#error-handling"
-ears = { type = "unwanted_behavior", trigger = "the configuration file has a missing, malformed, or unsupported top-level format version", system = "the mkFlake constructor", action = "fail evaluation with a bloomery-prefixed error before evaluating build settings" }
+ears = { type = "unwanted_behavior", trigger = "the configuration file has a missing, malformed, or unsupported top-level format version", system = "the mkFlake constructor", action = "fail evaluation with a bloomery-prefixed error before evaluating build settings and direct format 1 users to bloomery config upgrade" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-023"
+title = "Generated check families use separate tables"
+manual = false
+design = "design/configuration.md#checks"
+ears = { type = "ubiquitous", system = "the build configuration", action = "accept each generated check family through its own checks.<name>.enable option" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-024"
+title = "Lock freshness control is exposed"
+manual = false
+design = "design/configuration.md#checks"
+ears = { type = "ubiquitous", system = "the build configuration", action = "accept checks.lockFreshness.enable as the stale-lock policy switch" }

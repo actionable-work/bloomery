@@ -59,7 +59,7 @@ enabled code health and Clippy suppression policy, plus every check attribute
 for the host Nix system. Include generated
 Rust tests, clippy, documentation, doctests, lock validation, formatter checks,
 and integration-flake checks when present in that output. Package checks are
-included only when `checks.includePackageChecks` enables them; an omitted key
+included only when `checks.packages.enable` enables them; an omitted key
 leaves them out and
 [build](../../BUILD/README.md) materializes production packages instead. Do not
 implicitly build packages outside checks

@@ -1,4 +1,4 @@
-version = 1
+version = 2
 
 [build]
 devPackages = true
@@ -6,5 +6,9 @@ libPackages = true
 
 [checks]
 enable = true
-noDefaultFeatures = false
-workspaceDependencies = false
+
+[checks.noDefaultFeatures]
+enable = false
+
+[checks.workspaceDependencies]
+enable = false

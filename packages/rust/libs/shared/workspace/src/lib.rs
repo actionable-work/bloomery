@@ -25,7 +25,7 @@ mod tests {
         fs::create_dir_all(feature.join("requirements")).expect("requirements");
         fs::write(
             root.join(".bloomery/config.toml"),
-            "version = 1\n[specs]\ndir = \"specs\"\n",
+            "version = 2\n[specs]\ndir = \"specs\"\n",
         )
         .expect("config");
         fs::write(
@@ -56,7 +56,7 @@ mod tests {
         fs::create_dir_all(root.join(".bloomery")).expect("configuration directory");
         fs::write(
             root.join(".bloomery/config.toml"),
-            format!("version = 1\n{config}"),
+            format!("version = 2\n{config}"),
         )
         .expect("configuration");
         root
@@ -230,7 +230,7 @@ mod tests {
         let root = fixture();
         fs::write(
             root.join(".bloomery/config.toml"),
-            "version = 1\n[specs]\nenable = false\ndir = \"specs\"\n",
+            "version = 2\n[specs]\nenable = false\ndir = \"specs\"\n",
         )
         .expect("configuration");
 

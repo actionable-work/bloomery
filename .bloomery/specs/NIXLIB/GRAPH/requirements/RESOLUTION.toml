@@ -78,7 +78,7 @@ design = "design/resolution.md#bloomery-lock"
 
 [requirements.ears]
 type = "event"
-trigger = "checks.throwOnOutOfDate is enabled and the recorded digest differs from Cargo.lock"
+trigger = "checks.lockFreshness.enable is enabled and the recorded digest differs from Cargo.lock"
 system = "the workspace builder"
 action = "fail evaluation before any derivation is realized"
 

@@ -38,7 +38,7 @@ design = "design/schema-catalog.md#build-tables"
 [requirements.ears]
 type = "ubiquitous"
 system = "the schema catalog"
-action = "include the build, toolchain, profile, flags, devShell, checks, and features keys"
+action = "include build keys and its toolchain, profile, and flags subtables, plus devShell, checks, and features keys"
 
 [[requirements]]
 id = "PARSER-CONFIGURATION-CATALOG-005"
@@ -203,7 +203,7 @@ design = "design/schema-catalog.md#checks"
 [requirements.ears]
 type = "ubiquitous"
 system = "the schema catalog"
-action = "recommend true for checks.includePackageChecks while its omitted effective value remains false"
+action = "recommend true for checks.packages.enable while its omitted effective value remains false"
 
 [[requirements]]
 id = "PARSER-CONFIGURATION-CATALOG-020"
@@ -236,7 +236,7 @@ design = "design/schema-catalog.md#checks"
 [requirements.ears]
 type = "ubiquitous"
 system = "the schema catalog"
-action = "recommend true for checks.crateCheck while its omitted effective value remains false"
+action = "recommend true for checks.crates.enable while its omitted effective value remains false"
 
 [[requirements]]
 id = "PARSER-CONFIGURATION-CATALOG-023"
@@ -270,3 +270,14 @@ design = "design/schema-catalog.md#checks"
 type = "ubiquitous"
 system = "the schema catalog"
 action = "catalogue checks.specifications.enable as a boolean with an effective default of false and an upgrade recommendation of true"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-026"
+title = "Generated Nix checks use individual enable keys"
+manual = false
+design = "design/schema-catalog.md#checks"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the schema catalog"
+action = "catalogue an enable key for each generated Nix check under its own checks subtable"
