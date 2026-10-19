@@ -1,8 +1,9 @@
 {
   pkgs,
   lib ? pkgs.lib,
+  treefmtNix ? null,
 }: let
-  rawMkWorkspace = import ./mk-workspace.nix {inherit pkgs lib;};
+  rawMkWorkspace = import ./mk-workspace.nix {inherit pkgs lib treefmtNix;};
   mkWorkspace = args:
     rawMkWorkspace (args
       // {
@@ -44,6 +45,13 @@
     root = ../tests/basic-workspace;
     checks.enable = false;
   };
+  treefmtCheckSource =
+    (import ./formatters.nix {
+      inherit pkgs lib treefmtNix;
+    }).checkSource {
+      root = ../tests/basic-workspace;
+      formatterConfig = workspaceWithChecksDisabled.formatterConfig;
+    };
   workspaceWithoutWorkspaceDependencyCheck = mkWorkspace {
     root = ../tests/basic-workspace;
     checks.workspaceDependencies = false;
@@ -194,7 +202,9 @@ in {
       keepsUnitChecksWhenPackageChecksAreDisabled = builtins.hasAttr "bin-calc:test" workspaceWithoutPackageChecks.checks;
       omitsPackageChecksWhenDisabled = !(builtins.hasAttr "bin-calc:bin" workspaceWithoutPackageChecks.checks);
       keepsLockCheckWhenPackageChecksAreDisabled = builtins.hasAttr "workspace:lock" workspaceWithoutPackageChecks.checks;
-      disablesAllChecks = workspaceWithChecksDisabled.checks == {};
+      disablesRustChecks =
+        !(lib.any (name: name != "core:treefmt-check")
+          (builtins.attrNames workspaceWithChecksDisabled.checks));
     };
     expected = {
       hasWorkspaceLock = true;
@@ -202,7 +212,40 @@ in {
       keepsUnitChecksWhenPackageChecksAreDisabled = true;
       omitsPackageChecksWhenDisabled = true;
       keepsLockCheckWhenPackageChecksAreDisabled = true;
-      disablesAllChecks = true;
+      disablesRustChecks = true;
+    };
+  };
+
+  testNativeTreefmtCheckExistsWhenWorkspaceChecksAreDisabled = {
+    expr =
+      if treefmtNix == null
+      then true
+      else
+        builtins.hasAttr "core:treefmt-check" workspaceWithChecksDisabled.checks
+        && workspaceWithChecksDisabled.config.checks.enable == false;
+    expected = true;
+  };
+
+  testNativeTreefmtCheckUsesFormatterFilesAndProjectConfiguration = {
+    expr =
+      if treefmtNix == null
+      then true
+      else let
+        src = treefmtCheckSource;
+        projectRootFile = workspaceWithChecksDisabled.formatterConfig.projectRootFile;
+      in {
+        includesCargoManifest = builtins.pathExists (src + "/Cargo.toml");
+        includesRustSource = builtins.pathExists (src + "/crates/bin-calc/src/main.rs");
+        includesNixSource = builtins.pathExists (src + "/flake.nix");
+        excludesUnformattedLockfile = !(builtins.pathExists (src + "/flake.lock"));
+        includesProjectConfiguration = builtins.pathExists (src + "/" + projectRootFile);
+      };
+    expected = {
+      includesCargoManifest = true;
+      includesRustSource = true;
+      includesNixSource = true;
+      excludesUnformattedLockfile = true;
+      includesProjectConfiguration = true;
     };
   };
 

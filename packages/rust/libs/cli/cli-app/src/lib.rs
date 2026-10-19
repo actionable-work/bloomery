@@ -63,6 +63,21 @@ fn run_invocation_at(
     stderr: &mut impl Write,
 ) -> ExitCode {
     let color = color_mode(invocation.color);
+    if invocation.no_write
+        && let Some(operation) = write_required_operation(&invocation.command)
+    {
+        let command = command_name(&invocation.command);
+        let message =
+            format!("--no-write cannot be used with {operation} because it writes workspace files");
+        return report_usage_error(
+            command,
+            &message,
+            invocation.json_mode,
+            color,
+            stdout,
+            stderr,
+        );
+    }
     match invocation.command {
         CliCommand::Init(args) => {
             run_init_at(args, invocation.json_mode, color, root, stdout, stderr)
@@ -78,10 +93,79 @@ fn run_invocation_at(
         CliCommand::Config(args) => {
             run_config_at(args, invocation.json_mode, color, root, stdout, stderr)
         }
-        command => {
-            run_workspace_command_at(command, invocation.json_mode, color, root, stdout, stderr)
-        }
+        command => run_workspace_command_at_with_mode(
+            command,
+            invocation.json_mode,
+            color,
+            invocation.no_write,
+            root,
+            stdout,
+            stderr,
+        ),
     }
+}
+
+fn write_required_operation(command: &CliCommand) -> Option<&'static str> {
+    match command {
+        CliCommand::Init(_) => Some("bloomery init"),
+        CliCommand::Sync { .. } => Some("bloomery sync"),
+        CliCommand::Config(args) => match &args.operation {
+            bloomery_cli_types::ConfigOperation::Set { .. } => Some("bloomery config set"),
+            bloomery_cli_types::ConfigOperation::Unset { .. } => Some("bloomery config unset"),
+            bloomery_cli_types::ConfigOperation::Document => Some("bloomery config document"),
+            bloomery_cli_types::ConfigOperation::Upgrade {
+                dry_run: false,
+                diff: false,
+            } => Some("bloomery config upgrade"),
+            bloomery_cli_types::ConfigOperation::Get { .. }
+            | bloomery_cli_types::ConfigOperation::List { .. }
+            | bloomery_cli_types::ConfigOperation::Upgrade { .. } => None,
+        },
+        CliCommand::Spec(args) => match &args.operation {
+            bloomery_cli_types::SpecOperation::Add { .. } => Some("bloomery spec add"),
+            bloomery_cli_types::SpecOperation::Set { .. } => Some("bloomery spec set"),
+            bloomery_cli_types::SpecOperation::Remove { .. } => Some("bloomery spec remove"),
+            bloomery_cli_types::SpecOperation::List { .. }
+            | bloomery_cli_types::SpecOperation::Show { .. }
+            | bloomery_cli_types::SpecOperation::Trace { .. }
+            | bloomery_cli_types::SpecOperation::Candidates => None,
+        },
+        CliCommand::Check(args) => match &args.operation {
+            Some(bloomery_cli_types::CheckOperation::HealthUpdate(_)) => {
+                Some("bloomery check health update")
+            }
+            _ => None,
+        },
+        CliCommand::Build(_) | CliCommand::Disk(_) | CliCommand::Review => None,
+    }
+}
+
+fn report_usage_error(
+    command: Option<&str>,
+    message: &str,
+    json_mode: bool,
+    color: output::ColorMode,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
+    if json_mode {
+        let document = if command == Some("check") {
+            check_command::check_output::error_document("UsageError", message, None)
+        } else {
+            output::usage_error_json(command, message)
+        };
+        if write_json(stdout, &document).is_err() {
+            let _ = writeln!(stderr, "bloomery: unable to render JSON usage error");
+            return ExitCode::from(1);
+        }
+    } else {
+        let rendered = output::colorize_error(
+            &format!("error: {message}"),
+            output::color_enabled(output::Stream::Stderr, false, color),
+        );
+        let _ = writeln!(stderr, "{rendered}");
+    }
+    ExitCode::from(2)
 }
 
 /// Map the CLI's color selection onto the shared output policy.
@@ -649,10 +733,23 @@ fn run_init_request<L: bloomery_init::LockStage>(
     }
 }
 
+#[cfg(test)]
 fn run_workspace_command_at(
     command: CliCommand,
     json_mode: bool,
     color: output::ColorMode,
+    root: &Path,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
+    run_workspace_command_at_with_mode(command, json_mode, color, false, root, stdout, stderr)
+}
+
+fn run_workspace_command_at_with_mode(
+    command: CliCommand,
+    json_mode: bool,
+    color: output::ColorMode,
+    no_write: bool,
     root: &Path,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
@@ -666,11 +763,11 @@ fn run_workspace_command_at(
         return code;
     }
     match command {
-        CliCommand::Check(args) => {
-            check_command::run_at_with_color(args, json_mode, color, root, stdout, stderr)
-        }
+        CliCommand::Check(args) => check_command::run_at_with_color_and_mode(
+            args, json_mode, color, no_write, root, stdout, stderr,
+        ),
         CliCommand::Build(args) => {
-            build_command::run_at(args, json_mode, color, root, stdout, stderr)
+            build_command::run_at_with_mode(args, json_mode, color, no_write, root, stdout, stderr)
         }
         CliCommand::Disk(args) => run_disk_at(args, json_mode, color, root, stdout, stderr),
         CliCommand::Review => run_review_at(root, json_mode, color, stdout, stderr),
@@ -1069,6 +1166,7 @@ mod tests {
     #[derive(Debug)]
     struct Cli {
         json: bool,
+        no_write: bool,
         command: Command,
     }
 
@@ -1080,6 +1178,7 @@ mod tests {
         {
             parse_from(arguments).map(|invocation| Self {
                 json: invocation.json_mode,
+                no_write: invocation.no_write,
                 command: invocation.command,
             })
         }
@@ -1257,6 +1356,25 @@ mod tests {
         let error =
             Cli::try_parse_from(["bloomery", "lock"]).expect_err("lock must not be a CLI command");
         assert_eq!(error.exit_code(), 2);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-032"))]
+    fn no_write_is_global_before_and_after_nested_commands() {
+        for arguments in [
+            &["bloomery", "--no-write", "check"][..],
+            &["bloomery", "check", "--no-write"][..],
+            &["bloomery", "--no-write", "config", "get", "checks.enable"][..],
+            &["bloomery", "config", "get", "checks.enable", "--no-write"][..],
+            &["bloomery", "spec", "list", "--no-write"][..],
+        ] {
+            let parsed = Cli::try_parse_from(arguments.iter().copied())
+                .unwrap_or_else(|error| panic!("arguments {arguments:?}: {error}"));
+            assert!(parsed.no_write, "arguments: {arguments:?}");
+        }
+
+        let parsed = Cli::try_parse_from(["bloomery", "review"]).expect("default mode");
+        assert!(!parsed.no_write);
     }
 
     #[test]
@@ -1498,6 +1616,131 @@ mod tests {
             assert!(!root.join(".bloomery").exists());
             assert!(!root.join("Cargo.lock").exists());
             let _ = fs::remove_dir_all(root);
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-036"))]
+    fn no_write_keeps_parser_help_and_version_available() {
+        for arguments in [
+            &["bloomery", "--no-write", "--help"][..],
+            &["bloomery", "check", "--no-write", "--help"][..],
+            &["bloomery", "--no-write", "--version"][..],
+        ] {
+            let root = fixture_root("no-write-help");
+            fs::create_dir_all(&root).expect("workspace root");
+            let mut stdout = Vec::new();
+            let mut stderr = Vec::new();
+            let status = run_args_at(arguments.iter().copied(), &root, &mut stdout, &mut stderr);
+            assert_eq!(status, ExitCode::SUCCESS, "arguments: {arguments:?}");
+            assert!(!stdout.is_empty());
+            assert!(stderr.is_empty());
+            assert!(!root.join(".bloomery").exists());
+            let _ = fs::remove_dir_all(root);
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-033"))]
+    #[cfg_attr(any(), bloomery("CLI-INIT-COMMAND-013"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-INTERFACE-024"))]
+    #[cfg_attr(any(), bloomery("CLI-SPEC-EDITING-024"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-EDITING-021"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-027"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-DOCUMENT-013"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-038"))]
+    fn no_write_rejects_writers_before_workspace_preflights() {
+        let commands: &[&[&str]] = &[
+            &["bloomery", "init", "--no-write"],
+            &["bloomery", "sync", "--no-write"],
+            &[
+                "bloomery",
+                "spec",
+                "add",
+                "CLI-EXAMPLE-REQ-001",
+                "--title",
+                "Example",
+                "--ears",
+                "{ type = \"ubiquitous\", system = \"test\", action = \"pass\" }",
+                "--no-write",
+            ],
+            &[
+                "bloomery",
+                "spec",
+                "set",
+                "CLI-EXAMPLE-REQ-001",
+                "title",
+                "Example",
+                "--no-write",
+            ],
+            &[
+                "bloomery",
+                "spec",
+                "remove",
+                "CLI-EXAMPLE-REQ-001",
+                "--no-write",
+            ],
+            &[
+                "bloomery",
+                "config",
+                "set",
+                "checks.enable",
+                "true",
+                "--no-write",
+            ],
+            &["bloomery", "config", "unset", "checks.enable", "--no-write"],
+            &["bloomery", "config", "upgrade", "--no-write"],
+            &["bloomery", "config", "document", "--no-write"],
+            &["bloomery", "check", "health", "update", "--no-write"],
+        ];
+        for (index, arguments) in commands.iter().enumerate() {
+            let root = fixture_root(&format!("no-write-reject-{index}"));
+            fs::create_dir_all(&root).expect("workspace root");
+            let mut stdout = Vec::new();
+            let mut stderr = Vec::new();
+            let status = run_args_at(*arguments, &root, &mut stdout, &mut stderr);
+            assert_eq!(status, ExitCode::from(2), "arguments: {arguments:?}");
+            assert!(
+                String::from_utf8_lossy(&stderr).contains("--no-write"),
+                "arguments: {arguments:?}, stderr: {}",
+                String::from_utf8_lossy(&stderr)
+            );
+            assert!(!root.join("flake.nix").exists());
+            assert!(!root.join(".bloomery/config.toml").exists());
+            assert!(!root.join("Cargo.lock").exists());
+            assert!(!root.join("bloomery.lock").exists());
+            assert!(!root.join("Cargo.toml").exists());
+            let _ = fs::remove_dir_all(root);
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-035"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-028"))]
+    fn no_write_allows_reads_builds_and_read_only_upgrade_modes() {
+        for arguments in [
+            &["bloomery", "review", "--no-write"][..],
+            &["bloomery", "disk", "--no-write"][..],
+            &["bloomery", "build", "--no-write"][..],
+            &["bloomery", "config", "get", "checks.enable", "--no-write"][..],
+            &["bloomery", "config", "list", "--no-write"][..],
+            &["bloomery", "config", "upgrade", "--dry-run", "--no-write"][..],
+            &["bloomery", "config", "upgrade", "--diff", "--no-write"][..],
+            &["bloomery", "spec", "list", "--no-write"][..],
+            &["bloomery", "spec", "candidates", "--no-write"][..],
+            &["bloomery", "check", "list", "--no-write"][..],
+            &["bloomery", "check", "failures", "--no-write"][..],
+            &["bloomery", "check", "details", "f1", "--no-write"][..],
+            &["bloomery", "check", "health", "--no-write"][..],
+        ] {
+            let parsed = parse_from(arguments.iter().copied())
+                .unwrap_or_else(|error| panic!("arguments {arguments:?}: {error}"));
+            assert!(parsed.no_write, "arguments: {arguments:?}");
+            assert_eq!(
+                super::write_required_operation(&parsed.command),
+                None,
+                "arguments: {arguments:?}"
+            );
         }
     }
 

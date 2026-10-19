@@ -94,6 +94,10 @@ in
         hasDevShell = builtins.hasAttr "default" flakeOutputs.devShells.${pkgs.system};
         hasChecks = builtins.hasAttr pkgs.system flakeOutputs.checks;
         hasBloomeryCheck = builtins.hasAttr "bloomery:check" flakeOutputs.checks.${pkgs.system};
+        hasNativeTreefmtCheck =
+          if treefmtNix == null
+          then true
+          else builtins.hasAttr "core:treefmt-check" flakeOutputs.checks.${pkgs.system};
       };
       expected = {
         hasBinCalcPackage = true;
@@ -104,6 +108,7 @@ in
         hasDevShell = true;
         hasChecks = true;
         hasBloomeryCheck = false;
+        hasNativeTreefmtCheck = true;
       };
     };
 
@@ -251,10 +256,15 @@ in
       in {
         keepsSubFlakeCheck = builtins.hasAttr "complete:complete:check" flakeOutputs.checks.${pkgs.system};
         addsExtraCheck = builtins.hasAttr "extra" flakeOutputs.checks.${pkgs.system};
+        keepsNativeTreefmtCheck =
+          if treefmtNix == null
+          then true
+          else builtins.hasAttr "core:treefmt-check" flakeOutputs.checks.${pkgs.system};
       };
       expected = {
         keepsSubFlakeCheck = true;
         addsExtraCheck = true;
+        keepsNativeTreefmtCheck = true;
       };
     };
 

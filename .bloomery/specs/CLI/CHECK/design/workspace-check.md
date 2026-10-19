@@ -9,8 +9,8 @@ code health, and test/build orchestration:
 
 ```text
 bloomery check
-├── execution: catalog/selection setup → format:workspace (`nix fmt`)
-│   └── after formatting succeeds: static checks + code health + Clippy suppression policy + Nix derivations
+├── write mode: catalog/selection setup → format:workspace (`nix fmt`) → checks
+├── no-write mode: native treefmt check in batched Nix realization + selected checks
 └── list/failures/details/health retrieval and update: shared flake gate; no formatting
 ```
 
@@ -30,30 +30,41 @@ For externally supplied flakes, exclude an exact legacy `bloomery:check`
 attribute with an explicit compact compatibility notice, preventing the known
 recursive integration; custom derivations must not invoke the runner themselves.
 
-## Formatter preflight
+## Formatting execution
 
-For each valid `bloomery check` execution, invoke `nix fmt` once from the
-workspace root, using the flake's default formatter. Run it regardless of check
-selectors or selected systems, after catalog/selection setup and before any
-selected check task. It is an implicit `format:workspace` outcome, not a
-`checks.<system>.*` attribute or a selectable catalog ID. Read-only check
-subcommands do not invoke the formatter, but still require the shared flake gate.
+For each valid write-mode `bloomery check` execution, invoke `nix fmt` once
+from the workspace root, using the flake's default formatter. Run it regardless
+of check selectors or selected systems, after catalog/selection setup and
+before evaluating selected derivation paths or admitting check work. In
+no-write mode, include the native
+`checks.<system>."core:treefmt-check"` derivation for every selected system,
+regardless of selectors. A missing attribute is an operational catalog error
+before check work begins. Realize the check in the same
+batched Nix invocation as other selected checks. Do not invoke `nix fmt` or
+forward `--check` to the formatter. The native derivation retains its ordinary
+Nix check ID and uses its configured source set; untracked files omitted by
+that source set are not validated. Read-only check subcommands do not run
+formatting, but still require the shared flake gate.
 
-Capture formatter output in a run-local log without forwarding it to normal
-output. A non-zero exit is the `NixFormatFailed` check failure described in
-[selection and execution](execution.md#formatting-gate); failure to start Nix or
-retain the log is operational and leaves the formatter and selected checks
-not_run. Leave source edits in place, including partial edits from a failed
-formatter. Disable lockfile writes and updates for this Nix operation.
+Capture write-mode formatter output in a run-local log without forwarding it to
+normal output. A non-zero write-mode exit is the `NixFormatFailed` check failure
+described in [selection and execution](execution.md#formatting); it prevents
+selected checks from starting. A failed no-write native check is an ordinary
+Nix check failure and independent work continues unless `--fail-fast` applies.
+Failure to start Nix or retain the log is operational. Leave write-mode source
+edits in place, including partial edits from a failed formatter. Disable
+lockfile writes and updates for every Nix operation.
 
 ## Catalog evaluation
 
-`bloomery check` evaluates each selected system's check catalog once. One
-`nix eval` per selected system returns every non-legacy `checks.<system>`
-attribute together with its derivation path. This derivation plan is the sole
-evaluation input to realization; discovery and derivation-path evaluation are
-not repeated per attribute. Read-only catalog listing may evaluate attribute
-names without derivation paths.
+`bloomery check` discovers each selected system's check catalog once. In
+write mode, discover attribute names to validate selectors, run `nix fmt`,
+then evaluate selected derivation paths from the formatted workspace. In
+no-write mode, one `nix eval` per selected system returns every non-legacy
+`checks.<system>` attribute and its derivation path. Each mode evaluates
+selected paths once and uses that plan as the sole input to realization;
+derivation-path evaluation is not repeated per attribute. Read-only catalog
+listing evaluates attribute names without derivation paths.
 
 An attribute that cannot produce a derivation path is recorded as that check's
 evaluation failure while the remaining attributes continue to evaluate. A

@@ -108,6 +108,29 @@ pub struct RunSelection {
     pub partial: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunMode {
+    Write,
+    NoWrite,
+}
+
+impl RunMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Write => "write",
+            Self::NoWrite => "no-write",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "write" => Some(Self::Write),
+            "no-write" => Some(Self::NoWrite),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunRecord {
     pub id: String,
@@ -117,6 +140,9 @@ pub struct RunRecord {
     pub source_revision: Option<String>,
     pub source_dirty: Option<bool>,
     pub status: RunStatus,
+    pub mode: RunMode,
+    pub health_baseline_path: Option<String>,
+    pub health_baseline_refreshed: bool,
     pub selection: RunSelection,
     pub outcomes: Vec<CheckRecord>,
     pub failures: Vec<FailureRecord>,

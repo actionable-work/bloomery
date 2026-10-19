@@ -191,7 +191,7 @@ action = "report an operational failure rather than exit successfully"
 id = "CLI-CHECK-RUN-017"
 title = "Check leaves repository lockfiles unchanged"
 manual = false
-design = "design/workspace-check.md#formatter-preflight"
+design = "design/workspace-check.md#formatting-execution"
 
 [requirements.ears]
 type = "ubiquitous"

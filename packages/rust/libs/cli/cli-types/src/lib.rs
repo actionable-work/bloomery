@@ -7,6 +7,7 @@ pub const DETAIL_PAGE_LIMIT: usize = 40;
 pub struct CliInvocation {
     pub json_mode: bool,
     pub color: ColorChoice,
+    pub no_write: bool,
     pub command: CliCommand,
 }
 

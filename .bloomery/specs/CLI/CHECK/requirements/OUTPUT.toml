@@ -9,7 +9,7 @@ design = "design/diagnostics.md#bounded-summary"
 [requirements.ears]
 type = "ubiquitous"
 system = "bloomery check"
-action = "report aggregate selected-check and format:workspace outcome counts separately from failure-record totals"
+action = "report aggregate selected-check outcomes and the write-mode format:workspace outcome separately from failure-record totals"
 
 [[requirements]]
 id = "CLI-CHECK-OUTPUT-002"
@@ -121,7 +121,7 @@ design = "design/execution.md#exit-and-setup-failures"
 [requirements.ears]
 type = "ubiquitous"
 system = "bloomery check"
-action = "return exit code zero only when format:workspace and every selected check pass"
+action = "return exit code zero only when the write-mode format:workspace preflight and every selected check pass, or every no-write selected check passes"
 
 [[requirements]]
 id = "CLI-CHECK-OUTPUT-012"

@@ -171,3 +171,25 @@ design = "design/formatters.md#default-formatter-set"
 type = "ubiquitous"
 system = "the default toml-sort formatter"
 action = "leave requirement-group files to taplo so their canonical field order is preserved"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-FORMATTERS-016"
+title = "Each system exposes a native treefmt check"
+manual = false
+design = "design/formatters.md#native-treefmt-check"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the workspace builder"
+action = "expose checks.<system>.core:treefmt-check for every evaluated system independent of Rust and package check settings"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-FORMATTERS-017"
+title = "Native treefmt checks use the formatter source set"
+manual = false
+design = "design/formatters.md#native-treefmt-check"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the native treefmt check"
+action = "validate formatter-include-matched workspace files and the treefmt project config, using Git-tracked files when Git metadata exists and the Nix workspace root otherwise, without modifying workspace files"

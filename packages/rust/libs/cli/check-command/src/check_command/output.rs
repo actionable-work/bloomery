@@ -368,12 +368,19 @@ fn run_summary_document(record: &RunRecord, failure_count: usize) -> Value {
     let mut value = json!({
         "run": record.id,
         "status": record.status.as_str(),
+        "mode": record.mode.as_str(),
         "counts": Value::Object(counts),
         "total": record.failures.len(),
         "offset": 0,
         "failures": failures,
         "next": (failure_count < record.failures.len()).then_some(failure_count),
     });
+    if record.health_baseline_refreshed {
+        value["health_baseline"] = json!({
+            "path": record.health_baseline_path,
+            "refreshed": true,
+        });
+    }
     if record.selection.partial {
         let mut scope = Map::new();
         if !record.selection.selectors.is_empty() {
@@ -474,6 +481,13 @@ fn run_summary_text_with_count(record: &RunRecord, shown: usize, metrics: Option
         if record.failures.len() == 1 { "" } else { "s" }
     );
     let mut output = run_outcome(record.status).render(&detail, false);
+    output.push_str(&format!("\nmode: {}", record.mode.as_str()));
+    if record.health_baseline_refreshed
+        && let Some(path) = &record.health_baseline_path
+    {
+        output.push_str("\nhealth baseline refreshed: ");
+        output.push_str(&safe_field(path, 512));
+    }
     if record.selection.partial {
         output.push_str("\npartial selection");
         if !record.selection.selectors.is_empty() {
@@ -858,8 +872,8 @@ mod tests {
         health_page, list_page, list_text, run_summary_json, run_summary_text,
     };
     use crate::check_command::model::{
-        CheckRecord, FailureLocation, FailureRecord, OUTPUT_BYTE_LIMIT, Outcome, RunRecord,
-        RunSelection, RunStatus,
+        CheckRecord, FailureLocation, FailureRecord, OUTPUT_BYTE_LIMIT, Outcome, RunMode,
+        RunRecord, RunSelection, RunStatus,
     };
 
     fn record(failure_count: usize) -> RunRecord {
@@ -893,6 +907,9 @@ mod tests {
             } else {
                 RunStatus::Failed
             },
+            mode: RunMode::Write,
+            health_baseline_path: None,
+            health_baseline_refreshed: false,
             selection: RunSelection {
                 selectors: Vec::new(),
                 systems: Vec::new(),
@@ -925,6 +942,7 @@ mod tests {
         let passing = record(0);
         let summary = run_summary_json(&passing);
         assert_eq!(summary.value["status"], "passed");
+        assert_eq!(summary.value["mode"], "write");
         assert_eq!(summary.value["counts"]["passed"], 1);
         assert_eq!(summary.value["total"], 0);
         assert!(summary.value.get("checks").is_none());

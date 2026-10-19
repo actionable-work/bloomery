@@ -229,3 +229,10 @@ title = "Config mutations preserve the supported source format"
 manual = false
 design = "design/editing.md#invocation"
 ears = { type = "event", trigger = "config set, unset, or document writes a file with a supported numbered format", system = "bloomery config", action = "serialize the changes using the same numbered format and retain its version" }
+
+[[requirements]]
+id = "CLI-CONFIG-EDITING-021"
+title = "No-write blocks configuration key mutations"
+manual = false
+design = "design/editing.md#mutation-semantics"
+ears = { type = "event", trigger = "config set or config unset is invoked with --no-write", system = "bloomery config", action = "return a usage error before creating or changing .bloomery/config.toml" }

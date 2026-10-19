@@ -255,12 +255,7 @@ id = "CLI-CHECK-DETAIL-023"
 title = "Available Git dirty state is retained"
 manual = false
 design = "design/details.md#storage-and-identity"
-
-[requirements.ears]
-type = "event"
-trigger = "Git provides working-tree status after the formatter gate completes or fails"
-system = "bloomery check"
-action = "record whether the workspace has tracked or untracked changes in the retained run"
+ears = { type = "event", trigger = "Git provides working-tree status after write-mode formatting or the no-write Nix realization completes or fails", system = "bloomery check", action = "record whether the workspace has tracked or untracked changes in the retained run" }
 
 [[requirements]]
 id = "CLI-CHECK-DETAIL-024"

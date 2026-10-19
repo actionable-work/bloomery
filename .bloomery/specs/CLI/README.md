@@ -20,15 +20,19 @@ parser:
 - [`bloomery init`](INIT/README.md) scaffolds a new Bloomery flake and Rust
   workspace from a bundled template. It is the only command that does not
   require a root `flake.nix` or `.bloomery/config.toml`.
-- [`bloomery check`](CHECK/README.md) requires a root `flake.nix`; execution
-  runs `nix fmt` before static validation and Nix checks, then runs independent
-  checks in parallel with terminal work metrics, bounded summaries, and
-  seekable failure details. Package checks are excluded unless
+- [`bloomery check`](CHECK/README.md) requires a root `flake.nix`; write mode
+  runs `nix fmt` before static validation and Nix checks, while `--no-write`
+  includes the native treefmt check in the batched Nix realization for every
+  selected system.
+  It runs independent
+  checks in parallel with terminal work metrics, bounded summaries, and seekable
+  failure details. Package checks are excluded unless
   `checks.includePackageChecks` enables them, and static specification checks
   require both specification management and `checks.specifications.enable`.
   Code health shares
-  Rust analysis, scores each crate and the workspace, and compares a reviewed
-  baseline independently of specification enablement.
+  Rust analysis, scores each crate and the workspace, and refreshes the
+  baseline after a complete selected measurement in write mode, independently
+  of specification enablement.
   Inline Clippy suppressions are checked against configured exact-name
   exceptions independently of specification enablement.
 - [`bloomery build`](BUILD/README.md) materializes the exact production package
@@ -63,20 +67,23 @@ static evidence scanning, test-site discovery, relational validation, bounded
 output, test/build orchestration, explicit lockfile maintenance, and schema-typed
 configuration and requirement editing. Sync and config change locks and
 configuration respectively; spec mutations change requirement records. Mutating
-`config` commands create a missing configuration file with a warning. Every
+`config` commands create a missing configuration file with a warning unless
+blocked by `--no-write`. Every
 application command, including check retrieval, build, disk, review, sync, and
 spec,
 requires a root `flake.nix`. `init` is the bootstrap exception, `config` is
 exempt but warns when the flake is absent, and parser help and version output is
-served without a preflight. Check execution
-runs the formatter before checks and may modify workspace source; lockfiles
-remain unchanged. Config edits `.bloomery/config.toml` and leaves lockfiles and
-source unchanged. Config documentation edits only the comment layer of the
+served without a preflight. The shared `--no-write` policy rejects workspace
+mutations before command work; check execution instead verifies formatting
+without modifying workspace files. Write-mode check execution runs the formatter
+and refreshes a selected health baseline; check cache and Nix store writes
+remain enabled. Lockfiles remain unchanged. Config edits `.bloomery/config.toml`
+and leaves lockfiles and source unchanged. Config documentation edits only the comment layer of the
 configuration file. Spec editing changes only grouped requirement records and
 leaves configuration, design documents, source, and lockfiles unchanged. Check
 executes Nix builds and
-writes a user-cache run store. Its explicit `check health update` subcommand
-writes the tracked health baseline after verifying retained measurement inputs. Build realizes production package derivations
+writes a user-cache run store. `check health update` explicitly writes a
+retained measurement after freshness validation. Build realizes production package derivations
 and creates no result links or run store. Review remains a read-only catalog.
 Disk
 measures realized store paths without building or mutating anything. Spec
@@ -90,9 +97,9 @@ other Nix checks directly. See [Nix orchestration](CHECK/design/workspace-check.
 
 | Feature | Responsibility | Design |
 | --- | --- | --- |
-| [Interface](INTERFACE/README.md) | User-visible commands and options | [commands](INTERFACE/design/commands.md), [flags](INTERFACE/design/flags.md), [presentation](INTERFACE/design/presentation.md), [output](INTERFACE/design/output.md) |
+| [Interface](INTERFACE/README.md) | User-visible commands and options | [commands](INTERFACE/design/commands.md), [flags](INTERFACE/design/flags.md), [write policy](INTERFACE/design/no-write.md), [presentation](INTERFACE/design/presentation.md), [output](INTERFACE/design/output.md) |
 | [Init](INIT/README.md) | Template-driven workspace scaffolding | [behavior](INIT/design/init.md), [templates](INIT/design/templates.md) |
-| [Check](CHECK/README.md) | Formatting preflight, then parallel validation with terminal progress and retained failures | [pipeline](CHECK/design/pipeline.md), [execution](CHECK/design/execution.md), [progress](CHECK/design/progress.md), [diagnostics](CHECK/design/diagnostics.md), [details](CHECK/design/details.md), [Nix orchestration](CHECK/design/workspace-check.md) |
+| [Check](CHECK/README.md) | Write-mode formatting preflight or native no-write formatter derivation, then parallel validation with retained failures | [pipeline](CHECK/design/pipeline.md), [execution](CHECK/design/execution.md), [progress](CHECK/design/progress.md), [diagnostics](CHECK/design/diagnostics.md), [details](CHECK/design/details.md), [Nix orchestration](CHECK/design/workspace-check.md), [code health](CHECK/design/code-health.md) |
 | [Build](BUILD/README.md) | Batched realization of the exact production package derivations | [command](BUILD/design/command.md), [production realization](BUILD/design/execution.md) |
 | [Disk](DISK/README.md) | Read-only Nix store closure measurement for the packages/checks tree or one derivation | [usage](DISK/design/usage.md), [measurement](DISK/design/measurement.md) |
 | [Review](REVIEW/README.md) | Deterministic manual-review catalogues | [catalog](REVIEW/design/manual-catalog.md), [output](REVIEW/design/output.md) |
@@ -109,8 +116,8 @@ other Nix checks directly. See [Nix orchestration](CHECK/design/workspace-check.
 └── current directory + `flake.nix` presence gate
     ├── `bloomery check` execution
     │   ├── catalog/selection setup
-    │   ├── flake formatter ──► `nix fmt`
-    │   └── after formatting: PARSER/static checks + code health + Clippy suppression policy + Nix checks
+    │   ├── write mode: `nix fmt` before checks
+    │   └── no-write mode: native treefmt check in batched Nix realization
     ├── `bloomery build` ──► batched `packages.<system>` realization
     ├── `bloomery disk` ──► realized Nix store closure measurement
     ├── `bloomery review` ──► requirement model

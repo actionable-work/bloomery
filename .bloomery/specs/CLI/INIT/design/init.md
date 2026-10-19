@@ -25,6 +25,9 @@ arguments, the template name, the project name, the target guard, and the
 required lock tools are validated before any file is written. An argument or
 preflight failure leaves the target unchanged.
 
+The shared `--no-write` option is a usage error for `init`. Reject it before
+creating the target directory or invoking lock tools.
+
 ## Target directory
 
 The target defaults to the process's current working directory. A target that

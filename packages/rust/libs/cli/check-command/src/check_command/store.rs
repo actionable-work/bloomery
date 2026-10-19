@@ -1,5 +1,5 @@
 use super::model::{
-    CheckRecord, FailureLocation, FailureRecord, Notice, Outcome, RunRecord, RunSelection,
+    CheckRecord, FailureLocation, FailureRecord, Notice, Outcome, RunMode, RunRecord, RunSelection,
     RunStatus,
 };
 use serde_json::{Map, Value, json};
@@ -476,6 +476,11 @@ fn record_to_json(record: &RunRecord) -> Value {
             "dirty": record.source_dirty,
         },
         "status": record.status.as_str(),
+        "mode": record.mode.as_str(),
+        "health_baseline": {
+            "path": record.health_baseline_path,
+            "refreshed": record.health_baseline_refreshed,
+        },
         "selection": {
             "selectors": record.selection.selectors,
             "systems": record.selection.systems,
@@ -514,6 +519,20 @@ fn record_from_json(value: &Value) -> Result<RunRecord, String> {
         Some(Value::Object(source)) => Some(source),
         _ => return Err("retained check manifest has invalid source metadata".to_owned()),
     };
+    let mode = match value.get("mode").and_then(Value::as_str) {
+        Some(value) => RunMode::parse(value)
+            .ok_or_else(|| "retained check manifest has an invalid mode".to_owned())?,
+        None => RunMode::Write,
+    };
+    let health_baseline = value.get("health_baseline");
+    let health_baseline_path = health_baseline
+        .and_then(|value| value.get("path"))
+        .and_then(Value::as_str)
+        .map(str::to_owned);
+    let health_baseline_refreshed = health_baseline
+        .and_then(|value| value.get("refreshed"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
     let outcomes = value
         .get("outcomes")
         .and_then(Value::as_array)
@@ -590,6 +609,9 @@ fn record_from_json(value: &Value) -> Result<RunRecord, String> {
             .flatten(),
         status: RunStatus::parse(required_string(value, "status")?.as_str())
             .ok_or_else(|| "retained check manifest has an invalid status".to_owned())?,
+        mode,
+        health_baseline_path,
+        health_baseline_refreshed,
         selection: RunSelection {
             selectors: string_array_object(selection, "selectors")?,
             systems: string_array_object(selection, "systems")?,
@@ -699,7 +721,7 @@ pub(super) fn timestamp_millis() -> u64 {
 mod tests {
     use super::{RunStore, source_metadata_from_git_with, timestamp_millis};
     use crate::check_command::model::{
-        CheckRecord, FailureRecord, Outcome, RunRecord, RunSelection, RunStatus,
+        CheckRecord, FailureRecord, Outcome, RunMode, RunRecord, RunSelection, RunStatus,
     };
     use std::fs;
     use std::path::PathBuf;
@@ -730,6 +752,9 @@ mod tests {
             source_revision: None,
             source_dirty: None,
             status: RunStatus::Failed,
+            mode: RunMode::Write,
+            health_baseline_path: None,
+            health_baseline_refreshed: false,
             selection: RunSelection {
                 selectors: Vec::new(),
                 systems: Vec::new(),
@@ -772,6 +797,9 @@ mod tests {
         assert!(first.directory.starts_with(&cache));
 
         let mut record = sample_record(&store, first.id.clone());
+        record.mode = RunMode::NoWrite;
+        record.health_baseline_path = Some(".bloomery/code-health-summary.json".to_owned());
+        record.health_baseline_refreshed = true;
         store.finalize(&first, &record).expect("finalize run");
         assert!(first.directory.join("manifest.json").is_file());
         assert!(!first.directory.join("manifest.json.tmp").exists());
@@ -781,7 +809,14 @@ mod tests {
         store
             .finalize(&second, &record)
             .expect("finalize second run");
-        assert_eq!(store.load(&first.id).expect("load first").0.id, first.id);
+        let loaded = store.load(&first.id).expect("load first").0;
+        assert_eq!(loaded.id, first.id);
+        assert_eq!(loaded.mode, RunMode::NoWrite);
+        assert_eq!(
+            loaded.health_baseline_path.as_deref(),
+            Some(".bloomery/code-health-summary.json")
+        );
+        assert!(loaded.health_baseline_refreshed);
         let _ = fs::remove_dir_all(root);
         let _ = fs::remove_dir_all(cache);
     }

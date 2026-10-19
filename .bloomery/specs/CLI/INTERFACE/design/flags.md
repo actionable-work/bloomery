@@ -41,6 +41,7 @@ commands:
 | `disk` | `--system` | repeatable system name | host Nix system |
 | `disk` | `--scope` | `all`, `runtime`, or `build` | `all` |
 | all commands | `--color` | `auto`, `always`, or `never` | `auto` |
+| all commands | `--no-write` | flag | workspace writes enabled |
 | all commands | `-h`, `--help` | — | — |
 
 `--json` is a shared global option, accepted before or after the subcommand. It
@@ -56,6 +57,16 @@ always omits ANSI regardless of `--color`. `auto` honors non-empty
 `NO_COLOR`, `TERM=dumb`, and JSON mode. An unsupported `--color` value is a usage
 error. See the [output contract](output.md) and
 [presentation grammar](presentation.md#non-interactive-and-color-control).
+
+`--no-write` is a shared global workspace-write policy, available before or
+after application subcommands. It prevents mutations to the workspace (or the
+`init` target) and returns a usage error for operations that require such a
+mutation. Check execution has an explicit no-write plan: it runs the native
+treefmt check as ordinary Nix work and does not replace the health baseline.
+Internal run records, logs, and Nix store outputs remain allowed. The name follows the
+existing short boolean global flags; `--read-only` would imply that these
+internal execution outputs are also disabled. See the
+[workspace write policy](no-write.md).
 
 Bloomery does not expose a command-specific repository-root flag. Check and
 review use the current working directory, as does sync. Init instead accepts an

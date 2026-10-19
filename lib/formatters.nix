@@ -160,6 +160,43 @@
     wrapper = evaluated.config.build.wrapper;
     treefmt = evaluated.config;
   };
+
+  checkSource = {
+    root,
+    formatterConfig,
+  }: let
+    formatterSettings = formatterConfig.settings.formatter;
+    enabledPrograms = lib.filterAttrs (_: formatter: formatter.enable or false) formatterConfig.programs;
+    enabledFormatters = lib.filterAttrs (_: formatter: formatter.enable or false) formatterSettings;
+    includeGlobs = lib.unique (
+      lib.concatMap (formatter: lib.toList (formatter.includes or []))
+      (lib.attrValues enabledPrograms ++ lib.attrValues enabledFormatters)
+    );
+    globMatchesName = glob: name:
+      builtins.match
+      (lib.replaceStrings ["\\*" "\\?"] [".*" "."] (lib.escapeRegex glob))
+      name
+      != null;
+    formatterFiles =
+      lib.fileset.fileFilter (
+        file: lib.any (glob: globMatchesName glob file.name) includeGlobs
+      )
+      root;
+    rootPath = toString root;
+    rootIsInStore = lib.hasPrefix "${builtins.storeDir}/" rootPath;
+    tracked =
+      if !rootIsInStore && builtins.pathExists (root + "/.git")
+      then lib.fileset.gitTracked root
+      else root;
+  in
+    lib.fileset.toSource {
+      inherit root;
+      fileset = lib.fileset.unions [
+        (lib.fileset.intersection tracked formatterFiles)
+        (lib.path.append root formatterConfig.projectRootFile)
+      ];
+    };
 in {
   inherit build builtinNames;
+  inherit checkSource;
 }

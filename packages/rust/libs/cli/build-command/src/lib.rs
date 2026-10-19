@@ -164,14 +164,14 @@ pub struct GateOutcome {
 
 /// Runs the default check suite as a prerequisite.
 pub trait CheckGate {
-    fn run(&self, root: &Path, systems: &[String]) -> GateOutcome;
+    fn run(&self, root: &Path, systems: &[String], no_write: bool) -> GateOutcome;
 }
 
 /// Gate backed by `bloomery-check-command`'s retained default check suite.
 pub struct CheckCommandGate;
 
 impl CheckGate for CheckCommandGate {
-    fn run(&self, root: &Path, systems: &[String]) -> GateOutcome {
+    fn run(&self, root: &Path, systems: &[String], no_write: bool) -> GateOutcome {
         let args = bloomery_check_command::CheckArgs {
             operation: None,
             selectors: Vec::new(),
@@ -181,8 +181,14 @@ impl CheckGate for CheckCommandGate {
         };
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
-        let outcome =
-            bloomery_check_command::run_gate_at(args, root, None, &mut stdout, &mut stderr);
+        let outcome = bloomery_check_command::run_gate_at_with_mode(
+            args,
+            root,
+            None,
+            no_write,
+            &mut stdout,
+            &mut stderr,
+        );
         GateOutcome {
             status: match outcome.status {
                 bloomery_check_command::RunStatus::Passed => BuildStatus::Passed,
@@ -228,11 +234,24 @@ pub fn run_at(
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> ExitCode {
+    run_at_with_mode(args, json_mode, color, false, root, stdout, stderr)
+}
+
+pub fn run_at_with_mode(
+    args: BuildArgs,
+    json_mode: bool,
+    color: ColorMode,
+    no_write: bool,
+    root: &Path,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
     let backend = NixCli::default();
-    run_at_with(
+    run_at_with_backends_and_mode(
         args,
         json_mode,
         color,
+        no_write,
         root,
         &backend,
         &CheckCommandGate,
@@ -253,6 +272,23 @@ pub fn run_at_with<B: NixBackend, G: CheckGate>(
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> ExitCode {
+    run_at_with_backends_and_mode(
+        args, json_mode, color, false, root, backend, gate, stdout, stderr,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn run_at_with_backends_and_mode<B: NixBackend, G: CheckGate>(
+    args: BuildArgs,
+    json_mode: bool,
+    color: ColorMode,
+    no_write: bool,
+    root: &Path,
+    backend: &B,
+    gate: &G,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
     if !root.join("flake.nix").is_file() {
         return report_error(
             json_mode,
@@ -262,7 +298,7 @@ pub fn run_at_with<B: NixBackend, G: CheckGate>(
             stderr,
         );
     }
-    match execute(args, root, backend, gate) {
+    match execute_with_mode(args, root, backend, gate, no_write) {
         Ok(report) => {
             let status = report.status;
             if json_mode {
@@ -330,12 +366,22 @@ pub fn execute<B: NixBackend, G: CheckGate>(
     backend: &B,
     gate: &G,
 ) -> Result<BuildReport, BuildError> {
+    execute_with_mode(args, root, backend, gate, false)
+}
+
+pub fn execute_with_mode<B: NixBackend, G: CheckGate>(
+    args: BuildArgs,
+    root: &Path,
+    backend: &B,
+    gate: &G,
+    no_write: bool,
+) -> Result<BuildReport, BuildError> {
     validate_args(&args)?;
     let systems = resolve_systems(&args, root, backend)?;
 
     let mut gate_report = None;
     if args.check {
-        let outcome = gate.run(root, &systems);
+        let outcome = gate.run(root, &systems, no_write);
         gate_report = Some(GateReport {
             status: outcome.status,
             failed_checks: outcome.failed_checks,

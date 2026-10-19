@@ -338,3 +338,38 @@ type = "unwanted_behavior"
 trigger = "--color is given a value other than auto, always, or never"
 system = "the bloomery CLI"
 action = "return a usage error"
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-032"
+title = "No-write is a global option"
+manual = false
+design = "design/no-write.md#workspace-write-policy"
+ears = { type = "ubiquitous", system = "the bloomery CLI", action = "accept --no-write before or after every application command and nested command" }
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-033"
+title = "No-write rejects workspace writers before side effects"
+manual = false
+design = "design/no-write.md#operations-that-require-workspace-writes"
+ears = { type = "unwanted_behavior", trigger = "--no-write is set for a command that requires project-file writes", system = "the bloomery CLI", action = "return a usage error with exit code 2 before command preflights or workspace side effects, even when the operation would be idempotent" }
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-034"
+title = "No-write permits execution storage"
+manual = false
+design = "design/no-write.md#workspace-write-policy"
+ears = { type = "ubiquitous", system = "the bloomery CLI", action = "allow Bloomery run records, logs and cache files plus Nix store outputs while preventing workspace project-file writes" }
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-035"
+title = "No-write permits read operations"
+manual = false
+design = "design/no-write.md#operations-allowed-under-no-write"
+ears = { type = "ubiquitous", system = "the bloomery CLI", action = "allow check retrieval, review, disk, config reads, and spec reads and projections" }
+
+[[requirements]]
+id = "CLI-INTERFACE-FLAGS-036"
+title = "No-write preserves help and version output"
+manual = false
+design = "design/no-write.md#workspace-write-policy"
+ears = { type = "ubiquitous", system = "the bloomery CLI", action = "serve parser-generated help and version output without rejecting --no-write or running command preflights" }

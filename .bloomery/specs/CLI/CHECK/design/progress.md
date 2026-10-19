@@ -19,15 +19,16 @@ live progress.
 
 After selection validation and run allocation, initialize `checks complete` to
 zero and `checks total` to the deduplicated selected check count, including
-implicitly selected prerequisites, plus the `format:workspace` gate. The
-denominator stays fixed throughout the run. The formatter gate, static checks,
-and each selected Nix attribute count independently; aliases
-retain separate check identities.
+implicitly selected prerequisites and no-write native formatter checks. The
+write-mode `format:workspace` preflight also counts as one check outcome. The
+denominator stays fixed throughout the run. Static checks and each selected
+Nix attribute count independently; aliases retain separate check identities.
 
-A check or formatter gate becomes complete once it has a final outcome: passed,
-failed, blocked, canceled, or not_run. Queued work is not complete merely because
-its provisional outcome is not_run. Update completion when outcomes become final
-during execution, not only after all workers join. Count each outcome once.
+A check or formatting outcome becomes complete once it has a final outcome:
+passed, failed, blocked, canceled, or not_run. Queued work is not complete merely
+because its provisional outcome is not_run. Update completion when outcomes
+become final during execution, not only after all workers join. Count each
+outcome once.
 Finalizing skipped or canceled work can bring the counter to the denominator
 without implying success;
 the final summary owns the pass/fail result.
@@ -96,10 +97,10 @@ terminal, or sum aggregate totals from overlapping realization scopes.
 Completed derivation work may be reconciled from the post-realization outcome
 validity result when structured completion evidence is unavailable.
 
-Execution supplies final-outcome events for selected checks and the formatter
-gate to the same aggregator. Observe selected output validity periodically
-alongside Nix realization so each completed check advances the counter before
-the batch finishes, including separate check aliases. Validate all required
+Execution supplies final-outcome events for selected checks and the write-mode
+formatter preflight to the same aggregator. Observe selected output validity
+periodically alongside Nix realization so each completed check advances the
+counter before the batch finishes, including separate check aliases. Validate all required
 outputs before publishing a successful check outcome. One serialized renderer owns terminal writes;
 workers do not render independently.
 Collect progress without changing check selection, admission, Nix configuration,

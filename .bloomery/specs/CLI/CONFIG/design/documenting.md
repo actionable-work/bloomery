@@ -5,6 +5,9 @@ schema-catalog documentation text for every key the file already configures. It
 changes comments only: values, present keys, and unrelated formatting stay as
 they are.
 
+The shared `--no-write` option is a usage error for this command. Reject it
+before creating a missing configuration file or annotating existing comments.
+
 ## Documentation source
 
 Documentation text comes from the

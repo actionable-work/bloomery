@@ -36,6 +36,10 @@ creates them. It creates the group file when absent and inserts the record in
 sequence order. `spec set` and `spec remove` resolve the record through the
 loaded tree rather than by re-parsing the ID.
 
+The global `--no-write` option is a usage error for `spec add`, `spec set`,
+and `spec remove`. Reject these operations before writing grouped requirement
+files; `spec list`, `show`, and the traceability projections remain available.
+
 ## Reads
 
 `spec list` enumerates records with their area, feature, group, ID, title,

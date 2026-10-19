@@ -2,8 +2,8 @@ use super::catalog::{BatchRealization, CheckPlan, NixBackend, NixTaskResult};
 use super::command::{CheckArgs, CheckContext, CheckError, plan_for_selection, report_error};
 use super::interrupt::{CancellationToken, InterruptFlag};
 use super::model::{
-    CheckRecord, FailureLocation, FailureRecord, Outcome, RunRecord, RunSelection, RunStatus,
-    select_ids,
+    CheckRecord, FailureLocation, FailureRecord, Outcome, RunMode, RunRecord, RunSelection,
+    RunStatus, select_ids,
 };
 use super::output;
 use super::progress::{ProgressEvent, ProgressReducer, ProgressReporter, ProgressSink};
@@ -52,6 +52,7 @@ struct PreparedCheckRun {
     planned: super::command::PlannedCatalog,
     selected: BTreeSet<String>,
     health_sources: Option<Result<Vec<bloomery_check::HealthSourceCrate>, String>>,
+    health_baseline_path: Option<String>,
     clippy_policy: Option<bloomery_model::clippy::ClippySuppressionConfig>,
     selection: RunSelection,
     store: store::RunStore,
@@ -64,14 +65,52 @@ fn prepare_check_run(
     args: &CheckArgs,
     context: &CheckContext<'_>,
 ) -> Result<PreparedCheckRun, CheckError> {
-    let planned = plan_for_selection(
-        context.root,
-        &args.selectors,
-        &args.systems,
-        context.backend,
-    )?;
-    let (selected, selection) = prepare_selection(args, &planned)?;
-    let health_sources = prepare_health_sources(context.root, context.backend, &selected)?;
+    let planned = if context.no_write {
+        // No-write mode needs the native formatter derivation even for a
+        // static-only partial selection, so force system catalog planning.
+        let planned = plan_for_selection(context.root, &[], &args.systems, context.backend)?;
+        let missing = planned
+            .systems
+            .iter()
+            .filter(|system| {
+                !planned
+                    .ids
+                    .contains(&format!("nix:{system}:core:treefmt-check"))
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        if !missing.is_empty() {
+            return Err(CheckError::operational(format!(
+                "selected Nix system catalog is missing core:treefmt-check: {}",
+                missing.join(", ")
+            )));
+        }
+        planned
+    } else {
+        let catalog = super::command::discover_for_selection(
+            context.root,
+            &args.selectors,
+            &args.systems,
+            context.backend,
+        )?;
+        super::command::PlannedCatalog {
+            ids: catalog.ids,
+            systems: catalog.systems,
+            notices: catalog.notices,
+            plans: BTreeMap::new(),
+            outputs_by_derivation: BTreeMap::new(),
+            dependencies: BTreeMap::new(),
+        }
+    };
+    let (mut selected, mut selection) = prepare_selection(args, &planned)?;
+    if context.no_write {
+        for system in &planned.systems {
+            selected.insert(format!("nix:{system}:core:treefmt-check"));
+        }
+        selection.selected_checks = selected.iter().cloned().collect();
+    }
+    let (health_sources, health_baseline_path) =
+        prepare_health_sources(context.root, context.backend, &selected)?;
     let clippy_policy = if selected.contains("static:clippy-suppressions") {
         let loaded = bloomery_model::config::load_with_raw(context.root)
             .map_err(|diagnostic| CheckError::operational(diagnostic.message))?;
@@ -89,6 +128,7 @@ fn prepare_check_run(
         planned,
         selected,
         health_sources,
+        health_baseline_path,
         clippy_policy,
         selection,
         store,
@@ -118,13 +158,18 @@ fn prepare_selection(
     Ok((selected, selection))
 }
 
+type PreparedHealthSources = (
+    Option<Result<Vec<bloomery_check::HealthSourceCrate>, String>>,
+    Option<String>,
+);
+
 fn prepare_health_sources(
     root: &Path,
     backend: &dyn NixBackend,
     selected: &BTreeSet<String>,
-) -> Result<Option<Result<Vec<bloomery_check::HealthSourceCrate>, String>>, CheckError> {
+) -> Result<PreparedHealthSources, CheckError> {
     if !selected.contains("static:code-health") {
-        return Ok(None);
+        return Ok((None, None));
     }
     let loaded = bloomery_model::config::load_with_raw(root)
         .map_err(|diagnostic| CheckError::operational(diagnostic.message))?;
@@ -147,11 +192,11 @@ fn prepare_health_sources(
         validate_health_source_overlap(root, &config, &raw_json, sources)
             .map_err(CheckError::operational)?;
     }
-    Ok(Some(projection))
+    Ok((Some(projection), Some(config.baseline)))
 }
 
 struct CheckExecution {
-    format: FormatGate,
+    format: Option<FormatGate>,
     source: store::SourceMetadata,
     results: Result<ExecutionResults, String>,
     final_metrics: Option<String>,
@@ -177,22 +222,29 @@ fn execute_check_run(
     let has_nix_checks = prepared.selected.iter().any(|id| id.starts_with("nix:"));
     let eligible = context.terminal.progress_eligible(context.json_mode);
     let mut progress = ProgressReporter::new(
-        ProgressReducer::new(prepared.selected.len() + 1, has_nix_checks),
+        ProgressReducer::new(
+            prepared.selected.len() + usize::from(!context.no_write),
+            has_nix_checks,
+        ),
         stderr,
         eligible,
         context.terminal.width(),
         context.terminal.progress_styled(),
     );
     progress.start();
-    let format = run_format_gate(
-        context.root,
-        context.backend,
-        &prepared.allocation,
-        &context.interrupt,
-        &mut progress,
-    );
+    let format = if context.no_write {
+        None
+    } else {
+        Some(run_format_gate(
+            context.root,
+            context.backend,
+            &prepared.allocation,
+            &context.interrupt,
+            &mut progress,
+        ))
+    };
+    let results = execute_after_formatter(args, context, prepared, format.as_ref(), &mut progress);
     let source = store::source_metadata(prepared.store.root());
-    let results = execute_after_formatter(args, context, prepared, &format, &mut progress);
     let final_metrics = eligible.then(|| progress.final_metrics());
     progress.finish();
     CheckExecution {
@@ -207,10 +259,10 @@ fn execute_after_formatter(
     args: &CheckArgs,
     context: &CheckContext<'_>,
     prepared: &PreparedCheckRun,
-    format: &FormatGate,
+    format: Option<&FormatGate>,
     progress: &mut ProgressReporter<impl Write>,
 ) -> Result<ExecutionResults, String> {
-    if format.outcome == Outcome::Passed {
+    if context.no_write {
         return execute_selected(
             context.root,
             &prepared.selected,
@@ -227,6 +279,43 @@ fn execute_after_formatter(
             progress,
         );
     }
+    if format.is_some_and(|format| format.outcome == Outcome::Passed) {
+        let planned = plan_for_selection(
+            context.root,
+            &args.selectors,
+            &prepared.planned.systems,
+            context.backend,
+        )
+        .map_err(|error| error.message)?;
+        let missing = prepared
+            .selected
+            .iter()
+            .filter(|id| id.starts_with("nix:") && !planned.plans.contains_key(*id))
+            .cloned()
+            .collect::<Vec<_>>();
+        if !missing.is_empty() {
+            return Err(format!(
+                "selected check attributes disappeared after formatting: {}",
+                missing.join(", ")
+            ));
+        }
+        return execute_selected(
+            context.root,
+            &prepared.selected,
+            &prepared.allocation,
+            context.backend,
+            &planned.plans,
+            &planned.outputs_by_derivation,
+            &planned.dependencies,
+            prepared.health_sources.clone(),
+            prepared.clippy_policy.clone(),
+            context.interrupt.clone(),
+            prepared.jobs,
+            args.fail_fast,
+            progress,
+        );
+    }
+    let format = format.expect("write mode always has a formatter gate");
     for id in &prepared.selected {
         progress.apply(ProgressEvent::CheckFinalized {
             id: id.clone(),
@@ -315,7 +404,7 @@ fn assemble_run_record(
             final_metrics,
         ),
         Err(message) => {
-            let outcomes = operational_outcomes(&prepared.selected, format.outcome, &format.log);
+            let outcomes = operational_outcomes(&prepared.selected, format.as_ref());
             let record = RunRecord {
                 id: prepared.allocation.id.clone(),
                 root: prepared.store.root().to_string_lossy().into_owned(),
@@ -324,6 +413,9 @@ fn assemble_run_record(
                 source_revision: source.revision,
                 source_dirty: source.dirty,
                 status: RunStatus::Error,
+                mode: run_mode(context.no_write),
+                health_baseline_path: prepared.health_baseline_path.clone(),
+                health_baseline_refreshed: false,
                 selection: prepared.selection.clone(),
                 outcomes,
                 failures: Vec::new(),
@@ -337,31 +429,65 @@ fn assemble_run_record(
 fn assemble_completed_record(
     context: &CheckContext<'_>,
     prepared: &PreparedCheckRun,
-    mut format: FormatGate,
+    mut format: Option<FormatGate>,
     source: store::SourceMetadata,
     mut results: ExecutionResults,
     completed_at: u64,
     final_metrics: Option<String>,
 ) -> (RunRecord, Option<String>, Option<String>) {
-    if let Some(failure) = format.failure.take() {
-        results.failures.push(failure);
+    if let Some(format) = &mut format {
+        if let Some(failure) = format.failure.take() {
+            results.failures.push(failure);
+        }
+        results.outcomes.insert(
+            FORMAT_WORKSPACE_ID.to_owned(),
+            CheckRecord {
+                id: FORMAT_WORKSPACE_ID.to_owned(),
+                outcome: format.outcome,
+                blocked_by: None,
+                logs: format.log.clone().into_iter().collect(),
+            },
+        );
     }
-    results.outcomes.insert(
-        FORMAT_WORKSPACE_ID.to_owned(),
-        CheckRecord {
-            id: FORMAT_WORKSPACE_ID.to_owned(),
-            outcome: format.outcome,
-            blocked_by: None,
-            logs: format.log.clone().into_iter().collect(),
-        },
-    );
-    let mut operational_error = results.operational_error.take();
+    let mut health_baseline_refreshed = false;
+    let health_baseline_path = prepared.health_baseline_path.clone();
+    let report_for_baseline = results.health_report.clone();
     let health_report_available = results.health_report.is_some();
-    retain_health_report(
+    let mut operational_error = results.operational_error.take();
+    let health_report_retained = retain_health_report(
         &prepared.allocation,
         &mut results.health_report,
         &mut operational_error,
     );
+    if !context.no_write
+        && prepared.selected.contains("static:code-health")
+        && health_report_retained
+        && format
+            .as_ref()
+            .is_some_and(|format| format.outcome == Outcome::Passed)
+        && let Some(report) = report_for_baseline.as_ref()
+    {
+        match super::health::refresh_baseline(context.root, report) {
+            Ok(()) => health_baseline_refreshed = true,
+            Err(message) => {
+                if let Some(outcome) = results.outcomes.get_mut("static:code-health") {
+                    outcome.outcome = Outcome::Failed;
+                }
+                results.failures.push(FailureDraft {
+                    check: "static:code-health".to_owned(),
+                    code: "HealthBaselineWriteFailed".to_owned(),
+                    subject: health_baseline_path.clone(),
+                    location: None,
+                    message,
+                    notes: Vec::new(),
+                    log: None,
+                    nix_log: None,
+                    focus_tail: false,
+                    occurrence: usize::MAX,
+                });
+            }
+        }
+    }
     let status = run_status(
         &context.interrupt,
         operational_error.is_some(),
@@ -382,6 +508,9 @@ fn assemble_completed_record(
         source_revision: source.revision,
         source_dirty: source.dirty,
         status,
+        mode: run_mode(context.no_write),
+        health_baseline_path,
+        health_baseline_refreshed,
         selection: prepared.selection.clone(),
         outcomes: results.outcomes.into_values().collect(),
         failures,
@@ -392,8 +521,7 @@ fn assemble_completed_record(
 
 fn operational_outcomes(
     selected: &BTreeSet<String>,
-    format_outcome: Outcome,
-    format_log: &Option<String>,
+    format: Option<&FormatGate>,
 ) -> Vec<CheckRecord> {
     let mut outcomes = selected
         .iter()
@@ -404,26 +532,38 @@ fn operational_outcomes(
             logs: Vec::new(),
         })
         .collect::<Vec<_>>();
-    outcomes.push(CheckRecord {
-        id: FORMAT_WORKSPACE_ID.to_owned(),
-        outcome: format_outcome,
-        blocked_by: None,
-        logs: format_log.clone().into_iter().collect(),
-    });
+    if let Some(format) = format {
+        outcomes.push(CheckRecord {
+            id: FORMAT_WORKSPACE_ID.to_owned(),
+            outcome: format.outcome,
+            blocked_by: None,
+            logs: format.log.clone().into_iter().collect(),
+        });
+    }
     outcomes.sort_by(|left, right| left.id.cmp(&right.id));
     outcomes
+}
+
+fn run_mode(no_write: bool) -> RunMode {
+    if no_write {
+        RunMode::NoWrite
+    } else {
+        RunMode::Write
+    }
 }
 
 fn retain_health_report(
     allocation: &store::RunAllocation,
     report: &mut Option<Value>,
     operational_error: &mut Option<String>,
-) {
+) -> bool {
     if let Some(report) = report.take()
         && let Err(error) = allocation.retain_health_report(&report)
     {
         operational_error.get_or_insert(error);
+        return false;
     }
+    true
 }
 
 fn run_status(

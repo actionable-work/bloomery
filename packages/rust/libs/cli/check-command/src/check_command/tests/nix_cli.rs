@@ -5,7 +5,7 @@ use crate::check_command::model::Outcome;
 use crate::check_command::progress::ProgressSink;
 use crate::check_command::store::RunStore;
 use crate::check_command::test_support::subprocess::NixFixture;
-use crate::check_command::test_support::{fixture, invoke, request};
+use crate::check_command::test_support::{fixture, invoke, invoke_with_mode, request};
 use serde_json::{Value, json};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -67,6 +67,12 @@ fn plan_calls(script: &mut NixFixture, names: &[(&str, &str)], metadata: Value) 
     names.sort_by_key(|(name, _)| *name);
     args.extend(names.iter().map(|(_, drv)| (*drv).to_owned()));
     script.expect(&args, &metadata.to_string());
+}
+
+fn discover_calls(script: &mut NixFixture, system: &str, names: &[&str]) {
+    let mut names = names.to_vec();
+    names.sort();
+    script.expect(&eval_args(system, false), &json!(names).to_string());
 }
 
 fn formatter(script: &mut NixFixture) -> PathBuf {
@@ -167,12 +173,13 @@ fn production_adapter_preserves_names_and_builds_shared_derivations_once() {
     );
     let backend = script.backend();
     assert_eq!(backend.discover(&root, "x86_64-linux").unwrap(), sorted);
+    discover_calls(&mut script, "x86_64-linux", &names);
+    formatter(&mut script);
     plan_calls(
         &mut script,
         &names.map(|name| (name, SHARED)),
         metadata(&[(SHARED, OUTPUT, &[])]),
     );
-    formatter(&mut script);
     build(&mut script, &[SHARED], false);
     // Output validation queries every selected alias in one request.
     validity(&mut script, &vec![(OUTPUT, true); names.len()]);
@@ -208,7 +215,7 @@ fn production_adapter_preserves_names_and_builds_shared_derivations_once() {
 fn production_adapter_distinguishes_missing_and_empty_systems() {
     let (root, cache) = fixture(true);
     let mut script = NixFixture::new(&root);
-    let missing = script.expect(&eval_args("aarch64-darwin", true), "");
+    let missing = script.expect(&eval_args("aarch64-darwin", false), "");
     fs::write(missing.join("status"), "1").unwrap();
     fs::write(missing.join("stderr"), "missing checks output\n").unwrap();
     let mut args = request();
@@ -217,11 +224,12 @@ fn production_adapter_distinguishes_missing_and_empty_systems() {
     assert_eq!(status, ExitCode::from(2));
     let error: Value = serde_json::from_slice(&stdout).unwrap();
     assert_eq!(error["error"]["code"], "OperationalError");
+    discover_calls(&mut script, "aarch64-linux", &[]);
+    formatter(&mut script);
     script.expect(
         &eval_args("aarch64-linux", true),
         r#"{"legacy":false,"plan":{}}"#,
     );
-    formatter(&mut script);
     let mut args = request();
     args.systems = vec!["aarch64-linux".into()];
     let (status, _, _) = invoke(args, &root, &cache, &script.backend(), true);
@@ -231,6 +239,79 @@ fn production_adapter_distinguishes_missing_and_empty_systems() {
             .outcomes
             .iter()
             .any(|outcome| outcome.id == "static:structure" && outcome.outcome == Outcome::Passed)
+    );
+    script.verify().unwrap();
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-008"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-010"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-011"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-031"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-008"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-001"))]
+fn production_no_write_realizes_the_native_treefmt_check_without_formatting() {
+    let (root, cache) = fixture(true);
+    let sentinel = root.join("no-write-sentinel.txt");
+    fs::write(&sentinel, "unchanged\n").unwrap();
+    let mut script = NixFixture::new(&root);
+    plan_calls(
+        &mut script,
+        &[("core:treefmt-check", SHARED)],
+        metadata(&[(SHARED, OUTPUT, &[])]),
+    );
+    build(&mut script, &[SHARED], false);
+    validity(&mut script, &[(OUTPUT, true)]);
+    let backend = script.backend();
+    let mut args = request();
+    args.systems = vec!["x86_64-linux".into()];
+    args.selectors = vec!["static:structure".into()];
+    let (status, stdout, _) = invoke_with_mode(args, &root, &cache, &backend, true, true);
+    assert_eq!(status, ExitCode::SUCCESS);
+    assert_eq!(fs::read_to_string(&sentinel).unwrap(), "unchanged\n");
+    let summary: Value = serde_json::from_slice(&stdout).unwrap();
+    assert_eq!(summary["result"]["mode"], "no-write");
+    assert_eq!(summary["result"]["counts"]["passed"], 2);
+    let record = latest(&root, &cache);
+    assert!(record.outcomes.iter().any(|outcome| {
+        outcome.id == "nix:x86_64-linux:core:treefmt-check" && outcome.outcome == Outcome::Passed
+    }));
+    assert!(
+        !record
+            .outcomes
+            .iter()
+            .any(|outcome| outcome.id == "format:workspace")
+    );
+    script.verify().unwrap();
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-012"))]
+fn production_no_write_requires_the_native_treefmt_attribute_before_check_work() {
+    let (root, cache) = fixture(true);
+    let mut script = NixFixture::new(&root);
+    script.expect(
+        &eval_args("x86_64-linux", true),
+        r#"{"legacy":false,"plan":{}}"#,
+    );
+    let mut args = request();
+    args.systems = vec!["x86_64-linux".into()];
+    args.selectors = vec!["static:structure".into()];
+    let (status, stdout, _) = invoke_with_mode(args, &root, &cache, &script.backend(), true, true);
+    assert_eq!(status, ExitCode::from(2));
+    let error: Value = serde_json::from_slice(&stdout).unwrap();
+    assert_eq!(error["error"]["code"], "OperationalError");
+    assert!(
+        error["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("core:treefmt-check")
+    );
+    assert!(
+        RunStore::open(&root, Some(&cache))
+            .unwrap()
+            .latest()
+            .is_err()
     );
     script.verify().unwrap();
 }
@@ -253,12 +334,13 @@ fn production_batch_retains_sibling_success_causal_failure_and_log() {
         (fail, "/nix/store/fail-out", &[]),
         (pass, "/nix/store/pass-out", &[]),
     ]);
+    discover_calls(&mut script, "x86_64-linux", &["pass", "fail", "dependent"]);
+    formatter(&mut script);
     plan_calls(
         &mut script,
         &[("pass", pass), ("fail", fail), ("dependent", dependent)],
         data.clone(),
     );
-    formatter(&mut script);
     let batch = build(&mut script, &[dependent, fail, pass], false);
     fs::write(batch.join("status"), "1").unwrap();
     fs::write(batch.join("stderr"), format!("error: Cannot build '{fail}'.\n  Reason: builder failed\n  For full logs, run: nix log {fail}\n  > causal builder output\nerror: Cannot build '{dependent}'.\n  Reason: dependency failed\n")).unwrap();
@@ -322,11 +404,7 @@ fn production_formatter_edits_logs_and_gate_are_observed() {
         for fail_fast in [false, true] {
             let (root, cache) = fixture(true);
             let mut script = NixFixture::new(&root);
-            plan_calls(
-                &mut script,
-                &[("one", SHARED)],
-                metadata(&[(SHARED, OUTPUT, &[])]),
-            );
+            discover_calls(&mut script, "x86_64-linux", &["one"]);
             let format = formatter(&mut script);
             // Formatting invalidates structure: the static branch must read the edited file.
             fs::write(
@@ -343,6 +421,11 @@ fn production_formatter_edits_logs_and_gate_are_observed() {
             if formatter_fails {
                 fs::write(format.join("status"), "1").unwrap();
             } else {
+                plan_calls(
+                    &mut script,
+                    &[("one", SHARED)],
+                    metadata(&[(SHARED, OUTPUT, &[])]),
+                );
                 // Select Nix alone in fail-fast mode so a static failure cannot
                 // race with admission of the independent batch.
                 build(&mut script, &[SHARED], fail_fast);

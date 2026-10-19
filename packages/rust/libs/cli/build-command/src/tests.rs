@@ -107,11 +107,13 @@ impl NixBackend for FakeBackend {
 struct FakeGate {
     outcome: GateOutcome,
     calls: Mutex<Vec<Vec<String>>>,
+    no_write_calls: Mutex<Vec<bool>>,
 }
 
 impl CheckGate for FakeGate {
-    fn run(&self, _root: &Path, systems: &[String]) -> GateOutcome {
+    fn run(&self, _root: &Path, systems: &[String], no_write: bool) -> GateOutcome {
         self.calls.lock().unwrap().push(systems.to_vec());
+        self.no_write_calls.lock().unwrap().push(no_write);
         self.outcome.clone()
     }
 }
@@ -450,6 +452,54 @@ fn gate_uses_selected_systems() {
         report.gate.expect("gate report").status,
         BuildStatus::Passed
     );
+    assert_eq!(gate.no_write_calls.lock().unwrap().as_slice(), &[false]);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-BUILD-EXECUTION-020"))]
+#[cfg_attr(any(), bloomery("CLI-BUILD-EXECUTION-028"))]
+fn no_write_build_forwards_mode_to_the_gate_and_preserves_workspace_files() {
+    let root = flake_root();
+    let cargo = root.join("Cargo.toml");
+    let config = root.join("config.toml");
+    let lock = root.join("flake.lock");
+    let baseline = root.join("health-summary.json");
+    for (path, bytes) in [
+        (&cargo, b"workspace source\n".as_slice()),
+        (&config, b"workspace config\n".as_slice()),
+        (&lock, b"flake lock\n".as_slice()),
+        (&baseline, b"health baseline\n".as_slice()),
+    ] {
+        std::fs::write(path, bytes).expect("workspace file");
+    }
+    let before = [&cargo, &config, &lock, &baseline]
+        .into_iter()
+        .map(|path| std::fs::read(path).expect("read workspace file"))
+        .collect::<Vec<_>>();
+    let gate = FakeGate {
+        outcome: GateOutcome {
+            status: BuildStatus::Passed,
+            ..GateOutcome::default()
+        },
+        ..FakeGate::default()
+    };
+    let backend = passed_backend(&["app"]);
+    let args = BuildArgs {
+        check: true,
+        ..BuildArgs::default()
+    };
+    let report = execute_with_mode(args, &root, &backend, &gate, true).expect("build report");
+    assert_eq!(report.status, BuildStatus::Passed);
+    assert_eq!(gate.no_write_calls.lock().unwrap().as_slice(), &[true]);
+    assert_eq!(backend.realize_calls.lock().unwrap().len(), 1);
+    assert_eq!(
+        [&cargo, &config, &lock, &baseline]
+            .into_iter()
+            .map(|path| std::fs::read(path).expect("workspace file unchanged"))
+            .collect::<Vec<_>>(),
+        before
+    );
+    let _ = std::fs::remove_dir_all(root);
 }
 
 #[test]

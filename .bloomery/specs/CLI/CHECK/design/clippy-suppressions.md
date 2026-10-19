@@ -10,7 +10,7 @@ evidence scanning, Nix check generation, and selected systems. It follows
 ordinary check selection, scheduling, cancellation, failure retention, and exit
 code behavior. Disabled policy contributes no catalog entry.
 
-The check runs after the mandatory formatting preflight. It is a separate static
+The check runs after the write-mode formatting preflight. It is a separate static
 check from code health and does not affect health scores or the Nix Clippy
 derivations.
 

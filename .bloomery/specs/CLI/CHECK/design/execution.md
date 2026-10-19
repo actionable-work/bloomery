@@ -6,21 +6,26 @@
 | --- | --- | --- |
 | `static:structure` | Configuration, workspace/frontmatter, requirements, design links | specification management and enabled specification checks |
 | `static:traceability` | Enabled scanners and relational evidence checks | enabled specification checks and loaded valid requirement model |
-| `static:code-health` | Rust analysis, health scores, limits, baseline comparison | enabled health policy |
+| `static:code-health` | Rust analysis, health scores, limits, baseline comparison and write-mode refresh | enabled health policy |
 | `static:clippy-suppressions` | Inline Clippy suppression policy | enabled suppression policy |
 | `nix:<system>:<attribute>` | One attribute under `checks.<system>` | Catalog evaluation |
 
 Preserve the existing static validations; these IDs group the existing passes,
-not new independent validation semantics. Static structure is a prerequisite
+not new independent validation semantics. In write mode, `format:workspace` is
+a mandatory preflight task, not a catalog entry. In no-write mode, the native
+`nix:<system>:core:treefmt-check` catalog entry supplies formatting validation
+for each selected system. Static structure is a prerequisite
 of traceability. `static:structure` and `static:traceability` exist in the
 catalog only when specification management is enabled and
 `checks.specifications.enable` is true; otherwise they are absent and cannot
 be selected. The shared CLI preflight requires
 a root `flake.nix` before any
 check operation. Nix catalog discovery is setup and does not depend on
-specification validity. The formatter gate runs before selected check tasks; a
-failure prevents static validation and Nix check realization. After it passes,
-failures in either pipeline do not suppress the other in default mode.
+specification validity. In write mode, the formatter gate runs before selected
+check tasks; a failure prevents static validation and Nix check realization. In
+no-write mode, the native formatter derivation is ordinary Nix check work in
+the batched realization, and its failure does not suppress independent checks
+in default mode.
 
 `static:code-health` exists when `checks.codeHealth.enable` is true, independently
 of specification management and Nix check generation. It has no structure or
@@ -64,37 +69,54 @@ management is disabled, a selector naming a static check matches no catalog
 entry and is rejected like any other unmatched selector. Code health selectors
 remain valid while specification management is disabled.
 
-## Formatting gate
+## Formatting
 
-For each valid `bloomery check` execution, run `nix fmt` once from the workspace
-root after selection validation and run-store allocation, but before admitting
-any selected check. The gate runs for full and partial selections, including
-selections containing only static checks. It is not a catalog entry and cannot
-be selected; `check list`, `check failures`, and `check details` require the
-shared flake preflight but do not run the formatter.
+For each valid write-mode `bloomery check` execution, run `nix fmt` once from
+the workspace root after selection validation and run-store allocation, but
+before admitting any selected check. The formatter runs for full and partial
+selections, including selections containing only static checks. In no-write
+mode, include `nix:<system>:core:treefmt-check` for every selected system,
+even when a partial selector does not match it. A missing attribute is a
+catalog setup error. Realize the check in the normal batched Nix invocation; do not invoke
+`nix fmt` or `nix fmt -- --check`. This native derivation checks the files in
+its own source set, so untracked files excluded by that source set are not
+validated. `check list`, `check failures`, `check details`, and `check health`
+require the shared flake preflight but do not run formatting.
 
-Record the gate as the implicit `format:workspace` outcome. Capture its output
-in the run store without streaming it to normal output. A successful formatter
-outcome is passed, and selected checks run against the resulting workspace.
-Keep formatter edits in the working tree, including edits made before a
-formatting failure; do not roll them back.
+Record the write-mode formatter as `format:workspace`. In no-write mode, retain
+the native Nix check under its ordinary `nix:<system>:core:treefmt-check` ID
+and capture it with the batched realization output. Write-mode selected check
+derivation paths are evaluated after `nix fmt` so they use the resulting
+workspace; no-write checks use the workspace as found. Keep write-mode
+formatter edits in the working tree, including edits made before a formatting
+failure; do not roll them back.
 
-A non-zero `nix fmt` exit is a formatter check failure, not an operational
-failure. Record `format:workspace` as failed with a `NixFormatFailed` failure
-record, mark every selected check `not_run`, and finalize the run as failed with
-exit code 1. Publish those final outcomes to progress. This is unconditional
-fail-fast: no selected check starts, regardless of `--fail-fast`. Failure to
-start Nix or retain the formatter log is an operational error with exit code 2;
-leave the formatter and selected checks not_run and retain the partial run.
-User interruption retains the usual interrupted status and exit code.
+A non-zero write-mode `nix fmt` exit is a formatter check failure, not an
+operational failure. Record `format:workspace` as failed with a
+`NixFormatFailed` failure record, mark every selected check `not_run`, and
+finalize the run as failed with exit code 1. This preflight failure prevents
+check work regardless of `--fail-fast`. A no-write native formatter failure
+is an ordinary Nix check failure under its native catalog ID; let independent
+checks continue unless `--fail-fast` cancels them. Failure to start Nix or
+retain formatter output is an operational error with exit code 2; retain the
+partial run. User interruption retains the usual interrupted status and exit
+code.
 
 ## Selection
 
 `--check ID_OR_GLOB` is repeatable; selections form a deduplicated union. Exact
-IDs and case-sensitive anchored globs are accepted. Glob syntax is `*` (zero
-or more characters) and `?` (one character), including colons; no bracket or
-escape syntax. Quote globs to avoid shell expansion. Every selector must match
-at least one catalog entry or the invocation fails before executing checks.
+IDs and case-sensitive anchored globs are accepted. The write-mode
+`format:workspace` preflight is not a selectable catalog entry. The native
+formatter check is selected by its `nix:<system>:core:treefmt-check` ID. Glob
+syntax is `*` (zero or more characters) and
+`?` (one character), including colons; no bracket or escape syntax. Quote
+globs to avoid shell expansion. Every selector must match at least one catalog
+entry or the invocation fails before executing checks. In no-write execution,
+the native formatter check is added for each selected system even when an
+explicit selector does not match it; a direct selector match deduplicates with
+this implicit inclusion. `check list` shows
+native catalog entries and applies selectors without execution-only implicit
+inclusions.
 
 Selecting traceability includes its structure prerequisite. Selecting only Nix
 must not require loading specifications. `check list` discovers IDs without
@@ -114,20 +136,23 @@ with valid empty check sets are distinct from missing system outputs.
 
 ## Scheduler
 
-After the formatter gate passes, run independent specification static checks,
-health, Clippy suppression policy, and Nix tasks concurrently. Admit
+After the write-mode formatter gate passes, run independent specification
+static checks, health, Clippy suppression policy, and Nix tasks concurrently.
+In no-write mode, the native formatter check shares the batched Nix realization
+with selected Nix checks while static checks run concurrently. Admit
 traceability as soon as structure passes and a task slot is available, ahead of
 queued independent work; do not wait for Nix completion.
 The Nix branch is one batched realization task; Nix realizes independent
 derivations concurrently within it. All tasks share admission and cancellation.
 `--jobs N` is positive, defaults to the available logical CPU count, and has a
-minimum of one. The limit applies to Bloomery-owned active tasks, not the serial
-formatter preflight, catalog evaluation, the batched realization, or all
+minimum of one. The limit applies to Bloomery-owned active tasks, but not the
+write-mode serial formatter preflight, catalog evaluation, the batched
+realization, or all
 builders and dependencies inside the Nix daemon. Do not override users' Nix
 builder configuration to imply a global process bound.
 
-Track each selected check and `format:workspace` as passed, failed, blocked,
-canceled, or not_run. Queued/running are intermediate states.
+Track each selected check and the write-mode `format:workspace` task as passed,
+failed, blocked, canceled, or not_run. Queued/running are intermediate states.
 Publish final-outcome transitions during execution to the
 [progress aggregator](progress.md#check-metrics); provisional not_run records do
 not mark queued work complete. Default execution attempts every
@@ -149,8 +174,8 @@ timing; final presentation order must not depend on completion order.
 
 | Code | Meaning |
 | --- | --- |
-| `0` | The formatter gate and every selected check passed |
-| `1` | The formatter gate or a selected check failed, or failure prevented completion |
+| `0` | Formatting validation and every selected check passed |
+| `1` | Formatting validation or a selected check failed, or failure prevented completion |
 | `2` | Invalid invocation, unavailable required tool, discovery/setup or cache failure |
 | `130` | User interruption |
 
@@ -165,6 +190,8 @@ occurs after execution begins. See [Nix orchestration](workspace-check.md) and
 [details storage](details.md).
 
 The default full run is the readiness gate. Label any filtered or explicitly
-system-selected run with its selection; successful subsets must not claim that
-the default workspace suite passed. A run succeeds only when its formatter gate
-and every selected check pass.
+system-selected run with its selection and write mode; successful subsets must
+not claim that the default workspace suite passed. A write-mode run succeeds
+only when its formatter preflight and every selected check pass. A no-write run
+succeeds only when every selected check, including any implicitly selected
+native formatter check, passes.

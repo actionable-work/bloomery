@@ -47,10 +47,13 @@ parallelism. Report unavailable Nix as an operational error.
 Without `--check`, build goes straight to catalog evaluation and realization.
 With `--check`, run the default `bloomery check` suite for the selected systems
 before catalog evaluation and realization, using the same execution as a
-no-selector check invocation: the
-formatter preflight runs, static validation runs when specification management
-is enabled, the generated check set runs,
-and the run is retained. The gate is a prerequisite of every package; build
+no-selector check invocation. In write mode, the formatter preflight runs
+before checks. With `--no-write`, the native treefmt check derivation is
+included in the batched Nix check work for every selected system; a missing
+attribute is a catalog error.
+Static validation runs when specification management and its check
+control are enabled, and the generated check set runs. The check run is retained.
+The gate is a prerequisite of every package; build
 evaluates and realizes no package until it passes. When specification
 management is disabled the gate contains no static specification checks and
 proceeds on the formatter and Nix checks.

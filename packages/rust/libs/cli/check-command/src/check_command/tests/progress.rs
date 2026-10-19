@@ -7,7 +7,9 @@ use crate::check_command::progress::{
     ProgressEvent, ProgressReducer, ProgressReporter, ProgressSink,
 };
 use crate::check_command::scheduler::{Task, WorkerTracker, run_with_followups};
-use crate::check_command::test_support::{FakeNix, fixture, invoke_with_terminal, request};
+use crate::check_command::test_support::{
+    FakeNix, fixture, invoke_with_terminal, invoke_with_terminal_and_mode, request,
+};
 use crate::output::TerminalFacts;
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -101,6 +103,40 @@ fn eligible_execution_writes_changing_metrics_to_stderr_and_final_metrics_to_std
         "stderr: {stderr:?}"
     );
 
+    let _ = std::fs::remove_dir_all(root);
+    let _ = std::fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-008"))]
+fn no_write_progress_counts_implicit_treefmt_without_a_preflight_unit() {
+    let (root, cache) = fixture(true);
+    let backend = FakeNix {
+        names: vec!["core:treefmt-check".to_owned()],
+        ..FakeNix::default()
+    };
+    let mut args = request();
+    args.selectors = vec!["static:structure".to_owned()];
+    let (status, stdout, stderr) = invoke_with_terminal_and_mode(
+        args,
+        &root,
+        &cache,
+        &backend,
+        false,
+        InterruptFlag::for_test(),
+        true,
+        tty(),
+    );
+    assert_eq!(status, std::process::ExitCode::SUCCESS);
+    let stderr = stdio_text(&stderr);
+    assert!(
+        stderr.starts_with("\r\u{1b}[K\u{1b}[1mchecks 0/2"),
+        "{stderr:?}"
+    );
+    assert!(stderr.contains("checks 2/2 complete"), "{stderr:?}");
+    let stdout = stdio_text(&stdout);
+    assert!(stdout.contains("mode: no-write"), "{stdout:?}");
+    assert!(!stdout.contains("format:workspace"));
     let _ = std::fs::remove_dir_all(root);
     let _ = std::fs::remove_dir_all(cache);
 }
@@ -468,6 +504,7 @@ fn completed_check_outputs_advance_progress_before_the_batch_returns() {
                 root: &root_for_run,
                 json_mode: false,
                 color: crate::output::ColorMode::Auto,
+                no_write: false,
                 backend: backend_for_run.as_ref(),
                 interrupt: InterruptFlag::for_test(),
                 cache_base: Some(&cache_for_run),
@@ -588,6 +625,7 @@ fn blocked_dependents_finalize_before_a_slow_worker_joins() {
                 root: &root_for_run,
                 json_mode: false,
                 color: crate::output::ColorMode::Auto,
+                no_write: false,
                 backend: &backend,
                 interrupt: InterruptFlag::for_test(),
                 cache_base: Some(&cache_for_run),

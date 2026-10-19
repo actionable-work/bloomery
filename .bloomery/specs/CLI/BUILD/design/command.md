@@ -8,6 +8,10 @@ bloomery build [--package ID_OR_GLOB]... [--system SYSTEM]... [--check] [--json]
 It requires the shared root `flake.nix` preflight and `.bloomery/config.toml`.
 By default it does not run `nix fmt` or static validation.
 
+The global `--no-write` option does not disable package realization because
+build outputs are written to the Nix store rather than the workspace. When
+`--check` is supplied, forward `--no-write` to the check gate.
+
 ## Selection
 
 With no `--package` option, build selects every package under
@@ -32,8 +36,9 @@ distinct from a missing system output.
 ## Check gate
 
 `--check` runs the default `bloomery check` suite for the selected systems
-before realizing any package. The gate includes the check formatter preflight
-and is exactly the no-selector check execution, so `--check` inherits
+before realizing any package. The gate uses the check's normal write mode unless
+the build invocation includes `--no-write`, which is forwarded to check. It is
+exactly the no-selector check execution, so `--check` inherits
 `[checks]` configuration, including package-check inclusion. No package is
 realized unless the gate passes, and the gate retains its run so failures
 remain retrievable through `bloomery check failures` and

@@ -5,10 +5,12 @@
 }: let
   inherit (pkgs) lib;
 
-  formatters = treefmt.settings.formatter;
+  programs = lib.filterAttrs (_: formatter: formatter.enable or false) treefmt.programs;
+  settings = lib.filterAttrs (_: formatter: formatter.enable or false) treefmt.settings.formatter;
 
   includeGlobs = lib.unique (
-    lib.concatMap (fmt: lib.toList (fmt.includes or [])) (lib.attrValues formatters)
+    lib.concatMap (fmt: lib.toList (fmt.includes or []))
+    (lib.attrValues programs ++ lib.attrValues settings)
   );
 
   globMatchesName = glob: name:
@@ -23,8 +25,10 @@
     )
     root;
 
+  rootPath = toString root;
+  rootIsInStore = lib.hasPrefix "${builtins.storeDir}/" rootPath;
   tracked =
-    if builtins.pathExists (root + "/.git")
+    if !rootIsInStore && builtins.pathExists (root + "/.git")
     then lib.fileset.gitTracked root
     else root;
 

@@ -94,7 +94,7 @@ action = "orchestrate Nix directly without requiring or invoking nix-fast-build"
 id = "CLI-CHECK-NIX-012"
 title = "Missing Nix is explicit"
 manual = false
-design = "design/workspace-check.md#formatter-preflight"
+design = "design/workspace-check.md#formatting-execution"
 
 [requirements.ears]
 type = "unwanted_behavior"
@@ -106,7 +106,7 @@ action = "report an operational error rather than silently skip the formatter or
 id = "CLI-CHECK-NIX-013"
 title = "Check does not update flake locks"
 manual = false
-design = "design/workspace-check.md#formatter-preflight"
+design = "design/workspace-check.md#formatting-execution"
 
 [requirements.ears]
 type = "ubiquitous"
@@ -160,14 +160,14 @@ action = "run Nix operations without impure evaluation mode"
 
 [[requirements]]
 id = "CLI-CHECK-NIX-018"
-title = "Catalog evaluation is batched per system"
+title = "Check IDs are discovered once per system"
 manual = false
 design = "design/workspace-check.md#catalog-evaluation"
 
 [requirements.ears]
 type = "ubiquitous"
 system = "bloomery check"
-action = "evaluate every selected system's check catalog and derivation paths in one Nix evaluation per system"
+action = "discover every selected system's check IDs once per system for selector validation before write-mode formatting"
 
 [[requirements]]
 id = "CLI-CHECK-NIX-019"
@@ -296,3 +296,26 @@ type = "event"
 trigger = "the main flake exposes an aggregate sub-flake check"
 system = "bloomery check"
 action = "treat the aggregate as one check whose realization builds every sub-flake check it depends on"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-030"
+title = "Write-mode derivation paths use formatted sources"
+manual = false
+design = "design/workspace-check.md#catalog-evaluation"
+
+[requirements.ears]
+type = "event"
+trigger = "write-mode nix fmt completes successfully"
+system = "bloomery check"
+action = "evaluate selected check derivation paths from the formatted workspace before realization"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-031"
+title = "No-write plan evaluates once per system"
+manual = false
+design = "design/workspace-check.md#catalog-evaluation"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "bloomery check with --no-write"
+action = "evaluate selected system check IDs and selected derivation paths together once per system before realization"

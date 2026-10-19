@@ -26,6 +26,7 @@ pub(super) struct FakeNix {
     pub(super) built_derivations: Mutex<std::collections::BTreeSet<String>>,
     pub(super) names: Vec<String>,
     pub(super) health_crates: Vec<bloomery_check::HealthSourceCrate>,
+    pub(super) interrupt_on_health_source: Option<InterruptFlag>,
     pub(super) discovery_error: Option<String>,
     pub(super) unique_derivations: bool,
     /// Attributes whose derivation fails during `plan_checks` evaluation.
@@ -67,6 +68,8 @@ pub(super) struct FakeNix {
     pub(super) formatter_edits: Vec<(String, Vec<u8>)>,
     /// Files the fake formatter removes relative to the workspace root.
     pub(super) formatter_removals: Vec<String>,
+    /// Ordered catalog, formatting, and planning calls for mode assertions.
+    pub(super) catalog_events: Mutex<Vec<String>>,
     /// Events emitted only when the realized attribute matches the key.
     pub(super) events_by_attribute: Mutex<BTreeMap<String, Vec<DerivationEvent>>>,
     /// When set, realize_check blocks until the test releases this barrier so a
@@ -83,6 +86,10 @@ impl NixBackend for FakeNix {
     }
 
     fn discover(&self, _root: &Path, system: &str) -> Result<Vec<String>, String> {
+        self.catalog_events
+            .lock()
+            .expect("catalog event lock")
+            .push(format!("discover:{system}"));
         self.systems
             .lock()
             .expect("systems lock")
@@ -104,6 +111,10 @@ impl NixBackend for FakeNix {
             .lock()
             .expect("event lock")
             .push("format".to_owned());
+        self.catalog_events
+            .lock()
+            .expect("catalog event lock")
+            .push("format".to_owned());
         let contents = self
             .formatter_log_contents
             .clone()
@@ -121,6 +132,10 @@ impl NixBackend for FakeNix {
     }
 
     fn plan_checks(&self, _root: &Path, system: &str) -> Result<PlannedSystem, String> {
+        self.catalog_events
+            .lock()
+            .expect("catalog event lock")
+            .push(format!("plan:{system}"));
         self.systems
             .lock()
             .expect("systems lock")
@@ -392,6 +407,9 @@ impl NixBackend for FakeNix {
         _root: &Path,
         _system: &str,
     ) -> Result<Vec<bloomery_check::HealthSourceCrate>, String> {
+        if let Some(interrupt) = &self.interrupt_on_health_source {
+            interrupt.interrupt_for_test();
+        }
         Ok(self.health_crates.clone())
     }
 }
@@ -476,7 +494,26 @@ pub(super) fn invoke(
     backend: &dyn NixBackend,
     json: bool,
 ) -> (std::process::ExitCode, Vec<u8>, Vec<u8>) {
-    invoke_with_interrupt(args, root, cache, backend, json, InterruptFlag::for_test())
+    invoke_with_mode(args, root, cache, backend, json, false)
+}
+
+pub(super) fn invoke_with_mode(
+    args: CheckArgs,
+    root: &Path,
+    cache: &Path,
+    backend: &dyn NixBackend,
+    json: bool,
+    no_write: bool,
+) -> (std::process::ExitCode, Vec<u8>, Vec<u8>) {
+    invoke_with_interrupt_and_mode(
+        args,
+        root,
+        cache,
+        backend,
+        json,
+        InterruptFlag::for_test(),
+        no_write,
+    )
 }
 
 pub(super) fn invoke_with_interrupt(
@@ -487,13 +524,26 @@ pub(super) fn invoke_with_interrupt(
     json: bool,
     interrupt: InterruptFlag,
 ) -> (std::process::ExitCode, Vec<u8>, Vec<u8>) {
-    invoke_with_terminal(
+    invoke_with_interrupt_and_mode(args, root, cache, backend, json, interrupt, false)
+}
+
+pub(super) fn invoke_with_interrupt_and_mode(
+    args: CheckArgs,
+    root: &Path,
+    cache: &Path,
+    backend: &dyn NixBackend,
+    json: bool,
+    interrupt: InterruptFlag,
+    no_write: bool,
+) -> (std::process::ExitCode, Vec<u8>, Vec<u8>) {
+    invoke_with_terminal_and_mode(
         args,
         root,
         cache,
         backend,
         json,
         interrupt,
+        no_write,
         TerminalFacts::default(),
     )
 }
@@ -508,6 +558,20 @@ pub(super) fn invoke_with_terminal(
     interrupt: InterruptFlag,
     terminal: TerminalFacts,
 ) -> (std::process::ExitCode, Vec<u8>, Vec<u8>) {
+    invoke_with_terminal_and_mode(args, root, cache, backend, json, interrupt, false, terminal)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn invoke_with_terminal_and_mode(
+    args: CheckArgs,
+    root: &Path,
+    cache: &Path,
+    backend: &dyn NixBackend,
+    json: bool,
+    interrupt: InterruptFlag,
+    no_write: bool,
+    terminal: TerminalFacts,
+) -> (std::process::ExitCode, Vec<u8>, Vec<u8>) {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let code = run_at_with(
@@ -516,6 +580,7 @@ pub(super) fn invoke_with_terminal(
             root,
             json_mode: json,
             color: crate::output::ColorMode::Auto,
+            no_write,
             backend,
             interrupt,
             cache_base: Some(cache),

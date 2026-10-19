@@ -19,9 +19,10 @@ Preserve the existing diagnostic semantics and repository-relative locations:
 | `HealthScoreBelowMinimum` | A crate or workspace score is below its configured floor. |
 | `HealthFunctionLimitExceeded` | A callable exceeds a configured hard metric limit. |
 | `HealthRegression` | A comparable score decreased beyond the permitted allowance. |
-| `HealthBaselineMissing` | Applicable health has no reviewed baseline file. |
+| `HealthBaselineMissing` | Applicable health has no baseline file to compare. |
 | `HealthBaselineInvalid` | The baseline is malformed or unsupported. |
 | `HealthBaselineIncompatible` | Baseline and current scoring or selection policy differ. |
+| `HealthBaselineWriteFailed` | The complete health measurement could not replace the configured baseline. |
 
 Health source read/parse failures retain source diagnostics under
 `static:code-health`; shared failures carry affected consumer IDs. Health policy
@@ -30,8 +31,9 @@ identity, and contributing source spans where applicable. See
 [code health](code-health.md#policy-gates).
 
 Runner failures retain the batched realization output and the failed check's
-derivation store path as seekable task details. A formatter failure is recorded under
-`format:workspace` with its captured `nix fmt` output. The
+derivation store path as seekable task details. A write-mode formatter failure
+is recorded under `format:workspace` with its captured formatter output. A
+no-write native treefmt failure is recorded under its ordinary Nix check ID. The
 `check details` command resolves a retained Nix store path on demand and includes
 the derivation log in its detail stream. Setup/discovery errors are operational
 failures, not fabricated test cases.
@@ -70,10 +72,12 @@ run r42 · details: bloomery check details f2 --run r42
 built 12 · cached 4 · total 18
 ```
 
-Report run outcome counts, including the implicit `format:workspace` outcome,
-separately from the total number of failure records: one static check
+Report selected-check outcome counts and the write-mode `format:workspace`
+outcome separately from the total number of failure records: one static check
 may produce many diagnostics. Omitted failures have a count and continuation
-offset; `check failures` retrieves subsequent pages. Notices
+offset; `check failures` retrieves subsequent pages. Identify whether the run
+used write or no-write mode in the summary and retained result. Report the
+health-baseline path when a selected write-mode health check refreshes it. Notices
 (such as legacy integration exclusions) are bounded too and cannot silently
 consume the failure page. Details are described in [retained runs](details.md).
 

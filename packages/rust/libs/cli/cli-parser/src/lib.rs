@@ -82,6 +82,7 @@ where
     Ok(CliInvocation {
         json_mode: parsed.json,
         color: parsed.color,
+        no_write: parsed.no_write,
         command: parsed.command.into(),
     })
 }
@@ -111,6 +112,7 @@ fn command_from_arguments(arguments: &[OsString]) -> Option<&'static str> {
 #[derive(Debug, Parser)]
 #[command(
     name = "bloomery",
+    version = "0.1.0",
     about = "Workspace checks, requirements review, and lockfile synchronization"
 )]
 struct RawCli {
@@ -126,6 +128,9 @@ struct RawCli {
         value_parser = parse_color_choice
     )]
     color: ColorChoice,
+    /// Prevent commands from mutating workspace project files.
+    #[arg(long, global = true)]
+    no_write: bool,
     #[command(subcommand)]
     command: RawCommand,
 }

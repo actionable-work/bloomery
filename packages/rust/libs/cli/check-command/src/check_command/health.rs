@@ -1,7 +1,7 @@
 use super::command::{
     CheckContext, CheckError, HealthArgs, HealthUpdateArgs, report_error, write_page,
 };
-use super::model::{Outcome, RunStatus};
+use super::model::{Outcome, RunMode, RunStatus};
 use super::{execution, output, store};
 use bloomery_model::health::HealthConfig;
 use serde_json::{Value, json};
@@ -160,11 +160,22 @@ fn prepare_health_update(
 }
 
 fn require_exportable_run(record: &super::model::RunRecord) -> Result<(), UpdateFailure> {
-    let formatter_passed = record
-        .outcomes
-        .iter()
-        .find(|outcome| outcome.id == "format:workspace")
-        .is_some_and(|outcome| outcome.outcome == Outcome::Passed);
+    let formatter_passed = match record.mode {
+        RunMode::Write => record
+            .outcomes
+            .iter()
+            .find(|outcome| outcome.id == "format:workspace")
+            .is_some_and(|outcome| outcome.outcome == Outcome::Passed),
+        RunMode::NoWrite => {
+            !record.selection.systems.is_empty()
+                && record.selection.systems.iter().all(|system| {
+                    record.outcomes.iter().any(|outcome| {
+                        outcome.id == format!("nix:{system}:core:treefmt-check")
+                            && outcome.outcome == Outcome::Passed
+                    })
+                })
+        }
+    };
     if matches!(record.status, RunStatus::Passed | RunStatus::Failed) && formatter_passed {
         return Ok(());
     }
@@ -174,6 +185,23 @@ fn require_exportable_run(record: &super::model::RunRecord) -> Result<(), Update
             .to_owned(),
         run: record.id.clone(),
     })
+}
+
+pub(super) fn refresh_baseline(root: &Path, report: &Value) -> Result<(), String> {
+    let loaded =
+        bloomery_model::config::load_with_raw(root).map_err(|diagnostic| diagnostic.message)?;
+    let policy =
+        HealthConfig::from_raw(loaded.raw.as_ref()).map_err(|diagnostic| diagnostic.message)?;
+    let raw_json = loaded
+        .raw
+        .as_ref()
+        .map(serde_json::to_value)
+        .transpose()
+        .map_err(|error| format!("unable to read health source-selection policy: {error}"))?;
+    let effective_policy = execution::health_policy_value(&policy, &raw_json);
+    let destination = validate_destination(root, &policy.baseline, report, &effective_policy)?;
+    let bytes = serialize_summary(report)?;
+    atomic_replace(&destination, &bytes)
 }
 
 fn current_health_policy(root: &Path, run: &str) -> Result<(HealthConfig, Value), UpdateFailure> {
@@ -649,21 +677,27 @@ fn atomic_replace(destination: &Path, bytes: &[u8]) -> Result<(), String> {
         use std::os::unix::fs::OpenOptionsExt;
         options.mode(0o644);
     }
+    let mut created = false;
     let result = (|| {
         let mut file = options
             .open(&temporary)
             .map_err(|error| format!("unable to create temporary baseline: {error}"))?;
+        created = true;
         file.write_all(bytes)
             .map_err(|error| format!("unable to write temporary baseline: {error}"))?;
         file.sync_all()
             .map_err(|error| format!("unable to sync temporary baseline: {error}"))?;
         fs::rename(&temporary, destination)
             .map_err(|error| format!("unable to atomically replace baseline: {error}"))?;
-        fs::File::open(parent)
-            .and_then(|directory| directory.sync_all())
-            .map_err(|error| format!("unable to sync baseline directory: {error}"))
+        // The rename is the commit point. Directory fsync is best-effort so a
+        // durability warning cannot turn a successful replacement into a
+        // reported failure after the previous baseline has already moved.
+        if let Ok(directory) = fs::File::open(parent) {
+            let _ = directory.sync_all();
+        }
+        Ok(())
     })();
-    if result.is_err() {
+    if result.is_err() && created {
         let _ = fs::remove_file(&temporary);
     }
     result

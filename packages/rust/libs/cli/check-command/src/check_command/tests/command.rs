@@ -41,8 +41,8 @@ fn default_and_explicit_selection_choose_static_and_requested_system_catalogs() 
     args.jobs = Some(2);
     let (status, stdout, _) = invoke(args, &root, &cache2, &backend, true);
     assert_eq!(status, std::process::ExitCode::SUCCESS);
-    assert_eq!(backend.systems.lock().unwrap().len(), 2);
-    // One catalog evaluation per selected system resolves both IDs and plans.
+    assert_eq!(backend.systems.lock().unwrap().len(), 4);
+    // Write mode discovers IDs before formatting and evaluates paths after it.
     assert_eq!(backend.evaluations.load(Ordering::SeqCst), 2);
     let result: Value = serde_json::from_slice(&stdout).expect("partial run JSON");
     assert_eq!(result["result"]["scope"]["checks"][0], "nix:*:core:test");
@@ -281,7 +281,7 @@ fn explicitly_selected_system_with_empty_checks_is_a_valid_static_only_run() {
     assert_eq!(status, std::process::ExitCode::SUCCESS);
     assert_eq!(
         backend.systems.lock().unwrap().as_slice(),
-        &["aarch64-linux"]
+        &["aarch64-linux", "aarch64-linux"]
     );
     assert_eq!(backend.evaluations.load(Ordering::SeqCst), 1);
     let result: Value = serde_json::from_slice(&stdout).expect("summary JSON");

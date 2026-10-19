@@ -270,3 +270,10 @@ type = "event"
 trigger = "spec set addresses the design field with an empty value"
 system = "bloomery spec"
 action = "clear the record's explicit design reference"
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-024"
+title = "No-write blocks specification mutations"
+manual = false
+design = "design/editing.md#preservation-and-atomicity"
+ears = { type = "event", trigger = "spec add, spec set, or spec remove is invoked with --no-write", system = "bloomery spec", action = "return a usage error before changing any specification record" }

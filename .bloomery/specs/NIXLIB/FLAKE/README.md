@@ -5,8 +5,8 @@ tagline: Expose one config-driven mkFlake over the workspace option schema.
 description: |
   The flake interface feature defines the single mkFlake constructor Bloomery
   exports, the required config.toml build tables it evaluates, and the
-  packages, apps, checks, formatters, and development shells produced for each
-  system.
+  packages, apps, native treefmt and workspace checks, formatters, and
+  development shells produced for each system.
 ---
 
 # Flake Interface

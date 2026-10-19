@@ -139,3 +139,10 @@ type = "unwanted_behavior"
 trigger = "a non-directory exists at an ancestor of a template path and --force is not supplied"
 system = "bloomery init"
 action = "print a warning naming the target and exit nonzero before writing any file"
+
+[[requirements]]
+id = "CLI-INIT-COMMAND-013"
+title = "No-write blocks initialization before target changes"
+manual = false
+design = "design/init.md#target-directory"
+ears = { type = "event", trigger = "bloomery init is invoked with --no-write", system = "bloomery init", action = "return a usage error before creating, locking, or populating the target directory" }

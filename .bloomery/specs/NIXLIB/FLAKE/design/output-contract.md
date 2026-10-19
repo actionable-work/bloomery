@@ -26,6 +26,13 @@ dev-profile builds. Each app is an attribute set with `type = "app"` and a
 
 ## Checks
 
+For every evaluated system, `checks` includes
+`"core:treefmt-check"` independently of Rust check and package-check settings.
+It validates workspace files selected by the resolved formatter include globs
+and includes the treefmt project config. When Git metadata is available, only
+tracked files enter its source set; otherwise the Nix workspace root supplies
+the source. It does not modify the workspace.
+
 When checks are enabled, `checks` contains `<crate>:check`, `<crate>:test`,
 `<crate>:clippy`, `<crate>:doc`, and `<crate>:doctest` for workspace crates;
 `<crate>:doctest` exists only for crates with a library entrypoint.

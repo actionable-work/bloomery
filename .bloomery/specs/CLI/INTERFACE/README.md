@@ -19,6 +19,7 @@ and how the target repository root is selected.
 
 - [Commands and invocation](design/commands.md)
 - [Flags and option values](design/flags.md)
+- [Workspace write policy](design/no-write.md)
 - [Human output presentation](design/presentation.md)
 - [Human and machine-readable output](design/output.md)
 
@@ -37,7 +38,7 @@ and how the target repository root is selected.
 - Require `.bloomery/config.toml` for repository commands while exempting parser
   help, `init`, and flake-exempt `config`, whose mutating commands create a
   missing file with a warning.
-- Specify shared `--json`, `--color`, check selection/execution/retrieval
+- Specify shared `--json`, `--color`, `--no-write`, check selection/execution/retrieval
   options, build package/system selection, command-specific
   `sync --update`, `disk --system`, `spec list` filters, `config --prefix`/`config
   --dry-run`/`config

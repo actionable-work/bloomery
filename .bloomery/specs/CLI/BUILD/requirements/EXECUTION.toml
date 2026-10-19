@@ -196,15 +196,10 @@ action = "distinguish canceled started packages from not_run packages"
 
 [[requirements]]
 id = "CLI-BUILD-EXECUTION-018"
-title = "Build does not format by default"
+title = "Build without check skips workspace formatting"
 manual = false
 design = "design/execution.md"
-
-[requirements.ears]
-type = "event"
-trigger = "build is invoked without --check"
-system = "bloomery build"
-action = "skip the nix fmt preflight and leave workspace source unformatted"
+ears = { type = "event", trigger = "build is invoked without --check", system = "bloomery build", action = "skip check formatting work" }
 
 [[requirements]]
 id = "CLI-BUILD-EXECUTION-019"
@@ -220,26 +215,17 @@ action = "skip specification, scanner, and traceability validation"
 
 [[requirements]]
 id = "CLI-BUILD-EXECUTION-020"
-title = "Build leaves source and configuration unchanged"
+title = "No-write builds preserve workspace files"
 manual = false
 design = "design/execution.md"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "bloomery build"
-action = "avoid mutating workspace source, configuration, and lockfiles"
+ears = { type = "event", trigger = "build is invoked with --no-write", system = "bloomery build", action = "leave workspace source, configuration, lockfiles, and health baseline unchanged while allowing Nix store outputs" }
 
 [[requirements]]
 id = "CLI-BUILD-EXECUTION-021"
-title = "The check gate is the default check suite"
+title = "The check gate uses the mode-specific check suite"
 manual = false
 design = "design/execution.md#check-gate"
-
-[requirements.ears]
-type = "event"
-trigger = "--check is selected"
-system = "bloomery build"
-action = "run the no-selector default check suite, including its formatter preflight, for the selected systems before realizing any package"
+ears = { type = "event", trigger = "--check is selected", system = "bloomery build", action = "run the no-selector default check suite for selected systems before realizing packages, using the selected write or no-write behavior" }
 
 [[requirements]]
 id = "CLI-BUILD-EXECUTION-022"
@@ -311,3 +297,10 @@ type = "event"
 trigger = "--check runs while specification management is disabled"
 system = "bloomery build"
 action = "gate realization on the formatter and Nix checks without requiring a specification tree"
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-028"
+title = "Build forwards no-write to its check gate"
+manual = false
+design = "design/execution.md#check-gate"
+ears = { type = "event", trigger = "build --check is invoked with --no-write", system = "bloomery build", action = "run the default check suite with the native treefmt check and no-write baseline behavior before realizing selected packages" }

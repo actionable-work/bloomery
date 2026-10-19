@@ -1,6 +1,6 @@
 use crate::check_command::catalog::NixTaskResult;
 use crate::check_command::command::{
-    CheckContext, CheckOperation, DetailsArgs, FailureArgs, ListArgs, run_at_with,
+    CheckContext, CheckOperation, DetailsArgs, FailureArgs, HealthArgs, ListArgs, run_at_with,
     run_gate_at_with_backend,
 };
 use crate::check_command::execution::{FailureDraft, assign_failure_ids, default_jobs};
@@ -8,7 +8,8 @@ use crate::check_command::interrupt::InterruptFlag;
 use crate::check_command::model::{Outcome, RunStatus};
 use crate::check_command::store::RunStore;
 use crate::check_command::test_support::{
-    FakeNix, fixture, fixture_without_specs, invoke, invoke_with_interrupt, request,
+    FakeNix, fixture, fixture_without_specs, invoke, invoke_with_interrupt, invoke_with_mode,
+    request,
 };
 use serde_json::Value;
 use std::fs;
@@ -264,6 +265,7 @@ fn evaluation_failures_are_check_failures_and_store_failures_are_operational() {
             root: &root2,
             json_mode: true,
             color: crate::output::ColorMode::Auto,
+            no_write: false,
             backend: &backend,
             interrupt: InterruptFlag::for_test(),
             cache_base: Some(&blocked_cache),
@@ -455,7 +457,7 @@ fn prerequisite_failures_block_dependents_without_suppressing_nix_checks() {
     assert_eq!(backend.realizations.load(Ordering::SeqCst), 1);
     assert_eq!(
         backend.systems.lock().unwrap().as_slice(),
-        &["x86_64-linux"]
+        &["x86_64-linux", "x86_64-linux"]
     );
     assert_eq!(result["result"]["failures"].as_array().unwrap().len(), 1);
     let store =
@@ -588,6 +590,9 @@ fn summaries_agree_between_human_and_json_and_do_not_stream_logs() {
 
 #[test]
 #[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-001"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-006"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-018"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-030"))]
 fn every_execution_shape_formats_once_before_any_check() {
     for selectors in [
         Vec::new(),
@@ -600,12 +605,32 @@ fn every_execution_shape_formats_once_before_any_check() {
             ..FakeNix::default()
         };
         let mut args = request();
-        args.selectors = selectors;
-        let (status, _, _) = invoke(args, &root, &cache, &backend, true);
+        args.selectors = selectors.clone();
+        let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
         assert_eq!(status, std::process::ExitCode::SUCCESS);
+        let summary: Value = serde_json::from_slice(&stdout).expect("summary");
+        assert_eq!(summary["result"]["mode"], "write");
+        let store = RunStore::open(&root, Some(&cache)).expect("run store");
+        let record = store.latest().expect("latest run").0;
+        assert_eq!(record.mode, crate::check_command::model::RunMode::Write);
+        assert!(record.outcomes.iter().any(|outcome| {
+            outcome.id == "format:workspace" && outcome.outcome == Outcome::Passed
+        }));
         assert_eq!(backend.formatter_runs.load(Ordering::SeqCst), 1);
         let events = backend.events.lock().unwrap().clone();
         assert_eq!(events.first().map(String::as_str), Some("format"));
+        let catalog_events = backend.catalog_events.lock().unwrap().clone();
+        if selectors.is_empty()
+            || selectors
+                .iter()
+                .any(|selector| selector.starts_with("nix:"))
+        {
+            assert!(catalog_events[0].starts_with("discover:"));
+            assert_eq!(catalog_events[1], "format");
+            assert!(catalog_events[2].starts_with("plan:"));
+        } else {
+            assert_eq!(catalog_events, ["format"]);
+        }
         assert!(
             events[1..]
                 .iter()
@@ -614,6 +639,143 @@ fn every_execution_shape_formats_once_before_any_check() {
         let _ = fs::remove_dir_all(root);
         let _ = fs::remove_dir_all(cache);
     }
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-008"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-010"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-011"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-031"))]
+#[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-034"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-008"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-001"))]
+fn no_write_selects_and_deduplicates_the_native_formatter_per_system() {
+    let (root, cache) = fixture(true);
+    let important = root.join("preserve-on-no-write.txt");
+    fs::write(&important, b"unchanged\n").expect("sentinel");
+    let check_readme = root.join(".bloomery/specs/CLI/CHECK/README.md");
+    let original_readme = fs::read(&check_readme).expect("existing spec README");
+    let backend = FakeNix {
+        names: vec!["core:treefmt-check".to_owned(), "other".to_owned()],
+        formatter_edits: vec![("should-not-exist.txt".to_owned(), b"write".to_vec())],
+        formatter_removals: vec![".bloomery/specs/CLI/CHECK/README.md".to_owned()],
+        ..FakeNix::default()
+    };
+    let mut args = request();
+    args.selectors = vec![
+        "static:structure".to_owned(),
+        "nix:*:core:treefmt-check".to_owned(),
+    ];
+    args.systems = vec!["x86_64-linux".to_owned(), "aarch64-linux".to_owned()];
+    let (status, stdout, _) = invoke_with_mode(args, &root, &cache, &backend, true, true);
+    assert_eq!(status, std::process::ExitCode::SUCCESS);
+    assert_eq!(backend.evaluations.load(Ordering::SeqCst), 2);
+    assert_eq!(backend.formatter_runs.load(Ordering::SeqCst), 0);
+    assert_eq!(backend.build_commands.load(Ordering::SeqCst), 1);
+    assert_eq!(backend.catalog_events.lock().unwrap().len(), 2);
+    assert!(
+        backend
+            .catalog_events
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|event| event.starts_with("plan:"))
+    );
+    assert_eq!(
+        fs::read(&important).expect("preserved sentinel"),
+        b"unchanged\n"
+    );
+    assert_eq!(
+        fs::read(&check_readme).expect("preserved README"),
+        original_readme
+    );
+    assert!(!root.join("should-not-exist.txt").exists());
+
+    let summary: Value = serde_json::from_slice(&stdout).expect("summary");
+    assert_eq!(summary["result"]["mode"], "no-write");
+    assert_eq!(summary["result"]["counts"]["passed"], 3);
+    let store = RunStore::open(&root, Some(&cache)).expect("run store");
+    let record = store.latest().expect("latest run").0;
+    assert_eq!(record.mode, crate::check_command::model::RunMode::NoWrite);
+    assert!(
+        !record
+            .outcomes
+            .iter()
+            .any(|outcome| outcome.id == "format:workspace")
+    );
+    for system in ["aarch64-linux", "x86_64-linux"] {
+        assert_eq!(
+            record
+                .outcomes
+                .iter()
+                .filter(|outcome| outcome.id == format!("nix:{system}:core:treefmt-check"))
+                .count(),
+            1
+        );
+    }
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-012"))]
+fn no_write_rejects_a_catalog_without_the_native_formatter_before_work() {
+    let (root, cache) = fixture(true);
+    let backend = FakeNix {
+        names: vec!["ordinary-check".to_owned()],
+        ..FakeNix::default()
+    };
+    let mut args = request();
+    args.selectors = vec!["static:structure".to_owned()];
+    let (status, stdout, _) = invoke_with_mode(args, &root, &cache, &backend, true, true);
+    assert_eq!(status, std::process::ExitCode::from(2));
+    let error: Value = serde_json::from_slice(&stdout).expect("catalog error");
+    assert_eq!(error["error"]["code"], "OperationalError");
+    assert!(
+        error["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("core:treefmt-check")
+    );
+    assert_eq!(backend.evaluations.load(Ordering::SeqCst), 1);
+    assert_eq!(backend.formatter_runs.load(Ordering::SeqCst), 0);
+    assert_eq!(backend.build_commands.load(Ordering::SeqCst), 0);
+    assert!(
+        RunStore::open(&root, Some(&cache))
+            .unwrap()
+            .latest()
+            .is_err()
+    );
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-009"))]
+fn native_no_write_formatter_failure_is_an_ordinary_batched_check_failure() {
+    let (root, cache) = fixture(true);
+    let backend = FakeNix {
+        names: vec!["core:treefmt-check".to_owned(), "independent".to_owned()],
+        unique_derivations: true,
+        failing_attributes: vec!["core:treefmt-check".to_owned()],
+        ..FakeNix::default()
+    };
+    let mut args = request();
+    args.selectors = vec!["nix:*".to_owned()];
+    let (status, stdout, _) = invoke_with_mode(args, &root, &cache, &backend, true, true);
+    assert_eq!(status, std::process::ExitCode::FAILURE);
+    assert_eq!(backend.formatter_runs.load(Ordering::SeqCst), 0);
+    assert_eq!(backend.build_commands.load(Ordering::SeqCst), 1);
+    let summary: Value = serde_json::from_slice(&stdout).expect("summary");
+    assert_eq!(summary["result"]["mode"], "no-write");
+    assert_eq!(summary["result"]["counts"]["failed"], 1);
+    assert_eq!(summary["result"]["counts"]["passed"], 1);
+    assert_eq!(
+        summary["result"]["failures"][0]["check"],
+        "nix:x86_64-linux:core:treefmt-check"
+    );
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
 }
 
 #[test]
@@ -713,6 +875,11 @@ fn read_only_check_operations_do_not_format() {
             failure: "f1".to_owned(),
             run: None,
             offset: None,
+            limit: 20,
+        }),
+        CheckOperation::Health(HealthArgs {
+            run: None,
+            offset: 0,
             limit: 20,
         }),
     ];

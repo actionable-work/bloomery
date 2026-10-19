@@ -2,84 +2,84 @@ group = "FORMAT"
 
 [[requirements]]
 id = "CLI-CHECK-FORMAT-001"
-title = "Check executions format before selected checks"
+title = "Write-mode check formats before selected checks"
 manual = false
-design = "design/execution.md#formatting-gate"
-
-[requirements.ears]
-type = "event"
-trigger = "a valid bloomery check execution is requested"
-system = "bloomery check"
-action = "run nix fmt once before admitting any selected check, regardless of selected checks or systems"
+design = "design/execution.md#formatting"
+ears = { type = "event", trigger = "a valid bloomery check execution is requested without --no-write", system = "bloomery check", action = "run nix fmt once as a write-mode preflight before admitting selected checks, regardless of selected checks or systems" }
 
 [[requirements]]
 id = "CLI-CHECK-FORMAT-002"
-title = "Formatting failure always stops check work"
+title = "Write-mode formatting failure stops check work"
 manual = false
-design = "design/execution.md#formatting-gate"
-
-[requirements.ears]
-type = "event"
-trigger = "nix fmt exits unsuccessfully"
-system = "bloomery check"
-action = "record format:workspace as failed with a NixFormatFailed record, mark all selected checks not_run, and fail without starting check work regardless of --fail-fast"
+design = "design/execution.md#formatting"
+ears = { type = "event", trigger = "write-mode nix fmt exits unsuccessfully", system = "bloomery check", action = "record format:workspace as failed with a NixFormatFailed record, mark selected checks not_run, and fail without starting check work regardless of --fail-fast" }
 
 [[requirements]]
 id = "CLI-CHECK-FORMAT-003"
-title = "Checks use the formatted workspace"
+title = "Write-mode checks use the formatted workspace"
 manual = false
-design = "design/workspace-check.md#formatter-preflight"
-
-[requirements.ears]
-type = "event"
-trigger = "nix fmt exits successfully"
-system = "bloomery check"
-action = "run selected checks against the workspace state produced by formatting"
+design = "design/workspace-check.md#formatting-execution"
+ears = { type = "event", trigger = "write-mode nix fmt exits successfully", system = "bloomery check", action = "run selected checks against the workspace state produced by formatting" }
 
 [[requirements]]
 id = "CLI-CHECK-FORMAT-004"
-title = "Formatter edits are not rolled back"
+title = "Write-mode formatter edits are not rolled back"
 manual = false
-design = "design/workspace-check.md#formatter-preflight"
-
-[requirements.ears]
-type = "event"
-trigger = "nix fmt modifies workspace files"
-system = "bloomery check"
-action = "leave formatter edits in the workspace, including edits made before a formatting failure"
+design = "design/workspace-check.md#formatting-execution"
+ears = { type = "event", trigger = "write-mode nix fmt modifies workspace files", system = "bloomery check", action = "leave formatter edits in the workspace, including edits made before a formatting failure" }
 
 [[requirements]]
 id = "CLI-CHECK-FORMAT-005"
 title = "Read-only check operations do not format"
 manual = false
-design = "design/execution.md#formatting-gate"
-
-[requirements.ears]
-type = "state"
-state = "check list, check failures, or check details is selected"
-system = "bloomery check"
-action = "do not invoke nix fmt"
+design = "design/execution.md#formatting"
+ears = { type = "state", state = "check list, check failures, check details, or check health retrieval is selected", system = "bloomery check", action = "do not invoke nix fmt" }
 
 [[requirements]]
 id = "CLI-CHECK-FORMAT-006"
-title = "Formatter outcomes are retained"
+title = "Formatting outcomes retain their mode-specific identity"
 manual = false
 design = "design/details.md#storage-and-identity"
-
-[requirements.ears]
-type = "event"
-trigger = "the formatter gate completes"
-system = "bloomery check"
-action = "retain its format:workspace outcome in the run record"
+ears = { type = "event", trigger = "write-mode formatting completes", system = "bloomery check", action = "retain the format:workspace outcome in the run record" }
 
 [[requirements]]
 id = "CLI-CHECK-FORMAT-007"
-title = "Formatter output is captured"
+title = "Write-mode formatter output is captured"
 manual = false
-design = "design/workspace-check.md#formatter-preflight"
+design = "design/workspace-check.md#formatting-execution"
+ears = { type = "event", trigger = "write-mode nix fmt runs", system = "bloomery check", action = "capture formatter output in a run-local log without streaming it to normal output" }
 
-[requirements.ears]
-type = "event"
-trigger = "the formatter gate runs"
-system = "bloomery check"
-action = "capture nix fmt output in a run-local log without streaming it to normal output"
+[[requirements]]
+id = "CLI-CHECK-FORMAT-008"
+title = "No-write includes the native treefmt check"
+manual = false
+design = "design/execution.md#formatting"
+ears = { type = "event", trigger = "bloomery check runs with --no-write", system = "bloomery check", action = "include nix:<system>:core:treefmt-check for each selected system even when partial selectors do not match it, and realize it in the batched Nix check invocation" }
+
+[[requirements]]
+id = "CLI-CHECK-FORMAT-009"
+title = "Native no-write formatter failure follows Nix check rules"
+manual = false
+design = "design/execution.md#formatting"
+ears = { type = "event", trigger = "the no-write core:treefmt-check derivation fails", system = "bloomery check", action = "record the native Nix check as failed and continue independent checks unless --fail-fast stops or cancels them" }
+
+[[requirements]]
+id = "CLI-CHECK-FORMAT-010"
+title = "No-write treefmt check does not modify the workspace"
+manual = false
+design = "design/workspace-check.md#formatting-execution"
+ears = { type = "event", trigger = "bloomery check runs with --no-write and every selected system exposes core:treefmt-check", system = "bloomery check", action = "run the native treefmt derivation without changing workspace files" }
+
+[[requirements]]
+id = "CLI-CHECK-FORMAT-011"
+title = "Native treefmt check keeps its Nix catalog identity"
+manual = false
+design = "design/execution.md#selection"
+ears = { type = "ubiquitous", system = "the bloomery check catalog", action = "expose checks.<system>.core:treefmt-check as nix:<system>:core:treefmt-check and deduplicate its implicit no-write selection with an explicit selector match" }
+
+[[requirements]]
+id = "CLI-CHECK-FORMAT-012"
+title = "No-write requires the native treefmt check"
+manual = false
+design = "design/workspace-check.md#formatting-execution"
+ears = { type = "event", trigger = "bloomery check runs with --no-write and a selected system catalog lacks core:treefmt-check", system = "bloomery check", action = "report an operational catalog error before starting check work" }

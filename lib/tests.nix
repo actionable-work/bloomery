@@ -9,7 +9,7 @@
   mkFlakeTests = import ./mk-flake.test.nix {inherit pkgs lib treefmtNix flakeParts;};
   formatterTests = import ./formatters.test.nix {inherit pkgs lib treefmtNix;};
   buildConfigTests = import ./build-config.test.nix {inherit pkgs lib;};
-  mkWorkspaceTests = import ./mk-workspace.test.nix {inherit pkgs lib;};
+  mkWorkspaceTests = import ./mk-workspace.test.nix {inherit pkgs lib treefmtNix;};
   flakeModuleTests = import ./modules/flake-module.test.nix {inherit pkgs lib;};
   builderTests = import ./builders/builders.test.nix {inherit pkgs lib;};
   repositoryLayoutTests = import ./repository-layout.test.nix {inherit lib;};
@@ -209,6 +209,8 @@ in {
           "NIXLIB-FLAKE-FORMATTERS-013"
           "NIXLIB-FLAKE-FORMATTERS-014"
           "NIXLIB-FLAKE-FORMATTERS-015"
+          "NIXLIB-FLAKE-FORMATTERS-016"
+          "NIXLIB-FLAKE-FORMATTERS-017"
           "PARSER-SCANNING-HEALTH-001"
           "PARSER-SCANNING-HEALTH-002"
           "PARSER-SCANNING-HEALTH-006"

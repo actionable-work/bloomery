@@ -26,6 +26,7 @@ pub(super) struct CheckContext<'a> {
     pub(super) root: &'a Path,
     pub(super) json_mode: bool,
     pub(super) color: crate::output::ColorMode,
+    pub(super) no_write: bool,
     pub(super) backend: &'a dyn NixBackend,
     pub(super) interrupt: InterruptFlag,
     pub(super) cache_base: Option<&'a Path>,
@@ -80,6 +81,7 @@ pub fn run(args: CheckArgs, json_mode: bool) -> ExitCode {
             root: &root,
             json_mode,
             color: crate::output::ColorMode::Auto,
+            no_write: false,
             backend: &backend,
             interrupt,
             cache_base: None,
@@ -116,6 +118,18 @@ pub fn run_at_with_color(
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> ExitCode {
+    run_at_with_color_and_mode(args, json_mode, color, false, root, stdout, stderr)
+}
+
+pub fn run_at_with_color_and_mode(
+    args: CheckArgs,
+    json_mode: bool,
+    color: crate::output::ColorMode,
+    no_write: bool,
+    root: &Path,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
     let backend = NixCli::default();
     run_at_with(
         args,
@@ -123,6 +137,7 @@ pub fn run_at_with_color(
             root,
             json_mode,
             color,
+            no_write,
             backend: &backend,
             interrupt: InterruptFlag::install(),
             cache_base: None,
@@ -148,6 +163,7 @@ pub fn run_at_with_cache(
             root,
             json_mode,
             color: crate::output::ColorMode::Auto,
+            no_write: false,
             backend: &backend,
             interrupt: InterruptFlag::install(),
             cache_base: Some(cache_base),
@@ -176,15 +192,39 @@ pub fn run_gate_at(
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> GateOutcome {
-    let backend = NixCli::default();
-    run_gate_at_with_backend(args, root, cache_base, &backend, stdout, stderr)
+    run_gate_at_with_mode(args, root, cache_base, false, stdout, stderr)
 }
 
+pub fn run_gate_at_with_mode(
+    args: CheckArgs,
+    root: &Path,
+    cache_base: Option<&Path>,
+    no_write: bool,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> GateOutcome {
+    let backend = NixCli::default();
+    run_gate_at_with_backend_mode(args, root, cache_base, &backend, no_write, stdout, stderr)
+}
+
+#[cfg(test)]
 pub(super) fn run_gate_at_with_backend(
     args: CheckArgs,
     root: &Path,
     cache_base: Option<&Path>,
     backend: &dyn NixBackend,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> GateOutcome {
+    run_gate_at_with_backend_mode(args, root, cache_base, backend, false, stdout, stderr)
+}
+
+pub(super) fn run_gate_at_with_backend_mode(
+    args: CheckArgs,
+    root: &Path,
+    cache_base: Option<&Path>,
+    backend: &dyn NixBackend,
+    no_write: bool,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> GateOutcome {
@@ -194,6 +234,7 @@ pub(super) fn run_gate_at_with_backend(
             root,
             json_mode: false,
             color: crate::output::ColorMode::Auto,
+            no_write,
             backend,
             interrupt: InterruptFlag::install(),
             cache_base,
@@ -235,6 +276,22 @@ pub(super) fn run_at_with(
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> ExitCode {
+    if context.no_write
+        && matches!(
+            args.operation.as_ref(),
+            Some(CheckOperation::HealthUpdate(_))
+        )
+    {
+        return report_error(
+            context.json_mode,
+            &CheckError::usage(
+                "--no-write cannot be used with bloomery check health update because it writes workspace files",
+            ),
+            None,
+            stdout,
+            stderr,
+        );
+    }
     // Mirror the shared CLI preflight at the feature boundary so no direct
     // caller can execute or retrieve checks without a root flake.
     if !context.root.join("flake.nix").is_file() {
@@ -256,6 +313,7 @@ pub(super) fn run_at_with(
         root: requested_root,
         json_mode,
         color,
+        no_write,
         backend,
         interrupt,
         cache_base,
@@ -278,6 +336,7 @@ pub(super) fn run_at_with(
         root: &root,
         json_mode,
         color,
+        no_write,
         backend,
         interrupt,
         cache_base,

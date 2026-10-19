@@ -11,9 +11,10 @@ auto-detected from the specification tree or explicitly configured
 (`specs.enable = true`). When either gate is off, `static:structure` and
 `static:traceability` are absent from the catalog and no specification workspace
 or evidence pass runs. The
-formatter gate, enabled code health, enabled Clippy suppression policy, and
-Nix checks are unaffected. Health and suppression policy are independent static
-branches without requirement-model prerequisites; see
+Write-mode formatting, the native no-write formatter check, enabled
+code health, enabled Clippy suppression policy, and Nix checks are unaffected.
+Health and suppression policy are independent static branches without
+requirement-model prerequisites; see
 [code health](code-health.md). Health can request source ingestion while evidence
 scanning is disabled, without producing specification references.
 

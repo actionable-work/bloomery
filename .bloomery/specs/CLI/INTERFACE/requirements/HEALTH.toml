@@ -9,7 +9,7 @@ ears = { type = "ubiquitous", system = "the CLI", action = "expose bloomery chec
 
 [[requirements]]
 id = "CLI-INTERFACE-HEALTH-002"
-title = "Check exposes reviewed health export"
+title = "Check exposes explicit health baseline update"
 manual = false
 design = "design/commands.md"
 ears = { type = "ubiquitous", system = "the CLI", action = "expose bloomery check health update with run and JSON options" }

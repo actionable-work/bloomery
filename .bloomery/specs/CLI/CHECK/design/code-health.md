@@ -3,17 +3,17 @@
 ## Check integration
 
 `static:code-health` measures first-party Rust source, calculates crate and
-workspace scores, and checks configured limits and a reviewed baseline. It is
-opt-in through `checks.codeHealth.enable`, which defaults to `false`,
-independently of
+workspace scores, and checks configured limits against the existing baseline.
+It is opt-in through `checks.codeHealth.enable`, which defaults to `false`, independently of
 `specs.enable`, `scanners.rust.enabled`, and the Nix generation toggle
 `checks.enable`. It appears once in the catalog, regardless of selected systems.
 Normal selectors, formatting, scheduling, cancellation, failure retention, and
 exit codes apply. Disabled health contributes no catalog entry or analysis.
 
-Health has no specification prerequisite. After formatting, it can run beside
-structure and Nix work; a specification failure cannot suppress it in default
-mode. Traceability and health share the command-scoped Rust analysis described
+Health has no specification prerequisite. In write mode it runs after the
+formatter and beside structure and Nix work; a specification failure cannot
+suppress it in default mode. In no-write mode it runs alongside the batched
+native treefmt and selected Nix checks. Traceability and health share the command-scoped Rust analysis described
 in [shared analysis](../../../PARSER/SCANNING/design/health-analysis.md).
 Each consumer receives only its requested projections and diagnostics. The
 shared service publishes completed file facts without requiring simultaneous
@@ -119,12 +119,34 @@ The default check summary stays bounded and supplies a health retrieval hint
 when health was measured. Health failures participate in ordinary failure
 pagination and details; no per-crate success lines are added to normal output.
 
-## Reviewed snapshots
+## Baseline snapshots
 
 `bloomery check health update [--run RUN] [--json]` atomically replaces the file
 at `checks.codeHealth.baseline` with the selected run's complete current
-measurement. It is the explicit review action for checking scores into version
-control. A typical sequence is:
+measurement. A normal write-mode check also replaces this file after
+`static:code-health` completes a measurement. It first compares against the
+existing baseline, then writes the new measurement even when health policy gates
+or unrelated checks fail. If the baseline is missing, invalid, or incompatible,
+the check retains the corresponding failure and seeds the file from the complete
+measurement. This makes the file the latest comparison point for subsequent
+checks. Regression limits therefore compare each selected write-mode run with
+the baseline that existed when that run began.
+If atomic replacement fails, report `HealthBaselineWriteFailed`, fail the
+health check with exit code 1, retain the complete measurement, and preserve
+the previous baseline.
+
+Automatic refresh occurs only when code health is enabled and selected. It does
+not occur after a failed write-mode formatter preflight, an incomplete health
+measurement, or cancellation or interruption before measurement completes.
+With `--no-write`, health still compares against the existing baseline but
+never replaces it. A complete no-write measurement can still be explicitly
+published later with `check health update`.
+`check health update --no-write` is a usage error before Bloomery reads the
+retained measurement or modifies the baseline.
+
+The explicit update command remains available for publishing a retained
+measurement, including one produced by no-write execution. A typical sequence
+is:
 
 ```text
 bloomery check --check static:code-health
@@ -133,16 +155,18 @@ bloomery check health update --run RUN
 ```
 
 Update can export a complete measurement whose policy gates failed, including
-the initial missing-baseline failure. It requires a passed formatter outcome
-and a finalized, uninterrupted run with complete health measurement; unrelated
-check failures do not prevent export. Verify the current input digest against
+the initial missing-baseline failure. It requires passed formatting outcomes
+for the run: the `format:workspace` preflight in write mode or the native
+`core:treefmt-check` for every selected system in no-write mode. It also
+requires a finalized, uninterrupted run with complete health measurement;
+unrelated check failures do not prevent export. Verify the current input digest against
 the retained digest using source reads and discovery, without AST parsing,
 formatting, or builds. Reuse the retained module graph for source paths;
 changed graph-defining source or manifest bytes already invalidate its digest.
-Changed sources, manifests, inventory, or effective
-health configuration reject export as stale. Do not copy baseline-relative
-fields or gate diagnostics into the snapshot: it stores current measurements
-and their provenance, suitable for future comparison.
+Changed sources, manifests, inventory, or effective health configuration
+reject export as stale. Do not copy baseline-relative fields or gate diagnostics
+into the snapshot: it stores current measurements and their provenance, suitable
+for the next comparison.
 
 The checked-in `.bloomery/code-health-summary.json` is both the PR summary and
 the comparison baseline. It uses schema version 3 and has top-level fields
@@ -153,8 +177,7 @@ nesting, and duplication. Subscores are deduction points in each category.
 Crate rows also include the display name and repository-relative `manifest_path`
 used as their stable identity. Workspace score and subscores are SLOC weighted
 from crate results. The policy retains only effective scoring limits and
-source-selection inputs; the digest records which inputs produced the reviewed
-result.
+source-selection inputs; the digest records which inputs produced the snapshot.
 
 The file omits callable metrics and locations, duplicate ranges, source
 inventories, opaque macro locations, and run metadata. Those remain in retained
@@ -169,9 +192,9 @@ bytes. Replace the configured destination through a temporary file and atomic
 rename. The path must remain inside the repository, including through
 symlinks, and cannot overlap source inputs, manifests, configuration, locks, or
 specifications. Report the written path and crate/workspace scores in bounded
-human or JSON output. Invalid requests exit 2; stale inputs or write failures
-exit 1.
+human or JSON output for automatic refresh and explicit update. Invalid
+requests exit 2; stale inputs or write failures exit 1.
 
-Ordinary checks and retrieval never modify the tracked baseline. Git or
-jujutsu history of reviewed snapshots supplies the historical record; Bloomery
-does not create commits or maintain a second repository history store.
+Retrieval never modifies the baseline. Git or jujutsu history supplies prior
+snapshots; Bloomery does not create commits or maintain a second repository
+history store.

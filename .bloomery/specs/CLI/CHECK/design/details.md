@@ -6,14 +6,16 @@ Store execution results in a workspace-scoped user cache outside the repository,
 using the platform user-cache location (honoring `XDG_CACHE_HOME` where
 applicable). Namespace by canonical workspace root so results from different
 workspaces cannot be mixed. Use opaque run IDs, not timestamps as the sole
-identity. Retain the selection, system scope, selected check outcomes and the
-`format:workspace` outcome, structured failures, Git revision and working-tree
-state when available, and captured logs. Retain complete health measurements
+identity. Retain the selection, system scope, write mode (`write` or
+`no-write`), selected check outcomes and the write-mode `format:workspace` outcome,
+structured failures, Git revision and working-tree state when available, and
+captured logs. Retain complete health measurements
 and baseline comparisons as structured run data when selected health analysis
 completes; see [health retrieval and export](code-health.md#retained-reports).
-Sample revision and working-tree state after the formatter gate completes or
-fails, so retained metadata describes the source used by check tasks and any
-formatting edits, including partial edits from a failed formatter.
+Sample revision and working-tree state after formatting completes or fails, so
+retained metadata describes the source used by check tasks and any write-mode
+formatting edits, including partial edits from a failed formatter. Retain the
+configured health-baseline path and whether write mode refreshed it.
 A missing Git command or unavailable revision/status leaves the corresponding
 field null and does not fail the run. Working-tree state includes normal
 untracked files. When a selected check fails during batched realization, retain its derivation
@@ -43,8 +45,10 @@ Assign short run-local IDs (`f1`, `f2`, ...) after sorting by check ID, diagnost
 code, subject, source location, and a deterministic occurrence tie-breaker.
 Blocked/canceled/not_run checks do not produce duplicate root-cause failures.
 Static diagnostics are individual failures; Nix failures are normally failed
-check attributes. A formatter failure uses `format:workspace` and retains its
-captured command output as the task log. Alias failures can share a retained log.
+check attributes. A write-mode formatter failure uses `format:workspace` and
+retains its captured command output as the task log. A no-write native treefmt
+failure uses its ordinary Nix check ID and retained derivation log. Alias
+failures can share a retained log.
 
 `check failures [--run RUN] [--offset N] [--limit N]` enumerates failure records,
 not successful checks. Offset is zero-based in the sorted failure list. Default

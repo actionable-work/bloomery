@@ -135,3 +135,10 @@ type = "event"
 trigger = "a configured value already carries a trailing comment"
 system = "bloomery config document"
 action = "preserve the trailing comment and write the catalog documentation on the line above the key"
+
+[[requirements]]
+id = "CLI-CONFIG-DOCUMENT-013"
+title = "No-write blocks configuration documentation edits"
+manual = false
+design = "design/documenting.md#annotation-semantics"
+ears = { type = "event", trigger = "config document is invoked with --no-write", system = "bloomery config document", action = "return a usage error before creating or annotating .bloomery/config.toml" }

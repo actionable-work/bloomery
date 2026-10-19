@@ -9,6 +9,9 @@ generator while leaving Nix's pure lock parsing and validation intact.
 The Rust CLI orchestrates tools and owns Bloomery lock generation; running sync
 must not depend on evaluating or building the workspace's Nix outputs.
 
+The global `--no-write` option is a usage error for sync. Reject it before
+running Cargo or Nix, even when the current lockfiles would remain unchanged.
+
 ## Invocation and update selection
 
 Run from the workspace root (the current working directory). There is no root

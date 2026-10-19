@@ -18,7 +18,7 @@ not supply requirement coverage.
 
 | Boundary | Test mechanism | Assertions |
 | --- | --- | --- |
-| Runner | In-memory `NixBackend` | Selection, scheduling, formatter gating, retained outcomes and failures |
+| Runner | In-memory `NixBackend` | Selection, scheduling, mode-specific formatting, retained outcomes and failures |
 | Production `NixCli` adapter | Strict local subprocess fixture | Arguments, working directory, stdin, JSON decoding, exit handling, captured output, call order |
 | Catalog expressions | Nix evaluation assertions exposed as a flake check | Actual production projections over fixture check sets, alias identity, attribute spelling and per-attribute evaluation failures |
 
@@ -56,16 +56,25 @@ and failed plan entries.
 | Empty system | Adapter decodes a successful empty catalog and runner accepts it when other selected work exists | `CLI-CHECK-SELECT-020` |
 | Mixed batch results | Production adapter processes a failed batch with valid sibling outputs; runner retains individual pass/fail outcomes | `CLI-CHECK-NIX-021`, `023`, `027` |
 | Causal logs | Adapter processes dependency metadata and failure output; runner retains the causal derivation and retrieves its log through the production adapter | `CLI-CHECK-NIX-024`, `025`, `026` |
-| Formatter success | Production adapter invokes formatting once; a fixture edit is visible to subsequent checks and remains in the workspace | `CLI-CHECK-FORMAT-001`, `003`, `004` |
-| Formatter failure | Nonzero formatter exit retains its output and edits, fails the run, and admits no selected check work | `CLI-CHECK-FORMAT-002`, `004`, `006`, `007` |
+| Write-mode formatter success | Production adapter invokes formatting once; a fixture edit is visible to subsequent checks and remains in the workspace | `CLI-CHECK-FORMAT-001`, `003`, `004` |
+| Write-mode formatter failure | Nonzero formatter exit retains its output and edits, fails the run, and admits no selected check work | `CLI-CHECK-FORMAT-002`, `004`, `006`, `007` |
+| No-write native formatter check | The runner adds `nix:<system>:core:treefmt-check` for selected systems even when partial selectors omit it, batches it with Nix checks, retains its native outcome and derivation log, changes no workspace file, and deduplicates explicit selection | `CLI-CHECK-FORMAT-008`, `010`, `011` |
+| Missing native formatter check | Missing `core:treefmt-check` on a selected system is an operational catalog error before check work starts | `CLI-CHECK-FORMAT-012` |
+| No-write formatter failure | A failed formatting task is an ordinary check failure; independent work continues unless fail-fast stops or cancels it | `CLI-CHECK-FORMAT-009` |
+| No-write command policy | Accept the global option; reject writers early; allow read operations, preview modes, help/version, run cache and Nix store outputs | `CLI-INTERFACE-FLAGS-032`–`036`, `CLI-INIT-COMMAND-013`, `CLI-SYNC-INTERFACE-024`, `CLI-SPEC-EDITING-024`, `CLI-CONFIG-EDITING-021`, `CLI-CONFIG-UPGRADE-027`–`028`, `CLI-CONFIG-DOCUMENT-013`, `CLI-CHECK-HEALTH-038`, `CLI-BUILD-EXECUTION-020`, `028` |
+| Health baseline refresh | Write-mode selected health compares then refreshes after a complete measurement, including after policy or unrelated failures; missing or invalid baselines are seeded | `CLI-CHECK-HEALTH-032`, `033`, `036` |
+| Health baseline write failure | A failed atomic replacement reports `HealthBaselineWriteFailed`, retains the report, and leaves the previous file intact | `CLI-CHECK-HEALTH-028`, `039` |
+| Health baseline no-write and skips | No-write compares without replacing; disabled or unselected health, incomplete measurements, failed formatting, and interrupted runs preserve the file | `CLI-CHECK-HEALTH-034`, `035`, `037` |
 | Missing executable | Adapter startup failure yields an operational error and cannot produce a successful run | `CLI-CHECK-NIX-012` |
 
 Batch tests assert `--keep-going`, `--no-link`, lockfile protection, safe
 argument boundaries, output-validity stdin and log retrieval. Fail-fast tests
 assert cancellation and unstarted outcomes. Catalog tests include an attribute
 that fails evaluation alongside valid siblings and the excluded legacy
-recursive output. Formatter call order distinguishes setup evaluation from
-selected check work; catalog setup may precede formatting.
+recursive output. Write-mode call order discovers check IDs before formatting
+and resolves derivation paths only after formatting succeeds. No-write resolves
+IDs and paths once per system, then selects the native treefmt derivation into
+the batched Nix realization, including when the user selects only static checks.
 
 Alias tests verify Bloomery's responsibility to submit a shared derivation once
 and retain each alias outcome. Nix owns store locking and physical realization.

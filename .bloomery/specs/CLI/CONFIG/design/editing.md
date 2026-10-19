@@ -22,6 +22,12 @@ and is specified by [Configuration documentation](documenting.md).
 Every invocation re-reads the configuration file. Config commands never load
 the specification tree, scan source, or edit lockfiles.
 
+The global `--no-write` option rejects `config set`, `config unset`, a writing
+`config upgrade`, and `config document` before they create or edit
+`.bloomery/config.toml`. This applies even when a mutation would be
+idempotent. Config reads and the read-only `upgrade --dry-run` and `upgrade
+--diff` operations remain available.
+
 Every config command requires an explicit supported format version; format `1`
 is currently the only supported version. Dotted keys address the normalized
 configuration model; the top-level format `version` is metadata and is not a

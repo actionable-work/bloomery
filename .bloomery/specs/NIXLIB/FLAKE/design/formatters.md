@@ -3,6 +3,18 @@
 The workspace builder produces a default formatter for each evaluated system.
 `mkFlake` exposes it as the standard `formatter.<system>` flake attribute, so
 `nix fmt` and the `bloomery check` formatter preflight run the same derivation.
+It also exposes `checks.<system>."core:treefmt-check"` as a native check
+derivation using the same resolved formatter configuration.
+
+## Native treefmt check
+
+For every evaluated system, generate `checks.<system>."core:treefmt-check"`
+with `treefmt.build.check`. Its source set filters workspace files by the
+enabled formatter include globs and includes the treefmt project config. When
+Git metadata is available, restrict the source set to tracked files; otherwise
+use the workspace root supplied to Nix. The check does not modify workspace
+files and is independent of Rust check enablement and package-check settings.
+Files outside its source set are not checked.
 
 ## Default formatter set
 

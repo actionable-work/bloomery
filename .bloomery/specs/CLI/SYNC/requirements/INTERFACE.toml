@@ -262,3 +262,10 @@ design = "design/sync.md#nix-migration"
 type = "ubiquitous"
 system = "Bloomery"
 action = "refrain from exposing a bloomery lock subcommand"
+
+[[requirements]]
+id = "CLI-SYNC-INTERFACE-024"
+title = "No-write blocks synchronization before lock updates"
+manual = false
+design = "design/sync.md#execution-pipeline"
+ears = { type = "event", trigger = "bloomery sync is invoked with --no-write", system = "bloomery sync", action = "return a usage error before dependency resolution or Cargo and Bloomery lockfile writes" }

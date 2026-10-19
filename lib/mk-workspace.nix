@@ -76,6 +76,23 @@ in
           extraFormatters = cfg.extraFormatters;
         };
 
+    treefmtCheckResult =
+      if formatterResult == null
+      then null
+      else let
+        source = formattersMod.checkSource {
+          inherit root;
+          formatterConfig = formatterResult.treefmt;
+        };
+      in {
+        inherit source;
+        check = formatterResult.treefmt.build.check source;
+      };
+    treefmtCheck =
+      if treefmtCheckResult == null
+      then {}
+      else {"core:treefmt-check" = treefmtCheckResult.check;};
+
     # Discover every workspace member. source.members selects which members
     # generate outputs; unselected members remain available as dependency
     # sources for selected members. Unknown member names are evaluation errors
@@ -1351,25 +1368,28 @@ in
       });
 
     checks =
-      if cfg.checks.enable
-      then
-        workspaceTests
-        // workspaceClippy
-        // workspaceDocTests
-        // workspaceDocs
-        // (
-          if cfg.checks.crateCheck
-          then workspaceChecks
-          else {}
-        )
-        // (
-          if includePackageChecks
-          then packageChecks
-          else {}
-        )
-        // workspaceLockCheck
-        // manifestChecks
-      else {};
+      treefmtCheck
+      // (
+        if cfg.checks.enable
+        then
+          workspaceTests
+          // workspaceClippy
+          // workspaceDocTests
+          // workspaceDocs
+          // (
+            if cfg.checks.crateCheck
+            then workspaceChecks
+            else {}
+          )
+          // (
+            if includePackageChecks
+            then packageChecks
+            else {}
+          )
+          // workspaceLockCheck
+          // manifestChecks
+        else {}
+      );
 
     devShell =
       if cfg.devShell.enable

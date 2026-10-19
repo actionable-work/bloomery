@@ -254,3 +254,17 @@ title = "Diff reports pending format migration"
 manual = true
 design = "design/upgrade.md#format-migrations"
 ears = { type = "event", trigger = "config upgrade --diff runs on an older supported numbered format", system = "bloomery config upgrade", action = "report the source and target format versions without writing" }
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-027"
+title = "No-write blocks writing configuration upgrades"
+manual = false
+design = "design/upgrade.md"
+ears = { type = "event", trigger = "config upgrade is invoked with --no-write without --dry-run or --diff", system = "bloomery config upgrade", action = "return a usage error before creating or changing .bloomery/config.toml" }
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-028"
+title = "No-write allows read-only upgrade modes"
+manual = false
+design = "design/upgrade.md"
+ears = { type = "event", trigger = "config upgrade is invoked with --no-write and either --dry-run or --diff", system = "bloomery config upgrade", action = "report the requested upgrade preview without creating or changing .bloomery/config.toml" }

@@ -84,6 +84,13 @@ help,
  build and check proceed without a specification tree while commands that
  require a requirement model report that management is disabled.
 
+The shared `--no-write` policy is checked after valid argument parsing and
+before command preflights or work that could create a workspace file. Thus a
+write-required command with `--no-write` returns the write-policy usage error
+even when its normal preflight would create a missing config file. Parser help
+and version output remain exempt. See the
+[workspace write policy](no-write.md).
+
 The `check`, `build`, `disk`, `review`, `sync`, and `spec` commands operate on
 the validated root. The
 `init` command operates on its target directory instead and requires no
@@ -105,15 +112,17 @@ semantics are specified by
 [SYNC](../../SYNC/README.md),
 [SPEC](../../SPEC/README.md), and
 [CONFIG](../../CONFIG/README.md). Sync is a CLI-only replacement for the Nix
-lock app, not a new Nix app. The global `--json` and `--color` flags are
-available after any
-application subcommand and their nested commands; see the
+lock app, not a new Nix app. The global `--json`, `--color`, and
+`--no-write` flags are available before or after any application subcommand
+and its nested commands; see the
 [output contract](output.md) and
 [presentation grammar](presentation.md). Check without a nested command executes the
 selected suite; list discovers checks, failures pages retained failures, and
 details seeks within retained failure output. Health retrieves retained crate
-and workspace scores; health update explicitly writes the reviewed baseline
-from a complete, current retained measurement. See
-[code health](../../CHECK/design/code-health.md#reviewed-snapshots). Build realizes the selected
-production packages and reports their output store paths. Retrieval never executes tests or
-builds. Config commands are specified separately by [CONFIG](../../CONFIG/README.md).
+and workspace scores. A normal write-mode check refreshes the configured
+baseline after a complete selected health measurement; health update explicitly
+publishes a retained measurement. See
+[code health](../../CHECK/design/code-health.md#baseline-snapshots). Build
+realizes the selected production packages and reports their output store paths.
+Retrieval never executes tests or builds. Config commands are specified
+separately by [CONFIG](../../CONFIG/README.md).

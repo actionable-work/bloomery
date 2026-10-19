@@ -149,70 +149,126 @@ ears = { type = "ubiquitous", system = "Bloomery", action = "provide a health re
 
 [[requirements]]
 id = "CLI-CHECK-HEALTH-022"
-title = "Snapshot update requires complete measurement"
+title = "Explicit baseline update requires complete measurement"
 manual = false
-design = "design/code-health.md#reviewed-snapshots"
-ears = { type = "ubiquitous", system = "Bloomery", action = "allow baseline export only from a finalized uninterrupted run with passed formatting and complete health measurement" }
+design = "design/code-health.md#baseline-snapshots"
+ears = { type = "ubiquitous", system = "Bloomery", action = "allow explicit baseline update only from a finalized uninterrupted run with complete health measurement and passed write-mode format:workspace or no-write native treefmt checks for every selected system" }
 
 [[requirements]]
 id = "CLI-CHECK-HEALTH-023"
-title = "Policy failure does not prevent review export"
+title = "Policy failure does not prevent explicit baseline update"
 manual = false
-design = "design/code-health.md#reviewed-snapshots"
+design = "design/code-health.md#baseline-snapshots"
 ears = { type = "ubiquitous", system = "Bloomery", action = "allow explicit export of complete current measurements despite health policy failures or unrelated check failures" }
 
 [[requirements]]
 id = "CLI-CHECK-HEALTH-024"
 title = "Stale measurements cannot be exported"
 manual = false
-design = "design/code-health.md#reviewed-snapshots"
+design = "design/code-health.md#baseline-snapshots"
 ears = { type = "ubiquitous", system = "Bloomery", action = "reject snapshot update when current discovery inputs, source inventory, bytes, or effective health configuration differ from the retained input digest" }
 
 [[requirements]]
 id = "CLI-CHECK-HEALTH-025"
 title = "Export freshness avoids AST work"
 manual = false
-design = "design/code-health.md#reviewed-snapshots"
+design = "design/code-health.md#baseline-snapshots"
 ears = { type = "ubiquitous", system = "Bloomery", action = "verify export freshness through reads and discovery without AST parsing, formatting, or builds" }
 
 [[requirements]]
 id = "CLI-CHECK-HEALTH-026"
 title = "The summary retains comparison inputs"
 manual = false
-design = "design/code-health.md#reviewed-snapshots"
+design = "design/code-health.md#baseline-snapshots"
 ears = { type = "ubiquitous", system = "Bloomery", action = "export one high-level summary and comparison baseline with schema and algorithm versions, scoring and selection policy, input digest, workspace and per-crate SLOC, scores, and category subscores while omitting detailed metrics" }
 
 [[requirements]]
 id = "CLI-CHECK-HEALTH-027"
 title = "Health JSON exports are readable and reproducible"
 manual = false
-design = "design/code-health.md#reviewed-snapshots"
+design = "design/code-health.md#baseline-snapshots"
 ears = { type = "ubiquitous", system = "Bloomery", action = "produce identical two-space pretty-printed summary JSON for identical measurements using stable fields, sorted crate identities, and a trailing newline" }
 
 [[requirements]]
 id = "CLI-CHECK-HEALTH-028"
 title = "Snapshot replacement is atomic"
 manual = false
-design = "design/code-health.md#reviewed-snapshots"
+design = "design/code-health.md#baseline-snapshots"
 ears = { type = "ubiquitous", system = "Bloomery", action = "replace the configured summary-baseline file through temporary-file creation and atomic rename while preserving its previous contents on failure" }
 
 [[requirements]]
 id = "CLI-CHECK-HEALTH-029"
-title = "Ordinary checks preserve snapshots"
+title = "Health report retrieval preserves the baseline"
 manual = false
-design = "design/code-health.md#reviewed-snapshots"
-ears = { type = "ubiquitous", system = "Bloomery", action = "leave tracked baselines unchanged during ordinary check execution and report retrieval" }
+design = "design/code-health.md#baseline-snapshots"
+ears = { type = "ubiquitous", system = "Bloomery health report retrieval", action = "leave the configured baseline unchanged" }
 
 [[requirements]]
 id = "CLI-CHECK-HEALTH-030"
 title = "Malformed snapshot records are rejected"
 manual = false
-design = "design/code-health.md#reviewed-snapshots"
+design = "design/code-health.md#baseline-snapshots"
 ears = { type = "ubiquitous", system = "Bloomery", action = "reject summary baselines containing duplicate crate identities, invalid digests, unsupported values, or inconsistent crate and workspace scores" }
 
 [[requirements]]
 id = "CLI-CHECK-HEALTH-031"
-title = "Review summary reports high-level health metrics"
+title = "Health summary contains high-level metrics"
 manual = false
-design = "design/code-health.md#reviewed-snapshots"
+design = "design/code-health.md#baseline-snapshots"
 ears = { type = "ubiquitous", system = "Bloomery", action = "write one compact PR summary and comparison baseline with workspace and per-crate scores, SLOC, and category subscores, and no source locations or run-specific metadata" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-032"
+title = "Write-mode checks refresh selected health baselines"
+manual = false
+design = "design/code-health.md#baseline-snapshots"
+ears = { type = "event", trigger = "a write-mode check completes a selected enabled code-health measurement after formatting passes", system = "bloomery check", action = "compare the measurement with the existing baseline and replace the configured baseline from the complete current health report" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-033"
+title = "Health and unrelated failures do not block baseline refresh"
+manual = false
+design = "design/code-health.md#baseline-snapshots"
+ears = { type = "event", trigger = "a selected health measurement is complete despite health policy failures or failures in other checks", system = "bloomery check in write mode", action = "refresh the configured health baseline from the complete measurement" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-034"
+title = "Baseline refresh follows health selection"
+manual = false
+design = "design/code-health.md#baseline-snapshots"
+ears = { type = "event", trigger = "code health is disabled or omitted by check selectors", system = "bloomery check", action = "skip health measurement and automatic baseline refresh" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-035"
+title = "No-write health compares without replacing its baseline"
+manual = false
+design = "design/code-health.md#baseline-snapshots"
+ears = { type = "event", trigger = "a no-write check completes a selected health measurement", system = "bloomery check", action = "compare with the configured baseline and leave that baseline unchanged" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-036"
+title = "Complete measurements seed invalid or missing baselines"
+manual = false
+design = "design/code-health.md#baseline-snapshots"
+ears = { type = "event", trigger = "a complete write-mode health measurement has a missing, invalid, or incompatible baseline", system = "bloomery check", action = "retain the baseline diagnostic and seed the configured baseline from the complete current measurement" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-037"
+title = "Incomplete or interrupted checks do not refresh baselines"
+manual = false
+design = "design/code-health.md#baseline-snapshots"
+ears = { type = "event", trigger = "write-mode formatting fails, health measurement is incomplete, or the check run is interrupted before measurement completion", system = "bloomery check", action = "leave the configured health baseline unchanged" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-038"
+title = "No-write blocks explicit health baseline updates"
+manual = false
+design = "design/code-health.md#baseline-snapshots"
+ears = { type = "event", trigger = "check health update is invoked with --no-write", system = "bloomery check health update", action = "return a usage error before reading the retained measurement or changing the baseline" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-039"
+title = "Baseline write failure preserves data and fails health"
+manual = false
+design = "design/code-health.md#baseline-snapshots"
+ears = { type = "event", trigger = "automatic baseline replacement fails after a complete write-mode health measurement", system = "bloomery check", action = "report HealthBaselineWriteFailed with exit code 1, retain the complete measurement, and preserve the previous baseline" }
