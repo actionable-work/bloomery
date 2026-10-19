@@ -53,12 +53,7 @@ id = "CLI-CONFIG-OUTPUT-005"
 title = "Upgrade JSON reports added keys"
 manual = false
 design = "design/upgrade.md#output"
-
-[requirements.ears]
-type = "event"
-trigger = "config upgrade is invoked with --json"
-system = "bloomery config"
-action = "include the sorted added key paths and whether the file was written"
+ears = { type = "event", trigger = "config upgrade is invoked with --json", system = "bloomery config", action = "include any source and target format versions, the sorted added key paths, and whether the file was written" }
 
 [[requirements]]
 id = "CLI-CONFIG-OUTPUT-006"
@@ -112,12 +107,7 @@ id = "CLI-CONFIG-OUTPUT-010"
 title = "Diff JSON emits recommendation differences"
 manual = false
 design = "design/upgrade.md#output"
-
-[requirements.ears]
-type = "event"
-trigger = "config upgrade --diff is invoked with --json"
-system = "bloomery config"
-action = "emit the sorted requested, recommended, and current values for each catalogued key"
+ears = { type = "event", trigger = "config upgrade --diff is invoked with --json", system = "bloomery config", action = "emit the sorted requested, recommended, and current values for each catalogued key, and any pending source-to-target format migration" }
 
 [[requirements]]
 id = "CLI-CONFIG-OUTPUT-011"

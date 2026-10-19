@@ -187,7 +187,10 @@ fn health_catalog_enablement_ignores_specs_scanners_build_toggle_and_system_coun
 
     fs::write(
         root.join(".bloomery/config.toml"),
-        config.replace("enable = true\n", "enable = false\n"),
+        format!(
+            "version = 1\n{}",
+            config.replace("enable = true\n", "enable = false\n")
+        ),
     )
     .expect("disable health");
     let catalog = discover_for_selection(&root, &selectors, &[], &backend)

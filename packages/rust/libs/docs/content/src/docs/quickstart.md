@@ -31,6 +31,8 @@ For standard workspaces, `bloomery.mkFlake` sets up complete packages, runnable 
 > `mkFlake` requires `.bloomery/config.toml`. Create it next to `flake.nix`:
 >
 > ```toml
+> version = 1
+>
 > [build]
 > libPackages = false
 > devPackages = true

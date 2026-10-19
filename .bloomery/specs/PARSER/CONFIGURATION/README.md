@@ -13,12 +13,15 @@ description: |
 # Configuration
 
 Bloomery reads `.bloomery/config.toml` from the repository root. The file is
-required for every repository command except parser help and `init`.
+required for every repository command except parser help, `init`, and `config`.
 Configuration is declarative input to discovery and scanning; it is not a second
 source of requirement identity or lifecycle state. The file also carries the
 build tables and the sub-flake composition table consumed by
 [NIXLIB/FLAKE](../../NIXLIB/FLAKE/README.md), which the parser type-validates
-during loading and passes through for the flake interface.
+during loading and passes through for the flake interface. The top-level
+integer `version` identifies the structural layout; format `1` is currently the
+only supported version. A missing or unsupported version is rejected before
+configuration validation.
 
 ## Design documents
 
@@ -33,6 +36,9 @@ during loading and passes through for the flake interface.
 - Require `.bloomery/config.toml` for repository commands while exempting help,
   `init`, and `config`, whose mutating commands create a missing file with a
   warning.
+- Require the top-level format version, support format `1`, and normalize the
+  configuration before validation.
+- Keep configuration format versions stable when the schema catalog gains keys.
 - Use validated defaults for tables and keys omitted from a present file,
   including enabling every supported scanner by default.
 - Locate the specs root relative to `.bloomery/`.
@@ -49,9 +55,9 @@ during loading and passes through for the flake interface.
   the build tables.
 - Catalogue the parameterized sub-flake composition table and its per-flake
   elevation keys alongside the build tables.
-- Expose a schema catalog spanning every recognized key, with documentation text
-  and recommended defaults, consumed by `bloomery config` and sync
-  recommendations.
+- Expose a schema catalog spanning every configurable option except format
+  metadata, with documentation text and recommended defaults, consumed by
+  `bloomery config` and sync recommendations.
 - Resolve and validate CLI-owned `checks.codeHealth` scoring and baseline policy.
 - Resolve and validate CLI-owned `checks.clippySuppressions` enablement and exception names.
 - Resolve and validate CLI-owned `checks.specifications` check enablement.

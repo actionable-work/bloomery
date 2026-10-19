@@ -2,7 +2,15 @@
   pkgs,
   lib ? pkgs.lib,
 }: let
-  loader = import ./build-config.nix {inherit pkgs lib;};
+  rawLoader = import ./build-config.nix {inherit pkgs lib;};
+  loader =
+    rawLoader
+    // {
+      toWorkspaceArgs = request: let
+        config = request.config or {};
+      in
+        rawLoader.toWorkspaceArgs (request // {config = {version = 1;} // config;});
+    };
   options = import ./workspace/options.nix {inherit pkgs lib;};
 
   eval = config:
@@ -316,6 +324,59 @@ in {
     expected = true;
   };
 
+  testUnversionedConfigurationFileFails = {
+    expr = fails (loader.readConfig ../tests/config-fixtures/unversioned);
+    expected = true;
+  };
+
+  testConfigVersionValidation = {
+    expr = {
+      missing = fails (rawLoader.toWorkspaceArgs {
+        root = ./.;
+        config = {};
+      });
+      zero = fails (rawLoader.toWorkspaceArgs {
+        root = ./.;
+        config.version = 0;
+      });
+      negative = fails (rawLoader.toWorkspaceArgs {
+        root = ./.;
+        config.version = -1;
+      });
+      float = fails (rawLoader.toWorkspaceArgs {
+        root = ./.;
+        config.version = 1.0;
+      });
+      string = fails (rawLoader.toWorkspaceArgs {
+        root = ./.;
+        config.version = "1";
+      });
+      boolean = fails (rawLoader.toWorkspaceArgs {
+        root = ./.;
+        config.version = true;
+      });
+      future = fails (rawLoader.toWorkspaceArgs {
+        root = ./.;
+        config.version = 2;
+      });
+      current =
+        !fails (rawLoader.toWorkspaceArgs {
+          root = ./.;
+          config.version = 1;
+        });
+    };
+    expected = {
+      missing = true;
+      zero = true;
+      negative = true;
+      float = true;
+      string = true;
+      boolean = true;
+      future = true;
+      current = true;
+    };
+  };
+
   testValidConfigurationFileIsRead = {
     expr = let
       config = loader.readConfig ../tests/config-fixtures/valid;
@@ -324,12 +385,14 @@ in {
         inherit config;
       });
     in {
+      version = config.version;
       libPackages = cfg.createLibPackages;
       devPackages = cfg.createDevPackages;
       linker = cfg.toolchain.linker;
       profileOptLevel = cfg.profile.optLevel;
     };
     expected = {
+      version = 1;
       libPackages = true;
       devPackages = true;
       linker = "mold";

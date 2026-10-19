@@ -4,6 +4,23 @@ The configuration file is `.bloomery/config.toml`. It is required. Its paths
 are intentionally relative so a repository can be moved without rewriting the
 design tree.
 
+## Format versioning
+
+The top-level integer `version` identifies the configuration's structural
+layout. Format `1` is the current and only supported format. Every configuration
+must declare `version = 1`; Bloomery does not infer a version for an unversioned
+file or accept format `0`. A missing version produces a `ConfigurationError`
+that asks the user to set `version = 1`. The `version` field is format metadata,
+not a configurable schema-catalog key.
+
+The format version describes the structure of existing keys, not the set of
+keys supported by the schema catalog. Adding a key does not require a format
+version increase. Renaming, moving, nesting, or changing the representation of
+an existing key requires a new format version. When a later numbered format is
+defined, its migration upgrades supported earlier numbered formats, which
+remain readable. A migration from unversioned files or format `0` is not
+defined.
+
 ## Required file
 
 Every repository command requires `.bloomery/config.toml`. The only exemptions
@@ -20,9 +37,11 @@ Defaults are applied before validation, so a partial file is not treated
 differently from an explicitly written configuration with the same effective
 values.
 
-The scanner and spec configuration shape is:
+The scanner and spec configuration shape begins with the required format key:
 
 ```toml
+version = 1
+
 [specs]
 dir = "specs"
 # enable = true   # optional override; absent auto-detects from the specification tree
@@ -131,10 +150,10 @@ checks = "individual"
 ## Recommended default catalog
 
 The [schema catalog](schema-catalog.md) is the single enumerated description of
-every recognized configuration key. It spans both the CLI-owned tables and the
-Nix build tables, and pairs each key with a schema type, documentation text,
-an effective default, and an optional upgrade recommendation. The documentation
-text is the source for the
+every configurable option except the file-format metadata. It spans both the
+CLI-owned tables and the Nix build tables, and pairs each option with a schema
+type, documentation text, an effective default, and an optional upgrade
+recommendation. The documentation text is the source for the
 [`config document`](../../../CLI/CONFIG/design/documenting.md) comments.
 
 The catalog is the source of truth for `bloomery config upgrade`, which
@@ -149,16 +168,18 @@ Explicit values, including `false`, always take precedence over an upgrade.
 ## Error handling
 
 A missing, unreadable, unparsable, or invalid configuration file produces a
-`ConfigurationError`. Bloomery must not silently replace a broken file with
-defaults. Parser help, `init`, and `config` are the only commands that succeed
-without the file; `config` creates it rather than treating its absence as an
-error.
+`ConfigurationError`. A missing format version produces an error that asks the
+user to add `version = 1` to `.bloomery/config.toml`. A malformed, negative, or
+unsupported version, including `0`, is also a `ConfigurationError`. Bloomery
+must not silently replace a broken file with defaults. Parser help, `init`, and
+`config` are the only commands that succeed without the file; `config` creates
+it rather than treating its absence as an error.
 
 ## Loading order
 
 Configuration parsing happens before workspace and source scanning and
-validates the full schema catalog, including the build tables. The parsed
-configuration is immutable for the duration of a command so every pipeline
-stage observes one consistent set of targets. The `[build]`-family tables are
-type-validated and then carried through for the flake interface; they do not
-change scanner behavior.
+normalizes the declared format version, then validates the full schema catalog,
+including the build tables. The parsed configuration is immutable for the
+duration of a command so every pipeline stage observes one consistent set of
+targets. The `[build]`-family tables are type-validated and then carried through
+for the flake interface; they do not change scanner behavior.

@@ -1046,6 +1046,9 @@ pub fn validate_raw(raw: &Value) -> Result<(), Diagnostic> {
     if let Value::Table(table) = raw {
         let mut path = Vec::new();
         for (key, child) in table {
+            if key == "version" {
+                continue;
+            }
             path.push(key.as_str());
             collect_leaves(&mut path, child, &mut diagnostics);
             path.pop();
@@ -1164,6 +1167,16 @@ mod tests {
                 "{expected}"
             );
         }
+        assert!(
+            resolve(&["version"]).is_none(),
+            "format metadata is not catalogued"
+        );
+        let versioned: Value =
+            toml::from_str("version = 1\n[checks]\nenable = true\n").expect("versioned TOML");
+        assert!(
+            validate_raw(&versioned).is_ok(),
+            "format metadata is ignored by the catalog"
+        );
     }
 
     #[test]

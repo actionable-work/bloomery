@@ -296,3 +296,10 @@ design = "design/templates.md#seeded-specifications"
 type = "ubiquitous"
 system = "a seeded library unit test"
 action = "tag its requirement with a cfg_attr(any(), bloomery(\"ID\")) attribute"
+
+[[requirements]]
+id = "CLI-INIT-FILES-028"
+title = "Generated configurations declare the current format"
+manual = false
+design = "design/templates.md#common-files"
+ears = { type = "ubiquitous", system = "the Bloomery template catalog", action = "write .bloomery/config.toml with the current configuration format version" }

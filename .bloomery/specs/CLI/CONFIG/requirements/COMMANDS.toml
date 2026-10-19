@@ -71,12 +71,7 @@ id = "CLI-CONFIG-COMMANDS-007"
 title = "Mutating config commands create missing configuration"
 manual = false
 design = "design/editing.md#missing-configuration"
-
-[requirements.ears]
-type = "event"
-trigger = "a mutating config command runs without .bloomery/config.toml"
-system = "bloomery config"
-action = "create the .bloomery directory and an empty configuration file, then continue"
+ears = { type = "event", trigger = "a mutating config command runs without .bloomery/config.toml", system = "bloomery config", action = "create the .bloomery directory and a configuration file at the current format version, then continue" }
 
 [[requirements]]
 id = "CLI-CONFIG-COMMANDS-008"

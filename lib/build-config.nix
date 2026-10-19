@@ -2,7 +2,17 @@
   pkgs,
   lib ? pkgs.lib,
 }: let
-  inherit (builtins) attrNames elem filter isAttrs isList isString;
+  inherit (builtins) attrNames elem filter isAttrs isInt isList isString;
+  currentConfigVersion = 1;
+
+  validateConfigVersion = config:
+    if !(isAttrs config)
+    then throw "bloomery: .bloomery/config.toml must contain a top-level version = 1"
+    else if !(config ? version)
+    then throw "bloomery: .bloomery/config.toml has no top-level version; set version = 1"
+    else if isInt config.version && config.version == currentConfigVersion
+    then config
+    else throw "bloomery: unsupported or malformed config format version; expected integer ${toString currentConfigVersion}";
 
   # Recognized keys for each build table. Unknown keys are evaluation errors so
   # a typo cannot silently fall back to a default.
@@ -302,13 +312,14 @@
   in
     if !(builtins.pathExists path)
     then throw "bloomery: .bloomery/config.toml is required; create ${toString path} to configure Bloomery"
-    else builtins.fromTOML (builtins.readFile path);
+    else validateConfigVersion (builtins.fromTOML (builtins.readFile path));
 
   toWorkspaceArgs = {
     root,
     config ? readConfig root,
     overrides ? {},
   }: let
+    validatedConfig = validateConfigVersion config;
     build = checkTable "build" allowedKeys.build (config.build or {});
     toolchain = checkTable "toolchain" allowedKeys.toolchain (config.toolchain or {});
     profile = checkTable "profile" allowedKeys.profile (config.profile or {});
@@ -352,23 +363,25 @@
     buildArgs =
       lib.optionalAttrs (build ? unify) {unify = build.unify;};
   in
-    {
-      inherit root overrides;
-      source = source;
-      toolchain = toolchainArgs;
-      profile = release;
-      profileDev = dev;
-      flags = flags;
-      devShell = devShellArgs;
-      checks = checks;
-      build = buildArgs;
-      features = featuresArgs;
-      formatters = formatters;
-      inherit optimize;
-    }
-    // (lib.optionalAttrs (build ? profileName) {profileName = build.profileName;})
-    // (lib.optionalAttrs (build ? libPackages) {createLibPackages = build.libPackages;})
-    // (lib.optionalAttrs (build ? devPackages) {createDevPackages = build.devPackages;});
+    builtins.seq validatedConfig (
+      {
+        inherit root overrides;
+        source = source;
+        toolchain = toolchainArgs;
+        profile = release;
+        profileDev = dev;
+        flags = flags;
+        devShell = devShellArgs;
+        checks = checks;
+        build = buildArgs;
+        features = featuresArgs;
+        formatters = formatters;
+        inherit optimize;
+      }
+      // (lib.optionalAttrs (build ? profileName) {profileName = build.profileName;})
+      // (lib.optionalAttrs (build ? libPackages) {createLibPackages = build.libPackages;})
+      // (lib.optionalAttrs (build ? devPackages) {createDevPackages = build.devPackages;})
+    );
 in rec {
   inherit readConfig resolvePackage resolvePath checkTable checkFormatters checkFlakes checkOptimize checkOptimizePgo checkOptimizeBolt checkOptimizeSystems;
   load = toWorkspaceArgs;

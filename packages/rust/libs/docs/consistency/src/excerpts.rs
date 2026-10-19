@@ -92,6 +92,9 @@ fn validate_config(path: &Path, fence: &Fence, diagnostics: &mut Vec<Diagnostic>
     let mut prefix = Vec::new();
     collect_leaves(&value, &mut prefix, &mut leaves);
     for leaf in leaves {
+        if leaf.as_slice() == ["version"] {
+            continue;
+        }
         let segments: Vec<&str> = leaf.iter().map(String::as_str).collect();
         if bloomery_model::catalog::resolve(&segments).is_none() {
             diagnostics.push(
@@ -185,7 +188,7 @@ mod tests {
         let fixture = TempRoot::new("excerpts-config");
         fixture.write(
             "README.md",
-            "```toml bloomery-config\n[build]\nprofileName = \"release\"\n```\n",
+            "```toml bloomery-config\nversion = 1\n[build]\nprofileName = \"release\"\n```\n",
         );
         let diagnostics = check(fixture.path(), &manifest("README.md"));
         assert!(diagnostics.is_empty(), "{diagnostics:?}");

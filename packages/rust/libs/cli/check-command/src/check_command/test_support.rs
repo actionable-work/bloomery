@@ -413,7 +413,7 @@ pub(super) fn fixture(with_flake: bool) -> (PathBuf, PathBuf) {
     fs::create_dir_all(root.join(".bloomery")).expect("configuration directory");
     fs::write(
         root.join(".bloomery/config.toml"),
-        "[specs]\ndir = \"specs\"\n\n[checks.specifications]\nenable = true\n\n[checks.codeHealth]\nenable = false\n",
+        "version = 1\n[specs]\ndir = \"specs\"\n\n[checks.specifications]\nenable = true\n\n[checks.codeHealth]\nenable = false\n",
     )
     .expect("configuration");
     let feature = root.join(".bloomery/specs/CLI/CHECK");
@@ -438,8 +438,9 @@ pub(super) fn fixture(with_flake: bool) -> (PathBuf, PathBuf) {
     (root, cache)
 }
 
-/// Workspace fixture with no specification tree. `config` is written verbatim,
-/// so callers can exercise auto-detection or an explicit `specs.enable` value.
+/// Workspace fixture with no specification tree. `config` supplies the
+/// non-version fields so callers can exercise auto-detection or an explicit
+/// `specs.enable` value.
 pub(super) fn fixture_without_specs(with_flake: bool, config: &str) -> (PathBuf, PathBuf) {
     let id = FIXTURE.fetch_add(1, Ordering::Relaxed);
     let root = std::env::temp_dir().join(format!(
@@ -456,9 +457,9 @@ pub(super) fn fixture_without_specs(with_flake: bool, config: &str) -> (PathBuf,
     }
     fs::create_dir_all(root.join(".bloomery")).expect("configuration directory");
     let config = if config.contains("[checks.codeHealth]") {
-        config.to_owned()
+        format!("version = 1\n{config}")
     } else {
-        format!("{config}\n[checks.codeHealth]\nenable = false\n")
+        format!("version = 1\n{config}\n[checks.codeHealth]\nenable = false\n")
     };
     fs::write(root.join(".bloomery/config.toml"), config).expect("configuration");
     (root, cache)

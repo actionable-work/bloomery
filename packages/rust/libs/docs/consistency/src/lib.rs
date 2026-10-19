@@ -135,7 +135,10 @@ mod tests {
     #[cfg_attr(any(), bloomery("DOCS-CONSISTENCY-CHECK-002"))]
     fn check_reports_a_repository_violation() {
         let fixture = TempRoot::new("check-violation");
-        fixture.write(".bloomery/config.toml", "[specs]\ndir = \"specs\"\n");
+        fixture.write(
+            ".bloomery/config.toml",
+            "version = 1\n[specs]\ndir = \"specs\"\n",
+        );
         fixture.write(
             ".bloomery/specs/EXAMPLE/FEATURE/README.md",
             "---\nid: FEATURE\nname: Feature\ntagline: t\ndescription: d\n---\n",

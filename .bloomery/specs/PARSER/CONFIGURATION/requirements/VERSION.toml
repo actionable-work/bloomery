@@ -1,0 +1,36 @@
+group = "VERSION"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-VERSION-001"
+title = "Missing config version is an actionable error"
+manual = false
+design = "design/config-file.md#format-versioning"
+ears = { type = "unwanted_behavior", trigger = "config.toml has no top-level version", system = "the configuration loader", action = "report a ConfigurationError asking the user to set version = 1" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-VERSION-002"
+title = "Format 1 is the only supported version"
+manual = false
+design = "design/config-file.md#format-versioning"
+ears = { type = "ubiquitous", system = "configuration loading", action = "accept and normalize config files whose top-level version is integer 1" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-VERSION-003"
+title = "Schema key additions do not change format version"
+manual = true
+design = "design/schema-catalog.md#versioning"
+ears = { type = "event", trigger = "a key is added to the schema catalog", system = "configuration format versioning", action = "keep the format version unchanged and resolve the absent key using its documented behavior" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-VERSION-004"
+title = "Structural key changes increment format version"
+manual = true
+design = "design/config-file.md#format-versioning"
+ears = { type = "event", trigger = "an existing key is renamed, moved, nested, or changes representation", system = "configuration format versioning", action = "increment the format version and retain a migration path from every earlier supported numbered version" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-VERSION-005"
+title = "Malformed and unsupported format versions are rejected"
+manual = false
+design = "design/config-file.md#error-handling"
+ears = { type = "unwanted_behavior", trigger = "config.toml declares a negative, non-integer, or unsupported format version", system = "the configuration loader", action = "report a ConfigurationError before consuming the configuration" }

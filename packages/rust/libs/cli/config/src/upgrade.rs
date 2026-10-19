@@ -2,7 +2,35 @@ use crate::document;
 use crate::error::ConfigError;
 use crate::{DiffRecord, DiffStatus};
 use bloomery_model::catalog;
+use bloomery_model::config::CURRENT_CONFIG_VERSION;
 use toml_edit::DocumentMut;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct VersionMigration {
+    pub(crate) source_version: u32,
+    pub(crate) target_version: u32,
+}
+
+/// Select any format migrations needed before recommendation changes.
+/// Version 1 is currently the only supported format, so this dispatch is a
+/// no-op for every valid input. Future structural formats add migration steps
+/// here without changing recommendation handling.
+pub(crate) fn migration(
+    raw: Option<&toml::Value>,
+) -> Result<Option<VersionMigration>, ConfigError> {
+    let source_version = raw
+        .and_then(|raw| raw.get("version"))
+        .and_then(toml::Value::as_integer)
+        .and_then(|version| u32::try_from(version).ok())
+        .unwrap_or(CURRENT_CONFIG_VERSION);
+
+    match source_version {
+        CURRENT_CONFIG_VERSION => Ok(None),
+        _ => Err(ConfigError::failure(format!(
+            "no configuration migration is available from version {source_version}"
+        ))),
+    }
+}
 
 /// Recommended catalog entries absent from the raw configuration.
 pub(crate) fn missing_entries(raw: Option<&toml::Value>) -> Vec<&'static catalog::CatalogEntry> {

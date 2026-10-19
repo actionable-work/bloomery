@@ -29,6 +29,11 @@ with a warning. When
 the file is missing, `mkFlake` fails evaluation with a `bloomery:`-prefixed
 message naming the missing path.
 
+The top-level integer `version` is required. Format `1` is the only supported
+format; a missing, malformed, or unsupported version fails evaluation before
+the build settings are consumed. The `version` field is format metadata and is
+not a build option.
+
 ## Value encoding
 
 TOML values map to the workspace option module as follows:

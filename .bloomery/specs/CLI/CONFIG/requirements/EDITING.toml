@@ -222,3 +222,10 @@ design = "design/editing.md#invocation"
 type = "ubiquitous"
 system = "a config command"
 action = "read the configuration file at invocation rather than a cached copy"
+
+[[requirements]]
+id = "CLI-CONFIG-EDITING-020"
+title = "Config mutations preserve the supported source format"
+manual = false
+design = "design/editing.md#invocation"
+ears = { type = "event", trigger = "config set, unset, or document writes a file with a supported numbered format", system = "bloomery config", action = "serialize the changes using the same numbered format and retain its version" }

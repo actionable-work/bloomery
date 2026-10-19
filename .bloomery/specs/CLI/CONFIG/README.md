@@ -3,12 +3,11 @@ id: CONFIG
 name: Typesafe Configuration Editing
 tagline: Schema-typed CRUD, diff, and upgrade commands for .bloomery/config.toml.
 description: |
-  The config feature owns the `bloomery config` command tree. It reads and
-  edits every key of `.bloomery/config.toml` through schema-typed dotted keys,
-  provides `config upgrade` to materialize absent upgrade recommendations and
-  `config upgrade --diff` to compare the recommended configuration with the
-  current one without changing anything, and provides `config document` to
-  annotate configured keys with their schema-catalog documentation.
+  The config feature owns the `bloomery config` command tree. It edits
+  catalogued options through schema-typed dotted keys, upgrades files by
+  materializing recommendations and migrating older formats, compares
+  recommendations with `config upgrade --diff`, and annotates configured keys
+  with schema-catalog documentation through `config document`.
 ---
 
 # `bloomery config`
@@ -45,6 +44,10 @@ specification tree, scan evidence, run checks, or touch lockfiles.
 - Validate the complete resulting configuration and publish it atomically.
 - Add only absent recommended keys during `config upgrade` and report
   recommendation differences with `--diff`.
+- Require an explicit supported configuration format version; format `1` is
+  currently the only supported version.
+- Migrate supported older numbered layouts to the current format during a
+  writing `config upgrade` when a later format is defined.
 - Annotate every configured key with its schema-catalog documentation during
   `config document` without changing values or materializing absent keys.
 - Warn, without failing, when a config command runs outside a Bloomery flake

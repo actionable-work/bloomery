@@ -461,10 +461,15 @@ fn render_config_outcome(report: &ConfigReport, color: output::ColorMode, stdout
             }
         }
         ConfigOutcome::Upgrade {
+            source_version,
+            target_version,
             added,
             written,
             differences,
         } => {
+            if let (Some(source), Some(target)) = (source_version, target_version) {
+                let _ = writeln!(stdout, "format migration: {source} -> {target}");
+            }
             if !differences.is_empty() {
                 for record in differences {
                     let status = match record.status {
@@ -1045,12 +1050,13 @@ fn report_runtime_error(
 #[cfg(test)]
 mod tests {
     use super::{
-        run_args_at, run_disk_with_backend, run_workspace_command_at,
-        run_workspace_command_from_current_dir,
+        output, render_config_outcome, run_args_at, run_disk_with_backend,
+        run_workspace_command_at, run_workspace_command_from_current_dir,
     };
     use bloomery_cli_parser::{ParseError, ParseErrorKind as ErrorKind, parse_from};
     use bloomery_cli_types::CliCommand as Command;
     use bloomery_cli_types::ColorChoice;
+    use bloomery_config::{ConfigOutcome, ConfigReport};
     use serde_json::Value;
     use std::ffi::OsString;
     use std::fs;
@@ -1176,7 +1182,7 @@ mod tests {
         fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
         fs::write(
             root.join(".bloomery/config.toml"),
-            "[specs]\ndir = \"specs\"\n",
+            "version = 1\n[specs]\ndir = \"specs\"\n",
         )
         .expect("config");
         fs::write(
@@ -1369,7 +1375,7 @@ mod tests {
         fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
         fs::write(
             root.join(".bloomery/config.toml"),
-            "[specs]\ndir = \"specs\"\n",
+            "version = 1\n[specs]\ndir = \"specs\"\n",
         )
         .expect("config");
         let previous = std::env::current_dir().expect("original working directory");
@@ -1503,7 +1509,7 @@ mod tests {
         fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
         fs::write(
             root.join(".bloomery/config.toml"),
-            "[specs]\ndir = \"specs\"\n",
+            "version = 1\n[specs]\ndir = \"specs\"\n",
         )
         .expect("config");
 
@@ -1668,7 +1674,7 @@ mod tests {
         fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
         fs::write(
             root.join(".bloomery/config.toml"),
-            "[specs]\nenable = false\n",
+            "version = 1\n[specs]\nenable = false\n",
         )
         .expect("configuration");
         let mut stdout = Vec::new();
@@ -2426,7 +2432,7 @@ mod tests {
         fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
         fs::write(
             root.join(".bloomery/config.toml"),
-            "checks.enable = false\n",
+            "version = 1\nchecks.enable = false\n",
         )
         .expect("config");
 
@@ -2536,6 +2542,34 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-OUTPUT-005"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-OUTPUT-010"))]
+    fn upgrade_format_transitions_are_reported_in_human_and_json_results() {
+        let report = ConfigReport {
+            warnings: Vec::new(),
+            outcome: ConfigOutcome::Upgrade {
+                source_version: Some(1),
+                target_version: Some(2),
+                added: vec!["checks.enable".to_owned()],
+                written: false,
+                differences: Vec::new(),
+            },
+        };
+
+        let mut stdout = Vec::new();
+        render_config_outcome(&report, output::ColorMode::Never, &mut stdout);
+        let human = String::from_utf8(stdout).expect("human output");
+        assert!(human.contains("format migration: 1 -> 2"), "{human}");
+        assert!(human.contains("added checks.enable"), "{human}");
+        assert!(human.contains("dry run; not written"), "{human}");
+
+        let json = output::config_success_json(&report);
+        assert_eq!(json["result"]["source_version"], 1);
+        assert_eq!(json["result"]["target_version"], 2);
+        assert_eq!(json["result"]["written"], false);
+    }
+
+    #[test]
     #[cfg_attr(any(), bloomery("CLI-CONFIG-OUTPUT-006"))]
     #[cfg_attr(any(), bloomery("CLI-CONFIG-OUTPUT-007"))]
     #[cfg_attr(any(), bloomery("CLI-CONFIG-OUTPUT-008"))]
@@ -2543,7 +2577,11 @@ mod tests {
         let root = fixture_root("config-exit");
         fs::create_dir_all(root.join(".bloomery")).expect("workspace root");
         fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
-        fs::write(root.join(".bloomery/config.toml"), "checks.enable = true\n").expect("config");
+        fs::write(
+            root.join(".bloomery/config.toml"),
+            "version = 1\nchecks.enable = true\n",
+        )
+        .expect("config");
 
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();

@@ -1,9 +1,12 @@
 # Configuration schema catalog
 
-The schema catalog is the single enumerated description of every recognized
-`.bloomery/config.toml` key. The CLI uses it to address, validate, recommend,
-materialize, and document configuration; the flake interface retains authority
-over build-table semantics and evaluation-time resolution.
+The schema catalog is the single enumerated description of every configurable
+`.bloomery/config.toml` option. The top-level `version` field is format metadata
+and is described by the
+[configuration file design](config-file.md#format-versioning). The CLI uses the
+catalog to address, validate, recommend, materialize, and document
+configuration; the flake interface retains authority over build-table semantics
+and evaluation-time resolution.
 
 ## Catalog fields
 
@@ -267,4 +270,6 @@ The catalog ships with the Bloomery binary. A newer binary may add entries, and
 `bloomery config upgrade` materializes any newly recommended entries while
 leaving present values untouched. Explicit values, including those
 materialized by upgrade, always take precedence and suppress advisory
-recommendations.
+recommendations. Catalog additions are independent of the configuration format
+version: a new key uses its documented default when absent and does not require
+a format migration.

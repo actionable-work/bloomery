@@ -1,3 +1,5 @@
+version = 1
+
 [optimize.my-server]
 bogus = true
 enable = true

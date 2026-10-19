@@ -5,11 +5,7 @@ id = "PARSER-CONFIGURATION-CATALOG-001"
 title = "The schema exposes a full catalog"
 manual = false
 design = "design/schema-catalog.md"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the configuration schema"
-action = "enumerate every recognized config.toml key in a built-in catalog"
+ears = { type = "ubiquitous", system = "the configuration schema", action = "enumerate every configurable config.toml option except top-level format metadata in a built-in catalog" }
 
 [[requirements]]
 id = "PARSER-CONFIGURATION-CATALOG-002"

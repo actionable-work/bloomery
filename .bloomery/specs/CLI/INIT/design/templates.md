@@ -29,8 +29,9 @@ Every template provides the same bootstrap files:
   Bloomery CLI.
 - `Cargo.toml` declares a `[workspace]` with `resolver = "2"` and the
   template's member crates.
-- `.bloomery/config.toml` does not override the scanner settings. Generated
-  workspaces rely on the [documented default scanner paths](../../../PARSER/CONFIGURATION/design/schema-catalog.md#spec-and-scanner-tables),
+- `.bloomery/config.toml` declares the current configuration format version
+  and does not override the scanner settings. Generated workspaces rely on the
+  [documented default scanner paths](../../../PARSER/CONFIGURATION/design/schema-catalog.md#spec-and-scanner-tables),
   so the template crates live under `packages/rust/` and the configured
   defaults discover them without per-template overrides.
 - `.bloomery/specs/` contains a limited area, feature, design, and requirement

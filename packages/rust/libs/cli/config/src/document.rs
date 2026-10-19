@@ -1,5 +1,6 @@
 use crate::error::ConfigError;
 use bloomery_model::catalog::{self, CatalogEntry, DefaultValue, KeySpec, ValueType};
+use bloomery_model::config::CURRENT_CONFIG_VERSION;
 use std::fs;
 use std::path::Path;
 use toml_edit::{Array, DocumentMut, Item, RawString, Table, Value as EditValue};
@@ -94,6 +95,16 @@ pub(crate) fn parse_value(entry: &KeySpec, raw: &str) -> Result<toml::Value, Con
 /// Render the recommended default for an entry.
 pub(crate) fn recommended_toml(entry: &CatalogEntry) -> Option<toml::Value> {
     entry.recommended.map(DefaultValue::to_toml)
+}
+
+/// Start a new configuration document with the current structural format.
+pub(crate) fn new_config_document() -> DocumentMut {
+    let mut document = DocumentMut::new();
+    document.as_table_mut().insert(
+        "version",
+        Item::Value(EditValue::from(i64::from(CURRENT_CONFIG_VERSION))),
+    );
+    document
 }
 
 fn to_edit(value: &toml::Value) -> Result<EditValue, ConfigError> {

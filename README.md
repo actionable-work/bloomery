@@ -43,6 +43,8 @@ arguments.
 
 ```toml bloomery-config
 # .bloomery/config.toml (required)
+version = 1
+
 [build]
 libPackages = false
 devPackages = true

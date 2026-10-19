@@ -637,6 +637,7 @@ mod tests {
     #[cfg_attr(any(), bloomery("CLI-INIT-FILES-011"))]
     #[cfg_attr(any(), bloomery("CLI-INIT-FILES-012"))]
     #[cfg_attr(any(), bloomery("CLI-INIT-FILES-013"))]
+    #[cfg_attr(any(), bloomery("CLI-INIT-FILES-028"))]
     #[cfg_attr(any(), bloomery("CLI-INIT-TEMPLATES-004"))]
     fn every_template_carries_the_common_scaffolding() {
         assert_eq!(TEMPLATE_NAMES, &["basic", "axum", "topcoat"]);
@@ -653,6 +654,7 @@ mod tests {
             assert!(manifest.contains("[workspace]"), "{name} workspace");
             assert!(manifest.contains("resolver = \"2\""), "{name} resolver");
             let config = files.get(".bloomery/config.toml").expect("config");
+            assert!(config.contains("version = 1"), "{name} config version");
             assert!(config.contains("[build]"), "{name} build table");
             assert!(
                 config.contains("workspaceDependencies = false"),

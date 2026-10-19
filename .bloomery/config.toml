@@ -1,3 +1,5 @@
+version = 1
+
 [build]
 cargoLock = "Cargo.lock" # Repository-relative path to Cargo.lock.
 cargoToml = "Cargo.toml" # Repository-relative path to the Cargo workspace manifest.

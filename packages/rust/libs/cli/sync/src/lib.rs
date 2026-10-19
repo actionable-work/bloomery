@@ -537,7 +537,11 @@ mod tests {
         fn write_config(&self, config: &str) {
             let directory = self.root.join(".bloomery");
             fs::create_dir_all(&directory).expect("config directory");
-            fs::write(directory.join("config.toml"), config).expect("config");
+            fs::write(
+                directory.join("config.toml"),
+                format!("version = 1\n{config}"),
+            )
+            .expect("config");
         }
     }
 

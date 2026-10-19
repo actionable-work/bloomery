@@ -4,7 +4,7 @@
 
 `config upgrade` is driven by the
 [schema catalog](../../PARSER/CONFIGURATION/design/schema-catalog.md), which
-enumerates every recognized configuration key with its type, effective default,
+enumerates every configurable option with its type, effective default,
 and an optional upgrade recommendation. Recommendations can differ from
 effective defaults for check control keys: omission leaves checks disabled or
 applies a false check-policy value, while upgrade recommends `true`. The
@@ -18,20 +18,42 @@ materialized: `build.bloomeryLock` auto-detects, `build.members` means all
 members, `toolchain.linker` is host-dependent, `features.cratesIoIndex` means
 none, and the `profile.*` fields inherit from `Cargo.toml` and rustc.
 
+## Format migrations
+
+The top-level integer `version` is required. Format `1` is the current and only
+supported format. An existing file without a version is rejected with an error
+that asks the user to set `version = 1`; `config upgrade` does not infer or add a
+version to that file. Format `0` is unsupported.
+
+A future structural format increments the version and defines migrations from
+supported earlier numbered formats. `config upgrade` applies those migrations
+in order, preserves configured values and their meaning, then writes the current
+format version. At present, version `1` is the only supported format, so there
+is no format migration from `0` or from unversioned files. Adding recommended
+keys does not itself change the format version.
+
+`--dry-run` reports source and target versions when a supported older numbered
+format needs migration, along with catalog keys that would be added, without
+writing. `--diff` compares recommendations against the normalized configuration
+and reports any applicable format migration without writing. A version `1`
+configuration still receives newly recommended keys, if any.
+
 ## Upgrade semantics
 
-`config upgrade` reads the raw file before defaults are inserted and adds every
-catalog key with an upgrade recommendation that is absent. An absent parent
-table and an absent leaf inside a present table both count as missing. Adding a
-key with its recommended value is written explicitly. For ordinary keys it
-matches the effective default; for check control keys it enables the check or
-its associated strict policy.
+`config upgrade` applies format migrations before defaults are inserted, then
+adds every catalog key with an upgrade recommendation that is absent from the
+current layout. An absent parent table and an absent leaf inside a present table
+both count as missing. Adding a key with its recommended value is written
+explicitly. For ordinary keys it matches the effective default; for check
+control keys it enables the check or its associated strict policy.
 
-Keys already present are preserved exactly: value, comments, and formatting are
-not rewritten even when the present value differs from the recommendation. In
+For a file already in the current format, keys already present are preserved
+exactly: value, comments, and formatting are not rewritten even when the present
+value differs from the recommendation. Format migration may rewrite the layout
+of affected keys while preserving their configured values and meaning. In
 particular, an explicitly configured `false` check value is never changed. The
-command never disables a configured check, deletes a key, or
-reorders existing entries. Tables that are not catalogued pass through unchanged.
+command never disables a configured check or deletes configured data. Tables
+that are not catalogued pass through unchanged.
 
 `--dry-run` reports the keys that would be added without writing. The report is
 sorted by full key path.
@@ -52,19 +74,20 @@ by `config upgrade`, because explicit configuration always wins.
 
 ## Idempotence
 
-Upgrade is idempotent. After a successful upgrade every recommended catalog key
-is present, so a second invocation adds nothing and leaves the file
-byte-for-byte unchanged. A configuration that already contains every
-recommended key is not modified at all.
+Upgrade is idempotent. After a successful upgrade the current format version
+and every recommended catalog key are present, so a second invocation makes no
+change and leaves the file byte-for-byte unchanged. A version `1` configuration
+that already contains every recommended key is not modified.
 
 ## Validation and publication
 
-Upgrade requires a valid current configuration. A malformed, unreadable, or
-invalid file, including a build-table type or enum error, yields a
-`ConfigurationError` and no write. An absent file is not an error: a writing
-upgrade creates it and materializes every recommended key, warning while doing
-so, while `--dry-run` and `--diff` report against defaults without creating it.
-The upgraded candidate is revalidated as a
+Upgrade requires a readable configuration with an explicitly supported
+version. A malformed, unreadable, invalid, missing, or unsupported version
+yields a `ConfigurationError` and no write; a missing version error asks the
+user to set `version = 1`. An absent file is not an error: a writing upgrade
+creates it at the current format version and materializes every recommended
+key, warning while doing so, while `--dry-run` and `--diff` report against
+defaults without creating it. The upgraded candidate is revalidated as a
 complete configuration before publication and is published through a temporary
 file and atomic rename, so a failure leaves the original file intact.
 
@@ -72,12 +95,13 @@ file and atomic rename, so a failure leaves the original file intact.
 
 Human output follows the shared
 [presentation grammar](../../INTERFACE/design/presentation.md) and reports the
-added key paths, or states that the configuration is already current. `--diff`
-prints the recommendation differences sorted by key path.
-`config upgrade --json` carries the added key paths or the recommendation
-differences as the `result` of the shared
-[JSON envelope](../../INTERFACE/design/output.md#json-envelope); a dry run marks
-the reported paths as not yet written.
+source and target format versions when migration is pending, plus added key
+paths, or states that the configuration is already current. `--diff` prints
+the recommendation differences sorted by key path and any pending format
+migration. `config upgrade --json` carries the source and target versions when
+applicable, added key paths, or recommendation differences as the `result` of
+the shared [JSON envelope](../../INTERFACE/design/output.md#json-envelope); a
+dry run marks reported changes as not yet written.
 
 Materializing or explicitly setting a key always takes precedence and suppresses
 the corresponding [sync recommendation](../../SYNC/design/sync.md#recommendations);

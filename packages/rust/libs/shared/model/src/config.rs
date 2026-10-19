@@ -3,9 +3,11 @@ use serde::Deserialize;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
+    /// Structural format version. This field is metadata rather than a catalogued option.
+    pub version: u32,
     #[serde(default)]
     pub specs: SpecsConfig,
     #[serde(default)]
@@ -37,6 +39,28 @@ pub struct Config {
     // opaque to the CLI apart from schema cataloguing and type validation.
     #[serde(default)]
     pub flakes: Option<toml::Value>,
+}
+
+pub const CURRENT_CONFIG_VERSION: u32 = 1;
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            version: CURRENT_CONFIG_VERSION,
+            specs: SpecsConfig::default(),
+            scanners: ScannersConfig::default(),
+            build: None,
+            toolchain: None,
+            profile: None,
+            flags: None,
+            dev_shell: None,
+            checks: None,
+            features: None,
+            formatters: None,
+            optimize: None,
+            flakes: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -225,6 +249,7 @@ pub fn parse_contents(contents: &str, path: &Path) -> Result<LoadedConfig, Diagn
             Some(error_span_line(contents, error.to_string())),
         )
     })?;
+    validate_config_version(&raw, path)?;
     let config: Config = toml::from_str(contents).map_err(|error| {
         Diagnostic::new(
             "ConfigurationError",
@@ -242,6 +267,35 @@ pub fn parse_contents(contents: &str, path: &Path) -> Result<LoadedConfig, Diagn
         config,
         raw: Some(raw),
     })
+}
+
+#[allow(clippy::result_large_err)]
+fn validate_config_version(raw: &toml::Value, path: &Path) -> Result<(), Diagnostic> {
+    let version = raw.as_table().and_then(|table| table.get("version"));
+    match version {
+        None => Err(Diagnostic::new(
+            "ConfigurationError",
+            "config.toml has no top-level version; add `version = 1` to .bloomery/config.toml",
+        )
+        .at(path.to_path_buf(), Some(1))),
+        Some(toml::Value::Integer(version)) if *version == i64::from(CURRENT_CONFIG_VERSION) => {
+            Ok(())
+        }
+        Some(toml::Value::Integer(version)) => Err(Diagnostic::new(
+            "ConfigurationError",
+            format!(
+                "unsupported config format version {version}; supported version is {CURRENT_CONFIG_VERSION}"
+            ),
+        )
+        .at(path.to_path_buf(), None)),
+        Some(_) => Err(Diagnostic::new(
+            "ConfigurationError",
+            format!(
+                "config.toml version must be integer {CURRENT_CONFIG_VERSION}"
+            ),
+        )
+        .at(path.to_path_buf(), None)),
+    }
 }
 
 impl Config {
@@ -351,7 +405,9 @@ fn error_span_line(contents: &str, error: String) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::{NixScannerConfig, PlaywrightScannerConfig, RustScannerConfig, load};
+    use super::{
+        CURRENT_CONFIG_VERSION, NixScannerConfig, PlaywrightScannerConfig, RustScannerConfig, load,
+    };
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -401,6 +457,10 @@ mod tests {
         assert_eq!(diagnostic.code, "ConfigurationError");
     }
 
+    fn write_versioned_config(path: &Path, contents: &str) {
+        fs::write(path, format!("version = 1\n{contents}")).expect("config contents");
+    }
+
     #[test]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-REQUIRED-001"))]
     fn missing_configuration_is_an_error() {
@@ -416,8 +476,9 @@ mod tests {
         let config_path = root.join(".bloomery/config.toml");
         fs::create_dir_all(config_path.parent().expect("config parent")).expect("config dir");
 
-        fs::write(&config_path, "").expect("empty config");
+        write_versioned_config(&config_path, "");
         let config = load(&root).expect("empty config should use defaults");
+        assert_eq!(config.version, CURRENT_CONFIG_VERSION);
         assert_eq!(config.specs.dir, "specs");
         assert_eq!(config.specs.enable, None);
         assert_default_scanners(
@@ -426,7 +487,7 @@ mod tests {
             &config.scanners.nix,
         );
 
-        fs::write(&config_path, "[specs]\n").expect("partial config");
+        write_versioned_config(&config_path, "[specs]\n");
         let config = load(&root).expect("omitted scanner table should default");
         assert_eq!(config.specs.dir, "specs");
         assert_default_scanners(
@@ -435,13 +496,12 @@ mod tests {
             &config.scanners.nix,
         );
 
-        fs::write(
+        write_versioned_config(
             &config_path,
             "[scanners.rust]\nenabled = false\n\
              [scanners.playwright]\nenabled = false\n\
              [scanners.nix]\nenabled = false\n",
-        )
-        .expect("partial scanner config");
+        );
         let config = load(&root).expect("omitted scanner keys should default");
         assert_eq!(config.specs.dir, "specs");
         assert!(!config.scanners.rust.enabled);
@@ -462,19 +522,19 @@ mod tests {
         let config_path = root.join(".bloomery/config.toml");
         fs::create_dir_all(config_path.parent().expect("config parent")).expect("config dir");
 
-        fs::write(&config_path, "[specs]\nenable = false\n").expect("explicit false");
+        write_versioned_config(&config_path, "[specs]\nenable = false\n");
         let config = load(&root).expect("explicit false should load");
         assert_eq!(config.specs.enable, Some(false));
 
-        fs::write(&config_path, "[specs]\nenable = true\n").expect("explicit true");
+        write_versioned_config(&config_path, "[specs]\nenable = true\n");
         let config = load(&root).expect("explicit true should load");
         assert_eq!(config.specs.enable, Some(true));
 
-        fs::write(&config_path, "[specs]\ndir = \"specs\"\n").expect("absent override");
+        write_versioned_config(&config_path, "[specs]\ndir = \"specs\"\n");
         let config = load(&root).expect("absent override should load");
         assert_eq!(config.specs.enable, None);
 
-        fs::write(&config_path, "[specs]\nenable = \"yes\"\n").expect("invalid override");
+        write_versioned_config(&config_path, "[specs]\nenable = \"yes\"\n");
         assert_configuration_error(&root);
         let _ = fs::remove_dir_all(root);
     }
@@ -486,18 +546,18 @@ mod tests {
         fs::create_dir_all(config_path.parent().expect("config parent")).expect("config dir");
         let specs = root.join(".bloomery/specs");
 
-        fs::write(&config_path, "[specs]\ndir = \"specs\"\n").expect("config");
+        write_versioned_config(&config_path, "[specs]\ndir = \"specs\"\n");
         let config = load(&root).expect("load");
         assert!(!config.spec_management_enabled(&root));
 
         fs::create_dir_all(&specs).expect("specs directory");
         assert!(config.spec_management_enabled(&root));
 
-        fs::write(&config_path, "[specs]\nenable = false\ndir = \"specs\"\n").expect("config");
+        write_versioned_config(&config_path, "[specs]\nenable = false\ndir = \"specs\"\n");
         let config = load(&root).expect("load");
         assert!(!config.spec_management_enabled(&root));
 
-        fs::write(&config_path, "[specs]\nenable = true\ndir = \"specs\"\n").expect("config");
+        write_versioned_config(&config_path, "[specs]\nenable = true\ndir = \"specs\"\n");
         let config = load(&root).expect("load");
         fs::remove_dir_all(&specs).expect("remove specs");
         assert!(config.spec_management_enabled(&root));
@@ -512,15 +572,14 @@ mod tests {
         let config_path = root.join(".bloomery/config.toml");
         fs::create_dir_all(config_path.parent().expect("config parent")).expect("config dir");
 
-        fs::write(&config_path, "").expect("empty config");
+        write_versioned_config(&config_path, "");
         let config = load(&root).expect("empty config should use defaults");
         assert_eq!(config.scanners.nix.test_paths, ["**/*.test.nix"]);
 
-        fs::write(
+        write_versioned_config(
             &config_path,
             "[scanners.nix]\ntestPaths = [\"specs/**/*.test.nix\"]\n",
-        )
-        .expect("explicit testPaths");
+        );
         let config = load(&root).expect("explicit testPaths should load");
         assert_eq!(config.scanners.nix.test_paths, ["specs/**/*.test.nix"]);
         assert_eq!(
@@ -528,15 +587,14 @@ mod tests {
             ["*.nix", "lib/**/*.nix", "nix/**/*.nix", "tests/**/*.nix"]
         );
 
-        fs::write(&config_path, "[scanners.nix]\ntestPaths = []\n").expect("empty testPaths");
+        write_versioned_config(&config_path, "[scanners.nix]\ntestPaths = []\n");
         let config = load(&root).expect("empty testPaths disables discovery");
         assert!(config.scanners.nix.test_paths.is_empty());
 
-        fs::write(
+        write_versioned_config(
             &config_path,
             "[scanners.nix]\ntestPaths = [\"../escaped.test.nix\"]\n",
-        )
-        .expect("escaping testPaths");
+        );
         assert_configuration_error(&root);
         let _ = fs::remove_dir_all(root);
     }
@@ -549,7 +607,7 @@ mod tests {
         let config_path = root.join(".bloomery/config.toml");
         fs::create_dir_all(config_path.parent().expect("config parent")).expect("config dir");
 
-        fs::write(
+        write_versioned_config(
             &config_path,
             "[build]\ncargoToml = \"Cargo.toml\"\nlibPackages = true\nunify = true\n\
              [toolchain]\nlinker = \"lld\"\n\
@@ -559,8 +617,7 @@ mod tests {
              [devShell]\nenable = false\n\
              [checks]\nenable = true\n\
              [features]\ncratesIoIndex = \"crates-io-index\"\n",
-        )
-        .expect("build tables");
+        );
         let config = load(&root).expect("build tables should be accepted");
         assert_eq!(config.specs.dir, "specs");
         assert_default_scanners(
@@ -585,7 +642,7 @@ mod tests {
         let config_path = root.join(".bloomery/config.toml");
         fs::create_dir_all(config_path.parent().expect("config parent")).expect("config dir");
 
-        fs::write(&config_path, "[specs\n").expect("malformed config");
+        write_versioned_config(&config_path, "[specs\n");
         assert_configuration_error(&root);
 
         fs::remove_file(&config_path).expect("remove malformed config");
@@ -599,22 +656,19 @@ mod tests {
         assert_configuration_error(&root);
 
         fs::remove_dir(&config_path).expect("remove config directory");
-        fs::write(
+        write_versioned_config(
             &config_path,
             "[scanners.rust]\nenabled = true\npaths = []\n",
-        )
-        .expect("invalid Rust scanner config");
+        );
         assert_configuration_error(&root);
 
-        fs::write(&config_path, "[scanners.nix]\nenabled = true\npaths = []\n")
-            .expect("Nix scanner without paths");
+        write_versioned_config(&config_path, "[scanners.nix]\nenabled = true\npaths = []\n");
         assert_configuration_error(&root);
 
-        fs::write(
+        write_versioned_config(
             &config_path,
             "[scanners.nix]\nenabled = true\npaths = [\"../checks.nix\"]\n",
-        )
-        .expect("Nix scanner with an escaping path");
+        );
         assert_configuration_error(&root);
         let _ = fs::remove_dir_all(root);
     }
@@ -638,8 +692,52 @@ mod tests {
         let root = root();
         let config_path = root.join(".bloomery/config.toml");
         fs::create_dir_all(config_path.parent().expect("config parent")).expect("config dir");
-        fs::write(&config_path, contents).expect("config contents");
+        write_versioned_config(&config_path, contents);
         root
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-VERSION-001"))]
+    fn missing_version_asks_user_to_set_version_one() {
+        let root = root();
+        let config_path = root.join(".bloomery/config.toml");
+        fs::create_dir_all(config_path.parent().expect("config parent")).expect("config dir");
+        fs::write(&config_path, "[specs]\ndir = \"specs\"\n").expect("unversioned config");
+
+        let diagnostic = load(&root).expect_err("missing version should be rejected");
+        assert_eq!(diagnostic.code, "ConfigurationError");
+        assert!(diagnostic.message.contains("version = 1"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-VERSION-002"))]
+    fn version_one_is_accepted_as_current_format() {
+        let root = write_config("");
+        let config = load(&root).expect("version one should load");
+        assert_eq!(config.version, CURRENT_CONFIG_VERSION);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-VERSION-005"))]
+    fn malformed_and_unsupported_versions_are_rejected() {
+        for contents in [
+            "version = 0\n",
+            "version = -1\n",
+            "version = 1.0\n",
+            "version = \"1\"\n",
+            "version = true\n",
+            "version = 2\n",
+        ] {
+            let root = root();
+            let config_path = root.join(".bloomery/config.toml");
+            fs::create_dir_all(config_path.parent().expect("config parent")).expect("config dir");
+            fs::write(&config_path, contents).expect("invalid version config");
+            let diagnostic = load(&root).expect_err("invalid version should be rejected");
+            assert_eq!(diagnostic.code, "ConfigurationError", "{contents}");
+            let _ = fs::remove_dir_all(root);
+        }
     }
 
     #[test]

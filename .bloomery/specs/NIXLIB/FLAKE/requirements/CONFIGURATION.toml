@@ -236,3 +236,10 @@ design = "design/configuration.md#checks"
 type = "ubiquitous"
 system = "the build configuration"
 action = "accept checks.crateCheck"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-022"
+title = "Configuration format versions are validated"
+manual = false
+design = "design/configuration.md#error-handling"
+ears = { type = "unwanted_behavior", trigger = "the configuration file has a missing, malformed, or unsupported top-level format version", system = "the mkFlake constructor", action = "fail evaluation with a bloomery-prefixed error before evaluating build settings" }

@@ -75,6 +75,10 @@ pub enum ConfigOutcome {
         changed: bool,
     },
     Upgrade {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        source_version: Option<u32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        target_version: Option<u32>,
         added: Vec<String>,
         written: bool,
         differences: Vec<DiffRecord>,
@@ -178,8 +182,51 @@ fn publish_checked(config_path: &Path, document: &DocumentMut) -> Result<(), Con
 fn editable_document(contents: Option<&str>) -> Result<DocumentMut, ConfigError> {
     match contents {
         Some(contents) => document::parse_document(contents),
-        None => Ok(DocumentMut::new()),
+        None => Ok(document::new_config_document()),
     }
+}
+
+fn config_upgrade_outcome(
+    config_path: &Path,
+    contents: Option<&str>,
+    raw: Option<&toml::Value>,
+    exists: bool,
+    dry_run: bool,
+    diff: bool,
+) -> Result<ConfigOutcome, ConfigError> {
+    let migration = upgrade::migration(raw)?;
+    if diff {
+        return Ok(ConfigOutcome::Upgrade {
+            source_version: migration.map(|migration| migration.source_version),
+            target_version: migration.map(|migration| migration.target_version),
+            added: Vec::new(),
+            written: false,
+            differences: upgrade::diff(raw),
+        });
+    }
+
+    let mut added = upgrade::missing_entries(raw)
+        .into_iter()
+        .map(|entry| entry.path.join("."))
+        .collect::<Vec<_>>();
+    added.sort();
+    let created = !exists;
+    let written = if !dry_run && (!added.is_empty() || created) {
+        let mut document = editable_document(contents)?;
+        upgrade::apply(&mut document, raw)?;
+        publish_checked(config_path, &document)?;
+        true
+    } else {
+        false
+    };
+
+    Ok(ConfigOutcome::Upgrade {
+        source_version: migration.map(|migration| migration.source_version),
+        target_version: migration.map(|migration| migration.target_version),
+        added,
+        written,
+        differences: Vec::new(),
+    })
 }
 
 /// Execute one config command against the repository rooted at `root`.
@@ -259,35 +306,14 @@ pub fn run(root: &Path, operation: &ConfigOperation) -> Result<ConfigReport, Con
                 changed: removed || created,
             }
         }
-        Resolved::Upgrade { dry_run, diff } => {
-            if *diff {
-                ConfigOutcome::Upgrade {
-                    added: Vec::new(),
-                    written: false,
-                    differences: upgrade::diff(raw),
-                }
-            } else {
-                let mut added = upgrade::missing_entries(raw)
-                    .into_iter()
-                    .map(|entry| entry.path.join("."))
-                    .collect::<Vec<_>>();
-                added.sort();
-                let created = !exists;
-                let written = if *dry_run || (added.is_empty() && !created) {
-                    false
-                } else {
-                    let mut document = editable_document(contents.as_deref())?;
-                    upgrade::apply(&mut document, raw)?;
-                    publish_checked(&config_path, &document)?;
-                    true
-                };
-                ConfigOutcome::Upgrade {
-                    added,
-                    written,
-                    differences: Vec::new(),
-                }
-            }
-        }
+        Resolved::Upgrade { dry_run, diff } => config_upgrade_outcome(
+            &config_path,
+            contents.as_deref(),
+            raw,
+            exists,
+            *dry_run,
+            *diff,
+        )?,
         Resolved::Document => {
             let mut document = editable_document(contents.as_deref())?;
             let documented = match raw {
@@ -328,6 +354,10 @@ mod tests {
     }
 
     fn seed(root: &Path, contents: &str) {
+        seed_raw(root, &format!("version = 1\n{contents}"));
+    }
+
+    fn seed_raw(root: &Path, contents: &str) {
         let path = root.join(CONFIG_RELATIVE_PATH);
         fs::create_dir_all(path.parent().expect("config parent")).expect("config dir");
         fs::write(&path, contents).expect("config contents");
@@ -357,7 +387,125 @@ mod tests {
         assert!(report.warnings.contains(&ConfigWarning::CreatedConfig {
             path: CONFIG_RELATIVE_PATH.to_owned()
         }));
+        assert!(contents(&root).contains("version = 1"));
         assert!(contents(&root).contains("enable = false"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-007"))]
+    fn unset_and_document_create_versioned_configurations() {
+        for operation in [
+            ConfigOperation::Unset {
+                key: "checks.enable".to_owned(),
+            },
+            ConfigOperation::Document,
+        ] {
+            let root = temp_root();
+            run(&root, &operation).expect("mutator creates configuration");
+            assert_eq!(contents(&root), "version = 1\n", "{operation:?}");
+            let _ = fs::remove_dir_all(root);
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-007"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-EDITING-018"))]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-007"))]
+    fn mutations_reject_missing_or_unsupported_versions_without_writing() {
+        let operations = [
+            ConfigOperation::Set {
+                key: "checks.enable".to_owned(),
+                value: "false".to_owned(),
+            },
+            ConfigOperation::Unset {
+                key: "checks.enable".to_owned(),
+            },
+            ConfigOperation::Document,
+            ConfigOperation::Upgrade {
+                dry_run: false,
+                diff: false,
+            },
+        ];
+
+        for (index, operation) in operations.into_iter().enumerate() {
+            let root = temp_root().join(index.to_string());
+            let original = "checks.enable = true\n";
+            seed_raw(&root, original);
+            let error = run(&root, &operation).expect_err("missing version is rejected");
+            assert!(error.message().contains("version = 1"), "{error}");
+            assert_eq!(contents(&root), original);
+            let _ = fs::remove_dir_all(root);
+        }
+
+        let root = temp_root();
+        let original = "version = 0\nchecks.enable = true\n";
+        seed_raw(&root, original);
+        let error = run(
+            &root,
+            &ConfigOperation::Set {
+                key: "checks.enable".to_owned(),
+                value: "false".to_owned(),
+            },
+        )
+        .expect_err("unsupported version is rejected");
+        assert!(
+            error
+                .message()
+                .contains("unsupported config format version")
+        );
+        assert_eq!(contents(&root), original);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-EDITING-020"))]
+    fn version_is_metadata_and_survives_config_edits() {
+        let root = temp_root();
+        seed_raw(
+            &root,
+            "version = 1 # preserve format comment\nchecks.enable = true\n",
+        );
+
+        let error = run(
+            &root,
+            &ConfigOperation::Get {
+                key: "version".to_owned(),
+            },
+        )
+        .expect_err("version is not an editable schema key");
+        assert_eq!(error.kind(), ConfigErrorKind::Usage);
+
+        run(
+            &root,
+            &ConfigOperation::Set {
+                key: "checks.enable".to_owned(),
+                value: "false".to_owned(),
+            },
+        )
+        .expect("set");
+        run(&root, &ConfigOperation::Document).expect("document");
+        let after_edit = contents(&root);
+        assert!(after_edit.contains("version = 1"), "{after_edit}");
+        assert!(
+            after_edit.contains("# preserve format comment"),
+            "{after_edit}"
+        );
+        assert!(after_edit.contains("checks.enable = false"), "{after_edit}");
+
+        run(
+            &root,
+            &ConfigOperation::Unset {
+                key: "checks.enable".to_owned(),
+            },
+        )
+        .expect("unset");
+        let after_unset = contents(&root);
+        assert!(after_unset.contains("version = 1"), "{after_unset}");
+        assert!(
+            after_unset.contains("# preserve format comment"),
+            "{after_unset}"
+        );
         let _ = fs::remove_dir_all(root);
     }
 
@@ -786,7 +934,15 @@ mod tests {
         )
         .expect("upgrade");
         match report.outcome {
-            ConfigOutcome::Upgrade { added, written, .. } => {
+            ConfigOutcome::Upgrade {
+                source_version,
+                target_version,
+                added,
+                written,
+                ..
+            } => {
+                assert_eq!(source_version, None);
+                assert_eq!(target_version, None);
                 assert!(written);
                 assert!(!added.is_empty());
                 let mut sorted = added.clone();
@@ -802,6 +958,7 @@ mod tests {
             other => panic!("unexpected outcome: {other:?}"),
         }
         let after = contents(&root);
+        assert!(after.contains("version = 1"));
         assert!(after.contains("enable = true"));
         assert!(after.contains("crateCheck = true"));
         assert!(after.contains("[checks.specifications]\nenable = true"));
@@ -981,6 +1138,7 @@ mod tests {
                 differences,
                 written,
                 added,
+                ..
             } => {
                 assert!(!written);
                 assert!(added.is_empty());
@@ -1040,6 +1198,7 @@ mod tests {
         assert!(report.warnings.contains(&ConfigWarning::CreatedConfig {
             path: CONFIG_RELATIVE_PATH.to_owned()
         }));
+        assert!(contents(&root).contains("version = 1"));
         assert!(contents(&root).contains("enable = true"));
         let _ = fs::remove_dir_all(root);
     }

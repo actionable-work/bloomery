@@ -22,6 +22,13 @@ and is specified by [Configuration documentation](documenting.md).
 Every invocation re-reads the configuration file. Config commands never load
 the specification tree, scan source, or edit lockfiles.
 
+Every config command requires an explicit supported format version; format `1`
+is currently the only supported version. Dotted keys address the normalized
+configuration model; the top-level format `version` is metadata and is not a
+catalogued key. Only `config upgrade` changes the file's format version. Other
+config mutations write changes using the file's existing format and retain its
+version.
+
 ## Key addressing and type safety
 
 `KEY` is a dotted TOML path whose segments are bare TOML keys, for example
@@ -50,11 +57,11 @@ before any write.
 
 When `.bloomery/config.toml` is absent, the mutating commands `config set`,
 `config unset`, a writing `config upgrade`, and `config document` create the
-`.bloomery/` directory and an empty configuration file, emit an advisory
-warning naming the created path, and continue. The effective configuration
-before the mutation uses the documented defaults, and the newly created file is
-an empty TOML document; the command's own keys are then added in the same
-invocation. `config document` has no present keys to annotate in the new file.
+`.bloomery/` directory and a configuration file at the current format version,
+emit an advisory warning naming the created path, and continue. The effective
+configuration before the mutation uses the documented defaults, and the
+command's own keys are then added in the same invocation. `config document` has
+no catalogued keys to annotate in the new file.
 
 The read-only commands `config get`, `config list`, `config upgrade --dry-run`,
 and `config upgrade --diff` never create or modify the file. They report
