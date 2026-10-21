@@ -109,6 +109,14 @@ pub enum BuildErrorKind {
     Operational,
 }
 
+/// Execution choices for a single build command.
+pub struct BuildRunOptions {
+    pub args: BuildArgs,
+    pub json_mode: bool,
+    pub color: ColorMode,
+    pub no_write: bool,
+}
+
 /// A build invocation that could not produce a report.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BuildError {
@@ -248,10 +256,12 @@ pub fn run_at_with_mode(
 ) -> ExitCode {
     let backend = NixCli::default();
     run_at_with_backends_and_mode(
-        args,
-        json_mode,
-        color,
-        no_write,
+        BuildRunOptions {
+            args,
+            json_mode,
+            color,
+            no_write,
+        },
         root,
         &backend,
         &CheckCommandGate,
@@ -261,7 +271,6 @@ pub fn run_at_with_mode(
 }
 
 /// Execute `bloomery build` with injected Nix and gate backends.
-#[allow(clippy::too_many_arguments)]
 pub fn run_at_with<B: NixBackend, G: CheckGate>(
     args: BuildArgs,
     json_mode: bool,
@@ -269,26 +278,38 @@ pub fn run_at_with<B: NixBackend, G: CheckGate>(
     root: &Path,
     backend: &B,
     gate: &G,
-    stdout: &mut impl Write,
-    stderr: &mut impl Write,
+    output: (&mut impl Write, &mut impl Write),
 ) -> ExitCode {
+    let (stdout, stderr) = output;
     run_at_with_backends_and_mode(
-        args, json_mode, color, false, root, backend, gate, stdout, stderr,
+        BuildRunOptions {
+            args,
+            json_mode,
+            color,
+            no_write: false,
+        },
+        root,
+        backend,
+        gate,
+        stdout,
+        stderr,
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn run_at_with_backends_and_mode<B: NixBackend, G: CheckGate>(
-    args: BuildArgs,
-    json_mode: bool,
-    color: ColorMode,
-    no_write: bool,
+    options: BuildRunOptions,
     root: &Path,
     backend: &B,
     gate: &G,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> ExitCode {
+    let BuildRunOptions {
+        args,
+        json_mode,
+        color,
+        no_write,
+    } = options;
     if !root.join("flake.nix").is_file() {
         return report_error(
             json_mode,

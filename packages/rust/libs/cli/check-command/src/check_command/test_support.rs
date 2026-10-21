@@ -538,17 +538,18 @@ pub(super) fn invoke_with_interrupt_and_mode(
 ) -> (std::process::ExitCode, Vec<u8>, Vec<u8>) {
     invoke_with_terminal_and_mode(
         args,
-        root,
-        cache,
-        backend,
-        json,
-        interrupt,
-        no_write,
-        TerminalFacts::default(),
+        TerminalInvocation {
+            root,
+            cache,
+            backend,
+            json,
+            interrupt,
+            no_write,
+            terminal: TerminalFacts::default(),
+        },
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn invoke_with_terminal(
     args: CheckArgs,
     root: &Path,
@@ -558,20 +559,43 @@ pub(super) fn invoke_with_terminal(
     interrupt: InterruptFlag,
     terminal: TerminalFacts,
 ) -> (std::process::ExitCode, Vec<u8>, Vec<u8>) {
-    invoke_with_terminal_and_mode(args, root, cache, backend, json, interrupt, false, terminal)
+    invoke_with_terminal_and_mode(
+        args,
+        TerminalInvocation {
+            root,
+            cache,
+            backend,
+            json,
+            interrupt,
+            no_write: false,
+            terminal,
+        },
+    )
 }
 
-#[allow(clippy::too_many_arguments)]
+pub(super) struct TerminalInvocation<'a> {
+    pub(super) root: &'a Path,
+    pub(super) cache: &'a Path,
+    pub(super) backend: &'a dyn NixBackend,
+    pub(super) json: bool,
+    pub(super) interrupt: InterruptFlag,
+    pub(super) no_write: bool,
+    pub(super) terminal: TerminalFacts,
+}
+
 pub(super) fn invoke_with_terminal_and_mode(
     args: CheckArgs,
-    root: &Path,
-    cache: &Path,
-    backend: &dyn NixBackend,
-    json: bool,
-    interrupt: InterruptFlag,
-    no_write: bool,
-    terminal: TerminalFacts,
+    invocation: TerminalInvocation<'_>,
 ) -> (std::process::ExitCode, Vec<u8>, Vec<u8>) {
+    let TerminalInvocation {
+        root,
+        cache,
+        backend,
+        json,
+        interrupt,
+        no_write,
+        terminal,
+    } = invocation;
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let code = run_at_with(

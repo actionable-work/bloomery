@@ -1,5 +1,3 @@
-#![allow(clippy::result_large_err)]
-
 pub mod catalog;
 pub mod clippy;
 pub mod config;

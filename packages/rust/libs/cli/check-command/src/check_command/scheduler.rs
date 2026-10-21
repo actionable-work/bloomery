@@ -66,6 +66,22 @@ impl Drop for WorkerGuard {
 }
 
 pub(super) type Task<'scope, T> = Box<dyn FnOnce(CancellationToken) -> T + Send + 'scope>;
+type StopPredicate<'scope, T> = dyn Fn(&T) -> bool + Sync + 'scope;
+type FollowupFactory<'scope, T> = dyn Fn(&mut T) -> Vec<(String, Task<'scope, T>)> + Sync + 'scope;
+type CompletionHook<'scope, T> = dyn Fn(&str, &T) + Sync + 'scope;
+type StopHook<'scope> = dyn Fn(&[String]) + Sync + 'scope;
+type SpawnHook<'scope> = dyn FnOnce(&WorkerTracker) + 'scope;
+
+pub(super) struct FollowupSchedule<'scope, T> {
+    pub(super) tasks: Vec<(String, Task<'scope, T>)>,
+    pub(super) jobs: usize,
+    pub(super) interrupt: InterruptFlag,
+    pub(super) should_stop: Box<StopPredicate<'scope, T>>,
+    pub(super) followups: Box<FollowupFactory<'scope, T>>,
+    pub(super) on_complete: Box<CompletionHook<'scope, T>>,
+    pub(super) on_stopped: Box<StopHook<'scope>>,
+    pub(super) on_spawned: Box<SpawnHook<'scope>>,
+}
 
 struct Scheduler<'scope, T> {
     ids: Vec<String>,
@@ -112,19 +128,19 @@ where
     F: FnOnce(CancellationToken) -> T + Send + 'scope,
     IsFailure: Fn(&T) -> bool + Sync + 'scope,
 {
-    run_with_followups(
-        tasks
+    run_with_followups(FollowupSchedule {
+        tasks: tasks
             .into_iter()
             .map(|(id, task)| (id, Box::new(task) as Task<'scope, T>))
             .collect(),
         jobs,
         interrupt,
-        |result| fail_fast && is_failure(result),
-        |_| Vec::new(),
-        |_id, _result| {},
-        |_queued| {},
-        |_tracker| {},
-    )
+        should_stop: Box::new(|result| fail_fast && is_failure(result)),
+        followups: Box::new(|_| Vec::new()),
+        on_complete: Box::new(|_id, _result| {}),
+        on_stopped: Box::new(|_queued| {}),
+        on_spawned: Box::new(|_tracker| {}),
+    })
 }
 
 /// Admit newly ready dependencies ahead of queued independent work. Admission
@@ -137,25 +153,22 @@ where
 /// final not_run outcomes without waiting for active workers to join.
 /// `on_spawned` runs on the calling thread after every worker is started; it is
 /// the single-owner drain point for progress events.
-#[allow(clippy::too_many_arguments)]
-pub(super) fn run_with_followups<'scope, T, Stop, Followups, OnComplete, OnStopped, OnSpawned>(
-    tasks: Vec<(String, Task<'scope, T>)>,
-    jobs: usize,
-    interrupt: InterruptFlag,
-    should_stop: Stop,
-    followups: Followups,
-    on_complete: OnComplete,
-    on_stopped: OnStopped,
-    on_spawned: OnSpawned,
+pub(super) fn run_with_followups<'scope, T>(
+    schedule: FollowupSchedule<'scope, T>,
 ) -> ScheduleReport<T>
 where
     T: Send + 'scope,
-    Stop: Fn(&T) -> bool + Sync + 'scope,
-    Followups: Fn(&mut T) -> Vec<(String, Task<'scope, T>)> + Sync + 'scope,
-    OnComplete: Fn(&str, &T) + Sync + 'scope,
-    OnStopped: Fn(&[String]) + Sync + 'scope,
-    OnSpawned: FnOnce(&WorkerTracker),
 {
+    let FollowupSchedule {
+        tasks,
+        jobs,
+        interrupt,
+        should_stop,
+        followups,
+        on_complete,
+        on_stopped,
+        on_spawned,
+    } = schedule;
     let count = tasks.len();
     if count == 0 {
         return ScheduleReport {
@@ -267,7 +280,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{ScheduledState, Task, run_bounded, run_with_followups};
+    use super::{FollowupSchedule, ScheduledState, Task, run_bounded, run_with_followups};
     use crate::check_command::interrupt::{CancellationToken, InterruptFlag};
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Barrier};
@@ -315,28 +328,28 @@ mod tests {
         ];
         let queued_not_run = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
         let observed_queued = queued_not_run.clone();
-        let report = run_with_followups(
+        let report = run_with_followups(FollowupSchedule {
             tasks,
-            2,
-            InterruptFlag::for_test(),
-            |result| *result == TaskResult::Failed,
-            |result| {
+            jobs: 2,
+            interrupt: InterruptFlag::for_test(),
+            should_stop: Box::new(|result| *result == TaskResult::Failed),
+            followups: Box::new(|result| {
                 if *result == TaskResult::Passed {
                     let task: Task<'_, TaskResult> = Box::new(|_| TaskResult::Failed);
                     vec![("traceability".to_owned(), task)]
                 } else {
                     Vec::new()
                 }
-            },
-            |_id, _result| {},
-            |queued| {
+            }),
+            on_complete: Box::new(|_id, _result| {}),
+            on_stopped: Box::new(|queued| {
                 observed_queued
                     .lock()
                     .expect("queued outcome lock")
                     .extend_from_slice(queued);
-            },
-            |_tracker| {},
-        );
+            }),
+            on_spawned: Box::new(|_tracker| {}),
+        });
         assert_eq!(
             queued_not_run
                 .lock()

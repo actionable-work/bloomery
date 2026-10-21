@@ -7,7 +7,9 @@ use super::model::{
 };
 use super::output;
 use super::progress::{ProgressEvent, ProgressReducer, ProgressReporter, ProgressSink};
-use super::scheduler::{ScheduleReport, ScheduledState, WorkerTracker, run_with_followups};
+use super::scheduler::{
+    FollowupSchedule, ScheduleReport, ScheduledState, WorkerTracker, run_with_followups,
+};
 use super::store;
 use bloomery_check::AnalysisSession;
 use bloomery_model::{
@@ -263,21 +265,21 @@ fn execute_after_formatter(
     progress: &mut ProgressReporter<impl Write>,
 ) -> Result<ExecutionResults, String> {
     if context.no_write {
-        return execute_selected(
-            context.root,
-            &prepared.selected,
-            &prepared.allocation,
-            context.backend,
-            &prepared.planned.plans,
-            &prepared.planned.outputs_by_derivation,
-            &prepared.planned.dependencies,
-            prepared.health_sources.clone(),
-            prepared.clippy_policy.clone(),
-            context.interrupt.clone(),
-            prepared.jobs,
-            args.fail_fast,
+        return execute_selected(SelectedExecutionInputs {
+            root: context.root,
+            selected: &prepared.selected,
+            allocation: &prepared.allocation,
+            backend: context.backend,
+            plans: &prepared.planned.plans,
+            outputs_by_derivation: &prepared.planned.outputs_by_derivation,
+            dependencies: &prepared.planned.dependencies,
+            health_sources: prepared.health_sources.clone(),
+            clippy_policy: prepared.clippy_policy.clone(),
+            interrupt: context.interrupt.clone(),
+            jobs: prepared.jobs,
+            fail_fast: args.fail_fast,
             progress,
-        );
+        });
     }
     if format.is_some_and(|format| format.outcome == Outcome::Passed) {
         let planned = plan_for_selection(
@@ -299,21 +301,21 @@ fn execute_after_formatter(
                 missing.join(", ")
             ));
         }
-        return execute_selected(
-            context.root,
-            &prepared.selected,
-            &prepared.allocation,
-            context.backend,
-            &planned.plans,
-            &planned.outputs_by_derivation,
-            &planned.dependencies,
-            prepared.health_sources.clone(),
-            prepared.clippy_policy.clone(),
-            context.interrupt.clone(),
-            prepared.jobs,
-            args.fail_fast,
+        return execute_selected(SelectedExecutionInputs {
+            root: context.root,
+            selected: &prepared.selected,
+            allocation: &prepared.allocation,
+            backend: context.backend,
+            plans: &planned.plans,
+            outputs_by_derivation: &planned.outputs_by_derivation,
+            dependencies: &planned.dependencies,
+            health_sources: prepared.health_sources.clone(),
+            clippy_policy: prepared.clippy_policy.clone(),
+            interrupt: context.interrupt.clone(),
+            jobs: prepared.jobs,
+            fail_fast: args.fail_fast,
             progress,
-        );
+        });
     }
     let format = format.expect("write mode always has a formatter gate");
     for id in &prepared.selected {
@@ -771,9 +773,8 @@ struct InitialTask {
     result: InitialTaskResult,
 }
 
-#[allow(clippy::large_enum_variant)]
 enum InitialTaskResult {
-    Structure(Result<Option<bloomery_model::Context>, Vec<Diagnostic>>),
+    Structure(Result<Option<Box<bloomery_model::Context>>, Vec<Diagnostic>>),
     Traceability(Result<(), Vec<Diagnostic>>),
     Health(Result<HealthOutcome, Vec<Diagnostic>>),
     HealthCanceled,
@@ -872,7 +873,9 @@ fn build_initial_tasks<'a>(inputs: InitialTaskInputs<'a>) -> Vec<InitialWork<'a>
         tasks.push((
             "static:structure".to_owned(),
             Box::new(move |_cancellation: CancellationToken| InitialTask {
-                result: InitialTaskResult::Structure(bloomery_workspace::load(&root).map(Some)),
+                result: InitialTaskResult::Structure(
+                    bloomery_workspace::load(&root).map(|context| Some(Box::new(context))),
+                ),
             }) as _,
         ));
     }
@@ -894,7 +897,7 @@ fn build_initial_tasks<'a>(inputs: InitialTaskInputs<'a>) -> Vec<InitialWork<'a>
         ));
     }
     if !batch_plans.is_empty() {
-        tasks.push(batch_task(
+        tasks.push(batch_task(BatchTaskInputs {
             root,
             allocation,
             backend,
@@ -903,7 +906,7 @@ fn build_initial_tasks<'a>(inputs: InitialTaskInputs<'a>) -> Vec<InitialWork<'a>
             batch_outputs,
             fail_fast,
             sink,
-        ));
+        }));
     }
     tasks
 }
@@ -917,17 +920,28 @@ fn selected_derivations(plans: &[CheckPlan]) -> Vec<String> {
         .collect()
 }
 
-#[allow(clippy::too_many_arguments)]
-fn batch_task<'a>(
-    root: &Path,
-    allocation: &store::RunAllocation,
+struct BatchTaskInputs<'a> {
+    root: &'a Path,
+    allocation: &'a store::RunAllocation,
     backend: &'a dyn NixBackend,
     batch_plans: Vec<CheckPlan>,
     batch_derivations: Vec<String>,
     batch_outputs: BTreeMap<String, Vec<String>>,
     fail_fast: bool,
-    sink: &ProgressSink,
-) -> InitialWork<'a> {
+    sink: &'a ProgressSink,
+}
+
+fn batch_task<'a>(inputs: BatchTaskInputs<'a>) -> InitialWork<'a> {
+    let BatchTaskInputs {
+        root,
+        allocation,
+        backend,
+        batch_plans,
+        batch_derivations,
+        batch_outputs,
+        fail_fast,
+        sink,
+    } = inputs;
     let root = root.to_path_buf();
     let allocation = allocation.clone();
     let sink = sink.clone();
@@ -1067,22 +1081,40 @@ fn realize_observing_checks(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
-fn execute_selected<W: Write>(
-    root: &Path,
-    selected: &BTreeSet<String>,
-    allocation: &store::RunAllocation,
-    backend: &dyn NixBackend,
-    plans: &BTreeMap<String, CheckPlan>,
-    outputs_by_derivation: &BTreeMap<String, Vec<String>>,
-    dependencies: &BTreeMap<String, Vec<String>>,
+struct SelectedExecutionInputs<'a, W: Write> {
+    root: &'a Path,
+    selected: &'a BTreeSet<String>,
+    allocation: &'a store::RunAllocation,
+    backend: &'a dyn NixBackend,
+    plans: &'a BTreeMap<String, CheckPlan>,
+    outputs_by_derivation: &'a BTreeMap<String, Vec<String>>,
+    dependencies: &'a BTreeMap<String, Vec<String>>,
     health_sources: Option<Result<Vec<bloomery_check::HealthSourceCrate>, String>>,
     clippy_policy: Option<bloomery_model::clippy::ClippySuppressionConfig>,
     interrupt: InterruptFlag,
     jobs: usize,
     fail_fast: bool,
-    progress: &mut ProgressReporter<W>,
+    progress: &'a mut ProgressReporter<W>,
+}
+
+fn execute_selected<W: Write>(
+    inputs: SelectedExecutionInputs<'_, W>,
 ) -> Result<ExecutionResults, String> {
+    let SelectedExecutionInputs {
+        root,
+        selected,
+        allocation,
+        backend,
+        plans,
+        outputs_by_derivation,
+        dependencies,
+        health_sources,
+        clippy_policy,
+        interrupt,
+        jobs,
+        fail_fast,
+        progress,
+    } = inputs;
     let mut outcomes = initial_outcomes(selected);
     let nix_checks = selected
         .iter()
@@ -1277,16 +1309,22 @@ fn execute_initial_schedule<'a, W: Write>(
         event_receiver,
         progress,
     } = inputs;
-    run_with_followups(
+    run_with_followups(FollowupSchedule {
         tasks,
         jobs,
         interrupt,
-        |task| initial_task_stops_admission(task, fail_fast),
-        |task| followup_work(root, selected, health_sources, task),
-        |id, task| publish_completion_events(id, task, selected, sink),
-        |queued| publish_not_run_events(queued, sink),
-        |tracker| drain_progress_events(tracker, event_receiver, progress),
-    )
+        should_stop: Box::new(|task: &InitialTask| initial_task_stops_admission(task, fail_fast)),
+        followups: Box::new(|task: &mut InitialTask| {
+            followup_work(root, selected, health_sources, task)
+        }),
+        on_complete: Box::new(|id: &str, task: &InitialTask| {
+            publish_completion_events(id, task, selected, sink)
+        }),
+        on_stopped: Box::new(|queued: &[String]| publish_not_run_events(queued, sink)),
+        on_spawned: Box::new(|tracker: &WorkerTracker| {
+            drain_progress_events(tracker, event_receiver, progress)
+        }),
+    })
 }
 
 fn followup_work<'a>(
@@ -1301,7 +1339,7 @@ fn followup_work<'a>(
     {
         return vec![shared_analysis_task(
             root,
-            context,
+            *context,
             selected.contains("static:code-health"),
             health_sources,
         )];
@@ -1985,16 +2023,16 @@ fn compare_health_baseline(
         return failures;
     };
     match validate_health_baseline(&baseline, snapshot) {
-        Ok(baseline) => compare_compatible_baseline(
+        Ok(baseline) => compare_compatible_baseline(CompatibleBaselineInputs {
             config,
             crates,
             scores,
             workspace,
-            baseline.workspace_score_hundredths,
-            &baseline.crates,
+            baseline_workspace: baseline.workspace_score_hundredths,
+            baseline_crates: &baseline.crates,
             report,
-            &mut failures,
-        ),
+            failures: &mut failures,
+        }),
         Err(message) => {
             report["baseline_status"] = json!("incompatible");
             failures.push(health_failure(
@@ -2056,17 +2094,28 @@ fn read_health_baseline(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn compare_compatible_baseline(
-    config: &HealthConfig,
-    crates: &[bloomery_check::HealthCrateMetrics],
-    scores: &[bloomery_check::health::CrateScore],
+struct CompatibleBaselineInputs<'a> {
+    config: &'a HealthConfig,
+    crates: &'a [bloomery_check::HealthCrateMetrics],
+    scores: &'a [bloomery_check::health::CrateScore],
     workspace: Option<u16>,
     baseline_workspace: Option<u16>,
-    baseline_crates: &BTreeMap<String, Option<u16>>,
-    report: &mut Value,
-    failures: &mut Vec<FailureDraft>,
-) {
+    baseline_crates: &'a BTreeMap<String, Option<u16>>,
+    report: &'a mut Value,
+    failures: &'a mut Vec<FailureDraft>,
+}
+
+fn compare_compatible_baseline(inputs: CompatibleBaselineInputs<'_>) {
+    let CompatibleBaselineInputs {
+        config,
+        crates,
+        scores,
+        workspace,
+        baseline_workspace,
+        baseline_crates,
+        report,
+        failures,
+    } = inputs;
     report["baseline_status"] = json!("compatible");
     report["baseline_workspace_score_hundredths"] =
         baseline_workspace.map_or(Value::Null, |score| json!(score));

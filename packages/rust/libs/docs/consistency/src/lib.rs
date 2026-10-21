@@ -1,5 +1,3 @@
-#![allow(clippy::result_large_err)]
-
 mod cli_catalog;
 mod coverage;
 mod excerpts;

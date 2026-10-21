@@ -238,17 +238,19 @@ fn load_group(
     for entry in parsed.requirements {
         let line = markdown::line_containing(&contents, &format!("\"{}\"", entry.id));
         if let Some(design) = validate_requirement(
-            root,
-            area_path,
-            feature_path,
-            readme,
-            &group,
             &entry,
-            path,
-            line,
-            &mut sequences,
-            all_ids,
-            diagnostics,
+            RequirementValidation {
+                root,
+                area_path,
+                feature_path,
+                readme,
+                group: &group,
+                group_path: path,
+                line,
+                sequences: &mut sequences,
+                all_ids,
+                diagnostics,
+            },
         ) {
             requirements.push(Requirement {
                 entry,
@@ -266,20 +268,35 @@ fn load_group(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
-fn validate_requirement(
-    root: &Path,
-    area_path: &Path,
-    feature_path: &Path,
-    readme: &Path,
-    group: &str,
-    entry: &RequirementEntry,
-    group_path: &Path,
+struct RequirementValidation<'a> {
+    root: &'a Path,
+    area_path: &'a Path,
+    feature_path: &'a Path,
+    readme: &'a Path,
+    group: &'a str,
+    group_path: &'a Path,
     line: usize,
-    sequences: &mut BTreeSet<String>,
-    all_ids: &mut HashSet<String>,
-    diagnostics: &mut Vec<Diagnostic>,
+    sequences: &'a mut BTreeSet<String>,
+    all_ids: &'a mut HashSet<String>,
+    diagnostics: &'a mut Vec<Diagnostic>,
+}
+
+fn validate_requirement(
+    entry: &RequirementEntry,
+    validation: RequirementValidation<'_>,
 ) -> Option<DesignReference> {
+    let RequirementValidation {
+        root,
+        area_path,
+        feature_path,
+        readme,
+        group,
+        group_path,
+        line,
+        sequences,
+        all_ids,
+        diagnostics,
+    } = validation;
     let area = area_path
         .file_name()
         .and_then(|value| value.to_str())

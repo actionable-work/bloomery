@@ -1,5 +1,3 @@
-#![allow(clippy::result_large_err)]
-
 mod document;
 mod error;
 mod upgrade;

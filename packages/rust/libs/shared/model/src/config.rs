@@ -189,12 +189,10 @@ pub struct LoadedConfig {
     pub raw: Option<toml::Value>,
 }
 
-#[allow(clippy::result_large_err)]
 pub fn load(root: &Path) -> Result<Config, Diagnostic> {
     load_with_raw(root).map(|loaded| loaded.config)
 }
 
-#[allow(clippy::result_large_err)]
 pub fn load_with_raw(root: &Path) -> Result<LoadedConfig, Diagnostic> {
     let path = root.join(".bloomery/config.toml");
     let contents = match fs::read_to_string(&path) {
@@ -228,7 +226,6 @@ pub fn load_with_raw(root: &Path) -> Result<LoadedConfig, Diagnostic> {
 }
 
 /// Parse and validate configuration contents without reading or writing a file.
-#[allow(clippy::result_large_err)]
 pub fn parse_contents(contents: &str, path: &Path) -> Result<LoadedConfig, Diagnostic> {
     let raw = toml::from_str::<toml::Value>(contents).map_err(|error| {
         Diagnostic::new(
@@ -260,7 +257,6 @@ pub fn parse_contents(contents: &str, path: &Path) -> Result<LoadedConfig, Diagn
     })
 }
 
-#[allow(clippy::result_large_err)]
 fn validate_config_version(raw: &toml::Value, path: &Path) -> Result<(), Diagnostic> {
     let version = raw.as_table().and_then(|table| table.get("version"));
     match version {
@@ -292,7 +288,6 @@ fn validate_config_version(raw: &toml::Value, path: &Path) -> Result<(), Diagnos
 }
 
 impl Config {
-    #[allow(clippy::result_large_err)]
     fn validate(&self) -> Result<(), Diagnostic> {
         self.validate_specs_dir()?;
         validate_file_scanner(
@@ -316,7 +311,6 @@ impl Config {
         Ok(())
     }
 
-    #[allow(clippy::result_large_err)]
     fn validate_specs_dir(&self) -> Result<(), Diagnostic> {
         if self.specs.dir.trim().is_empty() {
             return Err(Diagnostic::new(
@@ -338,7 +332,6 @@ impl Config {
         Ok(())
     }
 
-    #[allow(clippy::result_large_err)]
     pub fn specs_root(&self, root: &Path) -> Result<PathBuf, Diagnostic> {
         self.validate_specs_dir()?;
         Ok(root.join(".bloomery").join(&self.specs.dir))
@@ -355,7 +348,6 @@ impl Config {
     }
 }
 
-#[allow(clippy::result_large_err)]
 fn validate_file_scanner(name: &str, enabled: bool, patterns: &[String]) -> Result<(), Diagnostic> {
     if !enabled {
         return Ok(());

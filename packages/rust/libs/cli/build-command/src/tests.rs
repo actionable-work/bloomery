@@ -606,8 +606,7 @@ fn human_report_lists_output_paths() {
         &root,
         &backend,
         &FakeGate::default(),
-        &mut stdout,
-        &mut stderr,
+        (&mut stdout, &mut stderr),
     );
     assert_eq!(status, std::process::ExitCode::from(0));
     let text = String::from_utf8(stdout).expect("stdout");
@@ -635,8 +634,7 @@ fn human_build_summary_omits_zero_outcome_counts() {
         &root,
         &backend,
         &FakeGate::default(),
-        &mut stdout,
-        &mut stderr,
+        (&mut stdout, &mut stderr),
     );
     assert_eq!(status, std::process::ExitCode::FAILURE);
     let text = String::from_utf8(stdout).expect("human output");
@@ -657,8 +655,7 @@ fn human_build_summary_omits_zero_outcome_counts() {
         &root,
         &backend,
         &FakeGate::default(),
-        &mut stdout,
-        &mut stderr,
+        (&mut stdout, &mut stderr),
     );
     assert_eq!(status, std::process::ExitCode::FAILURE);
     let text = String::from_utf8(stdout).expect("human output");
@@ -687,8 +684,7 @@ fn failed_package_names_log_retrieval() {
         &root,
         &backend,
         &FakeGate::default(),
-        &mut stdout,
-        &mut stderr,
+        (&mut stdout, &mut stderr),
     );
     let text = String::from_utf8(stderr).expect("stderr");
     assert!(text.contains("nix log"), "{text}");
@@ -714,8 +710,7 @@ fn json_report_is_structured() {
         &root,
         &backend,
         &FakeGate::default(),
-        &mut stdout,
-        &mut stderr,
+        (&mut stdout, &mut stderr),
     );
     let value: serde_json::Value = serde_json::from_slice(&stdout).expect("json");
     assert_eq!(value["command"], "build");
@@ -744,8 +739,7 @@ fn json_usage_error_is_structured() {
         &root,
         &backend,
         &FakeGate::default(),
-        &mut stdout,
-        &mut stderr,
+        (&mut stdout, &mut stderr),
     );
     let value: serde_json::Value = serde_json::from_slice(&stdout).expect("json");
     assert_eq!(value["status"], "error");
@@ -766,8 +760,7 @@ fn json_output_has_no_progress_or_color() {
         &root,
         &backend,
         &FakeGate::default(),
-        &mut stdout,
-        &mut stderr,
+        (&mut stdout, &mut stderr),
     );
     let text = String::from_utf8(stdout).expect("stdout");
     assert!(!text.contains("\u{1b}["), "{text}");
@@ -792,8 +785,7 @@ fn raw_logs_are_not_streamed() {
         &root,
         &backend,
         &FakeGate::default(),
-        &mut stdout,
-        &mut stderr,
+        (&mut stdout, &mut stderr),
     );
     // The failure is summarized, but the retained derivation is not expanded.
     assert!(
@@ -829,8 +821,7 @@ fn gate_failure_is_reported() {
         &root,
         &backend,
         &gate,
-        &mut stdout,
-        &mut stderr,
+        (&mut stdout, &mut stderr),
     );
     let text = String::from_utf8(stdout).expect("stdout");
     assert!(text.contains("checks failed"), "{text}");

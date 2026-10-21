@@ -30,7 +30,7 @@ impl SourceLocation {
 pub struct Diagnostic {
     pub code: String,
     pub message: String,
-    pub location: Option<SourceLocation>,
+    pub location: Option<Box<SourceLocation>>,
     pub notes: Vec<String>,
 }
 
@@ -45,7 +45,7 @@ impl Diagnostic {
     }
 
     pub fn at(mut self, path: impl Into<PathBuf>, line: Option<usize>) -> Self {
-        self.location = Some(SourceLocation::new(path, line));
+        self.location = Some(Box::new(SourceLocation::new(path, line)));
         self
     }
 

@@ -57,7 +57,6 @@ pub(crate) fn show(context: &Context, id: &str) -> Result<RecordDetail, SpecErro
     })
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn add(
     root: &Path,
     context: &Context,

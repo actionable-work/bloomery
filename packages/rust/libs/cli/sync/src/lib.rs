@@ -1,5 +1,3 @@
-#![allow(clippy::result_large_err)]
-
 mod lockfile;
 mod metadata;
 mod nix_migration;

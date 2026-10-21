@@ -6,9 +6,10 @@ use crate::check_command::model::Outcome;
 use crate::check_command::progress::{
     ProgressEvent, ProgressReducer, ProgressReporter, ProgressSink,
 };
-use crate::check_command::scheduler::{Task, WorkerTracker, run_with_followups};
+use crate::check_command::scheduler::{FollowupSchedule, Task, WorkerTracker, run_with_followups};
 use crate::check_command::test_support::{
-    FakeNix, fixture, invoke_with_terminal, invoke_with_terminal_and_mode, request,
+    FakeNix, TerminalInvocation, fixture, invoke_with_terminal, invoke_with_terminal_and_mode,
+    request,
 };
 use crate::output::TerminalFacts;
 use std::io::{self, Write};
@@ -121,13 +122,15 @@ fn no_write_progress_counts_implicit_treefmt_without_a_preflight_unit() {
     args.selectors = vec!["static:structure".to_owned()];
     let (status, stdout, stderr) = invoke_with_terminal_and_mode(
         args,
-        &root,
-        &cache,
-        &backend,
-        false,
-        InterruptFlag::for_test(),
-        true,
-        tty(),
+        TerminalInvocation {
+            root: &root,
+            cache: &cache,
+            backend: &backend,
+            json: false,
+            interrupt: InterruptFlag::for_test(),
+            no_write: true,
+            terminal: tty(),
+        },
     );
     assert_eq!(status, std::process::ExitCode::SUCCESS);
     let stderr = stdio_text(&stderr);
@@ -690,20 +693,20 @@ fn finalization_is_published_while_another_worker_is_still_running() {
                 }),
             ),
         ];
-        run_with_followups(
+        run_with_followups(FollowupSchedule {
             tasks,
-            2,
-            InterruptFlag::for_test(),
-            |_| false,
-            |_| Vec::new(),
-            |id, _result| {
+            jobs: 2,
+            interrupt: InterruptFlag::for_test(),
+            should_stop: Box::new(|_| false),
+            followups: Box::new(|_| Vec::new()),
+            on_complete: Box::new(|id: &str, _result| {
                 sink.emit(ProgressEvent::CheckFinalized {
                     id: id.to_owned(),
                     outcome: Outcome::Passed,
                 });
-            },
-            |_queued| {},
-            |tracker: &WorkerTracker| {
+            }),
+            on_stopped: Box::new(|_queued| {}),
+            on_spawned: Box::new(|tracker: &WorkerTracker| {
                 while !tracker.wait_timeout(Duration::from_millis(2)) {
                     while let Ok(event) = receiver.try_recv() {
                         reporter.apply(event);
@@ -712,8 +715,8 @@ fn finalization_is_published_while_another_worker_is_still_running() {
                 while let Ok(event) = receiver.try_recv() {
                     reporter.apply(event);
                 }
-            },
-        );
+            }),
+        });
     });
 
     let deadline = Instant::now() + Duration::from_secs(5);

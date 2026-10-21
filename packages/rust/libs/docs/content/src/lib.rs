@@ -446,7 +446,6 @@ fn slugify(s: &str) -> String {
     clean.split_whitespace().collect::<Vec<&str>>().join("-")
 }
 
-#[allow(clippy::collapsible_if)]
 fn render_inline(text: &str) -> String {
     let mut out = String::with_capacity(text.len() * 2);
     let chars: Vec<char> = text.chars().collect();
@@ -455,49 +454,51 @@ fn render_inline(text: &str) -> String {
 
     while idx < len {
         // Inline code `code`
-        if chars[idx] == '`' {
-            if let Some(end) = chars[idx + 1..].iter().position(|&c| c == '`') {
-                let code_content: String = chars[idx + 1..idx + 1 + end].iter().collect();
-                out.push_str("<code class=\"inline-code\">");
-                out.push_str(&escape_html(&code_content));
-                out.push_str("</code>");
-                idx += end + 2;
-                continue;
-            }
+        if chars[idx] == '`'
+            && let Some(end) = chars[idx + 1..].iter().position(|&c| c == '`')
+        {
+            let code_content: String = chars[idx + 1..idx + 1 + end].iter().collect();
+            out.push_str("<code class=\"inline-code\">");
+            out.push_str(&escape_html(&code_content));
+            out.push_str("</code>");
+            idx += end + 2;
+            continue;
         }
 
         // Bold **text**
-        if idx + 1 < len && chars[idx] == '*' && chars[idx + 1] == '*' {
-            if let Some(end) = (idx + 2..len - 1).find(|&j| chars[j] == '*' && chars[j + 1] == '*')
-            {
-                let bold_content: String = chars[idx + 2..end].iter().collect();
-                out.push_str("<strong>");
-                out.push_str(&render_inline(&bold_content));
-                out.push_str("</strong>");
-                idx = end + 2;
-                continue;
-            }
+        if idx + 1 < len
+            && chars[idx] == '*'
+            && chars[idx + 1] == '*'
+            && let Some(end) = (idx + 2..len - 1).find(|&j| chars[j] == '*' && chars[j + 1] == '*')
+        {
+            let bold_content: String = chars[idx + 2..end].iter().collect();
+            out.push_str("<strong>");
+            out.push_str(&render_inline(&bold_content));
+            out.push_str("</strong>");
+            idx = end + 2;
+            continue;
         }
 
         // Link [text](url)
-        if chars[idx] == '[' {
-            if let Some(bracket_end) = chars[idx + 1..].iter().position(|&c| c == ']') {
-                let text_end = idx + 1 + bracket_end;
-                if text_end + 1 < len && chars[text_end + 1] == '(' {
-                    if let Some(paren_end) = chars[text_end + 2..].iter().position(|&c| c == ')') {
-                        let link_text: String = chars[idx + 1..text_end].iter().collect();
-                        let link_url: String = chars[text_end + 2..text_end + 2 + paren_end]
-                            .iter()
-                            .collect();
-                        out.push_str(&format!(
-                            "<a href=\"{}\" class=\"doc-link\">{}</a>",
-                            escape_html(&link_url),
-                            render_inline(&link_text)
-                        ));
-                        idx = text_end + 2 + paren_end + 1;
-                        continue;
-                    }
-                }
+        if chars[idx] == '['
+            && let Some(bracket_end) = chars[idx + 1..].iter().position(|&c| c == ']')
+        {
+            let text_end = idx + 1 + bracket_end;
+            if text_end + 1 < len
+                && chars[text_end + 1] == '('
+                && let Some(paren_end) = chars[text_end + 2..].iter().position(|&c| c == ')')
+            {
+                let link_text: String = chars[idx + 1..text_end].iter().collect();
+                let link_url: String = chars[text_end + 2..text_end + 2 + paren_end]
+                    .iter()
+                    .collect();
+                out.push_str(&format!(
+                    "<a href=\"{}\" class=\"doc-link\">{}</a>",
+                    escape_html(&link_url),
+                    render_inline(&link_text)
+                ));
+                idx = text_end + 2 + paren_end + 1;
+                continue;
             }
         }
 

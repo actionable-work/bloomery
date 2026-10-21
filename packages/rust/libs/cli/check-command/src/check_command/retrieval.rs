@@ -1,7 +1,7 @@
 use super::catalog::NixBackend;
 use super::command::{
-    CheckError, DetailsArgs, FailureArgs, ListArgs, discover_for_selection, report_error,
-    write_page,
+    CheckContext, CheckError, DetailsArgs, FailureArgs, ListArgs, discover_for_selection,
+    report_error, write_page,
 };
 use super::details::{diagnostic_detail_text, display_records, normalize_display_bytes};
 use super::model::{FailureRecord, RunRecord, select_ids};
@@ -91,22 +91,18 @@ pub(super) fn run_failures(
     write_page(json_mode, color, bytes, stdout, stderr)
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn run_details(
-    root: &Path,
     args: DetailsArgs,
-    json_mode: bool,
-    color: crate::output::ColorMode,
+    context: &CheckContext<'_>,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
-    cache_base: Option<&Path>,
-    backend: &dyn NixBackend,
 ) -> ExitCode {
-    let store = match store::RunStore::open(root, cache_base) {
+    let root = context.root;
+    let store = match store::RunStore::open(root, context.cache_base) {
         Ok(store) => store,
         Err(message) => {
             return report_error(
-                json_mode,
+                context.json_mode,
                 &CheckError::operational(message),
                 None,
                 stdout,
@@ -116,7 +112,7 @@ pub(super) fn run_details(
     };
     let (record, directory) = match load_run(&store, args.run.as_deref()) {
         Ok(record) => record,
-        Err(error) => return report_error(json_mode, &error, None, stdout, stderr),
+        Err(error) => return report_error(context.json_mode, &error, None, stdout, stderr),
     };
     let Some(failure) = record
         .failures
@@ -124,7 +120,7 @@ pub(super) fn run_details(
         .find(|failure| failure.id == args.failure)
     else {
         return report_error(
-            json_mode,
+            context.json_mode,
             &CheckError::retrieval(format!(
                 "failure '{}' is not available in run '{}'",
                 args.failure, record.id
@@ -134,11 +130,11 @@ pub(super) fn run_details(
             stderr,
         );
     };
-    let records = match detail_records(failure, &directory, root, backend) {
+    let records = match detail_records(failure, &directory, root, context.backend) {
         Ok(records) => records,
         Err(message) => {
             return report_error(
-                json_mode,
+                context.json_mode,
                 &CheckError::retrieval(message),
                 Some(&record.id),
                 stdout,
@@ -173,12 +169,12 @@ pub(super) fn run_details(
         requested_offset: detail_page.requested_offset,
         limit: detail_page.limit,
     });
-    let bytes = if json_mode {
+    let bytes = if context.json_mode {
         page.bytes
     } else {
         output::details_text(&detail_page, &page).into_bytes()
     };
-    write_page(json_mode, color, bytes, stdout, stderr)
+    write_page(context.json_mode, context.color, bytes, stdout, stderr)
 }
 
 fn load_run(

@@ -1,5 +1,3 @@
-#![allow(clippy::result_large_err)]
-
 mod analysis;
 mod clippy;
 mod files;
@@ -93,6 +91,12 @@ mod tests {
     /// not perturbed by other tests running in parallel.
     static SCAN_LOCK: Mutex<()> = Mutex::new(());
 
+    fn scan_lock() -> std::sync::MutexGuard<'static, ()> {
+        SCAN_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
     fn root(name: &str) -> PathBuf {
         let suffix = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -158,7 +162,7 @@ mod tests {
     #[cfg_attr(any(), bloomery("PARSER-SCANNING-STATIC-005"))]
     #[cfg_attr(any(), bloomery("PARSER-SCANNING-DISCOVERY-009"))]
     fn extracts_static_references_with_locations_without_running_tests() {
-        let _guard = SCAN_LOCK.lock().expect("scan lock");
+        let _guard = scan_lock();
         let root = root("static");
         fs::create_dir_all(root.join("tests")).expect("tests");
         fs::create_dir_all(root.join("e2e")).expect("e2e");
@@ -285,6 +289,7 @@ in builtins.seq (builtins.abort "scanner must not evaluate Nix") {
     #[cfg_attr(any(), bloomery("PARSER-SCANNING-DISCOVERY-004"))]
     #[cfg_attr(any(), bloomery("PARSER-SCANNING-DISCOVERY-007"))]
     fn playwright_discovery_creates_test_sites() {
+        let _guard = scan_lock();
         let root = root("playwright-discovery");
         fs::create_dir_all(root.join("e2e")).expect("e2e");
         fs::write(
@@ -315,6 +320,7 @@ in builtins.seq (builtins.abort "scanner must not evaluate Nix") {
     #[cfg_attr(any(), bloomery("PARSER-SCANNING-DISCOVERY-012"))]
     #[cfg_attr(any(), bloomery("PARSER-SCANNING-DISCOVERY-013"))]
     fn nix_test_paths_discover_sites() {
+        let _guard = scan_lock();
         let root = root("nix-discovery");
         fs::create_dir_all(root.join("lib")).expect("lib");
         fs::write(
@@ -367,7 +373,7 @@ in builtins.seq (builtins.abort "scanner must not evaluate Nix") {
     #[cfg_attr(any(), bloomery("PARSER-SCANNING-DISCOVERY-010"))]
     #[cfg_attr(any(), bloomery("PARSER-SCANNING-PARSING-005"))]
     fn unparsable_file_reports_one_diagnostic() {
-        let _guard = SCAN_LOCK.lock().expect("scan lock");
+        let _guard = scan_lock();
         let root = root("parse-error");
         fs::create_dir_all(root.join("tests")).expect("tests");
         fs::write(root.join("tests/bad.rs"), "fn broken( {").expect("bad source");
@@ -383,7 +389,7 @@ in builtins.seq (builtins.abort "scanner must not evaluate Nix") {
     #[cfg_attr(any(), bloomery("PARSER-SCANNING-PARSING-002"))]
     #[cfg_attr(any(), bloomery("PARSER-SCANNING-PARSING-003"))]
     fn single_parse_serves_references_and_discovery() {
-        let _guard = SCAN_LOCK.lock().expect("scan lock");
+        let _guard = scan_lock();
         let root = root("parse-once");
         fs::create_dir_all(root.join("tests")).expect("tests");
         fs::write(
@@ -409,7 +415,7 @@ in builtins.seq (builtins.abort "scanner must not evaluate Nix") {
     #[cfg_attr(any(), bloomery("PARSER-SCANNING-HEALTH-009"))]
     #[cfg_attr(any(), bloomery("PARSER-SCANNING-HEALTH-010"))]
     fn health_and_evidence_share_one_parse_and_bad_tags_stay_independent() {
-        let _guard = SCAN_LOCK.lock().expect("scan lock");
+        let _guard = scan_lock();
         let root = root("health-shared-parse");
         fs::create_dir_all(root.join("crates/demo/src")).expect("source");
         fs::write(
@@ -449,7 +455,7 @@ in builtins.seq (builtins.abort "scanner must not evaluate Nix") {
     #[cfg_attr(any(), bloomery("PARSER-SCANNING-PARSING-001"))]
     #[cfg_attr(any(), bloomery("PARSER-SCANNING-PARSING-003"))]
     fn nix_union_of_paths_and_test_paths_parses_once() {
-        let _guard = SCAN_LOCK.lock().expect("scan lock");
+        let _guard = scan_lock();
         let root = root("nix-parse-once");
         fs::create_dir_all(root.join("lib")).expect("lib");
         fs::write(
@@ -470,7 +476,7 @@ in builtins.seq (builtins.abort "scanner must not evaluate Nix") {
     #[test]
     #[cfg_attr(any(), bloomery("PARSER-SCANNING-PARSING-004"))]
     fn parse_cache_is_command_scoped() {
-        let _guard = SCAN_LOCK.lock().expect("scan lock");
+        let _guard = scan_lock();
         let root = root("cache-scope");
         fs::create_dir_all(root.join("tests")).expect("tests");
         fs::write(root.join("tests/once.rs"), "#[test]\nfn once() {}\n").expect("Rust source");

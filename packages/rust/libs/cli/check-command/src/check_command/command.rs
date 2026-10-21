@@ -368,16 +368,7 @@ pub(super) fn run_at_with(
             stderr,
             context.cache_base,
         ),
-        Some(CheckOperation::Details(details)) => run_details(
-            context.root,
-            details,
-            json_mode,
-            color,
-            stdout,
-            stderr,
-            context.cache_base,
-            context.backend,
-        ),
+        Some(CheckOperation::Details(details)) => run_details(details, &context, stdout, stderr),
         Some(CheckOperation::Health(health)) => run_health(&context, health, stdout, stderr),
         Some(CheckOperation::HealthUpdate(update)) => {
             run_health_update(&context, update, stdout, stderr)
