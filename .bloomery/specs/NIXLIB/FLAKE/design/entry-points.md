@@ -76,3 +76,8 @@ or replace outputs. A returned `checks` attribute is merged with the generated
 checks per system instead of replacing them, so an extra set of checks — such
 as repository-specific root checks — extends the main workspace and elevated
 sub-flake checks.
+
+The Bloomery root flake contributes repository-specific check derivations
+alongside the generated workspace checks. Each workspace or root check
+derivation appears under only one `checks.<system>` attribute name; root checks
+do not add aliases for derivations already present in the workspace output.

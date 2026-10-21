@@ -69,7 +69,7 @@ pub(super) fn run_retrieve(
     let bytes = if context.json_mode {
         page.bytes
     } else {
-        health_page_text(&page.value).into_bytes()
+        health_page_text(&page.value, args.offset).into_bytes()
     };
     write_page(context.json_mode, context.color, bytes, stdout, stderr)
 }
@@ -368,21 +368,30 @@ fn read_health_report(directory: &Path) -> Result<Value, String> {
     Ok(report)
 }
 
-fn health_page_text(page: &Value) -> String {
+fn health_page_text(page: &Value, requested_offset: usize) -> String {
     let mut text = format!(
-        "workspace score {} · baseline {} · delta {}\n",
+        "run {} · workspace score {} · baseline {} · delta {}\n",
+        page.get("run").and_then(Value::as_str).unwrap_or(""),
         display_score(page.get("workspace_score_hundredths")),
         display_score(page.get("baseline_workspace_score_hundredths")),
         display_delta(page.get("workspace_delta_hundredths")),
     );
     let offset = page.get("offset").and_then(Value::as_u64).unwrap_or(0);
     let total = page.get("total").and_then(Value::as_u64).unwrap_or(0);
-    text.push_str(&format!(
-        "crates {}–{} of {}\n",
-        offset + 1,
-        offset + page["crates"].as_array().map_or(0, Vec::len) as u64,
-        total
-    ));
+    let count = page["crates"].as_array().map_or(0, Vec::len) as u64;
+    if count == 0 {
+        text.push_str(&format!("crates at offset {requested_offset} of {total}"));
+    } else {
+        text.push_str(&format!(
+            "crates {}–{} of {total}",
+            offset + 1,
+            offset + count
+        ));
+    }
+    if let Some(next) = page.get("next").and_then(Value::as_u64) {
+        text.push_str(&format!(" · next offset {next}"));
+    }
+    text.push('\n');
     if let Some(crates) = page.get("crates").and_then(Value::as_array) {
         for crate_record in crates {
             text.push_str(&format!(
@@ -395,9 +404,6 @@ fn health_page_text(page: &Value) -> String {
                 display_delta(crate_record.get("delta_hundredths")),
             ));
         }
-    }
-    if let Some(next) = page.get("next").and_then(Value::as_u64) {
-        text.push_str(&format!("next offset {next}\n"));
     }
     text
 }
@@ -734,4 +740,45 @@ fn update_error(
         stderr,
     );
     status
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{health_page_text, output};
+    use serde_json::json;
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-029"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-014"))]
+    fn health_human_pages_show_run_and_one_crate_range() {
+        let report = json!({
+            "workspace": {"score_hundredths": 9500},
+            "baseline_workspace_score_hundredths": 9400,
+            "workspace_delta_hundredths": 100,
+            "crates": [
+                {"manifest_path": "a/Cargo.toml", "score_hundredths": 9000, "applicability": "applicable"},
+                {"manifest_path": "b/Cargo.toml", "score_hundredths": 9500, "applicability": "applicable"},
+                {"manifest_path": "c/Cargo.toml", "score_hundredths": 9750, "applicability": "applicable"}
+            ],
+            "crate_comparisons": []
+        });
+
+        let first = output::health_page(&report, "r123", 0, 2).expect("first health page");
+        let human = health_page_text(&first.value, 0);
+        assert!(
+            human.starts_with("run r123 · workspace score 95.00 · baseline 94.00 · delta +1.00")
+        );
+        assert!(human.contains("crates 1–2 of 3 · next offset 2"), "{human}");
+        assert_eq!(human.matches("of 3").count(), 1);
+
+        let final_page = output::health_page(&report, "r123", 2, 2).expect("final health page");
+        let human = health_page_text(&final_page.value, 2);
+        assert!(human.contains("crates 3–3 of 3"), "{human}");
+        assert!(!human.contains("next offset"), "{human}");
+
+        let empty_page = output::health_page(&report, "r123", 4, 2).expect("empty health page");
+        let human = health_page_text(&empty_page.value, 4);
+        assert!(human.contains("crates at offset 4 of 3"), "{human}");
+        assert!(!human.contains("next offset"), "{human}");
+    }
 }

@@ -562,6 +562,8 @@ fn disabled_spec_management_skips_static_validation_of_a_present_tree() {
 #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-009"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-010"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-011"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-014"))]
+#[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-014"))]
 fn summaries_agree_between_human_and_json_and_do_not_stream_logs() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -581,6 +583,12 @@ fn summaries_agree_between_human_and_json_and_do_not_stream_logs() {
     assert!(text.contains("failed"));
     assert!(text.contains("1 failure record"));
     assert!(text.contains("f1"));
+    assert!(
+        text.contains("details: `bloomery check details f1 --run "),
+        "{text}"
+    );
+    assert!(!text.contains("mode: write"), "{text}");
+    assert!(!text.lines().any(|line| line.starts_with("run ")), "{text}");
     assert!(!text.contains("build log output"));
     assert_eq!(json["result"]["counts"]["failed"], 1);
     assert!(json["result"]["failures"][0].get("message").is_none());

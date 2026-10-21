@@ -113,14 +113,10 @@ action = "limit each complete serialized human or JSON page to 8 KiB"
 
 [[requirements]]
 id = "CLI-CHECK-DETAIL-011"
-title = "Retrieval exposes continuation"
+title = "JSON exposes retrieval paging metadata"
 manual = false
 design = "design/details.md#detail-stream-and-seek"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "bloomery check failure retrieval"
-action = "report actual offset, total records, and a nullable next offset"
+ears = { type = "event", trigger = "a check retrieval command is invoked with --json", system = "bloomery check retrieval", action = "include the actual offset, total records, and nullable next offset" }
 
 [[requirements]]
 id = "CLI-CHECK-DETAIL-012"
@@ -316,3 +312,10 @@ type = "event"
 trigger = "concurrent detail requests reference the same run-local derivation path"
 system = "bloomery check details"
 action = "resolve and publish one shared snapshot atomically without changing the completed run manifest"
+
+[[requirements]]
+id = "CLI-CHECK-DETAIL-029"
+title = "Human retrieval pages show one range"
+manual = false
+design = "design/details.md#detail-stream-and-seek"
+ears = { type = "ubiquitous", system = "bloomery check retrieval", action = "show the actual page range once and a next offset only when more records remain" }

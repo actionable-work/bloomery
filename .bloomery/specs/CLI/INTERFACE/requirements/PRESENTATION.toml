@@ -144,3 +144,10 @@ design = "design/presentation.md#spacing"
 type = "ubiquitous"
 system = "the bloomery CLI"
 action = "separate independent output sections with one blank line and end output without a trailing blank line"
+
+[[requirements]]
+id = "CLI-INTERFACE-PRESENTATION-014"
+title = "Human output omits redundant metadata"
+manual = false
+design = "design/presentation.md#progressive-disclosure"
+ears = { type = "ubiquitous", system = "the bloomery CLI", action = "omit zero-valued, empty, default, or repeated optional metadata when it adds no information or follow-up action" }

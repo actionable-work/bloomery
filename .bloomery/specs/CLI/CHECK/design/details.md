@@ -83,12 +83,22 @@ serialized response. Explicit `--offset` is zero-based. Without it, choose a
 failure-focused excerpt: diagnostic context for static failures and the retained
 log tail for unstructured build failures. Return the actual starting offset.
 
-Human and JSON output carry the same paging metadata: offset, next (nullable),
+JSON output carries exact paging metadata: zero-based `offset`, nullable `next`,
 and total display records. The next offset identifies the first unreturned
-record. A single record must fit the byte budget after serialization; split
-records and truncate metadata with explicit continuation where necessary.
-Offsets beyond the end yield an empty page, not a rerun. Context and metadata
-must not consume the budget so completely that paging makes no progress.
+record. Human output gives the actual range once, with the run ID where
+applicable, and shows a next offset only when more records remain. Do not repeat
+the offset and total in a footer or print a `next none` value. An empty page
+identifies its requested offset and total without inventing a range. A single
+record must fit the byte budget after serialization; split records and truncate
+metadata with explicit continuation where necessary. Offsets beyond the end
+yield an empty page, not a rerun. Context and metadata must not consume the
+budget so completely that paging makes no progress.
+
+`check list`, `check failures`, and `check details` use the same compact human
+page shape: one header with the selection or run and actual range, followed by
+the requested records. Add `next offset N` only for a continuing page. Health
+pages identify the run, show workspace score and comparison, and report the
+crate range once before the crate rows.
 
 Example:
 

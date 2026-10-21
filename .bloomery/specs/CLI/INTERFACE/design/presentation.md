@@ -106,6 +106,10 @@ Every command draws from one palette:
 ### Progressive disclosure
 
 - Default output is bounded and omits unbounded detail.
+- Omit zero-valued, empty, default, or repeated metadata when it adds no
+  information or follow-up action.
+- Show page range metadata once and show a continuation offset only when another
+  page exists.
 - Full diagnostics, tool output, and per-record success detail are retrieved
   through dedicated commands or `--json`, not printed by default.
 - Mutating commands report the affected identity and resulting state before the

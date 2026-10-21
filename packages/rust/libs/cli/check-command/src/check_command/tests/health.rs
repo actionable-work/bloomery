@@ -55,6 +55,11 @@ fn health_fixture() -> (std::path::PathBuf, std::path::PathBuf, FakeNix) {
 #[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-036"))]
 #[cfg_attr(any(), bloomery("PARSER-SCANNING-HEALTH-009"))]
 #[cfg_attr(any(), bloomery("PARSER-SCANNING-HEALTH-013"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-013"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-014"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-015"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-016"))]
+#[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-014"))]
 fn health_runs_without_specs_and_retains_measurements_when_baseline_is_missing() {
     let (root, cache, backend) = health_fixture();
     let mut args = request();
@@ -117,7 +122,34 @@ fn health_runs_without_specs_and_retains_measurements_when_baseline_is_missing()
         page["result"]["crates"][0]["manifest_path"],
         "crates/demo/Cargo.toml"
     );
-    assert_eq!(backend.formatter_runs.load(Ordering::SeqCst), 1);
+
+    let mut human_args = request();
+    human_args.selectors = vec!["static:code-health".to_owned()];
+    human_args.jobs = Some(1);
+    let (status, human_output, _) = invoke(human_args, &root, &cache, &backend, false);
+    assert_eq!(status, std::process::ExitCode::SUCCESS);
+    let human = String::from_utf8(human_output).expect("human summary");
+    let (human_run, _) = store.latest().expect("successful retained run");
+    assert!(
+        human.contains(&format!(
+            "health report: bloomery check health --run {}",
+            human_run.id
+        )),
+        "{human}"
+    );
+    assert!(!human.contains("mode: write"), "{human}");
+    assert!(!human.contains("failure record"), "{human}");
+    assert!(!human.contains("health baseline refreshed"), "{human}");
+    assert!(!human.contains("code-health-summary.json"), "{human}");
+    assert!(
+        !human.contains("retrieve the retained measurement"),
+        "{human}"
+    );
+    assert!(
+        !human.lines().any(|line| line.starts_with("run ")),
+        "{human}"
+    );
+    assert_eq!(backend.formatter_runs.load(Ordering::SeqCst), 2);
 
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);

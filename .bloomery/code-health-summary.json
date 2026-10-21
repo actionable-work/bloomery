@@ -40,22 +40,22 @@
     {
       "manifest_path": "packages/rust/libs/cli/build-command/Cargo.toml",
       "name": "bloomery-build-command",
-      "overall_score": 97.55,
-      "sloc": 1006,
+      "overall_score": 97.56,
+      "sloc": 1016,
       "subscores": {
-        "complexity": 0.85,
-        "duplication": 1.04,
+        "complexity": 0.83,
+        "duplication": 1.0,
         "nesting": 0.0,
-        "size": 0.56
+        "size": 0.61
       }
     },
     {
       "manifest_path": "packages/rust/libs/cli/check-command/Cargo.toml",
       "name": "bloomery-check-command",
-      "overall_score": 98.17,
-      "sloc": 8313,
+      "overall_score": 98.16,
+      "sloc": 8365,
       "subscores": {
-        "complexity": 0.63,
+        "complexity": 0.65,
         "duplication": 0.36,
         "nesting": 0.0,
         "size": 0.83
@@ -124,11 +124,11 @@
     {
       "manifest_path": "packages/rust/libs/cli/disk/Cargo.toml",
       "name": "bloomery-disk",
-      "overall_score": 94.54,
-      "sloc": 684,
+      "overall_score": 94.58,
+      "sloc": 674,
       "subscores": {
         "complexity": 0.4,
-        "duplication": 4.83,
+        "duplication": 4.79,
         "nesting": 0.0,
         "size": 0.23
       }
@@ -290,7 +290,7 @@
       }
     }
   ],
-  "input_digest": "340c5f9592555d30baf469e54fa1f5bd3acaf56a2663da274d5f259cbb5d2d00",
+  "input_digest": "70025a3e700a5e989ecd3380e999de631f7c88c0be9861417d81b6e86cbabed3",
   "policy": {
     "scoring": {
       "cyclomaticLimit": 10,
@@ -308,7 +308,7 @@
   "workspace": {
     "crate_count": 24,
     "overall_score": 97.64,
-    "sloc": 23539,
+    "sloc": 23591,
     "subscores": {
       "complexity": 0.77,
       "duplication": 0.51,

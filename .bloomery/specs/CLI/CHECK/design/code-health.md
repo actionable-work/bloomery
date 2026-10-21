@@ -115,9 +115,12 @@ metric contributions remain available through `check details`; full raw
 metrics remain in the retained run report. Successful retrieval exits 0 even
 if the retained check failed; invalid or unavailable requests exit 2.
 
-The default check summary stays bounded and supplies a health retrieval hint
-when health was measured. Health failures participate in ordinary failure
-pagination and details; no per-crate success lines are added to normal output.
+The bounded check summary supplies only the run-specific health retrieval
+command when a report was retained. It does not announce automatic baseline
+refresh or print the baseline path. The command identifies the run, so do not
+repeat the health notice or run ID elsewhere in the summary. Health failures
+participate in ordinary failure pagination and details; no per-crate success
+lines are added to normal output.
 
 ## Baseline snapshots
 

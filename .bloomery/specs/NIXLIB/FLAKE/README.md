@@ -17,7 +17,8 @@ optional `overrides` set, an optional `extraFormatters` set, an optional
 `extraOutputs` callback, and an optional main-flake `self`. Every other build
 setting, including which sub-flakes to compose, is read from the required
 `.bloomery/config.toml` and evaluated into the same output shape for each
-selected system.
+selected system. The Bloomery root flake adds repository checks without
+exposing a second name for a workspace check derivation.
 
 ## Design documents
 
@@ -33,5 +34,6 @@ selected system.
 This feature covers the exported constructor, configuration loading and value
 encoding, option evaluation, system enumeration, flake attribute mapping,
 sub-flake composition and output elevation, the default formatter and its
-ordering graph, and output naming and gating. How the derivations behind those
-outputs compile belongs to [Derivation graph](../GRAPH/README.md).
+ordering graph, repository root check composition, and output naming and
+gating. How the derivations behind those outputs compile belongs to
+[Derivation graph](../GRAPH/README.md).

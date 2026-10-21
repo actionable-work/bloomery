@@ -80,7 +80,9 @@ raw Nix build logs. When `--check` is selected, the gate's check progress and
 outcomes are shown on the same terms as `bloomery check`.
 
 Plain output lists each selected package, its system, its status, and its output
-store path, followed by a summary count of passed and failed packages. It uses
+store path, followed by `N packages` on success or passed and failed counts on
+failure; omit zero-valued counts. The summary does not repeat the command name
+already present in the root heading. It uses
 the shared
 [presentation grammar](../../INTERFACE/design/presentation.md): a root heading,
 the status vocabulary, the semantic color roles, and a closing summary line.

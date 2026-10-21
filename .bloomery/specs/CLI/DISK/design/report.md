@@ -33,20 +33,20 @@ produced for the same measurement.
 ## Rendering
 
 Plain `disk` prints the total, one line per measured category, the selected
-systems, and the number of unmeasured derivations:
+systems, and the number of unmeasured derivations when that number is nonzero.
+Human-readable totals use binary units; exact integer bytes remain in JSON.
 
 ```text
-Disk use: 2.6 GiB (2795315560 bytes)
+Disk use: 2.6 GiB
 Runtime: 1.6 GiB
 Build: 982.1 MiB
 Systems: x86_64-linux
-Unmeasured derivations: none
 ```
 
 `disk tree` prints the total followed by an indented tree:
 
 ```text
-Disk use: 2.6 GiB (2795315560 bytes)
+Disk use: 2.6 GiB
 Systems: x86_64-linux
 ├── runtime (1.6 GiB)
 │   ├── bloomery (1.6 GiB)
@@ -57,7 +57,8 @@ Systems: x86_64-linux
 ```
 
 Each category and entry shows its human-readable byte size. Entries with no
-claimed bytes render as `0 B`; unmeasured entries are marked as unmeasured. Tree
+claimed bytes render as `0 B`; unmeasured entries are marked as unmeasured. The
+summary omits an unmeasured-derivation line when there are none. Tree
 connectors, the root heading, byte labels, and the closing summary follow the
 shared [presentation grammar](../../INTERFACE/design/presentation.md). JSON mode
 carries the same categories and entries as the `result` payload of the shared

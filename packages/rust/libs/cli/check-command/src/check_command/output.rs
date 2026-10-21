@@ -474,19 +474,29 @@ pub fn run_summary_text(record: &RunRecord, metrics: Option<&str>) -> String {
 
 fn run_summary_text_with_count(record: &RunRecord, shown: usize, metrics: Option<&str>) -> String {
     let counts = record.counts();
-    let detail = format!(
-        "{} · {} failure record{}",
-        count_summary(&counts),
-        record.failures.len(),
-        if record.failures.len() == 1 { "" } else { "s" }
-    );
+    let detail = if record.status == RunStatus::Passed {
+        let total = counts.values().sum::<usize>();
+        format!("{total} check{}", if total == 1 { "" } else { "s" })
+    } else {
+        let outcomes = count_summary(&counts);
+        if record.failures.is_empty() {
+            outcomes
+        } else {
+            let failure_records = format!(
+                "{} failure record{}",
+                record.failures.len(),
+                if record.failures.len() == 1 { "" } else { "s" }
+            );
+            if outcomes.is_empty() {
+                failure_records
+            } else {
+                format!("{outcomes} · {failure_records}")
+            }
+        }
+    };
     let mut output = run_outcome(record.status).render(&detail, false);
-    output.push_str(&format!("\nmode: {}", record.mode.as_str()));
-    if record.health_baseline_refreshed
-        && let Some(path) = &record.health_baseline_path
-    {
-        output.push_str("\nhealth baseline refreshed: ");
-        output.push_str(&safe_field(path, 512));
+    if record.mode == super::model::RunMode::NoWrite {
+        output.push_str(" · no-write");
     }
     if record.selection.partial {
         output.push_str("\npartial selection");
@@ -539,7 +549,12 @@ fn run_summary_text_with_count(record: &RunRecord, shown: usize, metrics: Option
             record.id
         ));
     }
-    for notice in record.notices.iter().take(4) {
+    for notice in record
+        .notices
+        .iter()
+        .filter(|notice| notice.code != "HealthReportRetained")
+        .take(4)
+    {
         output.push_str("\nnotice: ");
         output.push_str(&safe_field(&notice.message, 512));
     }
@@ -570,13 +585,21 @@ fn run_summary_text_with_count(record: &RunRecord, shown: usize, metrics: Option
             safe_field(&record.id, 128)
         ));
     }
-    output.push_str(&format!("\nrun {}", safe_field(&record.id, 128)));
+    let mut has_retrieval_hint = record
+        .notices
+        .iter()
+        .any(|notice| notice.code == "HealthReportRetained")
+        || shown < record.failures.len();
     if let Some(failure) = record.failures.first() {
         output.push_str(&format!(
-            " · details: `bloomery check details {} --run {}`",
+            "\ndetails: `bloomery check details {} --run {}`",
             safe_field(&failure.id, 32),
             safe_field(&record.id, 128)
         ));
+        has_retrieval_hint = true;
+    }
+    if !has_retrieval_hint {
+        output.push_str(&format!("\nrun {}", safe_field(&record.id, 128)));
     }
     // The metrics close the completion message as the last line, keeping the
     // final snapshot visually distinct from the live progress line.
@@ -729,13 +752,26 @@ pub fn details_text(page: &DetailPage<'_>, bounded: &BoundedPage) -> String {
         .and_then(Value::as_array)
         .map_or(0, Vec::len);
     for count in (0..=available).rev() {
-        let mut output = format!(
-            "run {} · {} · {} {}\ncheck: {}\n{}\n",
+        let end = bounded.offset.saturating_add(count).min(page.records.len());
+        let next = (end < page.records.len()).then_some(end);
+        let mut header = format!(
+            "run {} · {} · {} {} · {}",
             safe_field(&page.run.id, 128),
             safe_field(&page.failure.id, 32),
             page.outcome
                 .map_or("failed", |outcome| outcome.outcome.as_str()),
             safe_field(&page.failure.code, 128),
+            page_range(
+                "records",
+                bounded.offset,
+                count,
+                page.records.len(),
+                page.requested_offset,
+            ),
+        );
+        append_next_offset(&mut header, next);
+        let mut output = format!(
+            "{header}\ncheck: {}\n{}\n",
             safe_field(&page.failure.check, 512),
             safe_field(&page.failure.message, 1024),
         );
@@ -748,18 +784,10 @@ pub fn details_text(page: &DetailPage<'_>, bounded: &BoundedPage) -> String {
             }
             output.push('\n');
         }
-        let end = bounded.offset.saturating_add(count).min(page.records.len());
         for record in &page.records[bounded.offset..end] {
             output.push_str(record);
             output.push('\n');
         }
-        let next = (end < page.records.len()).then_some(end);
-        output.push_str(&format!(
-            "offset {} · total {} · next {}\n",
-            bounded.offset,
-            page.records.len(),
-            next.map_or_else(|| "none".to_owned(), |next| next.to_string())
-        ));
         if human_output_fits(&output) {
             return output;
         }
@@ -767,7 +795,7 @@ pub fn details_text(page: &DetailPage<'_>, bounded: &BoundedPage) -> String {
     String::new()
 }
 
-pub fn failures_text(record: &RunRecord, page: &BoundedPage) -> String {
+pub fn failures_text(record: &RunRecord, requested_offset: usize, page: &BoundedPage) -> String {
     let failures = page
         .value
         .get("failures")
@@ -775,12 +803,21 @@ pub fn failures_text(record: &RunRecord, page: &BoundedPage) -> String {
         .cloned()
         .unwrap_or_default();
     for count in (0..=failures.len()).rev() {
-        let mut output = format!(
-            "run {} · failures {} · offset {}\n",
+        let end = page.offset.saturating_add(count).min(record.failures.len());
+        let next = (end < record.failures.len()).then_some(end);
+        let mut header = format!(
+            "run {} · {}",
             safe_field(&record.id, 128),
-            record.failures.len(),
-            page.offset
+            page_range(
+                "failures",
+                page.offset,
+                count,
+                record.failures.len(),
+                requested_offset,
+            )
         );
+        append_next_offset(&mut header, next);
+        let mut output = format!("{header}\n");
         for failure in failures.iter().take(count) {
             let id = failure.get("id").and_then(Value::as_str).unwrap_or("");
             let check = failure.get("check").and_then(Value::as_str).unwrap_or("");
@@ -792,14 +829,6 @@ pub fn failures_text(record: &RunRecord, page: &BoundedPage) -> String {
                 safe_field(code, 128)
             ));
         }
-        let end = page.offset.saturating_add(count).min(record.failures.len());
-        let next = (end < record.failures.len()).then_some(end);
-        output.push_str(&format!(
-            "total {} · offset {} · next {}\n",
-            record.failures.len(),
-            page.offset,
-            next.map_or_else(|| "none".to_owned(), |next| next.to_string())
-        ));
         if human_output_fits(&output) {
             return output;
         }
@@ -807,7 +836,12 @@ pub fn failures_text(record: &RunRecord, page: &BoundedPage) -> String {
     String::new()
 }
 
-pub fn list_text(ids: &[String], systems: &[String], page: &BoundedPage) -> String {
+pub fn list_text(
+    ids: &[String],
+    systems: &[String],
+    requested_offset: usize,
+    page: &BoundedPage,
+) -> String {
     let checks = page
         .value
         .get("checks")
@@ -828,12 +862,14 @@ pub fn list_text(ids: &[String], systems: &[String], page: &BoundedPage) -> Stri
         .unwrap_or_default();
 
     for count in (0..=checks.len()).rev() {
-        let mut output = format!(
-            "checks {} · offset {} · systems {}\n",
-            ids.len(),
-            page.offset,
-            displayed_systems.join(", ")
-        );
+        let end = page.offset.saturating_add(count).min(ids.len());
+        let next = (end < ids.len()).then_some(end);
+        let mut header = page_range("checks", page.offset, count, ids.len(), requested_offset);
+        if !displayed_systems.is_empty() {
+            header.push_str(&format!(" · systems {}", displayed_systems.join(", ")));
+        }
+        append_next_offset(&mut header, next);
+        let mut output = format!("{header}\n");
         if systems_omitted > 0 {
             output.push_str(&format!("{} additional systems omitted\n", systems_omitted));
         }
@@ -850,19 +886,31 @@ pub fn list_text(ids: &[String], systems: &[String], page: &BoundedPage) -> Stri
                 output.push('\n');
             }
         }
-        let end = page.offset.saturating_add(count).min(ids.len());
-        let next = (end < ids.len()).then_some(end);
-        output.push_str(&format!(
-            "total {} · offset {} · next {}\n",
-            ids.len(),
-            page.offset,
-            next.map_or_else(|| "none".to_owned(), |next| next.to_string())
-        ));
         if human_output_fits(&output) {
             return output;
         }
     }
     String::new()
+}
+
+fn page_range(
+    label: &str,
+    offset: usize,
+    count: usize,
+    total: usize,
+    requested_offset: usize,
+) -> String {
+    if count == 0 {
+        format!("{label} at offset {requested_offset} of {total}")
+    } else {
+        format!("{label} {}–{} of {total}", offset + 1, offset + count)
+    }
+}
+
+fn append_next_offset(header: &mut String, next: Option<usize>) {
+    if let Some(next) = next {
+        header.push_str(&format!(" · next offset {next}"));
+    }
 }
 
 #[cfg(test)]
@@ -872,7 +920,7 @@ mod tests {
         health_page, list_page, list_text, run_summary_json, run_summary_text,
     };
     use crate::check_command::model::{
-        CheckRecord, FailureLocation, FailureRecord, OUTPUT_BYTE_LIMIT, Outcome, RunMode,
+        CheckRecord, FailureLocation, FailureRecord, Notice, OUTPUT_BYTE_LIMIT, Outcome, RunMode,
         RunRecord, RunSelection, RunStatus,
     };
 
@@ -957,6 +1005,57 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-013"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-014"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-015"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-016"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-014"))]
+    fn human_summaries_omit_redundant_metadata_and_keep_actionable_hints() {
+        let passing = record(0);
+        let summary = run_summary_text(&passing, None);
+        assert!(summary.starts_with("✓ passed · 1 check"), "{summary}");
+        assert!(!summary.contains("0 failure record"), "{summary}");
+        assert!(!summary.contains("passed · 1 passed"), "{summary}");
+        assert!(!summary.contains("mode:"), "{summary}");
+        assert!(summary.contains("run r123"), "{summary}");
+
+        let mut no_write = passing.clone();
+        no_write.mode = RunMode::NoWrite;
+        let summary = run_summary_text(&no_write, None);
+        assert!(
+            summary.starts_with("✓ passed · 1 check · no-write"),
+            "{summary}"
+        );
+
+        let mut health = passing;
+        health.health_baseline_refreshed = true;
+        health.health_baseline_path = Some(".bloomery/code-health-summary.json".to_owned());
+        health.notices.push(Notice {
+            code: "HealthReportRetained".to_owned(),
+            message: "retrieve the retained measurement with `bloomery check health --run r123`"
+                .to_owned(),
+        });
+        let summary = run_summary_text(&health, None);
+        assert_eq!(summary.matches("health report:").count(), 1, "{summary}");
+        assert!(
+            summary.contains("health report: bloomery check health --run r123"),
+            "{summary}"
+        );
+        assert!(!summary.contains("health baseline refreshed"), "{summary}");
+        assert!(!summary.contains("code-health-summary.json"), "{summary}");
+        assert!(!summary.contains("notice:"), "{summary}");
+        assert!(!summary.contains("\nrun r123"), "{summary}");
+
+        let failed = run_summary_text(&record(1), None);
+        assert!(failed.contains("1 failure record"), "{failed}");
+        assert!(
+            failed.contains("details: `bloomery check details f1 --run r123`"),
+            "{failed}"
+        );
+        assert!(!failed.contains("\nrun r123"), "{failed}");
+    }
+
+    #[test]
     #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-003"))]
     #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-004"))]
     #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-005"))]
@@ -998,12 +1097,14 @@ mod tests {
     #[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-017"))]
     #[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-018"))]
     #[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-019"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-029"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-014"))]
     fn catalog_pages_are_sorted_seekable_and_bounded() {
         let ids = (0..500)
             .map(|index| format!("nix:x86_64-linux:check-{index:03}"))
             .collect::<Vec<_>>();
         let page =
-            list_page(&ids, &["x86_64-linux".to_owned()], &[], 10, 1000).expect("catalog page");
+            list_page(&ids, &["x86_64-linux".to_owned()], &[], 10, 10).expect("catalog page");
         assert_eq!(page.offset, 10);
         assert_eq!(page.value["total"], 500);
         assert!(page.bytes.len() <= OUTPUT_BYTE_LIMIT);
@@ -1012,9 +1113,20 @@ mod tests {
             page.value["next"].as_u64().map(|value| value as usize)
         );
         assert_eq!(ids[0], "nix:x86_64-linux:check-000");
-        let human = list_text(&ids, &["x86_64-linux".to_owned()], &page);
+        let human = list_text(&ids, &["x86_64-linux".to_owned()], 10, &page);
         assert!(human.len() <= OUTPUT_BYTE_LIMIT);
-        assert!(human.contains("offset 10 · next"));
+        assert!(human.contains("checks 11–20 of 500 · systems x86_64-linux · next offset 20"));
+        assert_eq!(human.matches("of 500").count(), 1);
+
+        let final_page = list_page(&ids, &[], &[], 490, 20).expect("final catalog page");
+        let human = list_text(&ids, &[], 490, &final_page);
+        assert!(human.contains("checks 491–500 of 500"), "{human}");
+        assert!(!human.contains("next offset"), "{human}");
+
+        let empty_page = list_page(&ids, &[], &[], 501, 20).expect("empty catalog page");
+        let human = list_text(&ids, &[], 501, &empty_page);
+        assert!(human.contains("checks at offset 501 of 500"), "{human}");
+        assert!(!human.contains("next offset"), "{human}");
     }
 
     #[test]
@@ -1037,6 +1149,8 @@ mod tests {
     #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-011"))]
     #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-016"))]
     #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-020"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-029"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-014"))]
     fn detail_pages_are_bounded_seekable_and_make_progress_in_both_formats() {
         let run = record(1);
         let failure = &run.failures[0];
@@ -1079,7 +1193,10 @@ mod tests {
             &first,
         );
         assert!(human.len() <= OUTPUT_BYTE_LIMIT);
-        assert!(human.contains("offset 0 · total 100 · next"));
+        assert!(human.contains("records 1–"), "{human}");
+        assert!(human.contains("of 100 · next offset"), "{human}");
+        assert_eq!(human.matches("of 100").count(), 1);
+        assert!(!human.contains("next none"));
 
         let end = details_page(DetailPage {
             run: &run,
@@ -1091,11 +1208,26 @@ mod tests {
         });
         assert!(end.value["records"].as_array().unwrap().is_empty());
         assert_eq!(end.next, None);
+        let human = details_text(
+            &DetailPage {
+                run: &run,
+                failure,
+                outcome: Some(outcome),
+                records: &records,
+                requested_offset: records.len() + 1,
+                limit: 10,
+            },
+            &end,
+        );
+        assert!(human.contains("records at offset 101 of 100"), "{human}");
+        assert!(!human.contains("next offset"), "{human}");
     }
 
     #[test]
     #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-006"))]
     #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-011"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-DETAIL-029"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-014"))]
     fn failure_pages_report_the_actual_offset_and_continuation() {
         let run = record(50);
         let first = failure_page(&run, 10, 5);
@@ -1104,10 +1236,25 @@ mod tests {
         assert_eq!(first.next, Some(15));
         assert_eq!(first.value["failures"][0]["id"], "f11");
         assert!(first.bytes.len() <= OUTPUT_BYTE_LIMIT);
-        assert!(failures_text(&run, &first).contains("offset 10 · next 15"));
+        let human = failures_text(&run, 10, &first);
+        assert!(
+            human.contains("failures 11–15 of 50 · next offset 15"),
+            "{human}"
+        );
+        assert_eq!(human.matches("of 50").count(), 1);
 
         let second = failure_page(&run, 15, 5);
         assert_eq!(second.value["failures"][0]["id"], "f16");
+
+        let final_page = failure_page(&run, 45, 10);
+        let human = failures_text(&run, 45, &final_page);
+        assert!(human.contains("failures 46–50 of 50"), "{human}");
+        assert!(!human.contains("next offset"), "{human}");
+
+        let empty_page = failure_page(&run, 51, 10);
+        let human = failures_text(&run, 51, &empty_page);
+        assert!(human.contains("failures at offset 51 of 50"), "{human}");
+        assert!(!human.contains("next offset"), "{human}");
     }
 
     #[test]

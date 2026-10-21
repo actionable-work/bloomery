@@ -52,7 +52,7 @@ pub(super) fn run_list(
     let bytes = if json_mode {
         page.bytes.clone()
     } else {
-        output::list_text(&ids, &catalog.systems, &page).into_bytes()
+        output::list_text(&ids, &catalog.systems, args.offset, &page).into_bytes()
     };
     write_page(json_mode, color, bytes, stdout, stderr)
 }
@@ -86,7 +86,7 @@ pub(super) fn run_failures(
     let bytes = if json_mode {
         page.bytes
     } else {
-        output::failures_text(&record, &page).into_bytes()
+        output::failures_text(&record, args.offset, &page).into_bytes()
     };
     write_page(json_mode, color, bytes, stdout, stderr)
 }

@@ -35,14 +35,16 @@
       })
       names)
     // {broken.success = false;};
+  workspaceChecks = {"bloomery-check-command:test" = shared;};
   registered = import ./default.nix {
     inherit pkgs lib system;
     nixpkgs = null;
     bloomery = null;
     docsPackage = null;
     treefmt = null;
-    workspace.checks."bloomery-check-command:test" = "rust-test-sentinel";
+    workspace.checks = workspaceChecks;
   };
+  visibleChecks = workspaceChecks // registered;
   overrides = import (adapter + "/overrides.nix") {inherit pkgs lib;};
   sourceSelection = import ../../lib/workspace/sources.nix {inherit pkgs lib;};
   common = sourceSelection.defaultFileset {crateDir = adapter;};
@@ -68,11 +70,13 @@
     testDefaultMembership = {
       expr = {
         catalog = builtins.hasAttr "core:check-command-catalog" registered;
-        rust = registered."core:bloomery-check-command:test";
+        workspaceCheck = visibleChecks."bloomery-check-command:test".drvPath == shared.drvPath;
+        workspaceAlias = builtins.hasAttr "core:bloomery-check-command:test" visibleChecks;
       };
       expected = {
         catalog = true;
-        rust = "rust-test-sentinel";
+        workspaceCheck = true;
+        workspaceAlias = false;
       };
     };
     testSources = {
@@ -116,6 +120,7 @@ in
         "CLI-CHECK-NIX-010"
         "CLI-CHECK-NIX-015"
         "CLI-CHECK-NIX-016"
+        "NIXLIB-FLAKE-ENTRYPOINTS-026"
       ];
     };
   } ''

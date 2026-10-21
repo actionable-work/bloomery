@@ -43,17 +43,24 @@ not the complete compiler-style rendering.
 
 ## Bounded summary
 
-Print one aggregate outcome line, a failure page, and one retrieval hint. The
-summary uses the shared
+Print one aggregate outcome line, a failure page, and any relevant retrieval
+hint. The summary uses the shared
 [presentation grammar](../../INTERFACE/design/presentation.md): the shared status
 glyph and label, the semantic color roles for failure IDs and source locations,
 and a closing summary. On eligible user terminals, close the summary with the
 final derivation work metrics from
 [terminal progress](progress.md#final-metrics). Do not print individual
-successes, build logs, durations, repeated headings, or expanded diagnostic notes
-by default. Successful full runs show counts, run ID, and a health retrieval hint
-when measurement completed. Subset runs
-identify partial scope. Eligible user terminals display one transient stderr
+successes, build logs, durations, repeated headings, zero failure-record counts,
+or expanded diagnostic notes by default. Successful full runs report the total
+as a check count after the passed status, without repeating `passed`. Write mode
+is implicit; identify `no-write` only when that mode was selected. If a health
+report was retained, show only its run-specific retrieval command. Do not
+announce an automatic baseline refresh or print the baseline path in the summary.
+The command supplies the run ID, so do not repeat it in a separate run footer or
+notice.
+Failure-detail and continuation commands likewise carry the run ID without a
+separate run footer. When no retrieval command is present, show the run ID once.
+Subset runs identify partial scope. Eligible user terminals display one transient stderr
 line for changing check and derivation metrics; CI, non-TTY, and JSON output have
 no progress stream. See [terminal progress](progress.md). Transient updates are
 separate from the bounded final summary and do not retain a line per task.
@@ -65,21 +72,29 @@ hints. Bound individual summary fields so at least one failure fits. Truncation
 must be explicit; the full retained diagnostic remains available through details.
 
 ```text
-✗ failed · 28 passed · 2 failed · 1 blocked
+✗ failed · 28 passed · 2 failed · 1 blocked · 2 failure records
 f1 static:traceability MissingAutomatedTest CLI-CHECK-RUN-001
 f2 nix:x86_64-linux:core:unit-tests BuildFailed
-run r42 · details: bloomery check details f2 --run r42
+details: bloomery check details f2 --run r42
 built 12 · cached 4 · total 18
+```
+
+A successful full run with a completed health measurement is rendered as:
+
+```text
+✓ passed · 267 checks
+health report: bloomery check health --run r29118-18e09712a4059892-0
+built 0 · cached 142 · total 142
 ```
 
 Report selected-check outcome counts and the write-mode `format:workspace`
 outcome separately from the total number of failure records: one static check
-may produce many diagnostics. Omitted failures have a count and continuation
-offset; `check failures` retrieves subsequent pages. Identify whether the run
-used write or no-write mode in the summary and retained result. Report the
-health-baseline path when a selected write-mode health check refreshes it. Notices
-(such as legacy integration exclusions) are bounded too and cannot silently
-consume the failure page. Details are described in [retained runs](details.md).
+may produce many diagnostics. Show the failure-record total only when it is
+nonzero. Omitted failures have a count and continuation offset; `check failures`
+retrieves subsequent pages. Retain the run mode in the run record and identify
+no-write mode in the summary. Notices (such as legacy integration exclusions)
+are bounded too and cannot silently consume the failure page. Details are
+described in [retained runs](details.md).
 
 ## JSON
 

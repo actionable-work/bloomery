@@ -13,14 +13,10 @@ action = "print each selected package with its system, status, and realized outp
 
 [[requirements]]
 id = "CLI-BUILD-OUTPUT-002"
-title = "Human output summarizes outcomes"
+title = "Human output summarizes nonzero package outcomes"
 manual = false
 design = "design/execution.md#output"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "bloomery build"
-action = "report a summary count of passed and failed packages"
+ears = { type = "ubiquitous", system = "bloomery build", action = "report the package total on success or passed and failed counts on failure, omitting zero-valued counts" }
 
 [[requirements]]
 id = "CLI-BUILD-OUTPUT-003"

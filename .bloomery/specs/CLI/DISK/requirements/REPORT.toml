@@ -77,3 +77,17 @@ design = "design/report.md#rendering"
 type = "ubiquitous"
 system = "bloomery disk"
 action = "report the runtime and build byte totals distinctly in both summary and tree output"
+
+[[requirements]]
+id = "CLI-DISK-REPORT-008"
+title = "Human totals use one size representation"
+manual = false
+design = "design/report.md#rendering"
+ears = { type = "ubiquitous", system = "bloomery disk", action = "render exact byte totals in JSON and binary units in human output without repeating the byte count" }
+
+[[requirements]]
+id = "CLI-DISK-REPORT-009"
+title = "Empty unmeasured status is omitted"
+manual = false
+design = "design/report.md#rendering"
+ears = { type = "event", trigger = "all derivations were measured", system = "bloomery disk", action = "omit an unmeasured-derivation count from human output" }

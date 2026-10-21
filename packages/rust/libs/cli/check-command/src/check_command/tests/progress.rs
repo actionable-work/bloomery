@@ -109,6 +109,8 @@ fn eligible_execution_writes_changing_metrics_to_stderr_and_final_metrics_to_std
 
 #[test]
 #[cfg_attr(any(), bloomery("CLI-CHECK-PROGRESS-008"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-014"))]
+#[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-014"))]
 fn no_write_progress_counts_implicit_treefmt_without_a_preflight_unit() {
     let (root, cache) = fixture(true);
     let backend = FakeNix {
@@ -135,7 +137,8 @@ fn no_write_progress_counts_implicit_treefmt_without_a_preflight_unit() {
     );
     assert!(stderr.contains("checks 2/2 complete"), "{stderr:?}");
     let stdout = stdio_text(&stdout);
-    assert!(stdout.contains("mode: no-write"), "{stdout:?}");
+    assert!(stdout.contains("· no-write"), "{stdout:?}");
+    assert!(!stdout.contains("mode:"), "{stdout:?}");
     assert!(!stdout.contains("format:workspace"));
     let _ = std::fs::remove_dir_all(root);
     let _ = std::fs::remove_dir_all(cache);

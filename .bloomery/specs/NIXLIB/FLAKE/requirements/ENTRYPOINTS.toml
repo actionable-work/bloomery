@@ -279,3 +279,10 @@ design = "design/entry-points.md#bloomery-cli-injection"
 type = "ubiquitous"
 system = "the Bloomery flake"
 action = "export a bloomery-wrapped package that makes the CLI's hard runtime tool dependencies, currently cargo, available on the executable's runtime PATH"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-026"
+title = "Root check outputs expose each derivation once"
+manual = false
+design = "design/entry-points.md#extraoutputs"
+ears = { type = "ubiquitous", system = "the Bloomery root flake", action = "expose each workspace or repository check derivation under only one checks attribute name per system" }

@@ -8,8 +8,7 @@
   docsPackage,
   system,
   root ? ../..,
-}:
-{
+}: {
   "core:check-command-catalog" = import ./check-command-catalog.test.nix {inherit pkgs lib system;};
   "core:unit-tests" = import ./unit-tests.nix {inherit bloomery;};
   "core:proc-macro-crate-type" = import ./proc-macro-crate-type.nix {inherit pkgs workspace;};
@@ -28,4 +27,3 @@
   "core:benchmarks-report" = import ./benchmarks-report.nix {inherit pkgs root;};
   "core:benchmarks-snapshot" = import ./benchmarks-snapshot.nix {inherit pkgs root;};
 }
-// (import ./workspace.nix {inherit lib workspace;})

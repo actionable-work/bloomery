@@ -133,3 +133,31 @@ design = "design/details.md#failures"
 type = "ubiquitous"
 system = "bloomery check"
 action = "represent blocked checks through outcome counts and causal links rather than duplicate failure records"
+
+[[requirements]]
+id = "CLI-CHECK-OUTPUT-013"
+title = "Successful summaries omit zero failure totals"
+manual = false
+design = "design/diagnostics.md#bounded-summary"
+ears = { type = "event", trigger = "all selected checks pass and no failure records are retained", system = "bloomery check", action = "omit a zero-valued failure-record count from the human summary" }
+
+[[requirements]]
+id = "CLI-CHECK-OUTPUT-014"
+title = "Write mode is implicit in summaries"
+manual = false
+design = "design/diagnostics.md#bounded-summary"
+ears = { type = "unwanted_behavior", trigger = "a check completes in write mode", system = "bloomery check", action = "print a mode label in the human summary" }
+
+[[requirements]]
+id = "CLI-CHECK-OUTPUT-015"
+title = "Health summary shows report command only"
+manual = false
+design = "design/diagnostics.md#bounded-summary"
+ears = { type = "event", trigger = "a run retains a health report", system = "bloomery check", action = "show one run-specific health retrieval command and omit baseline-refresh notices and paths from the summary" }
+
+[[requirements]]
+id = "CLI-CHECK-OUTPUT-016"
+title = "Successful summaries report checks once"
+manual = false
+design = "design/diagnostics.md#bounded-summary"
+ears = { type = "event", trigger = "the check run status is passed", system = "bloomery check", action = "report the passed status followed by the check count without repeating the passed label" }

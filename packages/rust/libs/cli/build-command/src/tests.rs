@@ -593,6 +593,7 @@ fn build_executes_without_a_specification_tree() {
 #[test]
 #[cfg_attr(any(), bloomery("CLI-BUILD-OUTPUT-001"))]
 #[cfg_attr(any(), bloomery("CLI-BUILD-OUTPUT-002"))]
+#[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-014"))]
 fn human_report_lists_output_paths() {
     let backend = passed_backend(&["app"]);
     let root = flake_root();
@@ -601,7 +602,7 @@ fn human_report_lists_output_paths() {
     let status = run_at_with(
         default_args(),
         false,
-        ColorMode::Auto,
+        ColorMode::Never,
         &root,
         &backend,
         &FakeGate::default(),
@@ -612,7 +613,60 @@ fn human_report_lists_output_paths() {
     let text = String::from_utf8(stdout).expect("stdout");
     assert!(text.contains("app"), "{text}");
     assert!(text.contains("/nix/store/app"), "{text}");
-    assert!(text.contains("1 passed"), "{text}");
+    assert_eq!(text.trim_end().lines().last(), Some("✓ passed · 1 package"));
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-BUILD-OUTPUT-002"))]
+#[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-014"))]
+fn human_build_summary_omits_zero_outcome_counts() {
+    let mut backend = passed_backend(&["app"]);
+    backend
+        .realization
+        .failed
+        .insert(drv("app"), "build failed".to_owned());
+    let root = flake_root();
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_at_with(
+        default_args(),
+        false,
+        ColorMode::Never,
+        &root,
+        &backend,
+        &FakeGate::default(),
+        &mut stdout,
+        &mut stderr,
+    );
+    assert_eq!(status, std::process::ExitCode::FAILURE);
+    let text = String::from_utf8(stdout).expect("human output");
+    assert_eq!(text.trim_end().lines().last(), Some("✗ failed · 1 failed"));
+    assert!(!text.contains("0 passed"), "{text}");
+
+    let mut backend = passed_backend(&["passed", "failed"]);
+    backend
+        .realization
+        .failed
+        .insert(drv("failed"), "build failed".to_owned());
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_at_with(
+        default_args(),
+        false,
+        ColorMode::Never,
+        &root,
+        &backend,
+        &FakeGate::default(),
+        &mut stdout,
+        &mut stderr,
+    );
+    assert_eq!(status, std::process::ExitCode::FAILURE);
+    let text = String::from_utf8(stdout).expect("human output");
+    assert_eq!(
+        text.trim_end().lines().last(),
+        Some("✗ failed · 1 passed · 1 failed")
+    );
+    let _ = std::fs::remove_dir_all(root);
 }
 
 #[test]

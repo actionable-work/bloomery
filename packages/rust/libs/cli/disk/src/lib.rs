@@ -293,11 +293,7 @@ fn deduplicate(values: &[String]) -> Vec<String> {
 
 /// Render a concise size summary for a terminal.
 pub fn render_summary(report: &DiskReport) -> String {
-    let mut output = format!(
-        "Disk use: {} ({} bytes)\n",
-        format_bytes(report.bytes),
-        report.bytes
-    );
+    let mut output = format!("Disk use: {}\n", format_bytes(report.bytes));
     if let Some(derivation) = &report.derivation {
         output.push_str(&format!("Derivation: {derivation}\n"));
     }
@@ -314,9 +310,7 @@ pub fn render_summary(report: &DiskReport) -> String {
             format_bytes(category.bytes)
         ));
     }
-    if report.unmeasured.is_empty() {
-        output.push_str("Unmeasured derivations: none\n");
-    } else {
+    if !report.unmeasured.is_empty() {
         output.push_str(&format!(
             "Unmeasured derivations: {}\n",
             report.unmeasured.len()
@@ -335,11 +329,7 @@ fn category_label(category: &str) -> &str {
 
 /// Render a report for a terminal as an indented category tree.
 pub fn render_text(report: &DiskReport) -> String {
-    let mut output = format!(
-        "Disk use: {} ({} bytes)\n",
-        format_bytes(report.bytes),
-        report.bytes
-    );
+    let mut output = format!("Disk use: {}\n", format_bytes(report.bytes));
     if let Some(derivation) = &report.derivation {
         output.push_str(&format!("Derivation: {derivation}\n"));
     }
@@ -1116,6 +1106,9 @@ mod tests {
     #[test]
     #[cfg_attr(any(), bloomery("CLI-DISK-MEASUREMENT-009"))]
     #[cfg_attr(any(), bloomery("CLI-DISK-MEASUREMENT-010"))]
+    #[cfg_attr(any(), bloomery("CLI-DISK-REPORT-008"))]
+    #[cfg_attr(any(), bloomery("CLI-DISK-REPORT-009"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-014"))]
     fn disk_renders_binary_units_and_integer_json_bytes() {
         assert_eq!(format_bytes(0), "0 B");
         assert_eq!(format_bytes(1536), "1.5 KiB");
@@ -1129,8 +1122,14 @@ mod tests {
             categories: Vec::new(),
         };
         let text = render_text(&report);
-        assert!(text.contains("Disk use: 1.5 KiB (1536 bytes)"));
+        assert!(text.contains("Disk use: 1.5 KiB"));
+        assert!(!text.contains("1536 bytes"));
         assert!(text.contains("Systems: x86_64-linux"));
+
+        let summary = render_summary(&report);
+        assert!(summary.contains("Disk use: 1.5 KiB"));
+        assert!(!summary.contains("1536 bytes"));
+        assert!(!summary.contains("Unmeasured derivations"));
 
         let value = serde_json::to_value(&report).expect("JSON");
         assert!(value["bytes"].is_u64());
@@ -1180,6 +1179,9 @@ mod tests {
     #[test]
     #[cfg_attr(any(), bloomery("CLI-DISK-REPORT-006"))]
     #[cfg_attr(any(), bloomery("CLI-DISK-REPORT-007"))]
+    #[cfg_attr(any(), bloomery("CLI-DISK-REPORT-008"))]
+    #[cfg_attr(any(), bloomery("CLI-DISK-REPORT-009"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-014"))]
     fn disk_renders_a_size_summary_without_the_tree() {
         let report = DiskReport {
             bytes: 1536,
@@ -1197,7 +1199,8 @@ mod tests {
             }],
         };
         let text = render_summary(&report);
-        assert!(text.contains("Disk use: 1.5 KiB (1536 bytes)"));
+        assert!(text.contains("Disk use: 1.5 KiB"));
+        assert!(!text.contains("1536 bytes"));
         assert!(text.contains("Systems: x86_64-linux"));
         assert!(text.contains("Runtime: 1.5 KiB"));
         assert!(text.contains("Unmeasured derivations: 1"));

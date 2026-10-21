@@ -172,7 +172,7 @@ impl OutcomeStatus {
         if detail.is_empty() {
             prefix
         } else {
-            format!("{prefix} {detail}")
+            format!("{prefix} · {detail}")
         }
     }
 }
@@ -814,7 +814,7 @@ mod tests {
         assert_eq!(OutcomeStatus::Skipped.label(), "skipped");
         assert_eq!(
             OutcomeStatus::Passed.render("28 passed", false),
-            "✓ passed 28 passed"
+            "✓ passed · 28 passed"
         );
     }
 
@@ -1158,7 +1158,10 @@ mod tests {
             field("Run", "r42", false),
             OutcomeStatus::Passed.render("28 passed", false),
         ]);
-        assert_eq!(plain, "bloomery check\n\nRun: r42\n\n✓ passed 28 passed\n");
+        assert_eq!(
+            plain,
+            "bloomery check\n\nRun: r42\n\n✓ passed · 28 passed\n"
+        );
 
         let styled = join_sections(&[
             heading("bloomery check", true),

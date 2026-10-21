@@ -73,7 +73,8 @@ without specification passes.
   formatter failure prevents execution.
 - Display check completion and deduplicated Nix work metrics only on user
   terminals.
-- Report bounded failure summaries in human and JSON formats.
+- Report concise, bounded failure summaries and retrieval pages in human and
+  JSON formats.
 - Retain immutable results and logs for paginated retrieval without rerunning.
 - Leave write-mode formatter changes in the workspace and leave repository
   lockfiles unchanged.

@@ -649,16 +649,26 @@ fn write_text_report(
         };
         writeln!(stdout, "{}", status.render(&summary, styled))?;
     }
-    let overall = if failed == 0 {
-        OutcomeStatus::Passed
-    } else {
-        OutcomeStatus::Failed
+    let overall = match report.status {
+        BuildStatus::Passed => OutcomeStatus::Passed,
+        BuildStatus::Failed | BuildStatus::Error => OutcomeStatus::Failed,
+        BuildStatus::Interrupted => OutcomeStatus::Skipped,
     };
-    writeln!(
-        stdout,
-        "{}",
-        overall.render(&format!("build {passed} passed, {failed} failed"), styled)
-    )?;
+    let summary = if report.status == BuildStatus::Passed {
+        format!(
+            "{} package{}",
+            report.packages.len(),
+            if report.packages.len() == 1 { "" } else { "s" }
+        )
+    } else {
+        [("passed", passed), ("failed", failed)]
+            .into_iter()
+            .filter(|(_, count)| *count > 0)
+            .map(|(label, count)| format!("{count} {label}"))
+            .collect::<Vec<_>>()
+            .join(" · ")
+    };
+    writeln!(stdout, "{}", overall.render(&summary, styled))?;
     stdout.flush()
 }
 
