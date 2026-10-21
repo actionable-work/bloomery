@@ -23,6 +23,12 @@ in {
       devPackages = cfg.createDevPackages;
       workspaceDependencies = cfg.checks.workspaceDependencies;
       noDefaultFeatures = cfg.checks.noDefaultFeatures;
+      vulnerabilitiesEnabled = cfg.checks.vulnerabilities.enable;
+      vulnerabilitiesIgnore = cfg.checks.vulnerabilities.ignoreAdvisories;
+      informationalDefault = cfg.checks.vulnerabilities.informational.unknown;
+      bansEnabled = cfg.checks.bans.enable;
+      licensesEnabled = cfg.checks.licenses.enable;
+      licenseOverrides = cfg.checks.licenses.overrides;
     };
     expected = {
       hasRoot = true;
@@ -41,6 +47,12 @@ in {
       devPackages = false;
       workspaceDependencies = false;
       noDefaultFeatures = false;
+      vulnerabilitiesEnabled = false;
+      vulnerabilitiesIgnore = [];
+      informationalDefault = "warn";
+      bansEnabled = false;
+      licensesEnabled = false;
+      licenseOverrides = {};
     };
   };
 
@@ -58,6 +70,29 @@ in {
     expected = {
       workspaceDependencies = false;
       noDefaultFeatures = false;
+    };
+  };
+
+  testDependencyPolicyOptions = {
+    expr = let
+      cfg = options.evalWorkspaceOptions {
+        root = ./.;
+        checks.vulnerabilities.enable = true;
+        checks.vulnerabilities.informational.notice = "deny";
+        checks.bans.allow = ["serde"];
+        checks.licenses.overrides."old-crate" = "MIT";
+      };
+    in {
+      vulnerabilityEnabled = cfg.checks.vulnerabilities.enable;
+      noticeOutcome = cfg.checks.vulnerabilities.informational.notice;
+      banAllow = cfg.checks.bans.allow;
+      licenseOverride = cfg.checks.licenses.overrides."old-crate";
+    };
+    expected = {
+      vulnerabilityEnabled = true;
+      noticeOutcome = "deny";
+      banAllow = ["serde"];
+      licenseOverride = "MIT";
     };
   };
 

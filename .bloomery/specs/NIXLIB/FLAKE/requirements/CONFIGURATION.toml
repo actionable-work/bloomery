@@ -257,3 +257,38 @@ title = "Lock freshness control is exposed"
 manual = false
 design = "design/configuration.md#checks"
 ears = { type = "ubiquitous", system = "the build configuration", action = "accept checks.lockFreshness.enable as the stale-lock policy switch" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-025"
+title = "Vulnerability policy options are exposed"
+manual = false
+design = "design/configuration.md#checks"
+ears = { type = "ubiquitous", system = "the build configuration", action = "accept checks.vulnerabilities.enable and checks.vulnerabilities.ignoreAdvisories" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-026"
+title = "Informational advisory outcomes are configurable"
+manual = false
+design = "design/configuration.md#checks"
+ears = { type = "ubiquitous", system = "the build configuration", action = "accept warn, deny, or ignore outcomes for unmaintained, unsound, notice, and unknown advisory categories" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-027"
+title = "Package ban policy options are exposed"
+manual = false
+design = "design/configuration.md#checks"
+ears = { type = "ubiquitous", system = "the build configuration", action = "accept checks.bans.enable, allow, deny, and exceptions" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-028"
+title = "License policy options are exposed"
+manual = false
+design = "design/configuration.md#checks"
+ears = { type = "ubiquitous", system = "the build configuration", action = "accept checks.licenses.enable, allow, deny, and exceptions" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-029"
+title = "License overrides are keyed by package selector"
+manual = false
+design = "design/configuration.md#checks"
+ears = { type = "ubiquitous", system = "the build configuration", action = "accept an SPDX expression under checks.licenses.overrides for each package selector" }

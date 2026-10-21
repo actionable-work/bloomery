@@ -151,6 +151,12 @@
         description = "Path to the Rust workspace root directory (containing Cargo.toml).";
       };
 
+      rustsecAdvisoryDb = lib.mkOption {
+        type = types.nullOr types.path;
+        default = null;
+        description = "Pinned RustSec advisory database source tree supplied by the consuming flake.";
+      };
+
       # ── Source & Files ──────────────────────────────────────────────────────
       source = {
         cargoToml = lib.mkOption {
@@ -456,6 +462,85 @@
           type = types.bool;
           default = false;
           description = "Require every dependency consumed by a workspace member to disable default features.";
+        };
+        vulnerabilities = {
+          enable = lib.mkOption {
+            type = types.bool;
+            default = false;
+            description = "Generate per-member RustSec advisory checks.";
+          };
+          ignoreAdvisories = lib.mkOption {
+            type = types.listOf types.str;
+            default = [];
+            description = "RustSec advisory IDs ignored by vulnerability checks.";
+          };
+          informational = {
+            unmaintained = lib.mkOption {
+              type = types.enum ["warn" "deny" "ignore"];
+              default = "warn";
+            };
+            unsound = lib.mkOption {
+              type = types.enum ["warn" "deny" "ignore"];
+              default = "warn";
+            };
+            notice = lib.mkOption {
+              type = types.enum ["warn" "deny" "ignore"];
+              default = "warn";
+            };
+            unknown = lib.mkOption {
+              type = types.enum ["warn" "deny" "ignore"];
+              default = "warn";
+            };
+          };
+        };
+        bans = {
+          enable = lib.mkOption {
+            type = types.bool;
+            default = false;
+            description = "Generate per-member package ban checks.";
+          };
+          allow = lib.mkOption {
+            type = types.listOf types.str;
+            default = [];
+            description = "Package selectors allowed by the package ban check.";
+          };
+          deny = lib.mkOption {
+            type = types.listOf types.str;
+            default = [];
+            description = "Package selectors denied by the package ban check.";
+          };
+          exceptions = lib.mkOption {
+            type = types.listOf types.str;
+            default = [];
+            description = "Package selectors exempt from package ban rules.";
+          };
+        };
+        licenses = {
+          enable = lib.mkOption {
+            type = types.bool;
+            default = false;
+            description = "Generate per-member license compatibility checks.";
+          };
+          allow = lib.mkOption {
+            type = types.listOf types.str;
+            default = [];
+            description = "SPDX license IDs or license-with-exception pairs allowed by the license check.";
+          };
+          deny = lib.mkOption {
+            type = types.listOf types.str;
+            default = [];
+            description = "SPDX license IDs or license-with-exception pairs denied by the license check.";
+          };
+          exceptions = lib.mkOption {
+            type = types.listOf types.str;
+            default = [];
+            description = "Package selectors exempt from global license rules.";
+          };
+          overrides = lib.mkOption {
+            type = types.attrsOf types.str;
+            default = {};
+            description = "SPDX expression overrides keyed by package selector.";
+          };
         };
       };
 

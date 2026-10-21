@@ -3,6 +3,23 @@
   lib ? pkgs.lib,
 }: let
   builderExports = import ./default.nix {inherit pkgs lib;};
+  policyFinding = {
+    member = "app-0.1.0";
+    name = "serde";
+    version = "1.0.0";
+    kind = "vulnerability";
+    advisoryId = "RUSTSEC-2024-0001";
+    advisoryTitle = "fixture advisory";
+    pathText = "app (0.1.0) -> serde (1.0.0)";
+  };
+  policyWarning = builderExports.dependencyPolicyCheck {
+    name = "app-vulnerabilities-warning";
+    warnings = [(policyFinding // {outcome = "warn";})];
+  };
+  policyViolation = builderExports.dependencyPolicyCheck {
+    name = "app-vulnerabilities-denied";
+    violations = [policyFinding];
+  };
   pkg = {
     name = "proc-macro-fixture";
     version = "0.1.0";
@@ -20,7 +37,7 @@
       version = "0.1.0"
     '';
     source.bloomeryLock = builtins.toFile "proc-macro-builder-tests-bloomery.lock" ''
-      version = 1
+      version = 2
     '';
     checks.includePackageChecks = false;
     devShell.enable = false;
@@ -166,6 +183,23 @@
     prebuilt = prebuiltBin;
   };
 in {
+  testDependencyPolicyBuilderReportsFindingsWithoutCrateInputs = {
+    expr = {
+      warningHasMemberAndAdvisory = lib.hasInfix "app-0.1.0 policy finding: serde-1.0.0 RUSTSEC-2024-0001" policyWarning.passthru.policyBuildCommand;
+      warningHasExamplePath = lib.hasInfix "path: app (0.1.0) -> serde (1.0.0)" policyWarning.passthru.policyBuildCommand;
+      warningCanSucceed = lib.hasInfix "echo passed" policyWarning.passthru.policyBuildCommand;
+      deniedFindingFails = lib.hasInfix "exit 1" policyViolation.passthru.policyBuildCommand;
+      hasNoCargoOrCrateInputs = (policyWarning.nativeBuildInputs or []) == [] && (policyWarning.buildInputs or []) == [];
+    };
+    expected = {
+      warningHasMemberAndAdvisory = true;
+      warningHasExamplePath = true;
+      warningCanSucceed = true;
+      deniedFindingFails = true;
+      hasNoCargoOrCrateInputs = true;
+    };
+  };
+
   testProcMacroBuildersHandleMissingMetadata = {
     expr = let
       phases = phasesFor null;

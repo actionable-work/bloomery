@@ -86,24 +86,25 @@ separate from rejecting an invalid configuration file.
 
 ## Bloomery lock format and publication
 
-Emit the version-1 TOML contract consumed by the Nix builders:
+Emit the version-2 TOML contract consumed by the Nix builders:
 
-- Generated-file header and `version = 1`.
+- Generated-file header and `version = 2`.
 - `cargo-lock-hash`: SHA-256 of final `Cargo.lock`, normalizing CRLF to LF,
   matching the Nix lock validator.
 - A `packages` table keyed by `name-version`, covering resolved packages with
   their workspace-wide active features, activated dependencies, `proc-macro`,
-  and edition metadata.
+  edition metadata, and optional `license` and `license-file` metadata from
+  the final `cargo metadata` package records.
 - A `contexts` table keyed by workspace member. Each context maps every package
   in that member's fully-unified closure to its active features and activated
   dependencies.
 
-Global and context records capture only dependencies that Cargo activates, so the
-lock never carries optional, weak, or target-specific edges that Cargo would not
-build. Contexts do not depend on `build.unify`; toggling that setting leaves the
-lock valid and byte-identical on regeneration. Derive records from the final
-locked Cargo resolution using the existing Cargo invocation outputs, retaining
-the edition fallback (`2021`); no additional tool is required.
+Global and context records capture only dependencies that Cargo activates, so
+the lock never carries optional, weak, or target-specific edges that Cargo would
+not build. Contexts do not depend on `build.unify`; toggling that setting leaves
+the lock valid and byte-identical on regeneration. Derive graph edges and package
+license metadata from the same final locked Cargo metadata snapshot, retaining
+the edition fallback (`2021`). License metadata adds no Cargo invocation.
 
 Canonical output sorts package keys, context keys, feature names, and
 deduplicated dependency identifiers and correctly escapes TOML strings.

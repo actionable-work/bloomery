@@ -101,7 +101,9 @@ configurable but produce no references without a requirement model.
 The same file carries Nix build tables `[build]`, `[build.toolchain]`,
 `[build.profile.release]`, `[build.profile.dev]`, and `[build.flags]`, plus
 `[devShell]`, `[checks]`, `[features]`, and `[formatters]`, and the
-parameterized `[optimize]` family.
+parameterized `[optimize]` family. The `[checks]` table includes per-member
+vulnerability, license compatibility, and package-ban policies documented in
+the [schema catalog](schema-catalog.md#checks).
 Their semantics and evaluation-time resolution are owned by
 [NIXLIB/FLAKE](../../../NIXLIB/FLAKE/design/configuration.md). The CLI catalogs
 the same keys and validates their types and enum value sets during

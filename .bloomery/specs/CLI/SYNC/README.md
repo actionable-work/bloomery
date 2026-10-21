@@ -25,6 +25,7 @@ requirements define the CLI behavior.
 - Preserve existing Cargo dependency versions where possible during normal sync.
 - Offer explicit dependency updates through `--update[=nix,rust]`.
 - Generate a compatible `bloomery.lock` from the final Cargo resolution.
+- Record Cargo license expressions and license-file paths in `bloomery.lock`.
 - Report missing recommended keys using the raw configuration, not defaults.
 - Require `.bloomery/config.toml` and report a ConfigurationError when it is absent.
 - Replace Nix lock-app exposure and lock-repair guidance with the CLI workflow.

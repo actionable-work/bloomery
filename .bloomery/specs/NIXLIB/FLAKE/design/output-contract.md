@@ -46,8 +46,10 @@ package checks reuses the release crate and binary derivations.
 `workspace:lock` validates lock consistency, `workspace:dependencies`
 validates dependency inheritance, and `workspace:default-features` validates
 disabled default features; each manifest check follows its own check table's
-`enable` switch. Bloomery never generates a recursive `bloomery:check`
-output.
+`enable` switch. When enabled, dependency policies add per-member
+`<crate>:vulnerabilities`, `<crate>:licenses`, and `<crate>:bans` checks for the
+member's resolved dependency context. Bloomery never generates a recursive
+`bloomery:check` output.
 
 ## Derivation and metadata outputs
 

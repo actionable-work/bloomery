@@ -338,3 +338,10 @@ type = "event"
 trigger = "checks.crates.enable is enabled"
 system = "the workspace builder"
 action = "expose a <crate>:check entry for every workspace crate"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-030"
+title = "Enabled policy checks are generated per member"
+manual = false
+design = "design/output-contract.md#checks"
+ears = { type = "event", trigger = "a dependency policy is enabled and checks.enable is true", system = "the workspace builder", action = "expose a separate <member>:vulnerabilities, <member>:licenses, or <member>:bans check for each selected member and enabled policy" }

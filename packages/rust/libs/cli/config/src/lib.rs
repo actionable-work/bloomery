@@ -947,6 +947,7 @@ mod tests {
     #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-009"))]
     #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-010"))]
     #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-021"))]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-029"))]
     fn upgrade_adds_absent_recommended_keys_in_sorted_order() {
         let root = temp_root();
         seed(&root, "");
@@ -977,6 +978,9 @@ mod tests {
                 assert!(added.contains(&"checks.crates.enable".to_owned()));
                 assert!(added.contains(&"checks.specifications.enable".to_owned()));
                 assert!(added.contains(&"checks.clippySuppressions.enable".to_owned()));
+                assert!(added.contains(&"checks.bans.enable".to_owned()));
+                assert!(added.contains(&"checks.licenses.enable".to_owned()));
+                assert!(!added.contains(&"checks.vulnerabilities.enable".to_owned()));
                 assert!(added.contains(&"build.toolchain.rustc".to_owned()));
                 assert!(!added.contains(&"build.toolchain.linker".to_owned()));
             }
@@ -994,6 +998,14 @@ mod tests {
                     && after.contains("allow = []"))
         );
         assert!(after.contains("[checks.lockFreshness]\nenable = true"));
+        let config = toml::from_str::<toml::Value>(&after).expect("upgraded TOML");
+        assert!(
+            config
+                .get("checks")
+                .and_then(|checks| checks.get("vulnerabilities"))
+                .and_then(|vulnerabilities| vulnerabilities.get("enable"))
+                .is_none()
+        );
         let _ = fs::remove_dir_all(root);
     }
 

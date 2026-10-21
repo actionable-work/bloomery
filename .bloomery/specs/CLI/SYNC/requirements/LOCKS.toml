@@ -38,14 +38,10 @@ action = "invoke nix flake update in the workspace root"
 
 [[requirements]]
 id = "CLI-SYNC-LOCKS-004"
-title = "Every successful sync generates a version-1 Bloomery lock"
+title = "Every successful sync generates a version-2 Bloomery lock"
 manual = false
 design = "design/sync.md#bloomery-lock-format-and-publication"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "bloomery sync"
-action = "generate a version-1 bloomery.lock on every successful invocation"
+ears = { type = "ubiquitous", system = "bloomery sync", action = "generate a version-2 bloomery.lock on every successful invocation" }
 
 [[requirements]]
 id = "CLI-SYNC-LOCKS-005"
@@ -520,3 +516,10 @@ design = "design/sync.md#bloomery-lock-format-and-publication"
 type = "ubiquitous"
 system = "the Bloomery lock generator"
 action = "produce records that do not encode build.unify so toggling that setting leaves the lock valid and byte-identical"
+
+[[requirements]]
+id = "CLI-SYNC-LOCKS-047"
+title = "Lock package records preserve Cargo license metadata"
+manual = false
+design = "design/sync.md#bloomery-lock-format-and-publication"
+ears = { type = "ubiquitous", system = "the Bloomery lock generator", action = "record each package's optional license expression and license-file path from the final Cargo metadata snapshot" }
