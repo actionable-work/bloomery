@@ -37,18 +37,27 @@ enable = true # Enable the inline Clippy suppression policy check.
 
 [checks.codeHealth]
 baseline = ".bloomery/code-health-summary.json" # Repository-relative reviewed code health snapshot.
+crateSlocLimit = 1500                           # Soft per-crate production SLOC limit used by code health scoring.
 cyclomaticLimit = 10                            # Soft cyclomatic complexity limit used by code health scoring.
 duplicateMinTokens = 64                         # Minimum exact token window considered a duplicate (at least 16).
 duplicationFreeRatio = 0.02                     # Duplicate body-token fraction without a scoring penalty (0–1).
 enable = true                                   # Enable the source-based code health check.
 functionTokensLimit = 250                       # Soft callable body token limit used by code health scoring.
+maxCrateSloc = 5000                             # Hard per-crate production SLOC limit.
 maxCyclomatic = 40                              # Hard per-callable cyclomatic complexity limit.
 maxFunctionTokens = 1000                        # Hard per-callable body token limit.
 maxNesting = 8                                  # Hard per-callable branch nesting limit.
-maxRegression = 0.5                             # Maximum allowed decrease from a reviewed score (0–100 points).
+maxRegression = 2                               # Maximum allowed decrease from a reviewed score (0–100 points).
 minCrateScore = 80                              # Minimum passing code health score for each crate (0–100).
 minWorkspaceScore = 80                          # Minimum passing aggregate code health score (0–100).
 nestingLimit = 4                                # Soft branch nesting limit used by code health scoring.
+
+[checks.codeHealth.weights]
+complexity = 25  # Relative weight for cyclomatic complexity.
+crateSize = 30   # Relative weight for production SLOC per crate.
+duplication = 15 # Relative weight for duplicated code.
+nesting = 10     # Relative weight for branch nesting.
+size = 20        # Relative weight for callable body size.
 
 [checks.crates]
 enable = true # Generate per-crate type-check entries.

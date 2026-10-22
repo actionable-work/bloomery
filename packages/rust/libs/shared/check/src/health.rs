@@ -9,6 +9,7 @@ pub struct Penalties {
     pub size: f64,
     pub nesting: f64,
     pub duplication: f64,
+    pub crate_size: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -36,44 +37,53 @@ pub fn score_crate(metrics: &HealthCrateMetrics, policy: &HealthConfig) -> Crate
             values.into_iter().sum::<f64>() / callable_count as f64
         }
     };
-    let complexity = mean(
+    let complexity_rate = mean(
         metrics
             .callables
             .iter()
             .map(|callable| excess(callable.cyclomatic, policy.cyclomatic_limit))
             .collect(),
-    ) * 40.0;
-    let size = mean(
+    );
+    let size_rate = mean(
         metrics
             .callables
             .iter()
             .map(|callable| excess(callable.body_tokens.len(), policy.function_tokens_limit))
             .collect(),
-    ) * 25.0;
-    let nesting = mean(
+    );
+    let nesting_rate = mean(
         metrics
             .callables
             .iter()
             .map(|callable| excess(callable.nesting, policy.nesting_limit))
             .collect(),
-    ) * 10.0;
+    );
     let duplication_fraction = if metrics.callable_tokens == 0 {
         0.0
     } else {
         metrics.duplicate_tokens as f64 / metrics.callable_tokens as f64
     };
-    let duplication = 25.0
-        * ((duplication_fraction - policy.duplication_free_ratio)
-            / (1.0 - policy.duplication_free_ratio))
-            .clamp(0.0, 1.0);
+    let duplication_rate = ((duplication_fraction - policy.duplication_free_ratio)
+        / (1.0 - policy.duplication_free_ratio))
+        .clamp(0.0, 1.0);
+    let crate_size_rate = excess(metrics.sloc, policy.crate_sloc_limit);
+    let weight_sum = policy.weights.total() as f64;
+    let weighted_penalty = |weight: u16, rate: f64| 100.0 * (f64::from(weight) / weight_sum) * rate;
+    let complexity = weighted_penalty(policy.weights.complexity, complexity_rate);
+    let size = weighted_penalty(policy.weights.size, size_rate);
+    let nesting = weighted_penalty(policy.weights.nesting, nesting_rate);
+    let duplication = weighted_penalty(policy.weights.duplication, duplication_rate);
+    let crate_size = weighted_penalty(policy.weights.crate_size, crate_size_rate);
     let penalties = Penalties {
         complexity,
         size,
         nesting,
         duplication,
+        crate_size,
     };
     let score_hundredths = (metrics.sloc > 0).then(|| {
-        let score = (100.0 - complexity - size - nesting - duplication).clamp(0.0, 100.0);
+        let score =
+            (100.0 - complexity - size - nesting - duplication - crate_size).clamp(0.0, 100.0);
         (score * 100.0 + 0.5).floor() as u16
     });
     CrateScore {
@@ -122,6 +132,7 @@ pub fn policy_gates(
 ) -> Vec<HealthGate> {
     let mut failures = Vec::new();
     for (metrics, score) in crates.iter().zip(scores) {
+        let hard_limits = policy.hard_limits_for_crate(&metrics.manifest_path);
         if let Some(score_value) = score.score_hundredths
             && score_value < policy.min_crate_score
         {
@@ -137,15 +148,31 @@ pub fn policy_gates(
                 line: None,
             });
         }
+        if metrics.sloc > hard_limits.max_crate_sloc {
+            failures.push(HealthGate {
+                code: "HealthCrateSizeLimitExceeded".to_owned(),
+                message: format!(
+                    "production SLOC {} exceeds configured maxCrateSloc {}",
+                    metrics.sloc, hard_limits.max_crate_sloc,
+                ),
+                subject: Some(metrics.manifest_path.clone()),
+                path: None,
+                line: None,
+            });
+        }
         for callable in &metrics.callables {
             let limits = [
-                ("maxCyclomatic", callable.cyclomatic, policy.max_cyclomatic),
+                (
+                    "maxCyclomatic",
+                    callable.cyclomatic,
+                    hard_limits.max_cyclomatic,
+                ),
                 (
                     "maxFunctionTokens",
                     callable.body_tokens.len(),
-                    policy.max_function_tokens,
+                    hard_limits.max_function_tokens,
                 ),
-                ("maxNesting", callable.nesting, policy.max_nesting),
+                ("maxNesting", callable.nesting, hard_limits.max_nesting),
             ];
             for (name, measured, limit) in limits {
                 if measured > limit {
@@ -227,8 +254,8 @@ mod tests {
         let policy = HealthConfig::default();
         let metrics = crate_metrics("a/Cargo.toml", 10, &[10, 11]);
         let score = score_crate(&metrics, &policy);
-        assert_eq!(score.penalties.complexity, 2.0);
-        assert_eq!(score.score_hundredths, Some(9_800));
+        assert_eq!(score.penalties.complexity, 1.25);
+        assert_eq!(score.score_hundredths, Some(9_875));
     }
 
     #[test]
@@ -247,7 +274,7 @@ mod tests {
             .map(|item| score_crate(item, &policy))
             .collect::<Vec<_>>();
         assert_eq!(scores[2].score_hundredths, None);
-        assert_eq!(workspace_score(&crates, &scores), Some(9_600));
+        assert_eq!(workspace_score(&crates, &scores), Some(9_750));
         assert_eq!(workspace_score(&[], &[]), None);
     }
 
@@ -280,7 +307,7 @@ mod tests {
         ];
         metrics.callable_tokens = 2;
         let score = score_crate(&metrics, &policy);
-        assert_eq!(score.penalties.size, 25.0);
+        assert_eq!(score.penalties.size, 20.0);
         let gates = policy_gates(
             &[metrics],
             &[score],
@@ -304,6 +331,94 @@ mod tests {
                 .count(),
             3,
             "cyclomatic, token count, and nesting have separate hard gates"
+        );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-004"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-040"))]
+    fn configured_weights_control_the_crate_size_deduction() {
+        let mut policy = HealthConfig::default();
+        policy.weights = bloomery_model::health::HealthWeights {
+            complexity: 4_000,
+            size: 0,
+            nesting: 0,
+            duplication: 0,
+            crate_size: 6_000,
+        };
+        let metrics = crate_metrics("large/Cargo.toml", 2_250, &[15]);
+        let score = score_crate(&metrics, &policy);
+        assert_eq!(score.penalties.crate_size, 30.0);
+        assert_eq!(score.penalties.complexity, 20.0);
+        assert_eq!(score.score_hundredths, Some(5_000));
+        let small = crate_metrics("small/Cargo.toml", 750, &[]);
+        let small_score = score_crate(&small, &policy);
+        assert_eq!(
+            workspace_score(&[metrics, small], &[score, small_score]),
+            Some(6_250)
+        );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-041"))]
+    fn crate_size_hard_limit_is_independent_of_score_floors() {
+        let mut policy = HealthConfig::default();
+        policy.min_crate_score = 0;
+        policy.min_workspace_score = 0;
+        policy.max_crate_sloc = 2_000;
+        let metrics = crate_metrics("large/Cargo.toml", 2_001, &[]);
+        let score = score_crate(&metrics, &policy);
+        let gates = policy_gates(&[metrics], &[score], Some(10_000), &policy);
+        assert_eq!(gates.len(), 1);
+        assert_eq!(gates[0].code, "HealthCrateSizeLimitExceeded");
+        assert!(gates[0].message.contains("2001"));
+        assert!(gates[0].message.contains("2000"));
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-044"))]
+    fn crate_exceptions_change_hard_gates_for_only_the_matching_manifest() {
+        use std::collections::BTreeMap;
+
+        use bloomery_model::health::HealthLimitOverrides;
+
+        let mut policy = HealthConfig {
+            min_crate_score: 0,
+            min_workspace_score: 0,
+            ..HealthConfig::default()
+        };
+        policy.crate_exceptions = BTreeMap::from([(
+            "overridden/Cargo.toml".to_owned(),
+            HealthLimitOverrides {
+                max_cyclomatic: Some(50),
+                max_crate_sloc: Some(6_000),
+                ..HealthLimitOverrides::default()
+            },
+        )]);
+        let overridden = crate_metrics("overridden/Cargo.toml", 5_001, &[41]);
+        let other = crate_metrics("other/Cargo.toml", 5_001, &[41]);
+        let scores = [
+            score_crate(&overridden, &policy),
+            score_crate(&other, &policy),
+        ];
+        let gates = policy_gates(&[overridden, other], &scores, Some(10_000), &policy);
+
+        assert_eq!(gates.len(), 2);
+        assert!(
+            gates
+                .iter()
+                .all(|gate| gate.subject.as_deref() == Some("other/Cargo.toml")
+                    || gate.subject.as_deref() == Some("other/Cargo.toml::f0"))
+        );
+        assert!(
+            gates
+                .iter()
+                .any(|gate| gate.code == "HealthCrateSizeLimitExceeded")
+        );
+        assert!(
+            gates
+                .iter()
+                .any(|gate| gate.code == "HealthCallableLimitExceeded")
         );
     }
 }

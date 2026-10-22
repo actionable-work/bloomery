@@ -81,8 +81,10 @@ without specification passes.
 - Share Rust ingestion between health and traceability without coupling outcomes.
 - Check inline Clippy lint suppressions against configured exceptions.
 - Warn through tracing when a supported check-control key is absent.
-- Retain explainable crate scores and a SLOC-weighted workspace score.
-- Apply configurable health limits and baseline regression gates.
+- Score production SLOC per crate to reward smaller crates and preserve a
+  SLOC-weighted workspace score.
+- Apply configurable health component weights, limits, and baseline regression
+  gates.
 - Refresh the health baseline after each complete selected health measurement
   in write mode, including after check failures; preserve it in no-write mode
   and retrieval commands.

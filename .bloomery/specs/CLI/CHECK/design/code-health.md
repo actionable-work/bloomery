@@ -22,10 +22,12 @@ task slots, including with `--jobs 1`.
 Inline Clippy suppression policy is a separate static check described in
 [Clippy suppressions](clippy-suppressions.md). It does not affect health scores.
 
-The health index summarizes source maintainability. Existing Clippy checks
-remain independent gates. Coverage, compiler diagnostics, unsafe frequency,
-binary size, and dependency cycles contribute no score: the index has no
-compiler, runtime, or artifact inputs and makes no safety or correctness claim.
+The health index summarizes source maintainability and crate modularity.
+Production SLOC per crate is a proxy for small compilation units; it does not
+measure build times. Existing Clippy checks remain independent gates. Coverage,
+compiler diagnostics, unsafe frequency, binary size, and dependency cycles
+contribute no score: the index has no compiler, runtime, or artifact inputs and
+makes no safety or correctness claim.
 
 ## Metrics and score
 
@@ -38,15 +40,29 @@ locations. Empty bodies still constitute callables.
 
 For metric value `x` and its positive soft limit `t`, define
 `excess(x,t) = min(1, max(0, (x-t)/t))`. For `F` callables and duplicate fraction
-`d`, the four penalties are:
+`d`, plus crate production SLOC `s`, the five normalized penalty rates are:
 
 ```text
-complexity = 40 × mean(excess(cyclomatic, cyclomaticLimit))
-size       = 25 × mean(excess(body_tokens, functionTokensLimit))
-nesting    = 10 × mean(excess(nesting, nestingLimit))
-duplicates = 25 × min(1, max(0, (d-duplicationFreeRatio)/(1-duplicationFreeRatio)))
-score      = max(0, 100-complexity-size-nesting-duplicates)
+complexityRate = mean(excess(cyclomatic, cyclomaticLimit))
+sizeRate       = mean(excess(body_tokens, functionTokensLimit))
+nestingRate    = mean(excess(nesting, nestingLimit))
+duplicateRate  = min(1, max(0, (d-duplicationFreeRatio)/(1-duplicationFreeRatio)))
+crateSizeRate  = excess(s, crateSlocLimit)
 ```
+
+The effective relative weights are `complexity`, `size`, `nesting`,
+`duplication`, and `crateSize`, defaulting to 25, 20, 10, 15, and 30. For their
+sum `W`, calculate each deduction as `100 × weight / W × penaltyRate`; the score
+is the greater of zero and 100 minus the five deductions. Weight values are
+finite numbers from 0 through 100 with at most two decimal places. Any component
+may have weight zero, but the effective weights must have a positive sum.
+Omitted component keys retain their defaults, so a partial table is valid.
+These relative weights apply uniformly to every selected crate; the workspace
+score and subscores remain the production-SLOC-weighted means of applicable
+crate results. A crate above `crateSlocLimit` incurs a crate-size deduction,
+which makes splitting a large crate into smaller crates improve the workspace
+score. Score arithmetic uses the exact weight ratios and rounds persisted scores
+once to integer hundredths, nearest with ties upward.
 
 An empty callable population has zero mean penalties. A crate with zero
 production SLOC has score `null`, status `not_applicable`, and zero aggregate
@@ -57,22 +73,25 @@ and health passes as `not_applicable` without requiring a baseline. There is
 no separate cross-crate penalty: cross-crate duplicates already contribute to
 each affected crate's duplicate fraction.
 
-Use deterministic arithmetic in algorithm version 1 and snapshot schema version
-2. Persist score values
+Use deterministic arithmetic in algorithm version 2 and snapshot schema version
+4. Persist score values
 in integer hundredths of a point, round once using nearest with ties upward,
 and compare those values for all gates and deltas. Workspace weighting uses
 the persisted crate values. Display two decimal places. Persist raw metrics,
-soft limits, and each penalty so a score can be explained and reproduced.
-Fixed weights and metric semantics belong to the algorithm version; thresholds
-are configurable, weights are not.
+soft limits, effective weights, and each weighted penalty so a score can be
+explained and reproduced. Thresholds and relative weights are configurable.
 
 ## Policy gates
 
 An applicable crate fails below `minCrateScore`; the applicable workspace fails
-below `minWorkspaceScore`. Any callable above `maxCyclomatic`,
-`maxFunctionTokens`, or `maxNesting` fails even when its crate score passes.
-Equality passes. Record each exceeded limit with its measured value, limit,
-crate identity, and source span when applicable.
+below `minWorkspaceScore`. Any crate above its effective `maxCrateSloc` and any
+callable above its effective `maxCyclomatic`, `maxFunctionTokens`, or
+`maxNesting` fails even when its score passes. A crate exception overrides only
+the hard limits it names for the exact workspace-relative `Cargo.toml` path;
+omitted limits and all other crates use the global values. An exception path
+that does not identify a selected workspace crate is a configuration error.
+Equality passes. Record each exceeded limit with its measured value, effective
+limit, crate identity, and source span when applicable.
 
 Compare each matching applicable crate and the workspace against the baseline.
 A decrease greater than `maxRegression` points fails; improvements and equality
@@ -82,11 +101,13 @@ as removed. Changes to applicability have nullable deltas. Crate identity is
 the repository-relative manifest path, with package name as a display field;
 renames at the same path retain identity.
 
-Missing, malformed, unsupported, or policy-incompatible baselines fail health
-with actionable diagnostics after measurement; they never erase a valid current
-report. Compatibility requires matching snapshot schema, algorithm version,
-effective scoring limits, duplicate window size, and source-selection policy
-(manifest location and configured member selection). Absolute score floors,
+Malformed, unsupported, or policy-incompatible baselines fail health with
+actionable diagnostics after measurement; they never erase a valid current
+report. A missing baseline fails in no-write mode only for applicable health;
+complete write mode initializes it without a failure. Compatibility requires
+matching snapshot schema, algorithm version, effective scoring limits and
+weights, duplicate window size, and source-selection policy (manifest location
+and configured member selection). Absolute score floors,
 hard limits, enablement, baseline path, and allowed regression do not change
 score comparability. Membership and source changes within the same selection
 policy are compared normally.
@@ -99,7 +120,8 @@ algorithm versions, effective policy, a deterministic input digest, crate
 identities and source inventory, raw metrics and penalty breakdowns, current
 and baseline scores, deltas, added/removed crates, and policy diagnostics.
 The SHA-256 input digest covers manifest discovery inputs, selected source bytes and
-paths, and effective health configuration. Run metadata holds revision and
+paths, and effective health configuration, including crate hard-limit exceptions.
+Run metadata holds revision and
 working-tree state; the portable snapshot contains no timestamp, absolute
 path, run ID, or revision identifier. Unavailable or interrupted measurement
 cannot yield a complete report or an exportable baseline.
@@ -129,11 +151,16 @@ at `checks.codeHealth.baseline` with the selected run's complete current
 measurement. A normal write-mode check also replaces this file after
 `static:code-health` completes a measurement. It first compares against the
 existing baseline, then writes the new measurement even when health policy gates
-or unrelated checks fail. If the baseline is missing, invalid, or incompatible,
-the check retains the corresponding failure and seeds the file from the complete
-measurement. This makes the file the latest comparison point for subsequent
-checks. Regression limits therefore compare each selected write-mode run with
-the baseline that existed when that run began.
+or unrelated checks fail. If the baseline is missing, a complete write-mode
+check initializes it from the current measurement without a missing-baseline
+failure. Absolute score and hard-limit gates still apply, and the retained report
+records `baseline_status = initialized`. With `--no-write`, an absent baseline
+fails with an instruction to rerun `bloomery check` in write mode or publish a
+retained measurement with `bloomery check health update`. If an existing baseline
+is invalid or incompatible, the check retains the corresponding failure and seeds
+the file from the complete measurement. This makes the file the latest comparison
+point for subsequent checks. Regression limits therefore compare each selected
+write-mode run with the baseline that existed when that run began.
 If atomic replacement fails, report `HealthBaselineWriteFailed`, fail the
 health check with exit code 1, retain the complete measurement, and preserve
 the previous baseline.
@@ -158,7 +185,8 @@ bloomery check health update --run RUN
 ```
 
 Update can export a complete measurement whose policy gates failed, including
-the initial missing-baseline failure. It requires passed formatting outcomes
+a no-write measurement with a missing-baseline failure. It requires passed
+formatting outcomes
 for the run: the `format:workspace` preflight in write mode or the native
 `core:treefmt-check` for every selected system in no-write mode. It also
 requires a finalized, uninterrupted run with complete health measurement;
@@ -172,14 +200,15 @@ into the snapshot: it stores current measurements and their provenance, suitable
 for the next comparison.
 
 The checked-in `.bloomery/code-health-summary.json` is both the PR summary and
-the comparison baseline. It uses schema version 3 and has top-level fields
+the comparison baseline. It uses schema version 4 and has top-level fields
 `schema_version`, `algorithm_version`, `policy`, `input_digest`, `workspace`,
 and `crates`. The workspace and each crate row expose `overall_score`,
 production `sloc`, and category `subscores` for complexity, function size,
-nesting, and duplication. Subscores are deduction points in each category.
+nesting, duplication, and crate size. Subscores are deduction points in each
+category.
 Crate rows also include the display name and repository-relative `manifest_path`
 used as their stable identity. Workspace score and subscores are SLOC weighted
-from crate results. The policy retains only effective scoring limits and
+from crate results. The policy retains effective scoring limits, weights, and
 source-selection inputs; the digest records which inputs produced the snapshot.
 
 The file omits callable metrics and locations, duplicate ranges, source

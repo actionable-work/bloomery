@@ -1,16 +1,12 @@
-mod catalog;
 mod command;
-mod details;
 mod execution;
-mod health;
-mod interrupt;
-mod model;
-mod nix_progress;
-pub mod output;
-mod progress;
-mod retrieval;
-mod scheduler;
-mod store;
+
+pub use bloomery_check_catalog::check_command::catalog;
+pub use bloomery_check_health::check_command::health;
+pub use bloomery_check_output::check_command::output;
+pub use bloomery_check_retrieval::check_command::retrieval;
+pub use bloomery_check_storage::check_command::store;
+pub use bloomery_check_support::check_command::{interrupt, model, progress, scheduler};
 
 #[cfg(test)]
 mod test_support;

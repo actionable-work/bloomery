@@ -280,6 +280,10 @@ in {
         config.checks.codeHealth = {
           enable = false;
           duplicationFreeRatio = 0.25;
+          weights.complexity = 12.5;
+          crateSlocLimit = 1500;
+          maxCrateSloc = 5000;
+          crateExceptions."packages/demo/Cargo.toml".maxCrateSloc = 6000;
         };
       };
     in {
@@ -299,12 +303,51 @@ in {
         root = ./.;
         config.checks.codeHealth.duplicateMinTokens = 15;
       });
+      crateHardBelowSoft = fails (loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.codeHealth = {
+          crateSlocLimit = 2000;
+          maxCrateSloc = 1500;
+        };
+      });
+      weightPrecision = fails (loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.codeHealth.weights.complexity = 12.501;
+      });
+      zeroWeights = fails (loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.codeHealth.weights = {
+          complexity = 0;
+          size = 0;
+          nesting = 0;
+          duplication = 0;
+          crateSize = 0;
+        };
+      });
+      exceptionBelowSoft = fails (loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.codeHealth.crateExceptions."packages/demo/Cargo.toml".maxCrateSloc = 1499;
+      });
+      exceptionUnknownField = fails (loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.codeHealth.crateExceptions."packages/demo/Cargo.toml".maxTokens = 3000;
+      });
+      exceptionBadPath = fails (loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.codeHealth.crateExceptions."../demo/Cargo.toml".maxCrateSloc = 6000;
+      });
     };
     expected = {
       cliPolicyRemoved = true;
       invalidRatio = true;
       hardBelowSoft = true;
       badWindow = true;
+      crateHardBelowSoft = true;
+      weightPrecision = true;
+      zeroWeights = true;
+      exceptionBelowSoft = true;
+      exceptionUnknownField = true;
+      exceptionBadPath = true;
     };
   };
 

@@ -262,7 +262,7 @@ impl NixBackend for FakeNix {
             }
         }
         if let Some(interrupt) = &self.interrupt_on_evaluation {
-            interrupt.interrupt_for_test();
+            interrupt.interrupt();
         }
         let all_fail = matches!(self.realization_result, Some(NixTaskResult::Failed { .. }));
         let mut failures = BTreeMap::new();
@@ -408,7 +408,7 @@ impl NixBackend for FakeNix {
         _system: &str,
     ) -> Result<Vec<bloomery_check::HealthSourceCrate>, String> {
         if let Some(interrupt) = &self.interrupt_on_health_source {
-            interrupt.interrupt_for_test();
+            interrupt.interrupt();
         }
         Ok(self.health_crates.clone())
     }
@@ -511,7 +511,7 @@ pub(super) fn invoke_with_mode(
         cache,
         backend,
         json,
-        InterruptFlag::for_test(),
+        InterruptFlag::new(),
         no_write,
     )
 }

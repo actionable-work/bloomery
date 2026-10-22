@@ -10,7 +10,14 @@ resolver = "2"
 [workspace.dependencies]
 bloomery-build-command = { default-features = false, path = "packages/rust/libs/cli/build-command" }
 bloomery-check = { default-features = false, path = "packages/rust/libs/shared/check" }
+bloomery-check-catalog = { default-features = false, path = "packages/rust/libs/cli/check-catalog" }
 bloomery-check-command = { default-features = false, path = "packages/rust/libs/cli/check-command" }
+bloomery-check-health = { default-features = false, path = "packages/rust/libs/cli/check-health" }
+bloomery-check-output = { default-features = false, path = "packages/rust/libs/cli/check-output" }
+bloomery-check-retrieval = { default-features = false, path = "packages/rust/libs/cli/check-retrieval" }
+bloomery-check-selection = { default-features = false, path = "packages/rust/libs/cli/check-selection" }
+bloomery-check-storage = { default-features = false, path = "packages/rust/libs/cli/check-storage" }
+bloomery-check-support = { default-features = false, path = "packages/rust/libs/cli/check-support" }
 bloomery-cli-app = { default-features = false, path = "packages/rust/libs/cli/cli-app" }
 bloomery-cli-output = { default-features = false, path = "packages/rust/libs/cli/cli-output" }
 bloomery-cli-parser = { default-features = false, path = "packages/rust/libs/cli/cli-parser" }

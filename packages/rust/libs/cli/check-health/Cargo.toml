@@ -1,0 +1,18 @@
+[dependencies]
+bloomery-check = { workspace = true }
+bloomery-check-catalog = { workspace = true }
+bloomery-check-output = { workspace = true }
+bloomery-check-storage = { workspace = true }
+bloomery-check-support = { workspace = true }
+bloomery-cli-output = { workspace = true }
+bloomery-cli-types = { workspace = true }
+bloomery-model = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+
+[dev-dependencies]
+
+[package]
+edition = "2024"
+name = "bloomery-check-health"
+version = "0.1.0"

@@ -87,6 +87,20 @@ pub struct FailureRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FailureDraft {
+    pub check: String,
+    pub code: String,
+    pub subject: Option<String>,
+    pub location: Option<FailureLocation>,
+    pub message: String,
+    pub notes: Vec<String>,
+    pub log: Option<String>,
+    pub nix_log: Option<String>,
+    pub focus_tail: bool,
+    pub occurrence: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CheckRecord {
     pub id: String,
     pub outcome: Outcome,

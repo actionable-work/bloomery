@@ -1,0 +1,9 @@
+[dependencies]
+bloomery-check-support = { workspace = true }
+bloomery-cli-output = { workspace = true }
+serde_json = { workspace = true }
+
+[package]
+edition = "2024"
+name = "bloomery-check-output"
+version = "0.1.0"

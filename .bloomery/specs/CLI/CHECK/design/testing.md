@@ -62,9 +62,10 @@ and failed plan entries.
 | Missing native formatter check | Missing `core:treefmt-check` on a selected system is an operational catalog error before check work starts | `CLI-CHECK-FORMAT-012` |
 | No-write formatter failure | A failed formatting task is an ordinary check failure; independent work continues unless fail-fast stops or cancels it | `CLI-CHECK-FORMAT-009` |
 | No-write command policy | Accept the global option; reject writers early; allow read operations, preview modes, help/version, run cache and Nix store outputs | `CLI-INTERFACE-FLAGS-032`–`036`, `CLI-INIT-COMMAND-013`, `CLI-SYNC-INTERFACE-024`, `CLI-SPEC-EDITING-024`, `CLI-CONFIG-EDITING-021`, `CLI-CONFIG-UPGRADE-027`–`028`, `CLI-CONFIG-DOCUMENT-013`, `CLI-CHECK-HEALTH-038`, `CLI-BUILD-EXECUTION-020`, `028` |
-| Health baseline refresh | Write-mode selected health compares then refreshes after a complete measurement, including after policy or unrelated failures; missing or invalid baselines are seeded | `CLI-CHECK-HEALTH-032`, `033`, `036` |
+| Health scoring and crate sizing | Effective component weights change crate deductions, production SLOC above the soft limit lowers crate and workspace scores, and the hard crate limit fails independently of score floors | `CLI-CHECK-HEALTH-004`, `005`, `040`, `041` |
+| Health baseline refresh | Write-mode selected health refreshes after a complete measurement, including after policy or unrelated failures; a missing baseline initializes without a failure, while an invalid baseline is seeded with a failure | `CLI-CHECK-HEALTH-032`, `033`, `036`, `042` |
 | Health baseline write failure | A failed atomic replacement reports `HealthBaselineWriteFailed`, retains the report, and leaves the previous file intact | `CLI-CHECK-HEALTH-028`, `039` |
-| Health baseline no-write and skips | No-write compares without replacing; disabled or unselected health, incomplete measurements, failed formatting, and interrupted runs preserve the file | `CLI-CHECK-HEALTH-034`, `035`, `037` |
+| Health baseline no-write and skips | No-write compares without replacing and reports actionable guidance for a missing baseline; disabled or unselected health, incomplete measurements, failed formatting, and interrupted runs preserve the file | `CLI-CHECK-HEALTH-034`, `035`, `037`, `043` |
 | Missing executable | Adapter startup failure yields an operational error and cannot produce a successful run | `CLI-CHECK-NIX-012` |
 
 Batch tests assert `--keep-going`, `--no-link`, lockfile protection, safe

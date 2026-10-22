@@ -78,14 +78,18 @@
     else config;
 
   checkCodeHealth = value: let
-    keys = ["enable" "baseline" "minCrateScore" "minWorkspaceScore" "maxRegression" "cyclomaticLimit" "functionTokensLimit" "nestingLimit" "duplicationFreeRatio" "duplicateMinTokens" "maxCyclomatic" "maxFunctionTokens" "maxNesting"];
+    keys = ["enable" "baseline" "minCrateScore" "minWorkspaceScore" "maxRegression" "cyclomaticLimit" "functionTokensLimit" "nestingLimit" "crateSlocLimit" "duplicationFreeRatio" "duplicateMinTokens" "maxCyclomatic" "maxFunctionTokens" "maxNesting" "maxCrateSloc" "weights" "crateExceptions"];
     config = checkTable "checks.codeHealth" keys value;
+    weightKeys = ["complexity" "size" "nesting" "duplication" "crateSize"];
+    configuredWeights = checkTable "checks.codeHealth.weights" weightKeys (config.weights or {});
+    crateExceptions = config.crateExceptions or {};
+    exceptionKeys = ["maxCyclomatic" "maxFunctionTokens" "maxNesting" "maxCrateSloc"];
     default = {
       enable = false;
       baseline = ".bloomery/code-health-summary.json";
       minCrateScore = 80;
       minWorkspaceScore = 80;
-      maxRegression = 0;
+      maxRegression = 2;
       cyclomaticLimit = 10;
       functionTokensLimit = 250;
       nestingLimit = 4;
@@ -94,11 +98,30 @@
       maxCyclomatic = 40;
       maxFunctionTokens = 1000;
       maxNesting = 8;
+      crateSlocLimit = 1500;
+      maxCrateSloc = 5000;
+      weights = {
+        complexity = 25;
+        size = 20;
+        nesting = 10;
+        duplication = 15;
+        crateSize = 30;
+      };
     };
     effective = default // config;
+    effectiveWeights = default.weights // configuredWeights;
     number = value: builtins.isInt value || builtins.isFloat value;
     score = value: number value && value >= 0 && value <= 100;
     positive = value: builtins.isInt value && value > 0;
+    weight = value: let
+      scaled = value * 100;
+      rounded = builtins.floor (scaled + 0.5);
+    in
+      number value
+      && value >= 0
+      && value <= 100
+      && scaled >= rounded - 0.000001
+      && scaled <= rounded + 0.000001;
     healthKeys = builtins.attrNames config;
     typeValid =
       builtins.all (
@@ -117,19 +140,63 @@
           then number candidate && candidate >= 0 && candidate < 1
           else if key == "duplicateMinTokens"
           then positive candidate && candidate >= 16
+          else if key == "weights"
+          then true
+          else if key == "crateExceptions"
+          then true
           else positive candidate
       )
       healthKeys;
+    weightsValid = builtins.all (key: weight configuredWeights.${key}) (builtins.attrNames configuredWeights);
+    weightsNonzero = builtins.foldl' (sum: key: sum + effectiveWeights.${key}) 0 weightKeys > 0;
     softHardValid =
       effective.maxCyclomatic
       >= effective.cyclomaticLimit
       && effective.maxFunctionTokens >= effective.functionTokensLimit
-      && effective.maxNesting >= effective.nestingLimit;
+      && effective.maxNesting >= effective.nestingLimit
+      && effective.maxCrateSloc >= effective.crateSlocLimit;
+    validManifestPath = manifest: let
+      components = lib.splitString "/" manifest;
+    in
+      isString manifest
+      && manifest != ""
+      && !(lib.hasPrefix "/" manifest)
+      && lib.last components == "Cargo.toml"
+      && builtins.all (component: component != "" && component != "." && component != "..") components;
+    exceptionSoftLimit = key:
+      if key == "maxCyclomatic"
+      then effective.cyclomaticLimit
+      else if key == "maxFunctionTokens"
+      then effective.functionTokensLimit
+      else if key == "maxNesting"
+      then effective.nestingLimit
+      else effective.crateSlocLimit;
+    exceptionsValid =
+      isAttrs crateExceptions
+      && builtins.all (
+        manifest: let
+          exception = crateExceptions.${manifest};
+        in
+          validManifestPath manifest
+          && isAttrs exception
+          && builtins.all (
+            key:
+              elem key exceptionKeys
+              && positive exception.${key}
+              && exception.${key} >= exceptionSoftLimit key
+          ) (attrNames exception)
+      ) (attrNames crateExceptions);
   in
     if !typeValid
     then throw "bloomery: invalid value in [checks.codeHealth]"
+    else if !weightsValid
+    then throw "bloomery: checks.codeHealth.weights values must be from 0 to 100 with at most two decimal places"
+    else if !weightsNonzero
+    then throw "bloomery: checks.codeHealth.weights must have a positive effective sum"
     else if !softHardValid
     then throw "bloomery: code health hard limits must be at least their corresponding soft limits"
+    else if !exceptionsValid
+    then throw "bloomery: checks.codeHealth.crateExceptions must map workspace-relative Cargo.toml paths to recognized positive hard limits at least as large as their corresponding soft limits"
     else config;
 
   checkSpecifications = value: let

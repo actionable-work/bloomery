@@ -9,7 +9,21 @@ pub struct InterruptFlag {
     include_user_signal: bool,
 }
 
+impl Default for InterruptFlag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InterruptFlag {
+    /// Create an interrupt flag that is controlled explicitly by its caller.
+    pub fn new() -> Self {
+        Self {
+            local: Arc::new(AtomicBool::new(false)),
+            include_user_signal: false,
+        }
+    }
+
     pub fn install() -> Self {
         USER_INTERRUPTED.store(false, Ordering::SeqCst);
         #[cfg(unix)]
@@ -22,16 +36,7 @@ impl InterruptFlag {
         }
     }
 
-    #[cfg(test)]
-    pub(super) fn for_test() -> Self {
-        Self {
-            local: Arc::new(AtomicBool::new(false)),
-            include_user_signal: false,
-        }
-    }
-
-    #[cfg(test)]
-    pub(super) fn interrupt_for_test(&self) {
+    pub fn interrupt(&self) {
         self.local.store(true, Ordering::SeqCst);
     }
 
@@ -89,10 +94,10 @@ mod tests {
     #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-012"))]
     #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-013"))]
     fn user_interruption_is_distinct_from_task_cancellation() {
-        let interrupt = InterruptFlag::for_test();
+        let interrupt = InterruptFlag::new();
         let token = CancellationToken::new(interrupt.clone());
         assert!(!token.is_canceled());
-        interrupt.interrupt_for_test();
+        interrupt.interrupt();
         assert!(token.is_canceled());
         assert!(token.interrupted());
     }

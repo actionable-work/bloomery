@@ -1,4 +1,6 @@
-use crate::check_command::catalog::{CheckPlan, NixBackend, NixCli};
+use crate::check_command::catalog::{
+    CheckPlan, NIX_DISCOVER_EXPRESSION, NIX_PLAN_EXPRESSION, NixBackend, NixCli,
+};
 use crate::check_command::command::{CheckArgs, CheckOperation, DetailsArgs};
 use crate::check_command::interrupt::{CancellationToken, InterruptFlag};
 use crate::check_command::model::Outcome;
@@ -28,9 +30,9 @@ fn eval_args(system: &str, planning: bool) -> Vec<String> {
         format!(".#checks.{system}"),
         "--apply".into(),
         if planning {
-            include_str!("../nix/plan.nix")
+            NIX_PLAN_EXPRESSION
         } else {
-            include_str!("../nix/discover.nix")
+            NIX_DISCOVER_EXPRESSION
         }
         .into(),
     ]
@@ -606,7 +608,7 @@ fn fail_fast_batch_omits_keep_going_and_cancels_its_owned_process() {
     let call = build(&mut script, &[SHARED], true);
     fs::write(call.join("block"), "").unwrap();
     let backend = script.backend();
-    let cancellation = CancellationToken::new(InterruptFlag::for_test());
+    let cancellation = CancellationToken::new(InterruptFlag::new());
     let (sender, _receiver) = std::sync::mpsc::channel();
     let progress = ProgressSink::new(sender, false);
     let plans = [CheckPlan {

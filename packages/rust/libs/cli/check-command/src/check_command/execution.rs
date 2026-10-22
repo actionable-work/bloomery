@@ -1,6 +1,7 @@
 use super::catalog::{BatchRealization, CheckPlan, NixBackend, NixTaskResult};
 use super::command::{CheckArgs, CheckContext, CheckError, plan_for_selection, report_error};
 use super::interrupt::{CancellationToken, InterruptFlag};
+pub(super) use super::model::FailureDraft;
 use super::model::{
     CheckRecord, FailureLocation, FailureRecord, Outcome, RunMode, RunRecord, RunSelection,
     RunStatus, select_ids,
@@ -12,11 +13,11 @@ use super::scheduler::{
 };
 use super::store;
 use bloomery_check::AnalysisSession;
+use bloomery_check_health::check_command::health_report::{self, HealthOutcome};
 use bloomery_model::{
     Diagnostic, health::HealthConfig, sort_diagnostics as sort_model_diagnostics,
 };
-use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
+use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -191,7 +192,14 @@ fn prepare_health_sources(
         .host_system(root)
         .and_then(|system| backend.health_sources(root, &system));
     if let Ok(sources) = &projection {
-        validate_health_source_overlap(root, &config, &raw_json, sources)
+        let manifests = sources
+            .iter()
+            .map(|source| source.manifest_path.clone())
+            .collect::<Vec<_>>();
+        config
+            .validate_crate_exception_manifests(&manifests)
+            .map_err(|diagnostic| CheckError::operational(diagnostic.message))?;
+        health_report::validate_health_source_overlap(root, &config, &raw_json, sources)
             .map_err(CheckError::operational)?;
     }
     Ok((Some(projection), Some(config.baseline)))
@@ -275,6 +283,7 @@ fn execute_after_formatter(
             dependencies: &prepared.planned.dependencies,
             health_sources: prepared.health_sources.clone(),
             clippy_policy: prepared.clippy_policy.clone(),
+            no_write: context.no_write,
             interrupt: context.interrupt.clone(),
             jobs: prepared.jobs,
             fail_fast: args.fail_fast,
@@ -311,6 +320,7 @@ fn execute_after_formatter(
             dependencies: &planned.dependencies,
             health_sources: prepared.health_sources.clone(),
             clippy_policy: prepared.clippy_policy.clone(),
+            no_write: context.no_write,
             interrupt: context.interrupt.clone(),
             jobs: prepared.jobs,
             fail_fast: args.fail_fast,
@@ -751,19 +761,6 @@ struct ExecutionResults {
     health_report: Option<Value>,
 }
 
-pub(super) struct FailureDraft {
-    pub(super) check: String,
-    pub(super) code: String,
-    pub(super) subject: Option<String>,
-    pub(super) location: Option<FailureLocation>,
-    pub(super) message: String,
-    pub(super) notes: Vec<String>,
-    pub(super) log: Option<String>,
-    pub(super) nix_log: Option<String>,
-    pub(super) focus_tail: bool,
-    pub(super) occurrence: usize,
-}
-
 type InitialWork<'a> = (
     String,
     Box<dyn FnOnce(CancellationToken) -> InitialTask + Send + 'a>,
@@ -802,11 +799,6 @@ enum InitialState {
     NotRun,
 }
 
-struct HealthOutcome {
-    report: Value,
-    failures: Vec<FailureDraft>,
-}
-
 fn initial_outcomes(selected: &BTreeSet<String>) -> BTreeMap<String, CheckRecord> {
     selected
         .iter()
@@ -834,6 +826,7 @@ struct InitialTaskInputs<'a> {
     batch_outputs: BTreeMap<String, Vec<String>>,
     health_sources: Option<Result<Vec<bloomery_check::HealthSourceCrate>, String>>,
     clippy_policy: Option<bloomery_model::clippy::ClippySuppressionConfig>,
+    no_write: bool,
     fail_fast: bool,
     sink: &'a ProgressSink,
 }
@@ -849,6 +842,7 @@ fn build_initial_tasks<'a>(inputs: InitialTaskInputs<'a>) -> Vec<InitialWork<'a>
         batch_outputs,
         health_sources,
         clippy_policy,
+        no_write,
         fail_fast,
         sink,
     } = inputs;
@@ -891,7 +885,9 @@ fn build_initial_tasks<'a>(inputs: InitialTaskInputs<'a>) -> Vec<InitialWork<'a>
                     InitialTaskResult::HealthCanceled
                 } else {
                     let analysis = AnalysisSession::new();
-                    InitialTaskResult::Health(collect_health_report(&root, &sources, &analysis))
+                    InitialTaskResult::Health(health_report::collect_health_report(
+                        &root, &sources, &analysis, no_write,
+                    ))
                 },
             }) as _,
         ));
@@ -1091,6 +1087,7 @@ struct SelectedExecutionInputs<'a, W: Write> {
     dependencies: &'a BTreeMap<String, Vec<String>>,
     health_sources: Option<Result<Vec<bloomery_check::HealthSourceCrate>, String>>,
     clippy_policy: Option<bloomery_model::clippy::ClippySuppressionConfig>,
+    no_write: bool,
     interrupt: InterruptFlag,
     jobs: usize,
     fail_fast: bool,
@@ -1110,6 +1107,7 @@ fn execute_selected<W: Write>(
         dependencies,
         health_sources,
         clippy_policy,
+        no_write,
         interrupt,
         jobs,
         fail_fast,
@@ -1158,6 +1156,7 @@ fn execute_selected<W: Write>(
         batch_outputs,
         health_sources: health_sources.clone(),
         clippy_policy,
+        no_write,
         fail_fast,
         sink: &sink,
     });
@@ -1167,6 +1166,7 @@ fn execute_selected<W: Write>(
             root,
             selected,
             health_sources: health_sources.as_ref(),
+            no_write,
             jobs,
             interrupt,
             fail_fast,
@@ -1286,6 +1286,7 @@ struct InitialScheduleInputs<'a, W: Write> {
     root: &'a Path,
     selected: &'a BTreeSet<String>,
     health_sources: Option<&'a Result<Vec<bloomery_check::HealthSourceCrate>, String>>,
+    no_write: bool,
     jobs: usize,
     interrupt: InterruptFlag,
     fail_fast: bool,
@@ -1302,6 +1303,7 @@ fn execute_initial_schedule<'a, W: Write>(
         root,
         selected,
         health_sources,
+        no_write,
         jobs,
         interrupt,
         fail_fast,
@@ -1315,7 +1317,7 @@ fn execute_initial_schedule<'a, W: Write>(
         interrupt,
         should_stop: Box::new(|task: &InitialTask| initial_task_stops_admission(task, fail_fast)),
         followups: Box::new(|task: &mut InitialTask| {
-            followup_work(root, selected, health_sources, task)
+            followup_work(root, selected, health_sources, no_write, task)
         }),
         on_complete: Box::new(|id: &str, task: &InitialTask| {
             publish_completion_events(id, task, selected, sink)
@@ -1331,6 +1333,7 @@ fn followup_work<'a>(
     root: &'a Path,
     selected: &BTreeSet<String>,
     health_sources: Option<&Result<Vec<bloomery_check::HealthSourceCrate>, String>>,
+    no_write: bool,
     task: &mut InitialTask,
 ) -> Vec<InitialWork<'a>> {
     if let InitialTaskResult::Structure(Ok(context)) = &mut task.result
@@ -1342,13 +1345,14 @@ fn followup_work<'a>(
             *context,
             selected.contains("static:code-health"),
             health_sources,
+            no_write,
         )];
     }
     if matches!(&task.result, InitialTaskResult::Structure(Err(_)))
         && selected.contains("static:code-health")
         && selected.contains("static:traceability")
     {
-        return vec![standalone_health_task(root, health_sources)];
+        return vec![standalone_health_task(root, health_sources, no_write)];
     }
     Vec::new()
 }
@@ -1358,6 +1362,7 @@ fn shared_analysis_task<'a>(
     context: bloomery_model::Context,
     health_selected: bool,
     health_sources: Option<&Result<Vec<bloomery_check::HealthSourceCrate>, String>>,
+    no_write: bool,
 ) -> InitialWork<'a> {
     let traceability_selected = true;
     let sources = health_sources
@@ -1381,7 +1386,7 @@ fn shared_analysis_task<'a>(
                         "code health analysis was canceled before it started",
                     )])
                 } else {
-                    collect_health_report(root, &sources, &analysis)
+                    health_report::collect_health_report(root, &sources, &analysis, no_write)
                 }
             });
             let result = match (traceability, health) {
@@ -1401,6 +1406,7 @@ fn shared_analysis_task<'a>(
 fn standalone_health_task<'a>(
     root: &'a Path,
     health_sources: Option<&Result<Vec<bloomery_check::HealthSourceCrate>, String>>,
+    no_write: bool,
 ) -> InitialWork<'a> {
     let root = root.to_path_buf();
     let sources = health_sources
@@ -1413,7 +1419,9 @@ fn standalone_health_task<'a>(
                 InitialTaskResult::HealthCanceled
             } else {
                 let analysis = AnalysisSession::new();
-                InitialTaskResult::Health(collect_health_report(&root, &sources, &analysis))
+                InitialTaskResult::Health(health_report::collect_health_report(
+                    &root, &sources, &analysis, no_write,
+                ))
             };
             InitialTask { result }
         }),
@@ -1914,702 +1922,6 @@ fn run_clippy_suppression_check(root: &Path, allow: &[String]) -> Result<(), Vec
     bloomery_check::find_clippy_suppressions(root, &source_paths, allow, &AnalysisSession::new())
 }
 
-fn collect_health_report(
-    root: &Path,
-    source_projection: &Result<Vec<bloomery_check::HealthSourceCrate>, String>,
-    session: &AnalysisSession,
-) -> Result<HealthOutcome, Vec<Diagnostic>> {
-    let loaded =
-        bloomery_model::config::load_with_raw(root).map_err(|diagnostic| vec![diagnostic])?;
-    let config =
-        HealthConfig::from_raw(loaded.raw.as_ref()).map_err(|diagnostic| vec![diagnostic])?;
-    let sources = source_projection
-        .clone()
-        .map_err(|error| vec![Diagnostic::new("HealthDiscoveryError", error)])?;
-    let mut crates =
-        bloomery_check::analyze_health(root, &sources, config.duplicate_min_tokens, session)?;
-    if let Err(message) = validate_health_metrics_overlap(root, &config, &crates) {
-        return Err(vec![Diagnostic::new("ConfigurationError", message)]);
-    }
-    crates.sort_by(|left, right| left.manifest_path.cmp(&right.manifest_path));
-    let scores = crates
-        .iter()
-        .map(|crate_metrics| bloomery_check::health::score_crate(crate_metrics, &config))
-        .collect::<Vec<_>>();
-    let workspace = bloomery_check::health::workspace_score(&crates, &scores);
-    let mut failures = bloomery_check::health::policy_gates(&crates, &scores, workspace, &config)
-        .into_iter()
-        .map(|gate| {
-            let location = gate.path.map(|path| FailureLocation {
-                path,
-                line: gate.line,
-                column: None,
-            });
-            FailureDraft {
-                check: "static:code-health".to_owned(),
-                code: gate.code,
-                subject: gate.subject,
-                location,
-                message: gate.message,
-                notes: Vec::new(),
-                log: None,
-                nix_log: None,
-                focus_tail: false,
-                occurrence: 0,
-            }
-        })
-        .collect::<Vec<_>>();
-    let raw_json = loaded
-        .raw
-        .as_ref()
-        .map(serde_json::to_value)
-        .transpose()
-        .map_err(|error| vec![Diagnostic::new("HealthInputError", error.to_string())])?;
-    let policy = health_policy_value(&config, &raw_json);
-    let input_digest = health_input_digest(root, &crates, &sources, &policy, session)
-        .map_err(|error| vec![Diagnostic::new("HealthInputError", error)])?;
-    let snapshot = health_snapshot(&crates, &scores, workspace, policy, input_digest);
-    let mut report = snapshot.clone();
-    failures.extend(compare_health_baseline(
-        root,
-        &config,
-        &crates,
-        &scores,
-        workspace,
-        &snapshot,
-        &mut report,
-    ));
-    failures.sort_by(|left, right| {
-        (
-            &left.code,
-            &left.subject,
-            left.location
-                .as_ref()
-                .map(|location| (&location.path, location.line)),
-            &left.message,
-        )
-            .cmp(&(
-                &right.code,
-                &right.subject,
-                right
-                    .location
-                    .as_ref()
-                    .map(|location| (&location.path, location.line)),
-                &right.message,
-            ))
-    });
-    for (index, failure) in failures.iter_mut().enumerate() {
-        failure.occurrence = index;
-    }
-    Ok(HealthOutcome { report, failures })
-}
-
-fn compare_health_baseline(
-    root: &Path,
-    config: &HealthConfig,
-    crates: &[bloomery_check::HealthCrateMetrics],
-    scores: &[bloomery_check::health::CrateScore],
-    workspace: Option<u16>,
-    snapshot: &Value,
-    report: &mut Value,
-) -> Vec<FailureDraft> {
-    let (status, baseline, mut failures) = read_health_baseline(root, config, workspace);
-    report["baseline_status"] = json!(status);
-    report["baseline_workspace_score_hundredths"] = Value::Null;
-    report["workspace_delta_hundredths"] = Value::Null;
-    report["added_crates"] = json!([]);
-    report["removed_crates"] = json!([]);
-    let Some(baseline) = baseline else {
-        return failures;
-    };
-    match validate_health_baseline(&baseline, snapshot) {
-        Ok(baseline) => compare_compatible_baseline(CompatibleBaselineInputs {
-            config,
-            crates,
-            scores,
-            workspace,
-            baseline_workspace: baseline.workspace_score_hundredths,
-            baseline_crates: &baseline.crates,
-            report,
-            failures: &mut failures,
-        }),
-        Err(message) => {
-            report["baseline_status"] = json!("incompatible");
-            failures.push(health_failure(
-                "HealthBaselineIncompatible",
-                message,
-                Some(config.baseline.clone()),
-                None,
-            ));
-        }
-    }
-    failures
-}
-
-fn read_health_baseline(
-    root: &Path,
-    config: &HealthConfig,
-    workspace: Option<u16>,
-) -> (&'static str, Option<Value>, Vec<FailureDraft>) {
-    let result = std::fs::read(root.join(&config.baseline));
-    match result {
-        Ok(bytes) => match serde_json::from_slice::<Value>(&bytes) {
-            Ok(value) => ("loaded", Some(value), Vec::new()),
-            Err(error) => (
-                "malformed",
-                None,
-                vec![health_failure(
-                    "HealthBaselineInvalid",
-                    format!("code health baseline is malformed: {error}"),
-                    Some(config.baseline.clone()),
-                    None,
-                )],
-            ),
-        },
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            let failures = workspace
-                .is_some()
-                .then(|| {
-                    health_failure(
-                        "HealthBaselineMissing",
-                        format!("code health baseline '{}' does not exist", config.baseline),
-                        Some(config.baseline.clone()),
-                        None,
-                    )
-                })
-                .into_iter()
-                .collect();
-            ("missing", None, failures)
-        }
-        Err(error) => (
-            "unreadable",
-            None,
-            vec![health_failure(
-                "HealthBaselineInvalid",
-                format!("unable to read code health baseline: {error}"),
-                Some(config.baseline.clone()),
-                None,
-            )],
-        ),
-    }
-}
-
-struct CompatibleBaselineInputs<'a> {
-    config: &'a HealthConfig,
-    crates: &'a [bloomery_check::HealthCrateMetrics],
-    scores: &'a [bloomery_check::health::CrateScore],
-    workspace: Option<u16>,
-    baseline_workspace: Option<u16>,
-    baseline_crates: &'a BTreeMap<String, Option<u16>>,
-    report: &'a mut Value,
-    failures: &'a mut Vec<FailureDraft>,
-}
-
-fn compare_compatible_baseline(inputs: CompatibleBaselineInputs<'_>) {
-    let CompatibleBaselineInputs {
-        config,
-        crates,
-        scores,
-        workspace,
-        baseline_workspace,
-        baseline_crates,
-        report,
-        failures,
-    } = inputs;
-    report["baseline_status"] = json!("compatible");
-    report["baseline_workspace_score_hundredths"] =
-        baseline_workspace.map_or(Value::Null, |score| json!(score));
-    compare_workspace_score(config, workspace, baseline_workspace, report, failures);
-    compare_crate_membership(crates, baseline_crates, report);
-    report["crate_comparisons"] = json!(compare_crate_scores(
-        config,
-        crates,
-        scores,
-        baseline_crates,
-        failures,
-    ));
-}
-
-fn compare_workspace_score(
-    config: &HealthConfig,
-    current: Option<u16>,
-    previous: Option<u16>,
-    report: &mut Value,
-    failures: &mut Vec<FailureDraft>,
-) {
-    if let (Some(current), Some(previous)) = (current, previous) {
-        let delta = i32::from(current) - i32::from(previous);
-        report["workspace_delta_hundredths"] = json!(delta);
-        if delta < -i32::from(config.max_regression) {
-            failures.push(health_failure(
-                "HealthWorkspaceRegression",
-                regression_message("workspace", delta, config.max_regression),
-                None,
-                None,
-            ));
-        }
-    }
-}
-
-fn compare_crate_membership(
-    crates: &[bloomery_check::HealthCrateMetrics],
-    baseline_crates: &BTreeMap<String, Option<u16>>,
-    report: &mut Value,
-) {
-    let current_ids = crates
-        .iter()
-        .map(|crate_metrics| crate_metrics.manifest_path.as_str())
-        .collect::<BTreeSet<_>>();
-    let previous_ids = baseline_crates
-        .keys()
-        .map(String::as_str)
-        .collect::<BTreeSet<_>>();
-    report["added_crates"] = json!(current_ids.difference(&previous_ids).collect::<Vec<_>>());
-    report["removed_crates"] = json!(previous_ids.difference(&current_ids).collect::<Vec<_>>());
-}
-
-fn compare_crate_scores(
-    config: &HealthConfig,
-    crates: &[bloomery_check::HealthCrateMetrics],
-    scores: &[bloomery_check::health::CrateScore],
-    baseline_crates: &BTreeMap<String, Option<u16>>,
-    failures: &mut Vec<FailureDraft>,
-) -> Vec<Value> {
-    crates
-        .iter()
-        .zip(scores)
-        .map(|(crate_metrics, score)| {
-            let previous = baseline_crates
-                .get(&crate_metrics.manifest_path)
-                .copied()
-                .flatten();
-            let delta = score
-                .score_hundredths
-                .zip(previous)
-                .map(|(now, before)| i32::from(now) - i32::from(before));
-            if let Some(delta) = delta
-                && delta < -i32::from(config.max_regression)
-            {
-                failures.push(health_failure(
-                    "HealthCrateRegression",
-                    regression_message("crate", delta, config.max_regression),
-                    Some(crate_metrics.manifest_path.clone()),
-                    None,
-                ));
-            }
-            json!({
-                "manifest_path": crate_metrics.manifest_path,
-                "baseline_score_hundredths": previous,
-                "score_hundredths": score.score_hundredths,
-                "delta_hundredths": delta,
-            })
-        })
-        .collect()
-}
-
-fn regression_message(scope: &str, delta: i32, allowance: u16) -> String {
-    format!(
-        "{scope} score regressed by {:.2} points, exceeding the {:.2} point allowance",
-        -delta as f64 / 100.0,
-        allowance as f64 / 100.0,
-    )
-}
-
-fn health_failure(
-    code: &str,
-    message: String,
-    subject: Option<String>,
-    location: Option<FailureLocation>,
-) -> FailureDraft {
-    FailureDraft {
-        check: "static:code-health".to_owned(),
-        code: code.to_owned(),
-        subject,
-        location,
-        message,
-        notes: Vec::new(),
-        log: None,
-        nix_log: None,
-        focus_tail: false,
-        occurrence: 0,
-    }
-}
-
-fn validate_health_source_overlap(
-    root: &Path,
-    config: &HealthConfig,
-    raw: &Option<Value>,
-    sources: &[bloomery_check::HealthSourceCrate],
-) -> Result<(), String> {
-    let root = std::fs::canonicalize(root)
-        .map_err(|error| format!("unable to resolve repository root: {error}"))?;
-    let baseline = Path::new(&config.baseline);
-    let candidate = root.join(baseline);
-    let selected_manifest = raw
-        .as_ref()
-        .and_then(|value| value.get("build"))
-        .and_then(Value::as_object)
-        .and_then(|build| build.get("cargoToml"))
-        .and_then(Value::as_str)
-        .unwrap_or("Cargo.toml");
-    let mut protected = BTreeSet::from([
-        root.join(".bloomery/config.toml"),
-        root.join(".bloomery/specs"),
-        root.join("Cargo.lock"),
-        root.join("flake.lock"),
-        root.join(selected_manifest),
-    ]);
-    for crate_source in sources {
-        protected.insert(root.join(&crate_source.manifest_path));
-        let crate_directory = root
-            .join(&crate_source.manifest_path)
-            .parent()
-            .unwrap_or(&root)
-            .to_path_buf();
-        for target in &crate_source.targets {
-            protected.insert(crate_directory.join(&target.path));
-        }
-    }
-    if protected
-        .iter()
-        .any(|path| candidate.starts_with(path) || path.starts_with(&candidate))
-    {
-        return Err("checks.codeHealth.baseline overlaps a manifest, source entrypoint, configuration, lockfile, or specification".to_owned());
-    }
-    Ok(())
-}
-
-fn validate_health_metrics_overlap(
-    root: &Path,
-    config: &HealthConfig,
-    crates: &[bloomery_check::HealthCrateMetrics],
-) -> Result<(), String> {
-    let root = std::fs::canonicalize(root)
-        .map_err(|error| format!("unable to resolve repository root: {error}"))?;
-    let candidate = root.join(&config.baseline);
-    if crates.iter().any(|crate_metrics| {
-        crate_metrics.sources.iter().any(|source| {
-            candidate == root.join(source) || root.join(source).starts_with(&candidate)
-        })
-    }) {
-        return Err("checks.codeHealth.baseline overlaps a resolved Rust source file".to_owned());
-    }
-    Ok(())
-}
-
-pub(super) fn health_policy_value(config: &HealthConfig, raw: &Option<Value>) -> Value {
-    let build = raw
-        .as_ref()
-        .and_then(|value| value.get("build"))
-        .and_then(Value::as_object);
-    let selected_manifest = build
-        .and_then(|build| build.get("cargoToml"))
-        .and_then(Value::as_str)
-        .unwrap_or("Cargo.toml");
-    let members = build
-        .and_then(|build| build.get("members"))
-        .and_then(Value::as_array)
-        .map(|members| {
-            let mut members = members.iter().filter_map(Value::as_str).collect::<Vec<_>>();
-            members.sort();
-            json!(members)
-        })
-        .unwrap_or(Value::Null);
-    json!({
-        "scoring": {
-            "cyclomaticLimit": config.cyclomatic_limit,
-            "functionTokensLimit": config.function_tokens_limit,
-            "nestingLimit": config.nesting_limit,
-            "duplicationFreeRatio": config.duplication_free_ratio,
-            "duplicateMinTokens": config.duplicate_min_tokens,
-        },
-        "selection": {
-            "manifest": selected_manifest,
-            "members": members,
-        },
-        "effective": {
-            "enable": config.enabled,
-            "baseline": config.baseline,
-            "minCrateScore": config.min_crate_score,
-            "minWorkspaceScore": config.min_workspace_score,
-            "maxRegression": config.max_regression,
-            "maxCyclomatic": config.max_cyclomatic,
-            "maxFunctionTokens": config.max_function_tokens,
-            "maxNesting": config.max_nesting,
-        },
-    })
-}
-
-fn health_input_digest(
-    root: &Path,
-    crates: &[bloomery_check::HealthCrateMetrics],
-    sources: &[bloomery_check::HealthSourceCrate],
-    policy: &Value,
-    session: &AnalysisSession,
-) -> Result<String, String> {
-    let mut hasher = Sha256::new();
-    let mut inputs = BTreeSet::new();
-    let selected_manifest = policy
-        .pointer("/selection/manifest")
-        .and_then(Value::as_str)
-        .unwrap_or("Cargo.toml");
-    inputs.insert(selected_manifest.to_owned());
-    inputs.insert(".bloomery/config.toml".to_owned());
-    for crate_source in sources {
-        inputs.insert(crate_source.manifest_path.clone());
-    }
-    let source_paths = crates
-        .iter()
-        .flat_map(|crate_metrics| crate_metrics.sources.iter().cloned())
-        .collect::<BTreeSet<_>>();
-    for path in inputs {
-        let full = root.join(&path);
-        let contents = std::fs::read(&full)
-            .map_err(|error| format!("unable to read health discovery input {}: {error}", path))?;
-        digest_field(&mut hasher, path.as_bytes());
-        digest_field(&mut hasher, &contents);
-    }
-    let discovery = health_discovery_value(sources);
-    let discovery_bytes = serde_json::to_vec(&discovery)
-        .map_err(|error| format!("unable to serialize health source discovery: {error}"))?;
-    digest_field(&mut hasher, &discovery_bytes);
-    for path in source_paths {
-        let parsed = session
-            .rust_file(&root.join(&path))
-            .map_err(|error| format!("unable to retrieve cached Rust source {path}: {error}"))?;
-        digest_field(&mut hasher, path.as_bytes());
-        digest_field(&mut hasher, parsed.source.as_bytes());
-    }
-    let policy_bytes = serde_json::to_vec(policy)
-        .map_err(|error| format!("unable to serialize effective health policy: {error}"))?;
-    digest_field(&mut hasher, &policy_bytes);
-    Ok(format!("{:x}", hasher.finalize()))
-}
-
-pub(super) fn health_discovery_value(sources: &[bloomery_check::HealthSourceCrate]) -> Value {
-    let mut crates = sources
-        .iter()
-        .map(|crate_source| {
-            let mut targets = crate_source
-                .targets
-                .iter()
-                .map(|target| json!({"kind": target.kind, "path": target.path}))
-                .collect::<Vec<_>>();
-            targets.sort_by(|left, right| {
-                left.get("path")
-                    .and_then(Value::as_str)
-                    .cmp(&right.get("path").and_then(Value::as_str))
-                    .then(
-                        left.get("kind")
-                            .and_then(Value::as_str)
-                            .cmp(&right.get("kind").and_then(Value::as_str)),
-                    )
-            });
-            json!({
-                "name": crate_source.name,
-                "manifest_path": crate_source.manifest_path,
-                "targets": targets,
-            })
-        })
-        .collect::<Vec<_>>();
-    crates.sort_by(|left, right| {
-        left.get("manifest_path")
-            .and_then(Value::as_str)
-            .cmp(&right.get("manifest_path").and_then(Value::as_str))
-    });
-    json!(crates)
-}
-
-fn digest_field(hasher: &mut Sha256, bytes: &[u8]) {
-    hasher.update((bytes.len() as u64).to_be_bytes());
-    hasher.update(bytes);
-}
-
-fn health_snapshot(
-    crates: &[bloomery_check::HealthCrateMetrics],
-    scores: &[bloomery_check::health::CrateScore],
-    workspace: Option<u16>,
-    policy: Value,
-    input_digest: String,
-) -> Value {
-    let crate_records = crates
-        .iter()
-        .zip(scores)
-        .map(|(crate_metrics, score)| {
-            let callables = crate_metrics
-                .callables
-                .iter()
-                .map(|callable| {
-                    json!({
-                        "identity": callable.identity,
-                        "path": callable.path,
-                        "start": {"line": callable.start_line, "column": callable.start_column},
-                        "end": {"line": callable.end_line, "column": callable.end_column},
-                        "cyclomatic": callable.cyclomatic,
-                        "nesting": callable.nesting,
-                        "body_tokens": callable.body_tokens.len(),
-                    })
-                })
-                .collect::<Vec<_>>();
-            let ranges = crate_metrics
-                .callables
-                .iter()
-                .filter(|callable| callable.duplicate_token_count > 0)
-                .map(|callable| {
-                    json!({
-                        "path": callable.path,
-                        "start_line": callable.start_line,
-                        "end_line": callable.end_line,
-                        "covered_tokens": callable.duplicate_token_count,
-                    })
-                })
-                .collect::<Vec<_>>();
-            json!({
-                "manifest_path": crate_metrics.manifest_path,
-                "name": crate_metrics.name,
-                "sources": crate_metrics.sources,
-                "opaque_sources": crate_metrics.opaque_sources.iter().map(|item| json!({
-                    "path": item.path,
-                    "line": item.line,
-                    "description": item.description,
-                })).collect::<Vec<_>>(),
-                "sloc": crate_metrics.sloc,
-                "callables": callables,
-                "duplication": {
-                    "covered_tokens": crate_metrics.duplicate_tokens,
-                    "total_tokens": crate_metrics.callable_tokens,
-                    "fraction": score.duplication_fraction,
-                    "ranges": ranges,
-                },
-                "penalties": {
-                    "complexity": score.penalties.complexity,
-                    "size": score.penalties.size,
-                    "nesting": score.penalties.nesting,
-                    "duplication": score.penalties.duplication,
-                },
-                "score_hundredths": score.score_hundredths,
-                "applicability": if score.score_hundredths.is_some() { "applicable" } else { "not_applicable" },
-            })
-        })
-        .collect::<Vec<_>>();
-    json!({
-        "schema_version": 1,
-        "algorithm_version": 1,
-        "policy": policy,
-        "input_digest": input_digest,
-        "crates": crate_records,
-        "workspace": {
-            "total_sloc": crates.iter().map(|crate_metrics| crate_metrics.sloc).sum::<usize>(),
-            "applicable_crates": scores.iter().filter(|score| score.score_hundredths.is_some()).count(),
-            "score_hundredths": workspace,
-        }
-    })
-}
-
-#[derive(Debug)]
-struct ValidatedHealthBaseline {
-    crates: BTreeMap<String, Option<u16>>,
-    workspace_score_hundredths: Option<u16>,
-}
-
-fn validate_health_baseline(
-    baseline: &Value,
-    current: &Value,
-) -> Result<ValidatedHealthBaseline, String> {
-    if baseline.get("schema_version").and_then(Value::as_u64) != Some(3) {
-        return Err("baseline has an unsupported schema version".to_owned());
-    }
-    if baseline.get("algorithm_version").and_then(Value::as_u64) != Some(1) {
-        return Err("baseline has an unsupported health algorithm version".to_owned());
-    }
-    if baseline.pointer("/policy/scoring") != current.pointer("/policy/scoring")
-        || baseline.pointer("/policy/selection") != current.pointer("/policy/selection")
-    {
-        return Err("baseline scoring limits or source-selection policy do not match".to_owned());
-    }
-    let digest = baseline
-        .get("input_digest")
-        .and_then(Value::as_str)
-        .unwrap_or("");
-    if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        return Err("baseline has an invalid input digest".to_owned());
-    }
-    let crate_records = baseline
-        .get("crates")
-        .and_then(Value::as_array)
-        .ok_or_else(|| "baseline has no crate array".to_owned())?;
-    let mut scores = BTreeMap::new();
-    let mut total_sloc = 0_u128;
-    let mut weighted_score = 0_u128;
-    for crate_record in crate_records {
-        let manifest = crate_record
-            .get("manifest_path")
-            .and_then(Value::as_str)
-            .filter(|manifest| !manifest.is_empty())
-            .ok_or_else(|| "baseline crate is missing manifest_path".to_owned())?;
-        let sloc = crate_record
-            .get("sloc")
-            .and_then(Value::as_u64)
-            .ok_or_else(|| format!("baseline crate '{manifest}' has no valid SLOC"))?;
-        let raw_score = crate_record
-            .get("overall_score")
-            .ok_or_else(|| format!("baseline crate '{manifest}' has no overall score"))?;
-        let score = parse_baseline_score(raw_score)
-            .ok_or_else(|| format!("baseline crate '{manifest}' has an invalid overall score"))?;
-        if (sloc == 0) != score.is_none() {
-            return Err(format!(
-                "baseline crate '{manifest}' has inconsistent score applicability"
-            ));
-        }
-        total_sloc += u128::from(sloc);
-        if let Some(score) = score {
-            weighted_score += u128::from(score) * u128::from(sloc);
-        }
-        if scores.insert(manifest.to_owned(), score).is_some() {
-            return Err(format!(
-                "baseline has duplicate crate identity '{manifest}'"
-            ));
-        }
-    }
-    let derived_workspace_score = (weighted_score + total_sloc / 2)
-        .checked_div(total_sloc)
-        .map(|score| score as u16);
-    let workspace = baseline
-        .get("workspace")
-        .ok_or_else(|| "baseline has no workspace summary".to_owned())?;
-    if workspace.get("sloc").and_then(Value::as_u64) != u64::try_from(total_sloc).ok() {
-        return Err("baseline workspace SLOC is inconsistent with crate rows".to_owned());
-    }
-    let workspace_score = parse_baseline_score(
-        workspace
-            .get("overall_score")
-            .ok_or_else(|| "baseline workspace has no overall score".to_owned())?,
-    )
-    .ok_or_else(|| "baseline workspace score is invalid".to_owned())?;
-    if workspace_score != derived_workspace_score {
-        return Err("baseline workspace score is inconsistent with crate rows".to_owned());
-    }
-    Ok(ValidatedHealthBaseline {
-        crates: scores,
-        workspace_score_hundredths: workspace_score,
-    })
-}
-
-fn parse_baseline_score(value: &Value) -> Option<Option<u16>> {
-    if value.is_null() {
-        return Some(None);
-    }
-    let score = value.as_f64()?;
-    let hundredths = (score * 100.0).round();
-    if !score.is_finite()
-        || !(0.0..=100.0).contains(&score)
-        || (score * 100.0 - hundredths).abs() > 1e-7
-    {
-        return None;
-    }
-    Some(Some(hundredths as u16))
-}
-
 fn failure_from_block(
     check: &str,
     block: &super::catalog::FailureBlock,
@@ -2750,76 +2062,4 @@ pub(super) fn assign_failure_ids(mut failures: Vec<FailureDraft>) -> Vec<Failure
             focus_tail: failure.focus_tail,
         })
         .collect()
-}
-
-#[cfg(test)]
-mod health_baseline_tests {
-    use super::validate_health_baseline;
-    use serde_json::{Value, json};
-
-    fn valid_snapshot() -> Value {
-        json!({
-            "schema_version": 3,
-            "algorithm_version": 1,
-            "input_digest": "a".repeat(64),
-            "policy": {
-                "scoring": {"cyclomaticLimit": 10},
-                "selection": {"include": "production"}
-            },
-            "crates": [{
-                "manifest_path": "crates/demo/Cargo.toml",
-                "sloc": 10,
-                "overall_score": 100.0
-            }],
-            "workspace": {
-                "sloc": 10,
-                "overall_score": 100.0
-            }
-        })
-    }
-
-    #[test]
-    #[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-030"))]
-    fn baseline_validation_rejects_duplicate_and_inconsistent_records() {
-        let valid = valid_snapshot();
-        let baseline = validate_health_baseline(&valid, &valid).expect("valid baseline");
-        assert_eq!(baseline.crates.len(), 1);
-        assert_eq!(baseline.workspace_score_hundredths, Some(10_000));
-
-        let mut duplicate = valid.clone();
-        let original = duplicate["crates"][0].clone();
-        duplicate["crates"]
-            .as_array_mut()
-            .expect("crate array")
-            .push(original);
-        assert!(
-            validate_health_baseline(&duplicate, &valid)
-                .expect_err("duplicate identity")
-                .contains("duplicate crate identity")
-        );
-
-        let mut invalid_score = valid.clone();
-        invalid_score["crates"][0]["overall_score"] = json!(100.01);
-        assert!(
-            validate_health_baseline(&invalid_score, &valid)
-                .expect_err("out-of-range score")
-                .contains("invalid overall score")
-        );
-
-        let mut inconsistent_crate = valid.clone();
-        inconsistent_crate["crates"][0]["sloc"] = json!(0);
-        assert!(
-            validate_health_baseline(&inconsistent_crate, &valid)
-                .expect_err("inconsistent score applicability")
-                .contains("inconsistent score applicability")
-        );
-
-        let mut inconsistent_workspace = valid.clone();
-        inconsistent_workspace["workspace"]["overall_score"] = json!(99.99);
-        assert!(
-            validate_health_baseline(&inconsistent_workspace, &valid)
-                .expect_err("inconsistent workspace score")
-                .contains("workspace score is inconsistent")
-        );
-    }
 }

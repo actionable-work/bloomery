@@ -12,7 +12,7 @@ use std::io::{self, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::ExitCode;
 
-pub(super) fn run_retrieve(
+pub fn run_retrieve(
     context: &CheckContext<'_>,
     args: HealthArgs,
     stdout: &mut impl Write,
@@ -74,7 +74,7 @@ pub(super) fn run_retrieve(
     write_page(context.json_mode, context.color, bytes, stdout, stderr)
 }
 
-pub(super) fn run_update(
+pub fn run_update(
     context: &CheckContext<'_>,
     args: HealthUpdateArgs,
     stdout: &mut impl Write,
@@ -187,7 +187,7 @@ fn require_exportable_run(record: &super::model::RunRecord) -> Result<(), Update
     })
 }
 
-pub(super) fn refresh_baseline(root: &Path, report: &Value) -> Result<(), String> {
+pub fn refresh_baseline(root: &Path, report: &Value) -> Result<(), String> {
     let loaded =
         bloomery_model::config::load_with_raw(root).map_err(|diagnostic| diagnostic.message)?;
     let policy =
@@ -359,7 +359,7 @@ fn read_health_report(directory: &Path) -> Result<Value, String> {
     let report: Value = serde_json::from_slice(&bytes)
         .map_err(|error| format!("retained health report is malformed: {error}"))?;
     if report.get("schema_version").and_then(Value::as_u64) != Some(1)
-        || report.get("algorithm_version").and_then(Value::as_u64) != Some(1)
+        || report.get("algorithm_version").and_then(Value::as_u64) != Some(2)
     {
         return Err(
             "retained health report uses an unsupported schema or algorithm version".to_owned(),
@@ -496,7 +496,7 @@ fn health_summary(report: &Value) -> Value {
             .cmp(&right["manifest_path"].as_str())
     });
     json!({
-        "schema_version": 3,
+        "schema_version": 4,
         "algorithm_version": report.get("algorithm_version"),
         "policy": {
             "scoring": report.pointer("/policy/scoring"),
@@ -543,6 +543,7 @@ fn rounded_penalties(penalties: Option<&Value>) -> Value {
         "size": rounded("size"),
         "nesting": rounded("nesting"),
         "duplication": rounded("duplication"),
+        "crateSize": rounded("crateSize"),
     })
 }
 
@@ -580,6 +581,7 @@ fn workspace_subscores(report: &Value) -> Value {
         "size": weighted_penalty("size"),
         "nesting": weighted_penalty("nesting"),
         "duplication": weighted_penalty("duplication"),
+        "crateSize": weighted_penalty("crateSize"),
     })
 }
 

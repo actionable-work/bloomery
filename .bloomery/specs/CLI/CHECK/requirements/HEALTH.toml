@@ -26,7 +26,7 @@ id = "CLI-CHECK-HEALTH-004"
 title = "Crate scores use documented penalties"
 manual = false
 design = "design/code-health.md#metrics-and-score"
-ears = { type = "ubiquitous", system = "Bloomery", action = "calculate applicable crate scores from the versioned complexity, size, nesting, and exact-duplication formulas" }
+ears = { type = "ubiquitous", system = "Bloomery", action = "calculate applicable crate scores from the versioned complexity, callable-size, nesting, duplication, and crate-size formulas using the effective component weights" }
 
 [[requirements]]
 id = "CLI-CHECK-HEALTH-005"
@@ -103,14 +103,14 @@ id = "CLI-CHECK-HEALTH-015"
 title = "Invalid baselines fail after measurement"
 manual = false
 design = "design/code-health.md#policy-gates"
-ears = { type = "ubiquitous", system = "Bloomery", action = "fail missing, malformed, unsupported, or incompatible baselines while retaining a valid current measurement" }
+ears = { type = "ubiquitous", system = "Bloomery", action = "fail malformed, unsupported, or policy-incompatible baselines after retaining a valid current measurement" }
 
 [[requirements]]
 id = "CLI-CHECK-HEALTH-016"
 title = "Baseline compatibility follows score semantics"
 manual = false
 design = "design/code-health.md#policy-gates"
-ears = { type = "ubiquitous", system = "Bloomery", action = "require matching schema, algorithm, scoring limits, duplicate window size, and source-selection policy before calculating baseline deltas" }
+ears = { type = "ubiquitous", system = "Bloomery", action = "require matching snapshot schema, algorithm, effective scoring limits and weights, duplicate window size, and source-selection policy before calculating baseline deltas" }
 
 [[requirements]]
 id = "CLI-CHECK-HEALTH-017"
@@ -247,10 +247,10 @@ ears = { type = "event", trigger = "a no-write check completes a selected health
 
 [[requirements]]
 id = "CLI-CHECK-HEALTH-036"
-title = "Complete measurements seed invalid or missing baselines"
+title = "Complete measurements seed invalid baselines"
 manual = false
 design = "design/code-health.md#baseline-snapshots"
-ears = { type = "event", trigger = "a complete write-mode health measurement has a missing, invalid, or incompatible baseline", system = "bloomery check", action = "retain the baseline diagnostic and seed the configured baseline from the complete current measurement" }
+ears = { type = "event", trigger = "a complete write-mode health measurement has a malformed, unsupported, or policy-incompatible baseline", system = "bloomery check", action = "retain the baseline diagnostic and seed the configured baseline from the complete current measurement" }
 
 [[requirements]]
 id = "CLI-CHECK-HEALTH-037"
@@ -272,3 +272,45 @@ title = "Baseline write failure preserves data and fails health"
 manual = false
 design = "design/code-health.md#baseline-snapshots"
 ears = { type = "event", trigger = "automatic baseline replacement fails after a complete write-mode health measurement", system = "bloomery check", action = "report HealthBaselineWriteFailed with exit code 1, retain the complete measurement, and preserve the previous baseline" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-040"
+title = "Component weights govern all code health scores"
+manual = false
+design = "design/code-health.md#metrics-and-score"
+ears = { type = "ubiquitous", system = "Bloomery", action = "apply the effective complexity, function-size, nesting, duplication, and crate-size weights to every applicable crate score before calculating the production-SLOC-weighted workspace score" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-041"
+title = "Crate SLOC hard limit prevents score dilution"
+manual = false
+design = "design/code-health.md#policy-gates"
+ears = { type = "ubiquitous", system = "Bloomery", action = "fail any crate whose production SLOC exceeds maxCrateSloc even when crate and workspace score floors pass" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-042"
+title = "First write-mode check initializes a missing baseline"
+manual = false
+design = "design/code-health.md#baseline-snapshots"
+ears = { type = "event", trigger = "a complete write-mode code health measurement has an applicable workspace and no configured baseline file", system = "bloomery check", action = "initialize the baseline from the complete measurement without a missing-baseline failure, record baseline_status as initialized, and continue enforcing absolute health gates" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-043"
+title = "No-write check explains a missing baseline"
+manual = false
+design = "design/code-health.md#baseline-snapshots"
+ears = { type = "event", trigger = "a no-write code health measurement has an applicable workspace and finds no configured baseline", system = "bloomery check", action = "fail with an instruction to rerun bloomery check in write mode or publish a retained measurement with bloomery check health update" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-044"
+title = "Crate exceptions override hard limits by manifest path"
+manual = false
+design = "design/code-health.md#policy-gates"
+ears = { type = "ubiquitous", system = "Bloomery", action = "apply each configured crate hard-limit override only to its matching workspace-relative Cargo.toml manifest while retaining global hard limits for all other crates" }
+
+[[requirements]]
+id = "CLI-CHECK-HEALTH-045"
+title = "Crate exceptions name selected manifests"
+manual = false
+design = "design/code-health.md#policy-gates"
+ears = { type = "event", trigger = "a configured crate hard-limit exception does not match a selected workspace Cargo.toml", system = "bloomery check", action = "fail with a configuration error before health policy gates are applied" }

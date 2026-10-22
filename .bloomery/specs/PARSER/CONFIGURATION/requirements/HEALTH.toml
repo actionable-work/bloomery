@@ -12,7 +12,7 @@ id = "PARSER-CONFIGURATION-HEALTH-002"
 title = "Health configuration is validated early"
 manual = false
 design = "design/code-health.md#catalog"
-ears = { type = "ubiquitous", system = "Bloomery", action = "reject unknown health keys, invalid types or ranges, nonfinite numbers, unsupported score precision, and hard limits below soft limits before formatting or analysis" }
+ears = { type = "ubiquitous", system = "Bloomery", action = "reject unknown health keys, invalid types or ranges, nonfinite numbers, unsupported score precision, and hard function or crate-size limits below their corresponding soft limits before formatting or analysis" }
 
 [[requirements]]
 id = "PARSER-CONFIGURATION-HEALTH-003"
@@ -27,3 +27,24 @@ title = "Baseline paths protect managed inputs"
 manual = false
 design = "design/code-health.md#catalog"
 ears = { type = "ubiquitous", system = "Bloomery", action = "reject baseline paths outside the repository through normal paths or symlinks and paths overlapping source inputs, manifests, config, locks, or specifications" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-HEALTH-005"
+title = "Health weights inherit catalogued defaults"
+manual = false
+design = "design/code-health.md#catalog"
+ears = { type = "ubiquitous", system = "Bloomery", action = "resolve omitted checks.codeHealth.weights component keys to defaults of 25 for complexity, 20 for size, 10 for nesting, 15 for duplication, and 30 for crateSize" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-HEALTH-006"
+title = "Health weights are bounded and nonzero as a set"
+manual = false
+design = "design/code-health.md#catalog"
+ears = { type = "ubiquitous", system = "Bloomery", action = "reject configured health weights that are nonfinite, outside 0 through 100, or more precise than two decimals, and reject an effective weight set whose sum is zero before formatting or analysis" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-HEALTH-007"
+title = "Health crate exceptions are validated"
+manual = false
+design = "design/code-health.md#catalog"
+ears = { type = "ubiquitous", system = "Bloomery", action = "accept only recognized positive hard-limit overrides keyed by workspace-relative Cargo.toml paths and require each override to meet its corresponding global soft limit" }

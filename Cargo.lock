@@ -205,10 +205,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "bloomery-check-catalog"
+version = "0.1.0"
+dependencies = [
+ "bloomery-check",
+ "bloomery-check-output",
+ "bloomery-check-support",
+ "serde_json",
+]
+
+[[package]]
 name = "bloomery-check-command"
 version = "0.1.0"
 dependencies = [
  "bloomery-check",
+ "bloomery-check-catalog",
+ "bloomery-check-health",
+ "bloomery-check-output",
+ "bloomery-check-retrieval",
+ "bloomery-check-selection",
+ "bloomery-check-storage",
+ "bloomery-check-support",
  "bloomery-cli-output",
  "bloomery-cli-types",
  "bloomery-model",
@@ -217,6 +234,72 @@ dependencies = [
  "sha2 0.10.9",
  "toml",
  "tracing",
+]
+
+[[package]]
+name = "bloomery-check-health"
+version = "0.1.0"
+dependencies = [
+ "bloomery-check",
+ "bloomery-check-catalog",
+ "bloomery-check-output",
+ "bloomery-check-storage",
+ "bloomery-check-support",
+ "bloomery-cli-output",
+ "bloomery-cli-types",
+ "bloomery-model",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
+name = "bloomery-check-output"
+version = "0.1.0"
+dependencies = [
+ "bloomery-check-support",
+ "bloomery-cli-output",
+ "serde_json",
+]
+
+[[package]]
+name = "bloomery-check-retrieval"
+version = "0.1.0"
+dependencies = [
+ "bloomery-check-catalog",
+ "bloomery-check-output",
+ "bloomery-check-selection",
+ "bloomery-check-storage",
+ "bloomery-check-support",
+ "bloomery-cli-output",
+ "bloomery-cli-types",
+]
+
+[[package]]
+name = "bloomery-check-selection"
+version = "0.1.0"
+dependencies = [
+ "bloomery-check-catalog",
+ "bloomery-check-support",
+ "bloomery-cli-output",
+ "bloomery-model",
+ "toml",
+ "tracing",
+]
+
+[[package]]
+name = "bloomery-check-storage"
+version = "0.1.0"
+dependencies = [
+ "bloomery-check-support",
+ "serde_json",
+]
+
+[[package]]
+name = "bloomery-check-support"
+version = "0.1.0"
+dependencies = [
+ "bloomery-cli-output",
+ "bloomery-cli-types",
 ]
 
 [[package]]
