@@ -111,9 +111,10 @@ the tables are still not interpreted as scanner or spec target configuration.
 ## Code health policy
 
 `[checks.codeHealth]` is CLI-owned despite its parent table also carrying Nix
-keys. It controls independently enabled health analysis, score and function
-limits, baseline location, and allowed regression. Defaults and validation live
-in [code health configuration](code-health.md). The flake loader accepts this
+keys. It controls independently enabled health analysis, component weights,
+score, function, and crate-size limits, baseline location, and allowed
+regression. Defaults and validation live in
+[code health configuration](code-health.md). The flake loader accepts this
 subtable without generating a health derivation.
 
 ## Sub-flake composition

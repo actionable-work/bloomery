@@ -72,7 +72,7 @@ fn eligible_execution_writes_changing_metrics_to_stderr_and_final_metrics_to_std
         &cache,
         &backend,
         false,
-        InterruptFlag::for_test(),
+        InterruptFlag::new(),
         tty(),
     );
     assert_eq!(status, std::process::ExitCode::SUCCESS);
@@ -127,7 +127,7 @@ fn no_write_progress_counts_implicit_treefmt_without_a_preflight_unit() {
             cache: &cache,
             backend: &backend,
             json: false,
-            interrupt: InterruptFlag::for_test(),
+            interrupt: InterruptFlag::new(),
             no_write: true,
             terminal: tty(),
         },
@@ -178,7 +178,7 @@ fn only_observed_dependency_work_is_added_to_selected_derivations() {
         &cache,
         &backend,
         false,
-        InterruptFlag::for_test(),
+        InterruptFlag::new(),
         terminal,
     );
     assert_eq!(status, std::process::ExitCode::SUCCESS);
@@ -207,7 +207,7 @@ fn eligible_completion_summary_repeats_the_final_metrics() {
         &cache,
         &backend,
         false,
-        InterruptFlag::for_test(),
+        InterruptFlag::new(),
         tty(),
     );
     assert_eq!(status, std::process::ExitCode::SUCCESS);
@@ -240,7 +240,7 @@ fn completion_output_omits_metrics_without_a_user_terminal() {
         &cache,
         &backend,
         false,
-        InterruptFlag::for_test(),
+        InterruptFlag::new(),
         TerminalFacts::default(),
     );
     assert_eq!(status, std::process::ExitCode::SUCCESS);
@@ -258,7 +258,7 @@ fn completion_output_omits_metrics_without_a_user_terminal() {
         &cache,
         &backend,
         true,
-        InterruptFlag::for_test(),
+        InterruptFlag::new(),
         tty(),
     );
     assert_eq!(status, std::process::ExitCode::SUCCESS);
@@ -285,7 +285,7 @@ fn non_terminal_stderr_receives_no_progress_on_either_stream() {
         &cache,
         &backend,
         true,
-        InterruptFlag::for_test(),
+        InterruptFlag::new(),
         TerminalFacts::default(),
     );
     assert_eq!(status, std::process::ExitCode::SUCCESS);
@@ -312,7 +312,7 @@ fn ci_markers_suppress_progress_even_with_a_terminal() {
         &cache,
         &backend,
         true,
-        InterruptFlag::for_test(),
+        InterruptFlag::new(),
         terminal,
     );
     assert_eq!(status, std::process::ExitCode::SUCCESS);
@@ -336,7 +336,7 @@ fn json_mode_suppresses_progress_on_both_streams() {
         &cache,
         &backend,
         true,
-        InterruptFlag::for_test(),
+        InterruptFlag::new(),
         tty(),
     );
     assert_eq!(status, std::process::ExitCode::SUCCESS);
@@ -365,7 +365,7 @@ fn dumb_terminals_suppress_progress() {
         &cache,
         &backend,
         true,
-        InterruptFlag::for_test(),
+        InterruptFlag::new(),
         terminal,
     );
     assert_eq!(status, std::process::ExitCode::SUCCESS);
@@ -391,7 +391,7 @@ fn no_color_keeps_progress_without_styling() {
         &cache,
         &backend,
         false,
-        InterruptFlag::for_test(),
+        InterruptFlag::new(),
         terminal,
     );
     assert_eq!(status, std::process::ExitCode::SUCCESS);
@@ -420,7 +420,7 @@ fn catalog_and_retrieval_subcommands_never_start_progress() {
         &cache,
         &backend,
         false,
-        InterruptFlag::for_test(),
+        InterruptFlag::new(),
         tty(),
     );
     assert_eq!(status, std::process::ExitCode::SUCCESS);
@@ -451,7 +451,7 @@ fn warm_selected_outputs_count_once_and_unused_dependencies_are_excluded() {
         &cache,
         &backend,
         false,
-        InterruptFlag::for_test(),
+        InterruptFlag::new(),
         tty(),
     );
     assert_eq!(status, std::process::ExitCode::SUCCESS);
@@ -512,7 +512,7 @@ fn completed_check_outputs_advance_progress_before_the_batch_returns() {
                 color: crate::output::ColorMode::Auto,
                 no_write: false,
                 backend: backend_for_run.as_ref(),
-                interrupt: InterruptFlag::for_test(),
+                interrupt: InterruptFlag::new(),
                 cache_base: Some(&cache_for_run),
                 terminal: tty(),
             },
@@ -566,7 +566,7 @@ fn static_only_runs_report_zero_derivation_work() {
         &cache,
         &backend,
         false,
-        InterruptFlag::for_test(),
+        InterruptFlag::new(),
         tty(),
     );
     assert_eq!(status, std::process::ExitCode::SUCCESS);
@@ -591,7 +591,7 @@ fn final_reporting_clears_the_transient_line_before_any_summary() {
         &cache,
         &backend,
         false,
-        InterruptFlag::for_test(),
+        InterruptFlag::new(),
         tty(),
     );
     assert_eq!(status, std::process::ExitCode::SUCCESS);
@@ -633,7 +633,7 @@ fn blocked_dependents_finalize_before_a_slow_worker_joins() {
                 color: crate::output::ColorMode::Auto,
                 no_write: false,
                 backend: &backend,
-                interrupt: InterruptFlag::for_test(),
+                interrupt: InterruptFlag::new(),
                 cache_base: Some(&cache_for_run),
                 terminal: tty(),
             },
@@ -696,7 +696,7 @@ fn finalization_is_published_while_another_worker_is_still_running() {
         run_with_followups(FollowupSchedule {
             tasks,
             jobs: 2,
-            interrupt: InterruptFlag::for_test(),
+            interrupt: InterruptFlag::new(),
             should_stop: Box::new(|_| false),
             followups: Box::new(|_| Vec::new()),
             on_complete: Box::new(|id: &str, _result| {
@@ -754,7 +754,7 @@ fn formatter_failure_finalizes_every_selected_check() {
         &cache,
         &backend,
         false,
-        InterruptFlag::for_test(),
+        InterruptFlag::new(),
         tty(),
     );
     assert_eq!(status, std::process::ExitCode::FAILURE);

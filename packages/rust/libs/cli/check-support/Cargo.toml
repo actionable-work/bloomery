@@ -1,0 +1,8 @@
+[dependencies]
+bloomery-cli-output = { workspace = true }
+bloomery-cli-types = { workspace = true }
+
+[package]
+edition = "2024"
+name = "bloomery-check-support"
+version = "0.1.0"

@@ -222,7 +222,7 @@ impl RunAllocation {
 /// Freeze a derivation's normalized records on first retrieval. The OS lock is
 /// shared by concurrent processes and released automatically if one exits.
 /// Aliased failures reference one snapshot without modifying the run manifest.
-pub(super) fn retain_derivation_records(
+pub fn retain_derivation_records(
     run_directory: &Path,
     store_path: &str,
     resolve: impl FnOnce() -> Vec<String>,
@@ -709,7 +709,7 @@ fn string_array_object(value: &Map<String, Value>, key: &str) -> Result<Vec<Stri
         .collect()
 }
 
-pub(super) fn timestamp_millis() -> u64 {
+pub fn timestamp_millis() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()

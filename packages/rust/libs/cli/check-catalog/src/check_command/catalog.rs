@@ -142,13 +142,11 @@ struct LoggedCommand<'a> {
 }
 
 impl NixCli {
-    #[cfg(test)]
     pub fn with_executable(executable: impl Into<OsString>) -> Self {
         Self::with_executables(executable, "/missing/bloomery-nix-store-cli")
     }
 
-    #[cfg(test)]
-    pub(super) fn with_executables(
+    pub fn with_executables(
         executable: impl Into<OsString>,
         store_executable: impl Into<OsString>,
     ) -> Self {
@@ -870,8 +868,7 @@ pub fn parse_nix_id(id: &str) -> Option<(&str, &str)> {
     (!system.is_empty() && !attribute.is_empty()).then_some((system, attribute))
 }
 
-#[cfg(test)]
-pub(super) fn nix_log_store_path(output: &[u8]) -> Option<String> {
+pub fn nix_log_store_path(output: &[u8]) -> Option<String> {
     let text = String::from_utf8_lossy(output);
     let safe = super::details::normalize_display_text(&text);
     let mut expects_log_command = false;
@@ -980,13 +977,16 @@ fn eval_base_args() -> Vec<OsString> {
         .collect()
 }
 
+pub const NIX_DISCOVER_EXPRESSION: &str = include_str!("nix/discover.nix");
+pub const NIX_PLAN_EXPRESSION: &str = include_str!("nix/plan.nix");
+
 fn discover_args(system: &str) -> Vec<OsString> {
     let mut args = eval_base_args();
     args.extend([
         OsString::from("--json"),
         OsString::from(format!(".#checks.{system}")),
         OsString::from("--apply"),
-        OsString::from(include_str!("nix/discover.nix")),
+        OsString::from(NIX_DISCOVER_EXPRESSION),
     ]);
     args
 }
@@ -1006,7 +1006,7 @@ fn plan_args(system: &str) -> Vec<OsString> {
         OsString::from("--json"),
         OsString::from(format!(".#checks.{system}")),
         OsString::from("--apply"),
-        OsString::from(include_str!("nix/plan.nix")),
+        OsString::from(NIX_PLAN_EXPRESSION),
     ]);
     args
 }
@@ -1438,7 +1438,7 @@ mod tests {
         let result = missing.format_workspace(
             Path::new("."),
             &log,
-            CancellationToken::new(InterruptFlag::for_test()),
+            CancellationToken::new(InterruptFlag::new()),
         );
         assert!(matches!(result, NixTaskResult::OperationalError(_)));
         let _ = fs::remove_file(log);

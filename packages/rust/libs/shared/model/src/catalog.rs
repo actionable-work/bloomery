@@ -101,7 +101,7 @@ impl KeySpec {
 }
 
 /// Increment when the catalog changes.
-pub const CATALOG_VERSION: u32 = 11;
+pub const CATALOG_VERSION: u32 = 13;
 
 fn is_check_control(path: &[&str]) -> bool {
     matches!(
@@ -562,7 +562,7 @@ pub const CATALOG: &[CatalogEntry] = &[
     CatalogEntry {
         path: &["checks", "codeHealth", "maxRegression"],
         value_type: ValueType::Number,
-        recommended: Some(DefaultValue::Integer(0)),
+        recommended: Some(DefaultValue::Integer(2)),
         documentation: "Maximum allowed decrease from a reviewed score (0–100 points).",
     },
     CatalogEntry {
@@ -582,6 +582,12 @@ pub const CATALOG: &[CatalogEntry] = &[
         value_type: ValueType::PositiveInteger,
         recommended: Some(DefaultValue::Integer(4)),
         documentation: "Soft branch nesting limit used by code health scoring.",
+    },
+    CatalogEntry {
+        path: &["checks", "codeHealth", "crateSlocLimit"],
+        value_type: ValueType::PositiveInteger,
+        recommended: Some(DefaultValue::Integer(1_500)),
+        documentation: "Soft production SLOC limit per crate used by code health scoring.",
     },
     CatalogEntry {
         path: &["checks", "codeHealth", "duplicationFreeRatio"],
@@ -612,6 +618,42 @@ pub const CATALOG: &[CatalogEntry] = &[
         value_type: ValueType::PositiveInteger,
         recommended: Some(DefaultValue::Integer(8)),
         documentation: "Hard per-callable branch nesting limit.",
+    },
+    CatalogEntry {
+        path: &["checks", "codeHealth", "maxCrateSloc"],
+        value_type: ValueType::PositiveInteger,
+        recommended: Some(DefaultValue::Integer(5_000)),
+        documentation: "Hard production SLOC limit per crate.",
+    },
+    CatalogEntry {
+        path: &["checks", "codeHealth", "weights", "complexity"],
+        value_type: ValueType::Number,
+        recommended: Some(DefaultValue::Integer(25)),
+        documentation: "Relative code health score weight for cyclomatic complexity.",
+    },
+    CatalogEntry {
+        path: &["checks", "codeHealth", "weights", "size"],
+        value_type: ValueType::Number,
+        recommended: Some(DefaultValue::Integer(20)),
+        documentation: "Relative code health score weight for callable body size.",
+    },
+    CatalogEntry {
+        path: &["checks", "codeHealth", "weights", "nesting"],
+        value_type: ValueType::Number,
+        recommended: Some(DefaultValue::Integer(10)),
+        documentation: "Relative code health score weight for branch nesting.",
+    },
+    CatalogEntry {
+        path: &["checks", "codeHealth", "weights", "duplication"],
+        value_type: ValueType::Number,
+        recommended: Some(DefaultValue::Integer(15)),
+        documentation: "Relative code health score weight for duplicated code.",
+    },
+    CatalogEntry {
+        path: &["checks", "codeHealth", "weights", "crateSize"],
+        value_type: ValueType::Number,
+        recommended: Some(DefaultValue::Integer(30)),
+        documentation: "Relative code health score weight for production SLOC per crate.",
     },
     CatalogEntry {
         path: &["build", "unify"],
@@ -815,7 +857,26 @@ pub fn resolve(path: &[&str]) -> Option<KeySpec> {
     }
     formatter_key(path)
         .or_else(|| flake_key(path))
+        .or_else(|| crate_exception_key(path))
         .or_else(|| optimize_key(path))
+}
+
+fn crate_exception_key(path: &[&str]) -> Option<KeySpec> {
+    let ["checks", "codeHealth", "crateExceptions", _manifest, field] = path else {
+        return None;
+    };
+    if !matches!(
+        *field,
+        "maxCyclomatic" | "maxFunctionTokens" | "maxNesting" | "maxCrateSloc"
+    ) {
+        return None;
+    }
+    Some(KeySpec {
+        path: path.iter().map(|segment| (*segment).to_owned()).collect(),
+        value_type: ValueType::PositiveInteger,
+        recommended: None,
+        documentation: "Hard code health limit override for one workspace crate.",
+    })
 }
 
 fn formatter_key(path: &[&str]) -> Option<KeySpec> {
@@ -927,6 +988,11 @@ fn flake_key(path: &[&str]) -> Option<KeySpec> {
 
 /// Whether a path is a recognized table that may contain catalogued leaves.
 fn is_known_table(path: &[&str]) -> bool {
+    if path == ["checks", "codeHealth", "crateExceptions"]
+        || (path.len() == 4 && path[..3] == ["checks", "codeHealth", "crateExceptions"])
+    {
+        return true;
+    }
     if path == ["formatters"] || (path.len() == 2 && path[0] == "formatters") {
         return true;
     }
@@ -1181,12 +1247,13 @@ mod tests {
 
     #[test]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-HEALTH-001"))]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-HEALTH-005"))]
     fn health_schema_supplies_all_recommended_defaults() {
         let health_entries = CATALOG
             .iter()
             .filter(|entry| entry.path.starts_with(&["checks", "codeHealth"]))
             .collect::<Vec<_>>();
-        assert_eq!(health_entries.len(), 13);
+        assert_eq!(health_entries.len(), 20);
         assert!(
             health_entries
                 .iter()
@@ -1196,11 +1263,36 @@ mod tests {
             effective_default(&["checks", "codeHealth", "duplicationFreeRatio"]),
             Some(Value::Float(0.02))
         );
+        assert_eq!(
+            effective_default(&["checks", "codeHealth", "maxRegression"]),
+            Some(Value::Integer(2))
+        );
+        assert_eq!(
+            effective_default(&["checks", "codeHealth", "crateSlocLimit"]),
+            Some(Value::Integer(1_500))
+        );
+        assert_eq!(
+            effective_default(&["checks", "codeHealth", "maxCrateSloc"]),
+            Some(Value::Integer(5_000))
+        );
+        for (key, expected) in [
+            ("complexity", 25),
+            ("size", 20),
+            ("nesting", 10),
+            ("duplication", 15),
+            ("crateSize", 30),
+        ] {
+            assert_eq!(
+                effective_default(&["checks", "codeHealth", "weights", key]),
+                Some(Value::Integer(expected))
+            );
+        }
     }
 
     #[test]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-HEALTH-002"))]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-HEALTH-003"))]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-HEALTH-006"))]
     fn health_schema_rejects_invalid_policy_even_when_disabled() {
         for raw in [
             "[checks.codeHealth]\nenable=false\nminCrateScore=101\n",
@@ -1209,10 +1301,46 @@ mod tests {
             "[checks.codeHealth]\ncyclomaticLimit=10\nmaxCyclomatic=9\n",
             "[checks.codeHealth]\nunknown=true\n",
             "[checks.codeHealth]\nminCrateScore=nan\n",
+            "[checks.codeHealth]\ncrateSlocLimit=1501\nmaxCrateSloc=1500\n",
+            "[checks.codeHealth.weights]\ncomplexity=100.001\n",
+            "[checks.codeHealth.weights]\ncomplexity=101\n",
+            "[checks.codeHealth]\nenable=false\n[checks.codeHealth.weights]\ncomplexity=0\nsize=0\nnesting=0\nduplication=0\ncrateSize=0\n",
+            "[checks.codeHealth.weights]\ncomplexity=nan\n",
+            "[checks.codeHealth.weights]\nunknown=25\n",
         ] {
             let value = toml::from_str::<Value>(raw).expect("TOML parses");
             assert!(validate_raw(&value).is_err(), "accepted {raw}");
         }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-HEALTH-007"))]
+    fn health_crate_exception_keys_are_catalogued_and_validated() {
+        let key = resolve(&[
+            "checks",
+            "codeHealth",
+            "crateExceptions",
+            "packages/demo/Cargo.toml",
+            "maxCrateSloc",
+        ])
+        .expect("crate exception hard limit");
+        assert_eq!(key.value_type, ValueType::PositiveInteger);
+        assert!(key.recommended.is_none());
+
+        for raw in [
+            "[checks.codeHealth.crateExceptions.\"../demo/Cargo.toml\"]\nmaxCrateSloc=6000\n",
+            "[checks.codeHealth.crateExceptions.\"packages/demo/Cargo.toml\"]\nmaxCrateSloc=1499\n",
+            "[checks.codeHealth.crateExceptions.\"packages/demo/Cargo.toml\"]\nunknown=6000\n",
+        ] {
+            let value = toml::from_str::<Value>(raw).expect("TOML parses");
+            assert!(validate_raw(&value).is_err(), "accepted {raw}");
+        }
+
+        let valid = toml::from_str::<Value>(
+            "[checks.codeHealth.crateExceptions.\"packages/demo/Cargo.toml\"]\nmaxCrateSloc=6000\n",
+        )
+        .expect("valid TOML");
+        assert!(validate_raw(&valid).is_ok());
     }
 
     #[test]
@@ -1428,7 +1556,7 @@ mod tests {
     #[test]
     #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-005"))]
     fn catalog_version_tracks_the_binary() {
-        assert_eq!(CATALOG_VERSION, 11);
+        assert_eq!(CATALOG_VERSION, 13);
         assert!(!CATALOG.is_empty());
     }
 

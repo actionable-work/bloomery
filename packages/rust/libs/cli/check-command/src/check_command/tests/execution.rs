@@ -267,7 +267,7 @@ fn evaluation_failures_are_check_failures_and_store_failures_are_operational() {
             color: crate::output::ColorMode::Auto,
             no_write: false,
             backend: &backend,
-            interrupt: InterruptFlag::for_test(),
+            interrupt: InterruptFlag::new(),
             cache_base: Some(&blocked_cache),
             terminal: crate::output::TerminalFacts::default(),
         },
@@ -402,7 +402,7 @@ fn independent_nix_derivations_realize_concurrently_within_the_job_limit() {
 #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-013"))]
 fn interrupted_runs_retain_completed_outcomes_and_return_130() {
     let (root, cache) = fixture(true);
-    let interrupt = InterruptFlag::for_test();
+    let interrupt = InterruptFlag::new();
     let backend = FakeNix {
         names: vec!["interrupted".to_owned()],
         interrupt_on_evaluation: Some(interrupt.clone()),

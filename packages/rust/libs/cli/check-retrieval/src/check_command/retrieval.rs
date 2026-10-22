@@ -1,22 +1,26 @@
-use super::catalog::NixBackend;
-use super::command::{
-    CheckContext, CheckError, DetailsArgs, FailureArgs, ListArgs, discover_for_selection,
-    report_error, write_page,
+use bloomery_check_catalog::check_command::catalog::NixBackend;
+use bloomery_check_output::check_command::{
+    details::{diagnostic_detail_text, display_records, normalize_display_bytes},
+    output::{self, DetailPage},
+    render::{report_error, write_page},
 };
-use super::details::{diagnostic_detail_text, display_records, normalize_display_bytes};
-use super::model::{FailureRecord, RunRecord, select_ids};
-use super::output::{self, DetailPage};
-use super::store;
+use bloomery_check_selection::check_command::selection::discover_for_selection;
+use bloomery_check_storage::check_command::store;
+use bloomery_check_support::check_command::{
+    context::{CheckError, HealthContext},
+    model::{FailureRecord, RunRecord, select_ids},
+};
+use bloomery_cli_types::{DetailsArgs, FailureArgs, ListArgs};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-pub(super) fn run_list(
+pub fn run_list(
     root: &Path,
     args: ListArgs,
     json_mode: bool,
-    color: crate::output::ColorMode,
+    color: bloomery_cli_output::ColorMode,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
     backend: &dyn NixBackend,
@@ -57,11 +61,11 @@ pub(super) fn run_list(
     write_page(json_mode, color, bytes, stdout, stderr)
 }
 
-pub(super) fn run_failures(
+pub fn run_failures(
     root: &Path,
     args: FailureArgs,
     json_mode: bool,
-    color: crate::output::ColorMode,
+    color: bloomery_cli_output::ColorMode,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
     cache_base: Option<&Path>,
@@ -91,9 +95,9 @@ pub(super) fn run_failures(
     write_page(json_mode, color, bytes, stdout, stderr)
 }
 
-pub(super) fn run_details(
+pub fn run_details(
     args: DetailsArgs,
-    context: &CheckContext<'_>,
+    context: &HealthContext<'_, dyn NixBackend + '_>,
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> ExitCode {
@@ -216,9 +220,11 @@ fn detail_records(
         let derivation_records = store::retain_derivation_records(directory, nix_log, || {
             match backend.read_derivation_log(root, nix_log) {
                 Ok(log) => normalize_display_bytes(&log),
-                Err(error) => display_records(&super::details::normalize_display_text(&format!(
-                    "Nix derivation log unavailable: {error}"
-                ))),
+                Err(error) => display_records(
+                    &bloomery_check_output::check_command::details::normalize_display_text(
+                        &format!("Nix derivation log unavailable: {error}"),
+                    ),
+                ),
             }
         })?;
         records.extend(derivation_records);

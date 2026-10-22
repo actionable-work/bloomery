@@ -1,0 +1,13 @@
+[dependencies]
+bloomery-check-catalog = { workspace = true }
+bloomery-check-output = { workspace = true }
+bloomery-check-selection = { workspace = true }
+bloomery-check-storage = { workspace = true }
+bloomery-check-support = { workspace = true }
+bloomery-cli-output = { workspace = true }
+bloomery-cli-types = { workspace = true }
+
+[package]
+edition = "2024"
+name = "bloomery-check-retrieval"
+version = "0.1.0"

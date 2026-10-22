@@ -4,8 +4,9 @@
   system,
 }: let
   adapter = ../../packages/rust/libs/cli/check-command;
-  discover = import (adapter + "/src/check_command/nix/discover.nix");
-  plan = import (adapter + "/src/check_command/nix/plan.nix");
+  catalog = ../../packages/rust/libs/cli/check-catalog;
+  discover = import (catalog + "/src/check_command/nix/discover.nix");
+  plan = import (catalog + "/src/check_command/nix/plan.nix");
   shared = builtins.derivation {
     name = "catalog-fixture";
     inherit system;
@@ -47,7 +48,7 @@
   visibleChecks = workspaceChecks // registered;
   overrides = import (adapter + "/overrides.nix") {inherit pkgs lib;};
   sourceSelection = import ../../lib/workspace/sources.nix {inherit pkgs lib;};
-  common = sourceSelection.defaultFileset {crateDir = adapter;};
+  common = sourceSelection.defaultFileset {crateDir = catalog;};
   tests = {
     testDiscovery = {
       expr = discover fixtures;
@@ -81,7 +82,7 @@
     };
     testSources = {
       expr = {
-        projection = sourceSelection.filesetContains common (adapter + "/src/check_command/nix/plan.nix");
+        projection = sourceSelection.filesetContains common (catalog + "/src/check_command/nix/plan.nix");
         helper = sourceSelection.filesetContains common (adapter + "/test-fixtures/nix-cli.rs");
         fixtureEnv = builtins.hasAttr "BLOOMERY_NIX_FIXTURE" overrides.test.env;
         productionEnv = overrides ? env;

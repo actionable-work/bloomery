@@ -17,9 +17,10 @@ Preserve the existing diagnostic semantics and repository-relative locations:
 | `MissingAutomatedTest` | Automated requirement has no evidence. |
 | `ParseError` | Configuration, Markdown, TOML, source, or Nix input is invalid. |
 | `HealthScoreBelowMinimum` | A crate or workspace score is below its configured floor. |
+| `HealthCrateSizeLimitExceeded` | A crate exceeds its configured production-SLOC hard limit. |
 | `HealthFunctionLimitExceeded` | A callable exceeds a configured hard metric limit. |
 | `HealthRegression` | A comparable score decreased beyond the permitted allowance. |
-| `HealthBaselineMissing` | Applicable health has no baseline file to compare. |
+| `HealthBaselineMissing` | Applicable no-write health has no baseline; the diagnostic tells the user how to initialize it. |
 | `HealthBaselineInvalid` | The baseline is malformed or unsupported. |
 | `HealthBaselineIncompatible` | Baseline and current scoring or selection policy differ. |
 | `HealthBaselineWriteFailed` | The complete health measurement could not replace the configured baseline. |

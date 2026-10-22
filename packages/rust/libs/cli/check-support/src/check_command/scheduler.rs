@@ -21,7 +21,7 @@ pub struct ScheduleReport<T> {
 /// Tracks worker completion so a caller-thread progress consumer knows when no
 /// further events can be produced. Workers hold a guard that decrements the
 /// count as their last action.
-pub(super) struct WorkerTracker {
+pub struct WorkerTracker {
     state: Arc<(Mutex<usize>, Condvar)>,
 }
 
@@ -39,7 +39,7 @@ impl WorkerTracker {
     }
 
     /// Wait up to `timeout` for all workers to finish. Returns `true` once idle.
-    pub(super) fn wait_timeout(&self, timeout: Duration) -> bool {
+    pub fn wait_timeout(&self, timeout: Duration) -> bool {
         let (lock, condvar) = &*self.state;
         let guard = lock.lock().expect("worker tracker lock");
         if *guard == 0 {
@@ -65,22 +65,22 @@ impl Drop for WorkerGuard {
     }
 }
 
-pub(super) type Task<'scope, T> = Box<dyn FnOnce(CancellationToken) -> T + Send + 'scope>;
+pub type Task<'scope, T> = Box<dyn FnOnce(CancellationToken) -> T + Send + 'scope>;
 type StopPredicate<'scope, T> = dyn Fn(&T) -> bool + Sync + 'scope;
 type FollowupFactory<'scope, T> = dyn Fn(&mut T) -> Vec<(String, Task<'scope, T>)> + Sync + 'scope;
 type CompletionHook<'scope, T> = dyn Fn(&str, &T) + Sync + 'scope;
 type StopHook<'scope> = dyn Fn(&[String]) + Sync + 'scope;
 type SpawnHook<'scope> = dyn FnOnce(&WorkerTracker) + 'scope;
 
-pub(super) struct FollowupSchedule<'scope, T> {
-    pub(super) tasks: Vec<(String, Task<'scope, T>)>,
-    pub(super) jobs: usize,
-    pub(super) interrupt: InterruptFlag,
-    pub(super) should_stop: Box<StopPredicate<'scope, T>>,
-    pub(super) followups: Box<FollowupFactory<'scope, T>>,
-    pub(super) on_complete: Box<CompletionHook<'scope, T>>,
-    pub(super) on_stopped: Box<StopHook<'scope>>,
-    pub(super) on_spawned: Box<SpawnHook<'scope>>,
+pub struct FollowupSchedule<'scope, T> {
+    pub tasks: Vec<(String, Task<'scope, T>)>,
+    pub jobs: usize,
+    pub interrupt: InterruptFlag,
+    pub should_stop: Box<StopPredicate<'scope, T>>,
+    pub followups: Box<FollowupFactory<'scope, T>>,
+    pub on_complete: Box<CompletionHook<'scope, T>>,
+    pub on_stopped: Box<StopHook<'scope>>,
+    pub on_spawned: Box<SpawnHook<'scope>>,
 }
 
 struct Scheduler<'scope, T> {
@@ -153,9 +153,7 @@ where
 /// final not_run outcomes without waiting for active workers to join.
 /// `on_spawned` runs on the calling thread after every worker is started; it is
 /// the single-owner drain point for progress events.
-pub(super) fn run_with_followups<'scope, T>(
-    schedule: FollowupSchedule<'scope, T>,
-) -> ScheduleReport<T>
+pub fn run_with_followups<'scope, T>(schedule: FollowupSchedule<'scope, T>) -> ScheduleReport<T>
 where
     T: Send + 'scope,
 {
@@ -331,7 +329,7 @@ mod tests {
         let report = run_with_followups(FollowupSchedule {
             tasks,
             jobs: 2,
-            interrupt: InterruptFlag::for_test(),
+            interrupt: InterruptFlag::new(),
             should_stop: Box::new(|result| *result == TaskResult::Failed),
             followups: Box::new(|result| {
                 if *result == TaskResult::Passed {
@@ -391,7 +389,7 @@ mod tests {
                 false
             }));
         }
-        let report = run_bounded(tasks, 2, false, InterruptFlag::for_test(), |failed| *failed);
+        let report = run_bounded(tasks, 2, false, InterruptFlag::new(), |failed| *failed);
         assert_eq!(maximum.load(Ordering::SeqCst), 2);
         assert!(
             report
@@ -422,7 +420,7 @@ mod tests {
                 )
             })
             .collect();
-        let report = run_bounded(tasks, 3, false, InterruptFlag::for_test(), |failed| *failed);
+        let report = run_bounded(tasks, 3, false, InterruptFlag::new(), |failed| *failed);
         assert!(
             report
                 .results
@@ -449,7 +447,7 @@ mod tests {
                 })
             })
             .collect();
-        let report = run_bounded(tasks, 1, true, InterruptFlag::for_test(), |failed| *failed);
+        let report = run_bounded(tasks, 1, true, InterruptFlag::new(), |failed| *failed);
 
         assert_eq!(admitted.load(Ordering::SeqCst), 1);
         assert!(matches!(
@@ -485,7 +483,7 @@ mod tests {
                 }),
             ),
         ];
-        let report = run_bounded(tasks, 2, true, InterruptFlag::for_test(), |result| {
+        let report = run_bounded(tasks, 2, true, InterruptFlag::new(), |result| {
             *result == TaskResult::Failed
         });
 
@@ -503,7 +501,7 @@ mod tests {
     #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-012"))]
     #[cfg_attr(any(), bloomery("CLI-CHECK-RUN-013"))]
     fn interruption_requests_cancellation_and_preserves_finished_work() {
-        let interrupt = InterruptFlag::for_test();
+        let interrupt = InterruptFlag::new();
         let for_task = interrupt.clone();
         let task_interrupt = interrupt.clone();
         let tasks: Vec<(String, TestTask)> = vec![
@@ -514,7 +512,7 @@ mod tests {
             (
                 "waiting".to_owned(),
                 Box::new(move |cancel: CancellationToken| {
-                    for_task.interrupt_for_test();
+                    for_task.interrupt();
                     while !cancel.is_canceled() {
                         std::thread::sleep(Duration::from_millis(1));
                     }

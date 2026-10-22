@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 /// A normalized progress event. Check finalization and derivation work share
 /// one channel so a single consumer owns ordering and rendering.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) enum ProgressEvent {
+pub enum ProgressEvent {
     CheckFinalized {
         id: String,
         outcome: Outcome,
@@ -27,7 +27,7 @@ pub(super) enum ProgressEvent {
 /// backend produces every variant; unavailable information is omitted.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(dead_code)]
-pub(super) enum DerivationEvent {
+pub enum DerivationEvent {
     Discovered { drv: String },
     BuildStarted { drv: String },
     BuildSucceeded { drv: String },
@@ -45,7 +45,7 @@ pub(super) enum DerivationEvent {
 /// A disabled sink drops events, which lets callers skip expensive progress
 /// collection when live rendering is suppressed.
 #[derive(Clone)]
-pub(super) struct ProgressSink {
+pub struct ProgressSink {
     sender: Arc<Mutex<mpsc::Sender<ProgressEvent>>>,
     enabled: bool,
     checks: Arc<BTreeMap<String, Vec<String>>>,
@@ -53,7 +53,7 @@ pub(super) struct ProgressSink {
 }
 
 impl ProgressSink {
-    pub(super) fn new(sender: mpsc::Sender<ProgressEvent>, enabled: bool) -> Self {
+    pub fn new(sender: mpsc::Sender<ProgressEvent>, enabled: bool) -> Self {
         Self {
             sender: Arc::new(Mutex::new(sender)),
             enabled,
@@ -62,7 +62,7 @@ impl ProgressSink {
         }
     }
 
-    pub(super) fn with_metadata(
+    pub fn with_metadata(
         mut self,
         checks: BTreeMap<String, Vec<String>>,
         outputs: BTreeMap<String, String>,
@@ -72,15 +72,15 @@ impl ProgressSink {
         self
     }
 
-    pub(super) fn output_metadata(&self) -> BTreeMap<String, String> {
+    pub fn output_metadata(&self) -> BTreeMap<String, String> {
         self.outputs.as_ref().clone()
     }
 
-    pub(super) fn is_enabled(&self) -> bool {
+    pub fn is_enabled(&self) -> bool {
         self.enabled
     }
 
-    pub(super) fn emit(&self, event: ProgressEvent) {
+    pub fn emit(&self, event: ProgressEvent) {
         if !self.enabled {
             return;
         }
@@ -90,7 +90,7 @@ impl ProgressSink {
         }
     }
 
-    pub(super) fn work(&self, event: DerivationEvent) {
+    pub fn work(&self, event: DerivationEvent) {
         let completed = match &event {
             DerivationEvent::OutputsValid { drv } => self.checks.get(drv).cloned(),
             _ => None,
@@ -120,19 +120,19 @@ enum DerivationWork {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct ProgressSnapshot {
-    pub(super) checks_complete: usize,
-    pub(super) checks_total: usize,
-    pub(super) built: Option<usize>,
-    pub(super) to_build: Option<usize>,
-    pub(super) cached: Option<usize>,
-    pub(super) to_fetch: Option<usize>,
-    pub(super) total: Option<usize>,
+pub struct ProgressSnapshot {
+    pub checks_complete: usize,
+    pub checks_total: usize,
+    pub built: Option<usize>,
+    pub to_build: Option<usize>,
+    pub cached: Option<usize>,
+    pub to_fetch: Option<usize>,
+    pub total: Option<usize>,
 }
 
 /// Pure run-scoped reducer. It owns exactly-once check completion and
 /// deduplicated derivation work accounting. It never performs I/O.
-pub(super) struct ProgressReducer {
+pub struct ProgressReducer {
     checks_total: usize,
     finalized: BTreeMap<String, Outcome>,
     derivations: BTreeMap<String, DerivationWork>,
@@ -145,7 +145,7 @@ impl ProgressReducer {
     /// selection count. Derivation metrics stay unknown until structured
     /// information arrives, except for static-only runs which are known to be
     /// zero.
-    pub(super) fn new(checks_total: usize, has_nix_checks: bool) -> Self {
+    pub fn new(checks_total: usize, has_nix_checks: bool) -> Self {
         Self {
             checks_total,
             finalized: BTreeMap::new(),
@@ -155,7 +155,7 @@ impl ProgressReducer {
         }
     }
 
-    pub(super) fn apply(&mut self, event: ProgressEvent) {
+    pub fn apply(&mut self, event: ProgressEvent) {
         match event {
             ProgressEvent::CheckFinalized { id, outcome } => {
                 // A finalized check counts once. Re-finalization reconciles the
@@ -276,7 +276,7 @@ impl ProgressReducer {
         }
     }
 
-    pub(super) fn snapshot(&self) -> ProgressSnapshot {
+    pub fn snapshot(&self) -> ProgressSnapshot {
         let (built, to_build, cached, to_fetch, total) = if self.work_known {
             let mut built = 0;
             let mut to_build = 0;
@@ -325,14 +325,14 @@ impl ProgressReducer {
 }
 
 /// Owns the reducer and the single transient terminal line for one run.
-pub(super) struct ProgressReporter<W: Write> {
+pub struct ProgressReporter<W: Write> {
     reducer: ProgressReducer,
     line: TransientLine<W>,
     width: usize,
 }
 
 impl<W: Write> ProgressReporter<W> {
-    pub(super) fn new(
+    pub fn new(
         reducer: ProgressReducer,
         writer: W,
         enabled: bool,
@@ -346,12 +346,12 @@ impl<W: Write> ProgressReporter<W> {
         }
     }
 
-    pub(super) fn start(&mut self) {
+    pub fn start(&mut self) {
         let text = format_progress_snapshot(&self.reducer.snapshot(), self.width);
         self.line.update(&text);
     }
 
-    pub(super) fn apply(&mut self, event: ProgressEvent) {
+    pub fn apply(&mut self, event: ProgressEvent) {
         let check_completed = matches!(event, ProgressEvent::CheckFinalized { .. });
         self.reducer.apply(event);
         if check_completed {
@@ -359,24 +359,24 @@ impl<W: Write> ProgressReporter<W> {
         }
     }
 
-    pub(super) fn refresh(&mut self) {
+    pub fn refresh(&mut self) {
         let text = format_progress_snapshot(&self.reducer.snapshot(), self.width);
         self.line.update(&text);
     }
 
-    pub(super) fn is_enabled(&self) -> bool {
+    pub fn is_enabled(&self) -> bool {
         self.line.is_enabled()
     }
 
     /// Final work metrics. Unfinished work remains visible as pending after
     /// failure or cancellation; check outcome counts appear in the summary.
-    pub(super) fn final_metrics(&self) -> String {
+    pub fn final_metrics(&self) -> String {
         format_work_metrics(&self.reducer.snapshot(), self.width)
     }
 
     /// Clear the transient line before any final summary, error, or
     /// interruption report.
-    pub(super) fn finish(&mut self) {
+    pub fn finish(&mut self) {
         self.refresh();
         self.line.clear();
     }

@@ -45,14 +45,13 @@ fn health_fixture() -> (std::path::PathBuf, std::path::PathBuf, FakeNix) {
 
 #[test]
 #[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-002"))]
-#[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-015"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-017"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-021"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-018"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-003"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-032"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-033"))]
-#[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-036"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-042"))]
 #[cfg_attr(any(), bloomery("PARSER-SCANNING-HEALTH-009"))]
 #[cfg_attr(any(), bloomery("PARSER-SCANNING-HEALTH-013"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-013"))]
@@ -60,13 +59,13 @@ fn health_fixture() -> (std::path::PathBuf, std::path::PathBuf, FakeNix) {
 #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-015"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-016"))]
 #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-014"))]
-fn health_runs_without_specs_and_retains_measurements_when_baseline_is_missing() {
+fn first_write_health_run_initializes_a_missing_baseline_without_failure() {
     let (root, cache, backend) = health_fixture();
     let mut args = request();
     args.selectors = vec!["static:code-health".to_owned()];
     args.jobs = Some(1);
     let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
-    assert_eq!(status, std::process::ExitCode::FAILURE);
+    assert_eq!(status, std::process::ExitCode::SUCCESS);
     let summary: Value = serde_json::from_slice(&stdout).expect("run summary");
     let run = summary["result"]["run"].as_str().expect("run ID");
     let store = RunStore::open(&root, Some(&cache)).expect("run store");
@@ -78,7 +77,7 @@ fn health_runs_without_specs_and_retains_measurements_when_baseline_is_missing()
             .find(|item| item.id == "static:code-health")
             .unwrap()
             .outcome,
-        Outcome::Failed
+        Outcome::Passed
     );
     assert!(record.health_baseline_refreshed);
     assert_eq!(
@@ -89,7 +88,8 @@ fn health_runs_without_specs_and_retains_measurements_when_baseline_is_missing()
         &fs::read(root.join(".bloomery/code-health-summary.json")).expect("seeded baseline"),
     )
     .expect("seeded baseline JSON");
-    assert_eq!(baseline["schema_version"], 3);
+    assert_eq!(baseline["schema_version"], 4);
+    assert_eq!(baseline["algorithm_version"], 2);
     assert!(
         record
             .notices
@@ -100,6 +100,7 @@ fn health_runs_without_specs_and_retains_measurements_when_baseline_is_missing()
         &fs::read(directory.join("health-report.json")).expect("report artifact"),
     )
     .expect("health report JSON");
+    assert_eq!(report["algorithm_version"], 2);
     assert_eq!(
         report["crates"][0]["manifest_path"],
         "crates/demo/Cargo.toml"
@@ -108,6 +109,7 @@ fn health_runs_without_specs_and_retains_measurements_when_baseline_is_missing()
         report["crates"][0]["callables"].as_array().unwrap().len(),
         1
     );
+    assert_eq!(report["baseline_status"], "initialized");
 
     let mut retrieval = request();
     retrieval.operation = Some(CheckOperation::Health(HealthArgs {
@@ -151,6 +153,124 @@ fn health_runs_without_specs_and_retains_measurements_when_baseline_is_missing()
     );
     assert_eq!(backend.formatter_runs.load(Ordering::SeqCst), 2);
 
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-044"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-045"))]
+fn crate_exception_is_retained_and_stale_manifest_paths_are_rejected() {
+    let (root, cache, backend) = health_fixture();
+    fs::write(
+        root.join(".bloomery/config.toml"),
+        "version = 2\n[specs]\nenable = false\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\n\n[checks.codeHealth.crateExceptions.\"crates/demo/Cargo.toml\"]\nmaxCrateSloc = 6000\n",
+    )
+    .expect("configured crate exception");
+    let mut args = request();
+    args.selectors = vec!["static:code-health".to_owned()];
+    let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::SUCCESS);
+    let summary: Value = serde_json::from_slice(&stdout).expect("run summary");
+    let run = summary["result"]["run"].as_str().expect("run ID");
+    let store = RunStore::open(&root, Some(&cache)).expect("run store");
+    let (_, directory) = store.load(run).expect("retained run");
+    let report: Value = serde_json::from_slice(
+        &fs::read(directory.join("health-report.json")).expect("health report"),
+    )
+    .expect("health report JSON");
+    assert_eq!(
+        report["policy"]["effective"]["crateExceptions"]["crates/demo/Cargo.toml"]["maxCrateSloc"],
+        6000
+    );
+
+    fs::write(
+        root.join(".bloomery/config.toml"),
+        "version = 2\n[specs]\nenable = false\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\n\n[checks.codeHealth.crateExceptions.\"crates/unknown/Cargo.toml\"]\nmaxCrateSloc = 6000\n",
+    )
+    .expect("stale crate exception");
+    let mut args = request();
+    args.selectors = vec!["static:code-health".to_owned()];
+    let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::from(2));
+    assert!(
+        String::from_utf8_lossy(&stdout).contains("does not match a selected workspace crate"),
+        "{}",
+        String::from_utf8_lossy(&stdout)
+    );
+
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-042"))]
+fn first_write_initializes_baseline_while_enforcing_absolute_health_gates() {
+    let (root, cache, backend) = health_fixture();
+    fs::write(
+        root.join(".bloomery/config.toml"),
+        "version = 2\n[specs]\nenable = false\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\ncyclomaticLimit = 1\nmaxCyclomatic = 1\n",
+    )
+    .expect("strict health policy");
+    let mut args = request();
+    args.selectors = vec!["static:code-health".to_owned()];
+    let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::FAILURE);
+    let summary: Value = serde_json::from_slice(&stdout).expect("summary");
+    let run = summary["result"]["run"].as_str().expect("run ID");
+    let store = RunStore::open(&root, Some(&cache)).expect("run store");
+    let (record, directory) = store.load(run).expect("retained run");
+    assert!(
+        record
+            .failures
+            .iter()
+            .any(|failure| { failure.code == "HealthCallableLimitExceeded" })
+    );
+    assert!(
+        !record
+            .failures
+            .iter()
+            .any(|failure| failure.code == "HealthBaselineMissing")
+    );
+    let report: Value = serde_json::from_slice(
+        &fs::read(directory.join("health-report.json")).expect("health report"),
+    )
+    .expect("report JSON");
+    assert_eq!(report["baseline_status"], "initialized");
+    assert!(root.join(".bloomery/code-health-summary.json").is_file());
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-015"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-036"))]
+fn write_mode_fails_and_reseeds_an_incompatible_baseline() {
+    let (root, cache, backend) = health_fixture();
+    fs::write(
+        root.join(".bloomery/code-health-summary.json"),
+        r#"{"schema_version":3,"algorithm_version":1}"#,
+    )
+    .expect("old baseline");
+    let mut args = request();
+    args.selectors = vec!["static:code-health".to_owned()];
+    let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::FAILURE);
+    let summary: Value = serde_json::from_slice(&stdout).expect("summary");
+    let run = summary["result"]["run"].as_str().expect("run ID");
+    let store = RunStore::open(&root, Some(&cache)).expect("run store");
+    let (_, directory) = store.load(run).expect("retained run");
+    let report: Value = serde_json::from_slice(
+        &fs::read(directory.join("health-report.json")).expect("health report"),
+    )
+    .expect("report JSON");
+    assert_eq!(report["baseline_status"], "incompatible");
+    let baseline: Value = serde_json::from_slice(
+        &fs::read(root.join(".bloomery/code-health-summary.json")).expect("reseeded baseline"),
+    )
+    .expect("baseline JSON");
+    assert_eq!(baseline["schema_version"], 4);
+    assert_eq!(baseline["algorithm_version"], 2);
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
 }
@@ -201,6 +321,44 @@ fn no_write_health_preserves_the_baseline_and_can_be_explicitly_published() {
         std::process::ExitCode::SUCCESS
     );
     assert_eq!(fs::read(&baseline_path).expect("explicit update"), before);
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-HEALTH-043"))]
+fn no_write_health_gives_initialization_guidance_for_a_missing_baseline() {
+    let (root, cache, health_backend) = health_fixture();
+    let backend = FakeNix {
+        names: vec!["core:treefmt-check".to_owned()],
+        health_crates: health_backend.health_crates.clone(),
+        ..FakeNix::default()
+    };
+    let mut args = request();
+    args.selectors = vec!["static:code-health".to_owned()];
+    let (status, _, _) = invoke_with_mode(args, &root, &cache, &backend, true, true);
+    assert_eq!(status, std::process::ExitCode::FAILURE);
+    assert!(!root.join(".bloomery/code-health-summary.json").exists());
+
+    let store = RunStore::open(&root, Some(&cache)).expect("run store");
+    let (record, directory) = store.latest().expect("retained no-write run");
+    assert!(!record.health_baseline_refreshed);
+    let report: Value = serde_json::from_slice(
+        &fs::read(directory.join("health-report.json")).expect("retained health report"),
+    )
+    .expect("report JSON");
+    assert_eq!(report["baseline_status"], "missing");
+    let failure = record
+        .failures
+        .iter()
+        .find(|failure| failure.code == "HealthBaselineMissing")
+        .expect("missing baseline failure");
+    assert!(
+        failure
+            .message
+            .contains("rerun `bloomery check` in write mode")
+    );
+    assert!(failure.message.contains("`bloomery check health update`"));
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
 }
@@ -328,7 +486,7 @@ fn failed_formatting_and_early_interrupt_leave_health_baselines_unchanged() {
         previous
     );
 
-    let interrupt = crate::check_command::interrupt::InterruptFlag::for_test();
+    let interrupt = crate::check_command::interrupt::InterruptFlag::new();
     let interrupted_backend = FakeNix {
         health_crates: health_backend.health_crates,
         interrupt_on_health_source: Some(interrupt.clone()),
@@ -414,12 +572,15 @@ fn health_update_exports_current_snapshot_and_rejects_stale_sources() {
     assert!(before.starts_with(b"{\n"));
     assert!(!root.join(".bloomery/code-health.json").exists());
     let summary: Value = serde_json::from_slice(&before).expect("PR summary baseline");
-    assert_eq!(summary["schema_version"], 3);
+    assert_eq!(summary["schema_version"], 4);
+    assert_eq!(summary["algorithm_version"], 2);
     assert!(summary["workspace"]["overall_score"].is_number());
     assert!(summary["workspace"]["sloc"].is_number());
     assert!(summary["workspace"]["subscores"]["complexity"].is_number());
     assert!(summary["crates"][0]["overall_score"].is_number());
     assert!(summary["crates"][0]["subscores"]["duplication"].is_number());
+    assert!(summary["crates"][0]["subscores"]["crateSize"].is_number());
+    assert!(summary["policy"]["scoring"]["weights"]["crateSize"].is_number());
     assert!(summary["crates"][0].get("callables").is_none());
     assert!(summary["crates"][0].get("sources").is_none());
     assert!(summary["input_digest"].is_string());
@@ -598,7 +759,7 @@ fn health_rejects_baselines_when_scoring_semantics_change() {
 
     fs::write(
         root.join(".bloomery/config.toml"),
-        "version = 2\n[specs]\nenable = false\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\ncyclomaticLimit = 9\n",
+        "version = 2\n[specs]\nenable = false\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\n\n[checks.codeHealth.weights]\ncrateSize = 29\n",
     )
     .expect("changed scoring policy");
     let mut args = request();
