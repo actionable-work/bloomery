@@ -1,0 +1,120 @@
+group = "POLICY"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-001"
+title = "Policy checks are generated per selected member"
+manual = false
+design = "design/dependency-policy-checks.md#check-selection"
+ears = { type = "event", trigger = "checks.enable and a dependency policy enable key are true", system = "the workspace builder", action = "generate the enabled policy check for each selected workspace member" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-002"
+title = "Policy checks use each member dependency context"
+manual = false
+design = "design/dependency-policy-checks.md#check-selection"
+ears = { type = "ubiquitous", system = "the dependency policy checks", action = "evaluate each workspace member dependency context independently of build.unify and exclude the member itself from its dependency policy" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-003"
+title = "Vulnerability checks require the advisory database input"
+manual = false
+design = "design/dependency-policy-checks.md#vulnerability-scan"
+ears = { type = "unwanted_behavior", trigger = "checks.enable and checks.vulnerabilities.enable are true and rustsecAdvisoryDb is absent", system = "mkFlake", action = "fail evaluation with a bloomery-prefixed error naming the required input" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-004"
+title = "Vulnerability matching uses crate identity and Cargo version ranges"
+manual = false
+design = "design/dependency-policy-checks.md#vulnerability-scan"
+ears = { type = "ubiquitous", system = "the vulnerability check", action = "match RustSec advisories against crates.io package names and locked versions using Cargo SemVer range semantics" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-005"
+title = "Security advisories fail unless ignored"
+manual = false
+design = "design/dependency-policy-checks.md#vulnerability-scan"
+ears = { type = "event", trigger = "a non-informational advisory matches a dependency and its ID is not ignored", system = "the vulnerability check", action = "fail the member check and report the advisory" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-006"
+title = "Informational advisories use category outcomes"
+manual = false
+design = "design/dependency-policy-checks.md#vulnerability-scan"
+ears = { type = "event", trigger = "an informational advisory matches a dependency", system = "the vulnerability check", action = "warn successfully, fail, or suppress the finding according to the configured category outcome, defaulting known and unknown categories to warn" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-007"
+title = "Withdrawn advisories do not match"
+manual = false
+design = "design/dependency-policy-checks.md#vulnerability-scan"
+ears = { type = "event", trigger = "a matching RustSec advisory is withdrawn", system = "the vulnerability check", action = "omit the advisory from findings" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-008"
+title = "Unsupported advisory data fails closed"
+manual = false
+design = "design/dependency-policy-checks.md#vulnerability-scan"
+ears = { type = "unwanted_behavior", trigger = "the advisory database contains an unsupported schema or version selector", system = "the vulnerability check", action = "fail evaluation instead of omitting the advisory" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-009"
+title = "Package bans apply allow, deny, and exception selectors"
+manual = false
+design = "design/dependency-policy-checks.md#package-bans"
+ears = { type = "ubiquitous", system = "the package ban check", action = "apply a non-empty allowlist, deny selectors, and package exceptions with exceptions taking precedence" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-010"
+title = "License checks evaluate SPDX operators"
+manual = false
+design = "design/dependency-policy-checks.md#license-compatibility"
+ears = { type = "ubiquitous", system = "the license check", action = "evaluate SPDX AND, OR, and WITH expressions against configured allow and deny license entries" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-011"
+title = "Missing license expressions fail without an override"
+manual = false
+design = "design/dependency-policy-checks.md#license-compatibility"
+ears = { type = "unwanted_behavior", trigger = "a dependency has no SPDX license expression and no matching license override", system = "the license check", action = "fail the member check and report the package" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-012"
+title = "License overrides replace package metadata"
+manual = false
+design = "design/dependency-policy-checks.md#license-compatibility"
+ears = { type = "event", trigger = "a package selector matches a configured license override", system = "the license check", action = "use the override SPDX expression in place of the package metadata expression" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-013"
+title = "Policy findings show a dependency path"
+manual = false
+design = "design/dependency-policy-checks.md#check-selection"
+ears = { type = "event", trigger = "a dependency violates an enabled policy", system = "the policy check", action = "report the workspace member, offending package and version, advisory ID and title when applicable, and an example dependency path" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-014"
+title = "Dependency policy checks do not build crates or run Cargo tools"
+manual = false
+design = "design/dependency-policy-checks.md#check-selection"
+ears = { type = "ubiquitous", system = "the dependency policy checks", action = "evaluate lock graph metadata and policy data without building Rust crate derivations or invoking Cargo, cargo-audit, or cargo-deny" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-015"
+title = "License exceptions bypass global license lists"
+manual = false
+design = "design/dependency-policy-checks.md#license-compatibility"
+ears = { type = "event", trigger = "a package matches checks.licenses.exceptions", system = "the license check", action = "exempt the package from the global allow and deny lists while still requiring an SPDX expression" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-016"
+title = "Dependency policy checks require a fresh version-2 lock"
+manual = false
+design = "design/dependency-policy-checks.md#check-selection"
+ears = { type = "unwanted_behavior", trigger = "checks.enable and a dependency policy enable key are true and bloomery.lock is missing, not version 2, or has a Cargo.lock digest mismatch", system = "the workspace builder", action = "fail evaluation with guidance to run bloomery sync" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-017"
+title = "Ignored advisory IDs suppress all matching findings"
+manual = false
+design = "design/dependency-policy-checks.md#vulnerability-scan"
+ears = { type = "event", trigger = "an advisory matches a dependency and its ID appears in checks.vulnerabilities.ignoreAdvisories", system = "the vulnerability check", action = "suppress the advisory regardless of its informational category" }

@@ -168,4 +168,6 @@
     ),
   }:
     import ./optimize.nix {inherit pkgs lib rustc stdenv mold lld useMold useLld defaultLinker;};
+
+  dependencyPolicyCheck = import ./dependency-policy.nix {inherit pkgs lib;};
 }

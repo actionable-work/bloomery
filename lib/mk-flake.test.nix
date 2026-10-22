@@ -372,7 +372,27 @@ in
 
     testMkFlakeArgumentSurface = {
       expr = builtins.attrNames (builtins.functionArgs mkFlake);
-      expected = ["extraFormatters" "extraOutputs" "nixpkgs" "overrides" "root" "self" "systems"];
+      expected = ["extraFormatters" "extraOutputs" "nixpkgs" "overrides" "root" "rustsecAdvisoryDb" "self" "systems"];
+    };
+
+    testMkFlakePassesPinnedRustSecDatabaseToWorkspace = {
+      expr = let
+        database = ../lib/workspace/fixtures/rustsec-db;
+        outputs = mkFlake {
+          nixpkgs = mockNixpkgs;
+          systems = [pkgs.system];
+          root = ../tests/basic-workspace;
+          rustsecAdvisoryDb = database;
+          extraOutputs = {
+            eachSystem,
+            perSystemWorkspace,
+          }: {
+            probe = eachSystem (system: perSystemWorkspace.${system}.config.rustsecAdvisoryDb);
+          };
+        };
+      in
+        outputs.probe.${pkgs.system} == ../lib/workspace/fixtures/rustsec-db;
+      expected = true;
     };
 
     testMkFlakeCompositionOffByDefault = {

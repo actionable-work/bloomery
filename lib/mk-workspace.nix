@@ -66,6 +66,12 @@ in
     includePackageChecks = cfg.checks.includePackageChecks;
     workspaceDependencies = cfg.checks.workspaceDependencies;
     noDefaultFeatures = cfg.checks.noDefaultFeatures;
+    dependencyPolicyChecksEnabled =
+      cfg.checks.enable
+      && (
+        cfg.checks.vulnerabilities.enable || cfg.checks.licenses.enable || cfg.checks.bans.enable
+      );
+    vulnerabilityChecksEnabled = cfg.checks.enable && cfg.checks.vulnerabilities.enable;
 
     formatterResult =
       if treefmtNix == null
@@ -296,6 +302,12 @@ in
     builderDocTest = builders.doctestCrateWith {inherit rustc stdenv mold lld defaultLinker;};
     builderLockCheck = import ./workspace/lock-check.nix {inherit pkgs lib;};
     builderManifestCheck = import ./workspace/manifest-check.nix {inherit pkgs lib;};
+    builderDependencyPolicyCheck = builders.dependencyPolicyCheck;
+    dependencyPolicy = import ./workspace/dependency-policy.nix {
+      inherit lib;
+      licenses = import ./workspace/licenses.nix {inherit lib;};
+    };
+    vulnerabilityPolicy = import ./workspace/vulnerabilities.nix {inherit lib;};
 
     mkCheckName = crateName: checkType: "${crateName}:${checkType}";
 
@@ -311,7 +323,9 @@ in
       then toString bloomeryLock
       else "<inline>";
     lockManifest =
-      if bloomeryLock != null
+      if bloomeryLock == null && dependencyPolicyChecksEnabled
+      then throw "bloomery: Dependency policy checks require a version-2 bloomery.lock. Run 'bloomery sync' to generate it."
+      else if bloomeryLock != null
       then let
         lockData =
           if builtins.isAttrs bloomeryLock
@@ -322,7 +336,11 @@ in
         expectedHash = builtins.hashString "sha256" (lib.replaceStrings ["\r\n"] ["\n"] (builtins.readFile cargoLock));
         actualHash = lockData."cargo-lock-hash" or lockData.cargo_lock_hash or null;
       in
-        if throwOnOutOfDate && actualHash != null && actualHash != expectedHash
+        if (lockData.version or null) != 2
+        then throw "bloomery: Unsupported bloomery.lock version in '${lockName}'; expected version 2. Run 'bloomery sync' to regenerate it."
+        else if dependencyPolicyChecksEnabled && actualHash != expectedHash
+        then throw "bloomery: Dependency policy checks require bloomery.lock to match Cargo.lock. Run 'bloomery sync' to update it."
+        else if throwOnOutOfDate && actualHash != null && actualHash != expectedHash
         then throw "bloomery: Lock manifest '${lockName}' is out of date with '${toString cargoLock}'. Run 'bloomery sync' to update it."
         else lockData
       else null;
@@ -1367,6 +1385,69 @@ in
         };
       });
 
+    policyEntriesFor = member: let
+      memberId = member.id;
+      context = lockContexts.${memberId} or null;
+    in
+      if context == null
+      then throw "bloomery: Dependency policy checks have no resolved lock context for '${memberId}'. Run 'bloomery sync' to regenerate bloomery.lock."
+      else
+        dependencyPolicy.packageEntries {
+          inherit memberId context;
+          packages = parsed.byId;
+          lockPackages = lockManifest.packages or {};
+        };
+
+    memberPolicyChecks = family: enabled: evaluate:
+      if !enabled
+      then {}
+      else
+        lib.listToAttrs (lib.concatMap (member: let
+            findings = evaluate member (policyEntriesFor member);
+            warnings = builtins.filter (finding: (finding.outcome or "deny") == "warn") findings;
+            violations = builtins.filter (finding: (finding.outcome or "deny") != "warn") findings;
+          in [
+            (lib.nameValuePair (mkCheckName member.name family) (builderDependencyPolicyCheck {
+              name = "${member.name}-${family}";
+              inherit warnings violations;
+            }))
+          ])
+          selectedWorkspacePackages);
+
+    banPolicyChecks =
+      memberPolicyChecks "bans" cfg.checks.bans.enable
+      (_member: entries:
+        dependencyPolicy.bansFromEntries {
+          inherit entries;
+          config = cfg.checks.bans;
+        });
+
+    licensePolicyChecks =
+      memberPolicyChecks "licenses" cfg.checks.licenses.enable
+      (_member: entries:
+        dependencyPolicy.licensesCheckFromEntries {
+          inherit entries;
+          config = cfg.checks.licenses;
+        });
+
+    vulnerabilityPolicyChecks =
+      if !vulnerabilityChecksEnabled
+      then {}
+      else if cfg.rustsecAdvisoryDb == null
+      then throw "bloomery: checks.vulnerabilities.enable requires the rustsecAdvisoryDb input."
+      else let
+        advisories = vulnerabilityPolicy.loadDatabase cfg.rustsecAdvisoryDb;
+      in
+        memberPolicyChecks "vulnerabilities" true
+        (_member: entries:
+          vulnerabilityPolicy.scan {
+            memberId = _member.id;
+            inherit entries advisories;
+            config = cfg.checks.vulnerabilities;
+          });
+
+    dependencyPolicyChecks = banPolicyChecks // licensePolicyChecks // vulnerabilityPolicyChecks;
+
     checks =
       treefmtCheck
       // (
@@ -1388,6 +1469,7 @@ in
           )
           // workspaceLockCheck
           // manifestChecks
+          // dependencyPolicyChecks
         else {}
       );
 

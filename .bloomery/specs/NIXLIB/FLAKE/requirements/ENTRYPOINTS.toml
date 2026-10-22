@@ -24,14 +24,10 @@ action = "expose no mkLib constructor"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-ENTRYPOINTS-003"
-title = "mkFlake accepts nixpkgs, root, systems, overrides, and extraOutputs"
+title = "mkFlake accepts its workspace and Nix data inputs"
 manual = false
 design = "design/entry-points.md#mkflake"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the mkFlake constructor"
-action = "accept nixpkgs, root, an optional systems list, an optional overrides set, and an optional extraOutputs callback"
+ears = { type = "ubiquitous", system = "the mkFlake constructor", action = "accept nixpkgs, root, optional systems, overrides, extraFormatters, extraOutputs, main-flake self, and rustsecAdvisoryDb inputs" }
 
 [[requirements]]
 id = "NIXLIB-FLAKE-ENTRYPOINTS-004"
@@ -286,3 +282,10 @@ title = "Root check outputs expose each derivation once"
 manual = false
 design = "design/entry-points.md#extraoutputs"
 ears = { type = "ubiquitous", system = "the Bloomery root flake", action = "expose each workspace or repository check derivation under only one checks attribute name per system" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-027"
+title = "mkFlake accepts the pinned RustSec database source"
+manual = false
+design = "design/entry-points.md#rustsec-advisory-database"
+ears = { type = "event", trigger = "checks.enable and checks.vulnerabilities.enable are true", system = "the mkFlake constructor", action = "require the rustsecAdvisoryDb source path and read the supplied pinned database" }

@@ -80,14 +80,18 @@ supplies a local crates.io index for the no-lock fallback.
 `devShell` controls shell generation, extra packages, and the shell hook.
 `checks.enable` enables or disables generated Nix checks and defaults to off.
 Each Nix check has its own table and `enable` setting: `checks.crates`,
-`checks.packages`, `checks.workspaceDependencies`, and
-`checks.noDefaultFeatures`. Each category contributes its entries only when
-both its switch and the global switch are enabled. `checks.lockFreshness.enable`
+`checks.packages`, `checks.workspaceDependencies`, `checks.noDefaultFeatures`,
+`checks.vulnerabilities`, `checks.licenses`, and `checks.bans`. Each category
+contributes its entries only when both its switch and the global switch are
+enabled. Dependency policy checks evaluate each selected member's resolved
+context. `checks.lockFreshness.enable`
 defaults to off and controls the stale-lock policy independently. Enabled
 package checks reuse the release crate and binary derivations, while
 [build](../../../CLI/BUILD/README.md) realizes the exported production
 packages. The workspace dependency and no default features manifest checks are
-available when their category toggles are enabled.
+available when their category toggles are enabled. Vulnerability, license, and
+package-ban policies are described in
+[Dependency policy checks](../../GRAPH/design/dependency-policy-checks.md).
 
 ## Formatter ordering
 

@@ -15,8 +15,10 @@ feature, documentation text, an effective default when omission has a fixed
 meaning, and an optional upgrade recommendation. Usually the recommendation
 equals the effective default. Check control keys default to `false` but
 recommend `true`, so an existing configuration keeps checks opt-in while
-`config upgrade` explicitly sets supported check controls. Keys whose omission
-is semantic are addressable but have no recommendation:
+`config upgrade` explicitly sets supported check controls. The vulnerability
+check has no upgrade recommendation because it requires a separately supplied
+Nix input. Other keys whose omission is semantic are addressable but have no
+recommendation:
 `build.bloomeryLock` auto-detects, `build.members` means all members,
 `build.toolchain.linker` is host-dependent, `features.cratesIoIndex` means
 none, `specs.enable` auto-detects from the specification tree, and the
@@ -127,11 +129,37 @@ default because omission delegates to `Cargo.toml` and rustc defaults.
 | `checks.lockFreshness.enable` | boolean | `true` |
 | `checks.workspaceDependencies.enable` | boolean | `true` |
 | `checks.noDefaultFeatures.enable` | boolean | `true` |
+| `checks.vulnerabilities.enable` | boolean | none |
+| `checks.vulnerabilities.ignoreAdvisories` | list of RustSec advisory IDs | `[]` |
+| `checks.vulnerabilities.informational.unmaintained` | `warn`, `deny`, or `ignore` | `warn` |
+| `checks.vulnerabilities.informational.unsound` | `warn`, `deny`, or `ignore` | `warn` |
+| `checks.vulnerabilities.informational.notice` | `warn`, `deny`, or `ignore` | `warn` |
+| `checks.vulnerabilities.informational.unknown` | `warn`, `deny`, or `ignore` | `warn` |
+| `checks.bans.enable` | boolean | `true` |
+| `checks.bans.allow` | list of package selectors | `[]` |
+| `checks.bans.deny` | list of package selectors | `[]` |
+| `checks.bans.exceptions` | list of package selectors | `[]` |
+| `checks.licenses.enable` | boolean | `true` |
+| `checks.licenses.allow` | list of SPDX license IDs or exception pairs | `[]` |
+| `checks.licenses.deny` | list of SPDX license IDs or exception pairs | `[]` |
+| `checks.licenses.exceptions` | list of package selectors | `[]` |
+| `checks.licenses.overrides.<package-selector>` | SPDX expression | none |
 
 When omitted, every check `enable` setting in this table is effectively
-`false` and has an upgrade recommendation of `true`. `checks.enable` gates
-generated Nix checks. `checks.lockFreshness.enable` controls the stale-lock
-policy independently.
+`false`. Every check enable setting has an upgrade recommendation of `true`
+except `checks.vulnerabilities.enable`, which has no recommendation because it
+requires the separately supplied `rustsecAdvisoryDb` Nix input. `checks.enable`
+gates generated Nix checks. `checks.lockFreshness.enable` controls the stale-lock
+policy independently. Package selectors are canonical crate names or exact
+`name@version` values. A non-empty package or license `allow` list enables a
+whitelist; an empty list imposes no allowlist. The license override family is
+keyed by package selector and has no upgrade recommendation.
+
+The vulnerability, license, and package-ban policy values are consumed by the
+per-member Nix checks in
+[Dependency policy checks](../../../NIXLIB/GRAPH/design/dependency-policy-checks.md).
+The RustSec advisory database path is a `mkFlake` Nix argument, not a
+config.toml key.
 
 `checks.specifications`, `checks.codeHealth`, and
 `checks.clippySuppressions` are CLI-owned nested tables. Their `enable` keys
@@ -140,8 +168,8 @@ designs define their scope. The Nix loader validates and accepts these tables
 without generating corresponding Nix checks.
 
 An unupgraded configuration generates no Nix checks by default. `config upgrade`
-sets each missing check enable setting to `true` unless a value was already
-configured.
+sets each missing check enable setting with a recommendation to `true` unless a
+value was already configured.
 The
 [CLI build command](../../../CLI/BUILD/README.md) materializes production
 packages instead. Setting `checks.packages.enable = true` adds the release

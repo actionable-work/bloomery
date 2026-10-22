@@ -10,15 +10,23 @@ it does not expose a public `lib` builder surface.
 
 `mkFlake` accepts `nixpkgs`, `root`, an optional `systems` list, an optional
 `overrides` attribute set, an optional `extraFormatters` attribute set, an
-optional `extraOutputs` callback, and an optional main-flake `self`. It
-evaluates one workspace per selected system with that system's
-`nixpkgs.legacyPackages`. No other workspace option is accepted as a
-constructor argument; every remaining setting comes from the configuration
-file described in [Build configuration](configuration.md).
+optional `extraOutputs` callback, an optional main-flake `self`, and an
+optional `rustsecAdvisoryDb` source path. The advisory database is a Nix input,
+not a workspace option; every build setting comes from the configuration file
+described in [Build configuration](configuration.md). `mkFlake` evaluates one
+workspace per selected system with that system's `nixpkgs.legacyPackages`.
 
 When `[flakes]` composition is configured, `mkFlake` uses `self` to resolve
 each sub-flake's inputs and forwards them to the sub-flake's `outputs`; see
 [Sub-flake composition](composition.md).
+
+## RustSec advisory database
+
+The consuming flake pins the RustSec advisory database as a flake input and
+passes its source path as `rustsecAdvisoryDb`. The argument is required when
+both `checks.enable` and `checks.vulnerabilities.enable` are true. Bloomery
+reads the pinned tree during Nix evaluation and never fetches advisory data
+itself.
 
 ## Configuration requirement
 

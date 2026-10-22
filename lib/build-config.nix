@@ -4,6 +4,9 @@
 }: let
   inherit (builtins) attrNames elem filter isAttrs isInt isList isString;
   currentConfigVersion = 2;
+  licenses = import ./workspace/licenses.nix {inherit lib;};
+  packageSelectorPattern = "[A-Za-z0-9][A-Za-z0-9_-]*(@[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?)?";
+  advisoryIdPattern = "RUSTSEC-[0-9]{4}-[0-9]{4}";
 
   validateConfigVersion = config:
     if !(isAttrs config)
@@ -48,7 +51,7 @@
     ];
     flags = ["rustc" "test" "clippy" "doc" "doctest"];
     devShell = ["enable" "packages" "shellHook"];
-    checks = ["enable" "crates" "packages" "lockFreshness" "workspaceDependencies" "noDefaultFeatures" "codeHealth" "specifications" "clippySuppressions"];
+    checks = ["enable" "crates" "packages" "lockFreshness" "workspaceDependencies" "noDefaultFeatures" "vulnerabilities" "licenses" "bans" "codeHealth" "specifications" "clippySuppressions"];
     features = ["cratesIoIndex"];
   };
 
@@ -218,6 +221,71 @@
     else if builtins.length allow != builtins.length (lib.unique allow)
     then throw "bloomery: checks.clippySuppressions.allow must not contain duplicate lint names"
     else config;
+
+  checkBooleanEnable = name: config:
+    if (config ? enable && !builtins.isBool config.enable)
+    then throw "bloomery: ${name}.enable must be a boolean"
+    else config;
+
+  checkStringList = name: value:
+    if !(isList value) || !(builtins.all isString value)
+    then throw "bloomery: ${name} must be a list of strings"
+    else value;
+
+  checkPackageSelectors = name: value: let
+    selectors = checkStringList name value;
+    invalid = filter (selector: builtins.match packageSelectorPattern selector == null) selectors;
+  in
+    if invalid != []
+    then throw "bloomery: ${name} contains invalid package selector(s): ${lib.concatStringsSep ", " invalid}"
+    else selectors;
+
+  checkVulnerabilities = value: let
+    config = checkTable "checks.vulnerabilities" ["enable" "ignoreAdvisories" "informational"] value;
+    informational = checkTable "checks.vulnerabilities.informational" ["unmaintained" "unsound" "notice" "unknown"] (config.informational or {});
+    categories = ["unmaintained" "unsound" "notice" "unknown"];
+    invalidOutcome = filter (category: elem category (attrNames informational) && !(elem informational.${category} ["warn" "deny" "ignore"])) categories;
+    ignored = checkStringList "checks.vulnerabilities.ignoreAdvisories" (config.ignoreAdvisories or []);
+    invalidIds = filter (advisory: builtins.match advisoryIdPattern advisory == null) ignored;
+  in
+    if config ? enable && !builtins.isBool config.enable
+    then throw "bloomery: checks.vulnerabilities.enable must be a boolean"
+    else if invalidOutcome != []
+    then throw "bloomery: checks.vulnerabilities.informational values must be warn, deny, or ignore"
+    else if invalidIds != []
+    then throw "bloomery: checks.vulnerabilities.ignoreAdvisories contains invalid RustSec advisory ID(s): ${lib.concatStringsSep ", " invalidIds}"
+    else
+      config
+      // {
+        inherit informational;
+        ignoreAdvisories = ignored;
+      };
+
+  checkBans = value: let
+    config = checkTable "checks.bans" ["enable" "allow" "deny" "exceptions"] value;
+    allow = checkPackageSelectors "checks.bans.allow" (config.allow or []);
+    deny = checkPackageSelectors "checks.bans.deny" (config.deny or []);
+    exceptions = checkPackageSelectors "checks.bans.exceptions" (config.exceptions or []);
+  in
+    checkBooleanEnable "checks.bans" config // {inherit allow deny exceptions;};
+
+  checkLicenses = value: let
+    config = checkTable "checks.licenses" ["enable" "allow" "deny" "exceptions" "overrides"] value;
+    allow = checkStringList "checks.licenses.allow" (config.allow or []);
+    deny = checkStringList "checks.licenses.deny" (config.deny or []);
+    exceptions = checkPackageSelectors "checks.licenses.exceptions" (config.exceptions or []);
+    overrides = config.overrides or {};
+    invalidEntries = filter (entry: licenses.compatibilityEntry entry == null) (allow ++ deny);
+    overrideNames = attrNames overrides;
+    invalidOverrides = filter (selector: builtins.match packageSelectorPattern selector == null || !(isString overrides.${selector}) || !(licenses.validExpression overrides.${selector})) overrideNames;
+  in
+    if !(isAttrs overrides)
+    then throw "bloomery: checks.licenses.overrides must be a table"
+    else if invalidEntries != []
+    then throw "bloomery: checks.licenses.allow and deny must contain SPDX license IDs or license-with-exception pairs"
+    else if invalidOverrides != []
+    then throw "bloomery: checks.licenses.overrides contains an invalid package selector or SPDX expression: ${lib.concatStringsSep ", " invalidOverrides}"
+    else checkBooleanEnable "checks.licenses" config // {inherit allow deny exceptions overrides;};
 
   # Formatter sub-tables are keyed by formatter name, so validate the shape of
   # each entry rather than a fixed key list.
@@ -420,16 +488,22 @@
     checkedLockFreshness = checkEnableTable "checks.lockFreshness" (rawChecks.lockFreshness or {});
     checkedWorkspaceDependencies = checkEnableTable "checks.workspaceDependencies" (rawChecks.workspaceDependencies or {});
     checkedNoDefaultFeatures = checkEnableTable "checks.noDefaultFeatures" (rawChecks.noDefaultFeatures or {});
+    checkedVulnerabilities = checkVulnerabilities (rawChecks.vulnerabilities or {});
+    checkedBans = checkBans (rawChecks.bans or {});
+    checkedLicenses = checkLicenses (rawChecks.licenses or {});
     checkedHealth = lib.optionalAttrs (rawChecks ? codeHealth) {codeHealth = checkCodeHealth rawChecks.codeHealth;};
     checkedSpecifications = lib.optionalAttrs (rawChecks ? specifications) {specifications = checkSpecifications rawChecks.specifications;};
     checkedClippySuppressions = lib.optionalAttrs (rawChecks ? clippySuppressions) {clippySuppressions = checkClippySuppressions rawChecks.clippySuppressions;};
-    checks = builtins.deepSeq [checkedCrates checkedPackages checkedLockFreshness checkedWorkspaceDependencies checkedNoDefaultFeatures checkedHealth checkedSpecifications checkedClippySuppressions] (
+    checks = builtins.deepSeq [checkedCrates checkedPackages checkedLockFreshness checkedWorkspaceDependencies checkedNoDefaultFeatures checkedVulnerabilities checkedBans checkedLicenses checkedHealth checkedSpecifications checkedClippySuppressions] (
       builtins.removeAttrs rawChecks [
         "crates"
         "packages"
         "lockFreshness"
         "workspaceDependencies"
         "noDefaultFeatures"
+        "vulnerabilities"
+        "bans"
+        "licenses"
         "codeHealth"
         "specifications"
         "clippySuppressions"
@@ -439,6 +513,11 @@
       // (lib.optionalAttrs (checkedLockFreshness ? enable) {throwOnOutOfDate = checkedLockFreshness.enable;})
       // (lib.optionalAttrs (checkedWorkspaceDependencies ? enable) {workspaceDependencies = checkedWorkspaceDependencies.enable;})
       // (lib.optionalAttrs (checkedNoDefaultFeatures ? enable) {noDefaultFeatures = checkedNoDefaultFeatures.enable;})
+      // {
+        vulnerabilities = checkedVulnerabilities;
+        bans = checkedBans;
+        licenses = checkedLicenses;
+      }
     );
     features = checkTable "features" allowedKeys.features (config.features or {});
     formatters = checkFormatters (config.formatters or {});

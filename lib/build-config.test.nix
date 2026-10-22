@@ -204,6 +204,75 @@ in {
     };
   };
 
+  testDependencyPolicyConfigurationIsMapped = {
+    expr = let
+      cfg = eval {
+        checks = {
+          enable = true;
+          vulnerabilities = {
+            enable = true;
+            ignoreAdvisories = ["RUSTSEC-2024-0001"];
+            informational.unsound = "deny";
+          };
+          bans = {
+            enable = true;
+            allow = ["serde" "foo@1.2.3"];
+            deny = ["bad-crate"];
+            exceptions = ["legacy@0.1.0"];
+          };
+          licenses = {
+            enable = true;
+            allow = ["MIT" "Apache-2.0 WITH LLVM-exception"];
+            deny = ["GPL-3.0-only"];
+            exceptions = ["legacy"];
+            overrides."legacy-crate@1.0.0" = "MIT OR Apache-2.0";
+          };
+        };
+      };
+    in {
+      vulnerabilityEnabled = cfg.checks.vulnerabilities.enable;
+      ignoredAdvisories = cfg.checks.vulnerabilities.ignoreAdvisories;
+      defaultInformational = cfg.checks.vulnerabilities.informational.unmaintained;
+      unsoundOutcome = cfg.checks.vulnerabilities.informational.unsound;
+      banAllow = cfg.checks.bans.allow;
+      banDeny = cfg.checks.bans.deny;
+      banExceptions = cfg.checks.bans.exceptions;
+      licenseAllow = cfg.checks.licenses.allow;
+      licenseDeny = cfg.checks.licenses.deny;
+      licenseExceptions = cfg.checks.licenses.exceptions;
+      licenseOverride = cfg.checks.licenses.overrides."legacy-crate@1.0.0";
+    };
+    expected = {
+      vulnerabilityEnabled = true;
+      ignoredAdvisories = ["RUSTSEC-2024-0001"];
+      defaultInformational = "warn";
+      unsoundOutcome = "deny";
+      banAllow = ["serde" "foo@1.2.3"];
+      banDeny = ["bad-crate"];
+      banExceptions = ["legacy@0.1.0"];
+      licenseAllow = ["MIT" "Apache-2.0 WITH LLVM-exception"];
+      licenseDeny = ["GPL-3.0-only"];
+      licenseExceptions = ["legacy"];
+      licenseOverride = "MIT OR Apache-2.0";
+    };
+  };
+
+  testDependencyPolicyConfigurationRejectsInvalidValues = {
+    expr = builtins.all (config:
+      fails (loader.toWorkspaceArgs {
+        root = ./.;
+        inherit config;
+      })) [
+      {checks.vulnerabilities.informational.notice = "fail";}
+      {checks.vulnerabilities.ignoreAdvisories = ["CVE-2024-0001"];}
+      {checks.bans.allow = ["bad selector@latest"];}
+      {checks.licenses.allow = ["MIT OR Apache-2.0"];}
+      {checks.licenses.overrides."bad selector" = "MIT";}
+      {checks.licenses.overrides.legacy = "MIT OR";}
+    ];
+    expected = true;
+  };
+
   testNonBuildTablesAreIgnored = {
     expr = let
       cfg = eval {

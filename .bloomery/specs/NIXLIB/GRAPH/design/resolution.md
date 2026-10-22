@@ -17,12 +17,14 @@ evaluation errors that name the offending dependency.
 
 ## bloomery.lock
 
-A present `bloomery.lock` supplies the resolved global package graph and one
+A version-2 `bloomery.lock` supplies the resolved global package graph and one
 resolution context per workspace member. The global `packages` view records, for
 every package, its active features and activated dependencies as resolved with
 workspace-wide unification. Each context records the same information for one
-member's fully-unified dependency closure. The lock also records proc-macro and
-edition metadata per package and a SHA-256 digest of `Cargo.lock`. Contexts are
+member's fully-unified dependency closure. The lock also records proc-macro,
+edition, optional Cargo license expression, and optional license-file path per
+package, plus a SHA-256 digest of `Cargo.lock`. License metadata is shared by
+all contexts. Contexts are
 independent of `build.unify`, so changing that setting neither invalidates the
 lock nor changes its bytes. `workspace:lock` reports a digest mismatch, and
 `checks.lockFreshness.enable` turns it into an evaluation error.

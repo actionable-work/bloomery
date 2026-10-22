@@ -18,6 +18,10 @@ struct CargoPackage {
     version: String,
     edition: Option<String>,
     #[serde(default)]
+    license: Option<String>,
+    #[serde(default)]
+    license_file: Option<String>,
+    #[serde(default)]
     targets: Vec<CargoTarget>,
     #[serde(default)]
     features: BTreeMap<String, Vec<String>>,
@@ -333,7 +337,7 @@ pub(crate) fn create_lock(metadata_json: &[u8], cargo_lock: &[u8]) -> Result<Blo
             && previous_identity != id
         {
             return Err(format!(
-                "unsupported Cargo resolution: distinct package identities '{previous_identity}' and '{id}' both map to bloomery.lock key '{key}'. The version-1 lock format keys packages by name-version; resolve the collision before syncing."
+                "unsupported Cargo resolution: distinct package identities '{previous_identity}' and '{id}' both map to bloomery.lock key '{key}'. The version-2 lock format keys packages by name-version; resolve the collision before syncing."
             ));
         }
         id_by_key.insert(key.clone(), id.clone());
@@ -429,12 +433,14 @@ pub(crate) fn create_lock(metadata_json: &[u8], cargo_lock: &[u8]) -> Result<Blo
                 dependencies,
                 proc_macro,
                 edition,
+                license: package.license.clone(),
+                license_file: package.license_file.clone(),
             },
         );
     }
 
     Ok(BloomeryLock {
-        version: 1,
+        version: 2,
         cargo_lock_hash: sha256_normalized_crlf(cargo_lock),
         packages: lock_packages,
         contexts,
@@ -470,8 +476,8 @@ mod tests {
     fn metadata(nodes: &str) -> Vec<u8> {
         format!(
             r#"{{"packages":[
-              {{"id":"crate-a 1.0.0 (registry+https://example.invalid)","name":"crate-a","version":"1.0.0","edition":"2024","targets":[{{"kind":["lib"]}}],"features":{{"default":["serde"],"serde":[]}},"dependencies":[{{"name":"crate-b","optional":false,"uses_default_features":true,"features":["derive"]}}]}},
-              {{"id":"crate-b 2.0.0 (registry+https://example.invalid)","name":"crate-b","version":"2.0.0","edition":null,"targets":[{{"kind":["proc-macro"]}}],"features":{{"derive":[]}},"dependencies":[]}}
+                {{"id":"crate-a 1.0.0 (registry+https://example.invalid)","name":"crate-a","version":"1.0.0","edition":"2024","license":"MIT OR Apache-2.0","license_file":null,"targets":[{{"kind":["lib"]}}],"features":{{"default":["serde"],"serde":[]}},"dependencies":[{{"name":"crate-b","optional":false,"uses_default_features":true,"features":["derive"]}}]}},
+              {{"id":"crate-b 2.0.0 (registry+https://example.invalid)","name":"crate-b","version":"2.0.0","edition":null,"license":null,"license_file":"LICENSE.txt","targets":[{{"kind":["proc-macro"]}}],"features":{{"derive":[]}},"dependencies":[]}}
             ],"workspace_members":["crate-a 1.0.0 (registry+https://example.invalid)"],"resolve":{{"nodes":[{nodes}]}}}}"#
         )
         .into_bytes()
@@ -482,6 +488,7 @@ mod tests {
     #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-018"))]
     #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-019"))]
     #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-020"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-047"))]
     fn resolved_metadata_builds_canonical_lock_records_and_normalizes_crlf() {
         let metadata = metadata(
             r#"{"id":"crate-a 1.0.0 (registry+https://example.invalid)","features":["default","serde"],"deps":[{"pkg":"crate-b 2.0.0 (registry+https://example.invalid)"}]},
@@ -501,11 +508,15 @@ mod tests {
         assert_eq!(crate_a.features, ["default", "serde"]);
         assert_eq!(crate_a.dependencies, ["crate-b-2.0.0"]);
         assert_eq!(crate_a.edition, "2024");
+        assert_eq!(crate_a.license.as_deref(), Some("MIT OR Apache-2.0"));
+        assert_eq!(crate_a.license_file, None);
         assert!(!crate_a.proc_macro);
         let crate_b = &lock.packages["crate-b-2.0.0"];
         assert_eq!(crate_b.features, ["derive"]);
         assert!(crate_b.dependencies.is_empty());
         assert_eq!(crate_b.edition, "2021");
+        assert_eq!(crate_b.license, None);
+        assert_eq!(crate_b.license_file.as_deref(), Some("LICENSE.txt"));
         assert!(crate_b.proc_macro);
 
         let context = &lock.contexts["crate-a-1.0.0"];
@@ -601,7 +612,7 @@ mod tests {
             .expect_err("colliding package identities");
         assert!(error.contains("distinct package identities"));
         assert!(error.contains("crate-a-1.0.0"));
-        assert!(error.contains("version-1 lock format"));
+        assert!(error.contains("version-2 lock format"));
     }
 
     #[test]

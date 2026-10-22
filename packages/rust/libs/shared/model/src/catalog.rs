@@ -112,6 +112,9 @@ fn is_check_control(path: &[&str]) -> bool {
             | ["checks", "lockFreshness", "enable"]
             | ["checks", "workspaceDependencies", "enable"]
             | ["checks", "noDefaultFeatures", "enable"]
+            | ["checks", "vulnerabilities", "enable"]
+            | ["checks", "bans", "enable"]
+            | ["checks", "licenses", "enable"]
             | ["checks", "specifications", "enable"]
             | ["checks", "codeHealth", "enable"]
             | ["checks", "clippySuppressions", "enable"]
@@ -518,6 +521,90 @@ pub const CATALOG: &[CatalogEntry] = &[
         documentation: "Require default features to be disabled on workspace dependencies.",
     },
     CatalogEntry {
+        path: &["checks", "vulnerabilities", "enable"],
+        value_type: ValueType::Bool,
+        recommended: None,
+        documentation: "Scan selected member dependencies against the supplied RustSec database.",
+    },
+    CatalogEntry {
+        path: &["checks", "vulnerabilities", "ignoreAdvisories"],
+        value_type: ValueType::StringList,
+        recommended: Some(DefaultValue::StringList(&[])),
+        documentation: "RustSec advisory IDs suppressed by vulnerability checks.",
+    },
+    CatalogEntry {
+        path: &["checks", "vulnerabilities", "informational", "unmaintained"],
+        value_type: ValueType::StringEnum(&["warn", "deny", "ignore"]),
+        recommended: Some(DefaultValue::String("warn")),
+        documentation: "Outcome for unmaintained-crate advisories.",
+    },
+    CatalogEntry {
+        path: &["checks", "vulnerabilities", "informational", "unsound"],
+        value_type: ValueType::StringEnum(&["warn", "deny", "ignore"]),
+        recommended: Some(DefaultValue::String("warn")),
+        documentation: "Outcome for unsoundness advisories.",
+    },
+    CatalogEntry {
+        path: &["checks", "vulnerabilities", "informational", "notice"],
+        value_type: ValueType::StringEnum(&["warn", "deny", "ignore"]),
+        recommended: Some(DefaultValue::String("warn")),
+        documentation: "Outcome for other informational advisories.",
+    },
+    CatalogEntry {
+        path: &["checks", "vulnerabilities", "informational", "unknown"],
+        value_type: ValueType::StringEnum(&["warn", "deny", "ignore"]),
+        recommended: Some(DefaultValue::String("warn")),
+        documentation: "Outcome for unrecognized advisory categories.",
+    },
+    CatalogEntry {
+        path: &["checks", "bans", "enable"],
+        value_type: ValueType::Bool,
+        recommended: Some(DefaultValue::Bool(true)),
+        documentation: "Check package allowlists, denylists, and exceptions.",
+    },
+    CatalogEntry {
+        path: &["checks", "bans", "allow"],
+        value_type: ValueType::StringList,
+        recommended: Some(DefaultValue::StringList(&[])),
+        documentation: "Package selectors permitted by the package ban check.",
+    },
+    CatalogEntry {
+        path: &["checks", "bans", "deny"],
+        value_type: ValueType::StringList,
+        recommended: Some(DefaultValue::StringList(&[])),
+        documentation: "Package selectors rejected by the package ban check.",
+    },
+    CatalogEntry {
+        path: &["checks", "bans", "exceptions"],
+        value_type: ValueType::StringList,
+        recommended: Some(DefaultValue::StringList(&[])),
+        documentation: "Package selectors exempt from package ban rules.",
+    },
+    CatalogEntry {
+        path: &["checks", "licenses", "enable"],
+        value_type: ValueType::Bool,
+        recommended: Some(DefaultValue::Bool(true)),
+        documentation: "Check dependency license expressions against compatibility policy.",
+    },
+    CatalogEntry {
+        path: &["checks", "licenses", "allow"],
+        value_type: ValueType::StringList,
+        recommended: Some(DefaultValue::StringList(&[])),
+        documentation: "SPDX license IDs or license-with-exception pairs allowed by the license check.",
+    },
+    CatalogEntry {
+        path: &["checks", "licenses", "deny"],
+        value_type: ValueType::StringList,
+        recommended: Some(DefaultValue::StringList(&[])),
+        documentation: "SPDX license IDs or license-with-exception pairs rejected by the license check.",
+    },
+    CatalogEntry {
+        path: &["checks", "licenses", "exceptions"],
+        value_type: ValueType::StringList,
+        recommended: Some(DefaultValue::StringList(&[])),
+        documentation: "Package selectors exempt from global license allow and deny rules.",
+    },
+    CatalogEntry {
         path: &["checks", "codeHealth", "enable"],
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(true)),
@@ -855,7 +942,8 @@ pub fn resolve(path: &[&str]) -> Option<KeySpec> {
     if let Some(entry) = lookup(path) {
         return Some(KeySpec::from_entry(entry));
     }
-    formatter_key(path)
+    license_override_key(path)
+        .or_else(|| formatter_key(path))
         .or_else(|| flake_key(path))
         .or_else(|| crate_exception_key(path))
         .or_else(|| optimize_key(path))
@@ -986,6 +1074,66 @@ fn flake_key(path: &[&str]) -> Option<KeySpec> {
     })
 }
 
+fn license_override_key(path: &[&str]) -> Option<KeySpec> {
+    let ["checks", "licenses", "overrides", selector] = path else {
+        return None;
+    };
+    if !valid_package_selector(selector) {
+        return None;
+    }
+    Some(KeySpec {
+        path: path.iter().map(|segment| (*segment).to_owned()).collect(),
+        value_type: ValueType::String,
+        recommended: None,
+        documentation: "SPDX license expression overriding Cargo metadata for this package selector.",
+    })
+}
+
+fn valid_package_selector(selector: &str) -> bool {
+    let mut parts = selector.split('@');
+    let Some(name) = parts.next() else {
+        return false;
+    };
+    let valid_name = !name.is_empty()
+        && name.as_bytes()[0].is_ascii_alphanumeric()
+        && name.bytes().all(|character| {
+            character.is_ascii_alphanumeric() || character == b'-' || character == b'_'
+        });
+    match parts.next() {
+        None => valid_name,
+        Some(version) => valid_name && parts.next().is_none() && valid_exact_version(version),
+    }
+}
+
+fn valid_exact_version(version: &str) -> bool {
+    let core = version.split(['-', '+']).next().unwrap_or_default();
+    let mut components = core.split('.');
+    let numeric = components.clone().count() == 3
+        && components.all(|component| {
+            !component.is_empty()
+                && component
+                    .bytes()
+                    .all(|character| character.is_ascii_digit())
+        });
+    let suffix = version.bytes().all(|character| {
+        character.is_ascii_alphanumeric() || matches!(character, b'.' | b'-' | b'+')
+    });
+    numeric && suffix
+}
+
+fn valid_advisory_id(value: &str) -> bool {
+    let Some(rest) = value.strip_prefix("RUSTSEC-") else {
+        return false;
+    };
+    let Some((year, issue)) = rest.split_once('-') else {
+        return false;
+    };
+    year.len() == 4
+        && issue.len() == 4
+        && year.bytes().all(|character| character.is_ascii_digit())
+        && issue.bytes().all(|character| character.is_ascii_digit())
+}
+
 /// Whether a path is a recognized table that may contain catalogued leaves.
 fn is_known_table(path: &[&str]) -> bool {
     if path == ["checks", "codeHealth", "crateExceptions"]
@@ -997,6 +1145,9 @@ fn is_known_table(path: &[&str]) -> bool {
         return true;
     }
     if path == ["flakes"] || (path.len() == 2 && path[0] == "flakes") {
+        return true;
+    }
+    if path == ["checks", "licenses", "overrides"] {
         return true;
     }
     if path == ["optimize"] || (path.len() == 2 && path[0] == "optimize") {
@@ -1136,6 +1287,40 @@ pub fn validate_raw(raw: &Value) -> Result<(), Diagnostic> {
                 diagnostics.push(Diagnostic::new(
                     "ConfigurationError",
                     format!("checks.clippySuppressions.allow contains duplicate lint '{lint}'"),
+                ));
+            }
+        }
+    }
+    for path in [
+        &["checks", "bans", "allow"][..],
+        &["checks", "bans", "deny"][..],
+        &["checks", "bans", "exceptions"][..],
+        &["checks", "licenses", "exceptions"][..],
+    ] {
+        if let Some(values) = raw_at(raw, path).and_then(Value::as_array) {
+            for selector in values.iter().filter_map(Value::as_str) {
+                if !valid_package_selector(selector) {
+                    diagnostics.push(Diagnostic::new(
+                        "ConfigurationError",
+                        format!(
+                            "{} contains invalid package selector '{selector}'",
+                            path.join(".")
+                        ),
+                    ));
+                }
+            }
+        }
+    }
+    if let Some(values) =
+        raw_at(raw, &["checks", "vulnerabilities", "ignoreAdvisories"]).and_then(Value::as_array)
+    {
+        for advisory in values.iter().filter_map(Value::as_str) {
+            if !valid_advisory_id(advisory) {
+                diagnostics.push(Diagnostic::new(
+                    "ConfigurationError",
+                    format!(
+                        "checks.vulnerabilities.ignoreAdvisories contains invalid RustSec advisory ID '{advisory}'"
+                    ),
                 ));
             }
         }
@@ -1449,6 +1634,16 @@ mod tests {
             effective_default(&["checks", "noDefaultFeatures", "enable"]),
             Some(Value::Boolean(false))
         );
+        assert_eq!(
+            effective_default(&["checks", "vulnerabilities", "enable"]),
+            Some(Value::Boolean(false))
+        );
+        assert_eq!(
+            lookup(&["checks", "vulnerabilities", "enable"])
+                .unwrap()
+                .recommended,
+            None
+        );
         for path in [
             &["checks", "enable"][..],
             &["checks", "packages", "enable"][..],
@@ -1456,6 +1651,8 @@ mod tests {
             &["checks", "lockFreshness", "enable"][..],
             &["checks", "workspaceDependencies", "enable"][..],
             &["checks", "noDefaultFeatures", "enable"][..],
+            &["checks", "bans", "enable"][..],
+            &["checks", "licenses", "enable"][..],
             &["checks", "codeHealth", "enable"][..],
             &["checks", "specifications", "enable"][..],
             &["checks", "clippySuppressions", "enable"][..],
@@ -1468,6 +1665,51 @@ mod tests {
             effective_default(&["checks", "clippySuppressions", "allow"]),
             Some(Value::Array(Vec::new()))
         );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-027"))]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-028"))]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-029"))]
+    fn dependency_policy_keys_and_license_overrides_are_catalogued() {
+        for path in [
+            &["checks", "vulnerabilities", "ignoreAdvisories"][..],
+            &["checks", "vulnerabilities", "informational", "unmaintained"][..],
+            &["checks", "bans", "allow"][..],
+            &["checks", "bans", "deny"][..],
+            &["checks", "bans", "exceptions"][..],
+            &["checks", "licenses", "allow"][..],
+            &["checks", "licenses", "deny"][..],
+            &["checks", "licenses", "exceptions"][..],
+        ] {
+            assert!(lookup(path).is_some(), "{}", path.join("."));
+        }
+        assert_eq!(
+            lookup(&["checks", "vulnerabilities", "informational", "unmaintained"])
+                .unwrap()
+                .value_type,
+            ValueType::StringEnum(&["warn", "deny", "ignore"])
+        );
+
+        let override_key = resolve(&["checks", "licenses", "overrides", "legacy-crate@1.2.3"])
+            .expect("parameterized license override");
+        assert_eq!(override_key.value_type, ValueType::String);
+        assert_eq!(override_key.recommended, None);
+        assert!(resolve(&["checks", "licenses", "overrides", "legacy-crate@latest"]).is_none());
+
+        let valid = toml::from_str::<Value>(
+            "[checks.bans]\nallow = [\"serde\", \"foo-bar@1.2.3\"]\n[checks.vulnerabilities]\nignoreAdvisories = [\"RUSTSEC-2024-0001\"]\n[checks.licenses.overrides]\nlegacy = \"MIT OR Apache-2.0\"\n",
+        )
+        .expect("valid policy TOML");
+        assert!(validate_raw(&valid).is_ok());
+        for raw in [
+            "[checks.bans]\nallow = [\"bad selector@latest\"]\n",
+            "[checks.vulnerabilities]\nignoreAdvisories = [\"CVE-2024-0001\"]\n",
+            "[checks.vulnerabilities.informational]\nnotice = \"fail\"\n",
+        ] {
+            let value = toml::from_str::<Value>(raw).expect("TOML parses");
+            assert!(validate_raw(&value).is_err(), "accepted {raw}");
+        }
     }
 
     #[test]

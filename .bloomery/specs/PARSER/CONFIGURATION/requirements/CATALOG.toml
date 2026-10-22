@@ -251,14 +251,10 @@ action = "include checks.specifications, checks.codeHealth, and checks.clippySup
 
 [[requirements]]
 id = "PARSER-CONFIGURATION-CATALOG-024"
-title = "Check controls default off and upgrade on"
+title = "Check controls default off with input-aware upgrade recommendations"
 manual = false
 design = "design/schema-catalog.md#checks"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the schema catalog"
-action = "give every boolean check-control key an effective default of false and an upgrade recommendation of true"
+ears = { type = "ubiquitous", system = "the schema catalog", action = "give every boolean check-control key an effective default of false and recommend true for generated checks except checks.vulnerabilities.enable" }
 
 [[requirements]]
 id = "PARSER-CONFIGURATION-CATALOG-025"
@@ -281,3 +277,24 @@ design = "design/schema-catalog.md#checks"
 type = "ubiquitous"
 system = "the schema catalog"
 action = "catalogue an enable key for each generated Nix check under its own checks subtable"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-027"
+title = "Dependency policy keys are catalogued"
+manual = false
+design = "design/schema-catalog.md#checks"
+ears = { type = "ubiquitous", system = "the schema catalog", action = "catalogue the vulnerability, package ban, and license policy keys with their types and effective defaults" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-028"
+title = "License override keys are parameterized"
+manual = false
+design = "design/schema-catalog.md#checks"
+ears = { type = "ubiquitous", system = "the schema catalog", action = "catalogue each checks.licenses.overrides.<package-selector> entry as an SPDX expression without a recommended default" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-CATALOG-029"
+title = "Vulnerability checks are not enabled by config upgrade"
+manual = false
+design = "design/schema-catalog.md#checks"
+ears = { type = "ubiquitous", system = "the schema catalog", action = "omit an upgrade recommendation for checks.vulnerabilities.enable because it requires the rustsecAdvisoryDb Nix input" }

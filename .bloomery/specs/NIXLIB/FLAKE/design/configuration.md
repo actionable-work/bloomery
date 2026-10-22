@@ -2,7 +2,8 @@
 
 Every build setting that `mkFlake` evaluates comes from
 `.bloomery/config.toml`. Settings that require Nix values stay in the
-constructor or in `overrides.nix`.
+constructor or in `overrides.nix`; the pinned advisory database source is
+passed through the `rustsecAdvisoryDb` constructor argument.
 
 ## Configuration source
 
@@ -130,10 +131,14 @@ shellHook = "echo ready"
 
 `[checks]` carries the global `enable` switch. Each check has a subtable with an
 `enable` switch: `[checks.crates]`, `[checks.packages]`,
-`[checks.lockFreshness]`, `[checks.workspaceDependencies]`, and
-`[checks.noDefaultFeatures]`. Every check switch defaults to `false`, so an
-unconfigured flake generates no checks. `checks.enable` gates generated Nix
-checks; the `lockFreshness` policy applies independently. The
+`[checks.lockFreshness]`, `[checks.workspaceDependencies]`,
+`[checks.noDefaultFeatures]`, `[checks.vulnerabilities]`, `[checks.licenses]`,
+and `[checks.bans]`. Every check switch defaults to `false`, so an unconfigured
+flake generates no checks. `checks.enable` gates generated Nix checks; the
+`lockFreshness` policy applies independently. The vulnerability, license, and
+package-ban tables carry allowlists, denylists, exceptions, and license
+overrides as described in
+[Dependency policy checks](../../GRAPH/design/dependency-policy-checks.md). The
 [CLI build command](../../../CLI/BUILD/README.md) remains the production
 package path; package checks are available when explicitly enabled.
 
@@ -155,7 +160,38 @@ enable = false
 
 [checks.noDefaultFeatures]
 enable = false
+
+[checks.vulnerabilities]
+enable = false
+ignoreAdvisories = []
+
+[checks.vulnerabilities.informational]
+unmaintained = "warn"
+unsound = "warn"
+notice = "warn"
+unknown = "warn"
+
+[checks.bans]
+enable = false
+allow = []
+deny = []
+exceptions = []
+
+[checks.licenses]
+enable = false
+allow = []
+deny = []
+exceptions = []
+
+[checks.licenses.overrides]
+legacy-crate = "MIT OR Apache-2.0"
 ```
+
+Informational advisory outcomes are `warn`, `deny`, or `ignore`, and default to
+`warn` for `unmaintained`, `unsound`, `notice`, and unknown categories. These
+dependency policies produce checks per selected workspace member. When both
+`checks.enable` and `checks.vulnerabilities.enable` are true, the
+`rustsecAdvisoryDb` constructor input is required.
 
 ## Features
 
@@ -231,7 +267,8 @@ arbitrary Nix values and are not represented in `config.toml`.
 ## Error handling
 
 An absent configuration file, a syntactically invalid file, an option value of
-the wrong type, an unknown key in a build table, a formatter ordering cycle, a
+the wrong type, an unknown key in a build table, an invalid policy outcome or
+SPDX expression, a malformed package selector, a formatter ordering cycle, a
 formatter self-reference, an ordering edge naming a formatter that is neither
 built in nor supplied by the flake, an enabled optimize entry that names an
 unknown binary, lacks a script, or targets a platform

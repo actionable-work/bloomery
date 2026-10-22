@@ -145,7 +145,7 @@
     devShell.enable = false;
   };
   staleLock = builtins.toFile "stale-bloomery.lock" ''
-    version = 1
+    version = 2
     cargo-lock-hash = "0000000000000000000000000000000000000000000000000000000000000000"
 
     [packages."bin-calc-0.1.0"]
@@ -165,6 +165,40 @@
   missingLockWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
     source.bloomeryLock = null;
+  };
+  allPolicyWorkspace = mkWorkspace {
+    root = ../tests/basic-workspace;
+    rustsecAdvisoryDb = ./workspace/fixtures/rustsec-db;
+    checks.bans.enable = true;
+    checks.licenses.enable = true;
+    checks.vulnerabilities.enable = true;
+  };
+  selectedPolicyWorkspace = mkWorkspace {
+    root = ../tests/basic-workspace;
+    source.members = ["bin-calc"];
+    build.unify = false;
+    checks.bans.enable = true;
+    checks.bans.deny = ["itoa"];
+  };
+  missingPolicyLockWorkspace = mkWorkspace {
+    root = ../tests/basic-workspace;
+    source.bloomeryLock = null;
+    checks.bans.enable = true;
+  };
+  stalePolicyLockWorkspace = mkWorkspace {
+    root = ../tests/basic-workspace;
+    source.bloomeryLock = staleLock;
+    checks.throwOnOutOfDate = false;
+    checks.licenses.enable = true;
+  };
+  missingRustSecWorkspace = mkWorkspace {
+    root = ../tests/basic-workspace;
+    checks.vulnerabilities.enable = true;
+  };
+  disabledPolicyWorkspace = mkWorkspace {
+    root = ../tests/basic-workspace;
+    checks.enable = false;
+    checks.bans.enable = true;
   };
 in {
   testMkWorkspaceOmitsRecursiveCheckRegardlessOfMetadata = {
@@ -213,6 +247,52 @@ in {
       omitsPackageChecksWhenDisabled = true;
       keepsLockCheckWhenPackageChecksAreDisabled = true;
       disablesRustChecks = true;
+    };
+  };
+
+  testDependencyPolicyOutputsArePerSelectedMemberAndFamily = {
+    expr = {
+      allFamilies = lib.filter (name: builtins.any (family: lib.hasSuffix ":${family}" name) ["bans" "licenses" "vulnerabilities"]) (builtins.attrNames allPolicyWorkspace.checks);
+      selectedMemberHasBan = builtins.hasAttr "bin-calc:bans" selectedPolicyWorkspace.checks;
+      selectedMemberOmitsUnselected = !(builtins.hasAttr "lib-calc:bans" selectedPolicyWorkspace.checks);
+      unifiedAndNonUnifiedContextsRemainLockDriven = selectedPolicyWorkspace.lockContexts == metadataWorkspace.lockContexts;
+    };
+    expected = {
+      allFamilies = [
+        "bin-calc:bans"
+        "bin-calc:licenses"
+        "bin-calc:vulnerabilities"
+        "bin-report:bans"
+        "bin-report:licenses"
+        "bin-report:vulnerabilities"
+        "lib-calc:bans"
+        "lib-calc:licenses"
+        "lib-calc:vulnerabilities"
+        "lib-core:bans"
+        "lib-core:licenses"
+        "lib-core:vulnerabilities"
+        "lib-msg:bans"
+        "lib-msg:licenses"
+        "lib-msg:vulnerabilities"
+      ];
+      selectedMemberHasBan = true;
+      selectedMemberOmitsUnselected = true;
+      unifiedAndNonUnifiedContextsRemainLockDriven = true;
+    };
+  };
+
+  testDependencyPolicyRequiresFreshVersionTwoLockAndRustSecInput = {
+    expr = {
+      missingLockFails = !(builtins.tryEval (builtins.deepSeq missingPolicyLockWorkspace.checks."bin-calc:bans".drvPath true)).success;
+      staleLockFailsEvenWithoutOrdinaryFreshness = !(builtins.tryEval (builtins.deepSeq stalePolicyLockWorkspace.checks."bin-calc:licenses".drvPath true)).success;
+      missingAdvisoryInputFails = !(builtins.tryEval (builtins.deepSeq missingRustSecWorkspace.checks."bin-calc:vulnerabilities".drvPath true)).success;
+      disabledChecksOmitPolicyOutputs = !(builtins.any (name: lib.hasSuffix ":bans" name) (builtins.attrNames disabledPolicyWorkspace.checks));
+    };
+    expected = {
+      missingLockFails = true;
+      staleLockFailsEvenWithoutOrdinaryFreshness = true;
+      missingAdvisoryInputFails = true;
+      disabledChecksOmitPolicyOutputs = true;
     };
   };
 

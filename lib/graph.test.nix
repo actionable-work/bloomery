@@ -35,7 +35,7 @@
       version = "0.1.0"
     '';
     source.bloomeryLock = builtins.toFile "proc-macro-graph-tests-bloomery.lock" ''
-      version = 1
+      version = 2
 
       [packages."bloomery-test-macros-0.1.0"]
       features = []
@@ -54,7 +54,7 @@
   lockDrivenWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
     source.bloomeryLock = builtins.toFile "lock-driven-bloomery.lock" ''
-      version = 1
+      version = 2
 
       [packages."bin-calc-0.1.0"]
       features = [ "custom-feature" ]
@@ -70,7 +70,7 @@
   multiContextWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
     source.bloomeryLock = builtins.toFile "multi-context-bloomery.lock" ''
-      version = 1
+      version = 2
 
       [packages."lib-calc-0.1.0"]
       features = [ "alpha", "beta" ]
@@ -110,7 +110,7 @@
     build.unify = false;
     createLibPackages = true;
     source.bloomeryLock = builtins.toFile "non-unified-bloomery.lock" ''
-      version = 1
+      version = 2
 
       [packages."lib-calc-0.1.0"]
       features = [ "alpha", "beta" ]
@@ -148,7 +148,7 @@
   fallbackWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
     source.bloomeryLock = builtins.toFile "no-edges-bloomery.lock" ''
-      version = 1
+      version = 2
 
       [packages."lib-calc-0.1.0"]
       features = [ ]
@@ -160,7 +160,7 @@
   featureOverrideWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
     source.bloomeryLock = builtins.toFile "feature-precedence-bloomery.lock" ''
-      version = 1
+      version = 2
 
       [packages."lib-calc-0.1.0"]
       features = [ "locked-feature" ]
@@ -186,7 +186,7 @@
       checksum = "0000000000000000000000000000000000000000000000000000000000000000"
     '';
     source.bloomeryLock = builtins.toFile "unsupported-bloomery.lock" ''
-      version = 1
+      version = 2
 
       [packages."unsupported-dep-1.0.0"]
       features = [ ]

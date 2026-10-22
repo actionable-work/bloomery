@@ -51,12 +51,7 @@ id = "NIXLIB-GRAPH-RESOLUTION-005"
 title = "Bloomery lock supplies the global and per-member resolutions"
 manual = false
 design = "design/resolution.md#bloomery-lock"
-
-[requirements.ears]
-type = "event"
-trigger = "bloomery.lock is present"
-system = "the workspace builder"
-action = "take the global package view and one unified context per workspace member, each recording active features and activated dependencies, plus proc-macro and edition metadata and the Cargo.lock digest"
+ears = { type = "event", trigger = "bloomery.lock is present", system = "the workspace builder", action = "take the global package view and one unified context per workspace member, each recording active features and activated dependencies, plus proc-macro, edition, optional license and license-file metadata, and the Cargo.lock digest" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-RESOLUTION-006"
@@ -263,3 +258,17 @@ design = "design/resolution.md#bloomery-lock"
 type = "ubiquitous"
 system = "the workspace builder"
 action = "treat one bloomery.lock as valid for both build.unify settings and keep its bytes unchanged when only that setting changes"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-024"
+title = "Package license metadata is available in the graph"
+manual = false
+design = "design/resolution.md#bloomery-lock"
+ears = { type = "event", trigger = "bloomery.lock is present", system = "the workspace builder", action = "retain each package license expression and license-file path for dependency policy evaluation" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-RESOLUTION-025"
+title = "Graph parsing accepts the license metadata lock format"
+manual = false
+design = "design/resolution.md#bloomery-lock"
+ears = { type = "event", trigger = "a version-2 bloomery.lock is present", system = "the workspace builder", action = "require the version-2 lock contract and read its package metadata and per-member contexts" }

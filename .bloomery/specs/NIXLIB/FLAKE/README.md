@@ -14,7 +14,8 @@ description: |
 Bloomery is consumed through one integration point: the `mkFlake` constructor.
 It accepts a nixpkgs instance, a workspace root, an optional systems list, an
 optional `overrides` set, an optional `extraFormatters` set, an optional
-`extraOutputs` callback, and an optional main-flake `self`. Every other build
+`extraOutputs` callback, an optional main-flake `self`, and an optional
+`rustsecAdvisoryDb` source path for vulnerability checks. Every other build
 setting, including which sub-flakes to compose, is read from the required
 `.bloomery/config.toml` and evaluated into the same output shape for each
 selected system. The Bloomery root flake adds repository checks without

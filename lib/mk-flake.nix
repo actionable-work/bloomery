@@ -17,6 +17,7 @@ in
     extraFormatters ? {},
     extraOutputs ? null,
     self ? null,
+    rustsecAdvisoryDb ? null,
   }: let
     lib = nixpkgs.lib;
     eachSystem = lib.genAttrs systems;
@@ -149,6 +150,7 @@ in
         bl.mkWorkspace (raw
           // {
             extraFormatters = extraFormatters;
+            inherit rustsecAdvisoryDb;
             devShell = raw.devShell // lib.optionalAttrs (cli != null) {bloomeryCli = cli;};
           })
     );
