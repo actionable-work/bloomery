@@ -1272,6 +1272,14 @@ mod tests {
         ))
     }
 
+    fn config_value_at<'a>(config: &'a toml::Value, path: &[&str]) -> Option<&'a toml::Value> {
+        let mut value = config;
+        for segment in path {
+            value = value.get(*segment)?;
+        }
+        Some(value)
+    }
+
     fn fixture_workspace(requirement_id: &str, manual: bool) -> PathBuf {
         let root = fixture_root("workspace");
         let area = root.join(".bloomery/specs/CLI");
@@ -2450,6 +2458,53 @@ mod tests {
                 assert!(!args.force);
             }
             other => panic!("expected init, got {other:?}"),
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INIT-FILES-007"))]
+    fn init_templates_materialize_all_recommended_config_values() {
+        for template in bloomery_init::TEMPLATE_NAMES {
+            let root = fixture_root(&format!("init-config-{template}"));
+            let target = root.join("app");
+            let request = bloomery_init::InitRequest {
+                directory: target.clone(),
+                template: Some((*template).to_owned()),
+                force: false,
+            };
+            let mut stage = InitLock::default();
+            bloomery_init::run(&request, &mut stage, &mut Vec::new(), &mut Vec::new())
+                .expect("template scaffolds");
+            assert!(stage.locked, "{template} lock stage");
+
+            let config_text =
+                fs::read_to_string(target.join(".bloomery/config.toml")).expect("config file");
+            let config: toml::Value = toml::from_str(&config_text).expect("valid TOML");
+            for entry in bloomery_model::catalog::recommended_entries() {
+                let expected = entry
+                    .recommended
+                    .expect("recommended entry carries a value")
+                    .to_toml();
+                assert_eq!(
+                    config_value_at(&config, entry.path),
+                    Some(&expected),
+                    "{template}: {}",
+                    entry.path.join(".")
+                );
+            }
+            for entry in bloomery_model::catalog::CATALOG
+                .iter()
+                .filter(|entry| entry.recommended.is_none())
+            {
+                assert_eq!(
+                    config_value_at(&config, entry.path),
+                    None,
+                    "{template}: {} has no recommended value",
+                    entry.path.join(".")
+                );
+            }
+
+            let _ = fs::remove_dir_all(root);
         }
     }
 

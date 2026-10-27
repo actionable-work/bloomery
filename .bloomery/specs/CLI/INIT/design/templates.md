@@ -25,15 +25,17 @@ Every template provides the same bootstrap files:
 
 - `flake.nix` wires `bloomery.mkFlake` with a `nixpkgs` input and a `bloomery`
   input pointing at `github:actionable-work/bloomery`, passing `root = ./.`.
-  The generated workspace inherits the default development shell, including the
-  Bloomery CLI.
+  The generated `nixpkgs` input follows the input declared by Bloomery, and
+  `mkFlake` receives that shared input. The generated workspace inherits the
+  default development shell, including the Bloomery CLI.
 - `Cargo.toml` declares a `[workspace]` with `resolver = "2"` and the
   template's member crates.
 - `.bloomery/config.toml` declares the current configuration format version
-  and does not override the scanner settings. Generated workspaces rely on the
-  [documented default scanner paths](../../../PARSER/CONFIGURATION/design/schema-catalog.md#spec-and-scanner-tables),
-  so the template crates live under `packages/rust/` and the configured
-  defaults discover them without per-template overrides.
+  and includes every key with a recommended default in Bloomery's
+  [configuration schema catalog](../../../PARSER/CONFIGURATION/design/schema-catalog.md),
+  using each catalogued value. A new recommendation is included by every
+  template. Keys without a recommended default remain omitted. Recommended
+  scanner paths explicitly discover template crates under `packages/rust/`.
 - `.bloomery/specs/` contains a limited area, feature, design, and requirement
   skeleton matching the template's crates.
 - `.gitignore` ignores `target/`, `result`, `result-*`, and `.direnv/`.

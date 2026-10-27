@@ -1,9 +1,160 @@
 version = 2
 
 [build]
+cargoLock = "Cargo.lock"
+cargoToml = "Cargo.toml"
+devPackages = false
+libPackages = false
+profileName = "release"
+unify = true
+
+[build.flags]
+clippy = []
+doc = ["-Dwarnings"]
+doctest = []
+rustc = ["-Copt-level=3"]
+test = []
+
+[build.toolchain]
+cargo = "cargo"
+clippy = "clippy"
+lld = "lld"
+mold = "mold"
+rustc = "rustc"
+stdenv = "stdenv"
+
+[checks]
+enable = true
+
+[checks.bans]
+allow = []
+deny = []
+enable = true
+exceptions = []
+
+[checks.clippySuppressions]
+allow = []
+enable = true
+
+[checks.codeHealth]
+baseline = ".bloomery/code-health-summary.json"
+crateSlocLimit = 1500
+cyclomaticLimit = 10
+duplicateMinTokens = 64
+duplicationFreeRatio = 0.02
+enable = true
+functionTokensLimit = 250
+maxCrateSloc = 5000
+maxCyclomatic = 40
+maxFunctionTokens = 1000
+maxNesting = 8
+maxRegression = 2
+minCrateScore = 80
+minWorkspaceScore = 80
+nestingLimit = 4
+
+[checks.codeHealth.weights]
+complexity = 25
+crateSize = 30
+duplication = 15
+nesting = 10
+size = 20
+
+[checks.crates]
+enable = true
+
+[checks.licenses]
+allow = []
+deny = []
+enable = true
+exceptions = []
+
+[checks.lockFreshness]
+enable = true
 
 [checks.noDefaultFeatures]
-enable = false
+enable = true
+
+[checks.packages]
+enable = true
+
+[checks.specifications]
+enable = true
+
+[checks.vulnerabilities]
+ignoreAdvisories = []
+
+[checks.vulnerabilities.informational]
+notice = "warn"
+unknown = "warn"
+unmaintained = "warn"
+unsound = "warn"
 
 [checks.workspaceDependencies]
-enable = false
+enable = true
+
+[devShell]
+enable = true
+packages = []
+shellHook = ""
+
+[formatters]
+
+[formatters.alejandra]
+after = []
+before = []
+enable = true
+
+[formatters.deadnix]
+after = []
+before = []
+enable = true
+
+[formatters.rustfmt]
+after = []
+before = []
+enable = true
+
+[formatters.shellcheck]
+after = []
+before = []
+enable = true
+
+[formatters.shfmt]
+after = []
+before = []
+enable = true
+
+[formatters.taplo]
+after = []
+before = []
+enable = true
+
+[formatters.toml-sort]
+after = []
+before = []
+enable = true
+
+[formatters.yamlfmt]
+after = []
+before = []
+enable = true
+
+[scanners]
+
+[scanners.nix]
+enabled = true
+paths = ["*.nix", "lib/**/*.nix", "nix/**/*.nix", "tests/**/*.nix"]
+testPaths = ["**/*.test.nix"]
+
+[scanners.playwright]
+enabled = true
+paths = ["packages/playwright/**/*.spec.ts", "packages/playwright/**/*.test.ts"]
+tag_prefix = "@bloomery:"
+
+[scanners.rust]
+enabled = true
+paths = ["packages/rust/**/*.rs"]
+
+[specs]
+dir = "specs"

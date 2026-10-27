@@ -5,9 +5,9 @@ tagline: Scaffold a new Bloomery flake and Rust workspace from a bundled templat
 description: |
   The init feature owns the bootstrap `bloomery init` command. It selects a
   bundled template, derives the project name, writes a multi-crate Bloomery
-  flake, Rust workspace, configuration, specification skeleton, gitignore, and
-  direnv files into a target directory using Bloomery defaults, then locks the
-  generated workspace.
+  flake using Bloomery's nixpkgs input, Rust workspace, configuration with all
+  recommended defaults, specification skeleton, gitignore, and direnv files
+  into a target directory, then locks the generated workspace.
 ---
 
 # `bloomery init`
@@ -32,8 +32,9 @@ skeleton, and then locks the generated workspace so it is immediately usable.
   immediate child of the repository's `templates/` directory.
 - Derive and validate the project name used by the `{{project}}` placeholder.
 - Write the common scaffolding: `flake.nix`, `Cargo.toml`,
-  `.bloomery/config.toml` using the current format version, a seeded
-  `.bloomery/specs` skeleton, `.gitignore`, and `.envrc`.
+  `.bloomery/config.toml` with the current format version and every recommended
+  configuration default, a seeded `.bloomery/specs` skeleton, `.gitignore`,
+  and `.envrc`.
 - Provide the `basic`, `axum`, and `topcoat` multi-crate templates with thin
   binaries over library crates.
 - Lock the generated workspace by creating `Cargo.lock`, `bloomery.lock`, and

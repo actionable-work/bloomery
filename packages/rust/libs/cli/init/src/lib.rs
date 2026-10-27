@@ -630,7 +630,6 @@ mod tests {
     #[cfg_attr(any(), bloomery("CLI-INIT-FILES-004"))]
     #[cfg_attr(any(), bloomery("CLI-INIT-FILES-005"))]
     #[cfg_attr(any(), bloomery("CLI-INIT-FILES-006"))]
-    #[cfg_attr(any(), bloomery("CLI-INIT-FILES-007"))]
     #[cfg_attr(any(), bloomery("CLI-INIT-FILES-008"))]
     #[cfg_attr(any(), bloomery("CLI-INIT-FILES-009"))]
     #[cfg_attr(any(), bloomery("CLI-INIT-FILES-010"))]
@@ -649,21 +648,23 @@ mod tests {
                 flake.contains("github:actionable-work/bloomery"),
                 "{name} bloomery input"
             );
-            assert!(flake.contains("nixpkgs.url"), "{name} nixpkgs input");
+            assert!(
+                flake.contains("nixpkgs.follows = \"bloomery/nixpkgs\""),
+                "{name} nixpkgs follows Bloomery"
+            );
+            assert!(
+                !flake.contains("nixpkgs.url"),
+                "{name} does not pin a separate nixpkgs input"
+            );
+            assert!(
+                !flake.contains("inputs.nixpkgs.follows = \"nixpkgs\""),
+                "{name} does not create a reverse follows edge"
+            );
             let manifest = files.get("Cargo.toml").expect("manifest");
             assert!(manifest.contains("[workspace]"), "{name} workspace");
             assert!(manifest.contains("resolver = \"2\""), "{name} resolver");
             let config = files.get(".bloomery/config.toml").expect("config");
             assert!(config.contains("version = 2"), "{name} config version");
-            assert!(config.contains("[build]"), "{name} build table");
-            assert!(
-                config.contains("[checks.workspaceDependencies]\nenable = false"),
-                "{name} workspace dependency opt-out"
-            );
-            assert!(
-                config.contains("[checks.noDefaultFeatures]\nenable = false"),
-                "{name} default feature opt-out"
-            );
             assert!(files.contains_key(".gitignore"), "{name} gitignore");
             let gitignore = files.get(".gitignore").expect("gitignore");
             for entry in ["target/", "result", "result-*", ".direnv/"] {
@@ -676,10 +677,6 @@ mod tests {
                 "{name} direnv"
             );
             assert!(manifest.contains("packages/rust/"), "{name} multi-crate");
-            assert!(
-                !config.contains("[scanners"),
-                "{name} config relies on default scanner paths"
-            );
             assert!(
                 files.keys().any(|path| path.ends_with("src/lib.rs")),
                 "{name} library crate"

@@ -35,14 +35,10 @@ action = "declare a bloomery input pointing at github:actionable-work/bloomery"
 
 [[requirements]]
 id = "CLI-INIT-FILES-004"
-title = "Generated flakes declare a nixpkgs input"
+title = "Generated flakes reuse Bloomery's nixpkgs input"
 manual = false
 design = "design/templates.md#common-files"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "a generated flake.nix"
-action = "declare a nixpkgs input"
+ears = { type = "ubiquitous", system = "generated flake", action = "make its nixpkgs input follow the nixpkgs input declared by Bloomery and pass that input to bloomery.mkFlake" }
 
 [[requirements]]
 id = "CLI-INIT-FILES-005"
@@ -68,14 +64,10 @@ action = "provide .bloomery/config.toml in every template"
 
 [[requirements]]
 id = "CLI-INIT-FILES-007"
-title = "Generated configuration uses Bloomery defaults"
+title = "Generated configurations include all recommended defaults"
 manual = false
 design = "design/templates.md#common-files"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "a generated .bloomery/config.toml"
-action = "rely on the documented default build settings and default scanner paths"
+ears = { type = "ubiquitous", system = "generated .bloomery/config.toml", action = "include every key carrying a recommended value in the Bloomery schema catalog with that recommended value" }
 
 [[requirements]]
 id = "CLI-INIT-FILES-008"
