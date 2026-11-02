@@ -36,5 +36,7 @@ This feature covers the exported constructor, configuration loading and value
 encoding, option evaluation, system enumeration, flake attribute mapping,
 sub-flake composition and output elevation, the default formatter and its
 ordering graph, repository root check composition, and output naming and
-gating. How the derivations behind those outputs compile belongs to
+gating. The Bloomery distribution flake selects its wrapped CLI as the default
+package and app, while generated development shells receive the unwrapped CLI.
+How the derivations behind those outputs compile belongs to
 [Derivation graph](../GRAPH/README.md).

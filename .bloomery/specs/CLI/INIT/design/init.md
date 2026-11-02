@@ -65,6 +65,12 @@ same Cargo reconciliation, Bloomery lock generation, and Nix flake locking
 performed by [`bloomery sync`](../SYNC/README.md) and Nix flake locking.
 Required Cargo and Nix executables are checked before any file is written.
 
+Locking uses the scaffolded working-tree contents even when the target is
+inside a Git worktree and the generated files are untracked. Init never asks the
+user to stage scaffold files and never changes the Git index. The lock pass
+does not load `.envrc` or require direnv approval; it runs with the available
+Cargo and Nix executables.
+
 A lock failure preserves the scaffolded files and returns a nonzero exit code
 with recovery guidance to fix the reported error and run `bloomery sync` (or
 `bloomery init DIRECTORY --force`) in the target.

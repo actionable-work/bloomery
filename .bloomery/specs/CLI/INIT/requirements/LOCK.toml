@@ -95,3 +95,24 @@ type = "event"
 trigger = "init succeeds"
 system = "bloomery init"
 action = "report the generated lockfiles in its output"
+
+[[requirements]]
+id = "CLI-INIT-LOCK-009"
+title = "Init locks untracked scaffold files in Git worktrees"
+manual = false
+design = "design/init.md#locking"
+ears = { type = "event", trigger = "init scaffolds a target inside a Git worktree where its generated flake files are untracked", system = "bloomery init", action = "create the workspace lockfiles without requiring the scaffold files to be staged" }
+
+[[requirements]]
+id = "CLI-INIT-LOCK-010"
+title = "Init leaves the Git index unchanged"
+manual = false
+design = "design/init.md#locking"
+ears = { type = "event", trigger = "init locks a target inside a Git worktree", system = "bloomery init", action = "leave the Git index unchanged" }
+
+[[requirements]]
+id = "CLI-INIT-LOCK-011"
+title = "Init does not require direnv approval"
+manual = false
+design = "design/init.md#locking"
+ears = { type = "event", trigger = "the target contains an unapproved .envrc", system = "bloomery init", action = "complete locking without loading .envrc or invoking direnv" }

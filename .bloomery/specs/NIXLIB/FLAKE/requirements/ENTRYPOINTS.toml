@@ -234,14 +234,10 @@ action = "accept an optional main-flake self and use it to resolve configured su
 
 [[requirements]]
 id = "NIXLIB-FLAKE-ENTRYPOINTS-022"
-title = "The default Bloomery CLI package is unwrapped"
+title = "The injected development shell CLI is unwrapped"
 manual = false
 design = "design/entry-points.md#bloomery-cli-injection"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the Bloomery CLI package"
-action = "install the executable without wrapping runtime tools onto its runtime PATH"
+ears = { type = "ubiquitous", system = "the Bloomery CLI injected into generated development shells", action = "install the unwrapped workspace executable because the development shell provides its hard runtime tools" }
 
 [[requirements]]
 id = "NIXLIB-FLAKE-ENTRYPOINTS-023"
@@ -289,3 +285,17 @@ title = "mkFlake accepts the pinned RustSec database source"
 manual = false
 design = "design/entry-points.md#rustsec-advisory-database"
 ears = { type = "event", trigger = "checks.enable and checks.vulnerabilities.enable are true", system = "the mkFlake constructor", action = "require the rustsecAdvisoryDb source path and read the supplied pinned database" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-028"
+title = "The default package is the wrapped Bloomery CLI"
+manual = false
+design = "design/entry-points.md#bloomery-cli-injection"
+ears = { type = "event", trigger = "a package is requested from the Bloomery flake without a package name", system = "the Bloomery flake", action = "expose packages.<system>.default as the wrapped Bloomery CLI package" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-ENTRYPOINTS-029"
+title = "The default app launches the wrapped Bloomery CLI"
+manual = false
+design = "design/entry-points.md#bloomery-cli-injection"
+ears = { type = "event", trigger = "nix run executes Bloomery without an explicit app name", system = "the Bloomery flake", action = "launch the wrapped CLI as apps.<system>.default" }

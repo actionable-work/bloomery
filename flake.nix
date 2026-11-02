@@ -76,7 +76,21 @@
       extraOutputs = {
         eachSystem,
         perSystemWorkspace,
-      }: {
+      }: let
+        wrappedCli = system: let
+          pkgs = nixpkgs.legacyPackages.${system};
+          bloomery = perSystemWorkspace.${system}.packages.bloomery;
+        in
+          pkgs.runCommand "bloomery-wrapped" {
+            nativeBuildInputs = [pkgs.makeWrapper];
+            meta = (bloomery.meta or {}) // {mainProgram = "bloomery";};
+            passthru = {inherit bloomery;};
+          } ''
+            mkdir -p "$out/bin"
+            makeWrapper "${bloomery}/bin/bloomery" "$out/bin/bloomery" \
+              --prefix PATH : "${lib.makeBinPath [pkgs.cargo]}"
+          '';
+      in {
         checks = eachSystem (
           system:
             import ./nix/root-checks.nix {
@@ -85,27 +99,18 @@
         );
         packages = eachSystem (
           system: let
-            pkgs = nixpkgs.legacyPackages.${system};
-            bloomery = perSystemWorkspace.${system}.packages.bloomery;
-            wrapped =
-              pkgs.runCommand "bloomery-wrapped" {
-                nativeBuildInputs = [pkgs.makeWrapper];
-                meta = (bloomery.meta or {}) // {mainProgram = "bloomery";};
-                passthru = {inherit bloomery;};
-              } ''
-                mkdir -p "$out/bin"
-                makeWrapper "${bloomery}/bin/bloomery" "$out/bin/bloomery" \
-                  --prefix PATH : "${lib.makeBinPath [pkgs.cargo]}"
-              '';
+            wrapped = wrappedCli system;
           in
             perSystemWorkspace.${system}.packages
             // {
+              default = wrapped;
               bloomery-wrapped = wrapped;
             }
         );
         apps = eachSystem (
           system: let
             pkgs = nixpkgs.legacyPackages.${system};
+            wrapped = wrappedCli system;
             bloomeryCli = perSystemWorkspace.${system}.packages.bloomery;
             bench = pkgs.writeShellApplication {
               name = "bloomery-bench";
@@ -125,6 +130,10 @@
           in
             perSystemWorkspace.${system}.apps
             // {
+              default = {
+                type = "app";
+                program = "${wrapped}/bin/bloomery";
+              };
               bench = {
                 type = "app";
                 program = "${bench}/bin/bloomery-bench";

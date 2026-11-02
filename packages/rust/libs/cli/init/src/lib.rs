@@ -4,7 +4,7 @@ mod template;
 
 use bloomery_sync::{CommandRunner, SystemCommandRunner, UpdateSelection};
 use std::fmt;
-use std::io::Write;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 pub use template::TEMPLATE_NAMES;
@@ -102,6 +102,66 @@ impl SyncLockStage<SystemCommandRunner> {
     }
 }
 
+/// Adds an explicit path flake reference to init's Nix update command.
+///
+/// Nix otherwise treats a flake inside a Git worktree as a Git source and
+/// excludes untracked scaffold files from its view.
+struct InitCommandRunner<'runner, R> {
+    runner: &'runner mut R,
+}
+
+impl<R: CommandRunner> CommandRunner for InitCommandRunner<'_, R> {
+    fn is_available(&self, executable: &str) -> bool {
+        self.runner.is_available(executable)
+    }
+
+    fn run(
+        &mut self,
+        executable: &std::ffi::OsStr,
+        arguments: &[std::ffi::OsString],
+        working_directory: &Path,
+    ) -> io::Result<bloomery_sync::CommandOutput> {
+        let is_flake_update = executable == std::ffi::OsStr::new("nix")
+            && arguments.len() == 2
+            && arguments[0] == "flake"
+            && arguments[1] == "update";
+        if !is_flake_update {
+            return self.runner.run(executable, arguments, working_directory);
+        }
+
+        let mut path_arguments = arguments.to_vec();
+        path_arguments.push(std::ffi::OsString::from("--flake"));
+        path_arguments.push(path_flake_url(working_directory)?);
+        self.runner
+            .run(executable, &path_arguments, working_directory)
+    }
+}
+
+fn path_flake_url(root: &Path) -> io::Result<std::ffi::OsString> {
+    let absolute_root = root.canonicalize()?;
+    let path = absolute_root.to_str().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!(
+                "Nix flake path is not valid UTF-8: {}",
+                absolute_root.display()
+            ),
+        )
+    })?;
+    let mut encoded_path = String::with_capacity(path.len());
+    for byte in path.bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~' | b'/') {
+            encoded_path.push(char::from(byte));
+        } else {
+            const HEX: &[u8; 16] = b"0123456789ABCDEF";
+            encoded_path.push('%');
+            encoded_path.push(char::from(HEX[(byte >> 4) as usize]));
+            encoded_path.push(char::from(HEX[(byte & 0x0f) as usize]));
+        }
+    }
+    Ok(std::ffi::OsString::from(format!("path:{encoded_path}")))
+}
+
 impl<R: CommandRunner> LockStage for SyncLockStage<R> {
     fn missing_tools(&self) -> Vec<&'static str> {
         let mut missing = Vec::new();
@@ -120,14 +180,11 @@ impl<R: CommandRunner> LockStage for SyncLockStage<R> {
         stdout: &mut O,
         stderr: &mut E,
     ) -> Result<Vec<String>, InitError> {
-        bloomery_sync::run(
-            root,
-            &UpdateSelection::All,
-            &mut self.runner,
-            stdout,
-            stderr,
-        )
-        .map_err(|error| InitError::operational(format!("lock stage failed: {error}")))?;
+        let mut runner = InitCommandRunner {
+            runner: &mut self.runner,
+        };
+        bloomery_sync::run(root, &UpdateSelection::All, &mut runner, stdout, stderr)
+            .map_err(|error| InitError::operational(format!("lock stage failed: {error}")))?;
         Ok(vec![
             "Cargo.lock".to_owned(),
             "bloomery.lock".to_owned(),
@@ -727,7 +784,17 @@ mod tests {
 
     // --- SyncLockStage integration with a fake tool runner ---
 
-    struct FakeRunner;
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct RunnerCall {
+        executable: String,
+        arguments: Vec<String>,
+        working_directory: PathBuf,
+    }
+
+    #[derive(Default)]
+    struct FakeRunner {
+        calls: Vec<RunnerCall>,
+    }
 
     impl CommandRunner for FakeRunner {
         fn is_available(&self, _executable: &str) -> bool {
@@ -740,11 +807,16 @@ mod tests {
             arguments: &[OsString],
             working_directory: &Path,
         ) -> io::Result<CommandOutput> {
-            let name = executable.to_string_lossy();
+            let name = executable.to_string_lossy().into_owned();
             let args: Vec<String> = arguments
                 .iter()
                 .map(|argument| argument.to_string_lossy().into_owned())
                 .collect();
+            self.calls.push(RunnerCall {
+                executable: name.clone(),
+                arguments: args.clone(),
+                working_directory: working_directory.to_path_buf(),
+            });
             if name == "nix" {
                 std::fs::write(working_directory.join("flake.lock"), "{}\n")?;
             }
@@ -799,7 +871,9 @@ mod tests {
     #[cfg_attr(any(), bloomery("CLI-INIT-LOCK-003"))]
     fn sync_lock_stage_creates_all_lockfiles() {
         let root = temp_root("sync-lock");
-        let mut stage = SyncLockStage { runner: FakeRunner };
+        let mut stage = SyncLockStage {
+            runner: FakeRunner::default(),
+        };
         let report = run(
             &request(&root, None, false),
             &mut stage,
@@ -817,6 +891,127 @@ mod tests {
                 "bloomery.lock".to_owned(),
                 "flake.lock".to_owned(),
             ]
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    fn create_git_index_fixture(root: &Path) -> Vec<u8> {
+        let git_directory = root.join(".git");
+        std::fs::create_dir_all(&git_directory).expect("git directory");
+        let index_path = git_directory.join("index");
+        let index = b"existing index contents".to_vec();
+        std::fs::write(index_path, &index).expect("git index fixture");
+        index
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INIT-LOCK-009"))]
+    fn untracked_scaffolding_is_locked_through_an_explicit_path_flake() {
+        let root = temp_root("untracked").join("new repo");
+        create_git_index_fixture(&root);
+        let mut stage = SyncLockStage {
+            runner: FakeRunner::default(),
+        };
+
+        let report = run(
+            &request(&root, None, false),
+            &mut stage,
+            &mut Vec::new(),
+            &mut Vec::new(),
+        )
+        .expect("init in a Git worktree with untracked scaffold files");
+
+        assert!(root.join("Cargo.lock").is_file());
+        assert!(root.join("bloomery.lock").is_file());
+        assert!(root.join("flake.lock").is_file());
+        assert_eq!(report.lockfiles.len(), 3);
+        let nix_update = stage
+            .runner
+            .calls
+            .iter()
+            .find(|call| call.executable == "nix")
+            .expect("Nix input update");
+        let flake_url = super::path_flake_url(&root)
+            .expect("path flake URL")
+            .to_string_lossy()
+            .into_owned();
+        assert!(flake_url.starts_with("path:/"));
+        assert!(flake_url.ends_with("/new%20repo"));
+        assert_eq!(
+            nix_update.arguments,
+            vec![
+                "flake".to_owned(),
+                "update".to_owned(),
+                "--flake".to_owned(),
+                flake_url,
+            ]
+        );
+        assert_eq!(nix_update.working_directory, root);
+        let _ = std::fs::remove_dir_all(root.parent().expect("temporary parent"));
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INIT-LOCK-010"))]
+    fn init_leaves_the_git_index_unchanged() {
+        let root = temp_root("index");
+        let index_before = create_git_index_fixture(&root);
+        let mut stage = SyncLockStage {
+            runner: FakeRunner::default(),
+        };
+
+        run(
+            &request(&root, None, false),
+            &mut stage,
+            &mut Vec::new(),
+            &mut Vec::new(),
+        )
+        .expect("init with a Git index present");
+
+        assert_eq!(
+            std::fs::read(root.join(".git/index")).expect("git index after init"),
+            index_before
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INIT-LOCK-011"))]
+    fn init_does_not_invoke_direnv_for_an_unapproved_envrc() {
+        let root = temp_root("direnv");
+        std::fs::create_dir_all(&root).expect("target directory");
+        std::fs::write(root.join(".envrc"), "use flake\n").expect("unapproved envrc");
+        let mut stage = SyncLockStage {
+            runner: FakeRunner::default(),
+        };
+
+        run(
+            &request(&root, None, true),
+            &mut stage,
+            &mut Vec::new(),
+            &mut Vec::new(),
+        )
+        .expect("init does not require direnv approval");
+
+        assert!(
+            stage
+                .runner
+                .calls
+                .iter()
+                .all(|call| call.executable != "direnv")
+        );
+        assert!(
+            stage
+                .runner
+                .calls
+                .iter()
+                .any(|call| call.executable == "nix")
+        );
+        assert!(
+            stage
+                .runner
+                .calls
+                .iter()
+                .any(|call| call.executable == "cargo")
         );
         let _ = std::fs::remove_dir_all(root);
     }

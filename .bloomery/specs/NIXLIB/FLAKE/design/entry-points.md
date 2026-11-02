@@ -45,19 +45,21 @@ when the workspace disables it, and the remaining attributes stay present.
 
 ## Bloomery CLI injection
 
-The exported `mkFlake` always adds the Bloomery CLI derivation to each generated
-default development shell. The derivation is the `bloomery` binary produced from
-the Bloomery flake's own workspace for the selected system. The default package
-is unwrapped: it invokes its hard runtime tools, currently `cargo`, from the
-surrounding environment. The generated development shell already provides
-`cargo`, so it does not depend on a wrapped CLI.
+The exported `mkFlake` always adds the unwrapped Bloomery CLI derivation to each
+generated default development shell. The derivation is the `bloomery` binary
+produced from the Bloomery flake's own workspace for the selected system. The
+generated development shell already provides `cargo`, so this injected CLI does
+not depend on a wrapped package.
 
 The Bloomery flake also exports a `bloomery-wrapped` package. It wraps the
 default executable so its hard runtime tool dependencies, currently `cargo`, are
 available on the runtime `PATH`. `nix` is the sole global runtime exception and
 is assumed to be provided by the host, so it is not wrapped. Optional metadata
 tools such as `git` are not runtime dependencies and are not wrapped. The
-constructor exposes no argument that enables or disables CLI injection.
+Bloomery flake's `packages.<system>.default` and `apps.<system>.default` select
+this wrapped CLI, so running the flake without naming a package invokes the
+wrapped executable. The named `bloomery-wrapped` package remains available.
+The constructor exposes no argument that enables or disables CLI injection.
 
 ## Self-hosting
 
