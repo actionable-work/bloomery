@@ -45,6 +45,61 @@ in {
       };
     };
   };
+  testLegacyCargoSlashSeparatorsMeanOr = {
+    expr = {
+      noSpace = licenses.parse "MIT/Apache-2.0";
+      spaces = licenses.parse "Apache-2.0 / MIT";
+      oldBsdForm = licenses.parse "BSD-3-Clause/MIT";
+      acceptsAllowedAlternative = licenses.evaluate {
+        expression = "MIT/Apache-2.0";
+        allow = ["Apache-2.0"];
+      };
+      rejectsWhenNoAlternativeIsAllowed =
+        !(licenses.evaluate {
+          expression = "MIT/Apache-2.0";
+          allow = ["BSD-3-Clause"];
+        });
+      rejectsMalformedRepeatedSeparator = !(licenses.validExpression "MIT//Apache-2.0");
+    };
+    expected = {
+      noSpace = {
+        type = "OR";
+        left = {
+          type = "id";
+          value = "MIT";
+        };
+        right = {
+          type = "id";
+          value = "Apache-2.0";
+        };
+      };
+      spaces = {
+        type = "OR";
+        left = {
+          type = "id";
+          value = "Apache-2.0";
+        };
+        right = {
+          type = "id";
+          value = "MIT";
+        };
+      };
+      oldBsdForm = {
+        type = "OR";
+        left = {
+          type = "id";
+          value = "BSD-3-Clause";
+        };
+        right = {
+          type = "id";
+          value = "MIT";
+        };
+      };
+      acceptsAllowedAlternative = true;
+      rejectsWhenNoAlternativeIsAllowed = true;
+      rejectsMalformedRepeatedSeparator = true;
+    };
+  };
   testSpdxAllowDenyAndWithPairEvaluation = {
     expr = {
       choosesAllowedOrBranch = licenses.evaluate {

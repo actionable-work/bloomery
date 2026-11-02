@@ -63,9 +63,23 @@ omitting an advisory.
 `license-file` path from the metadata snapshot used to generate its graph. The
 license check parses SPDX expressions in Nix from that metadata or an explicit
 `checks.licenses.overrides` entry keyed by package selector. A license file by
-itself is not an SPDX expression. A package without a declared expression or
-override fails the check. A malformed package expression also fails the check;
-an invalid configured expression is a configuration error.
+itself is not an SPDX expression. An external dependency without a declared
+expression or override fails the check. A malformed external package expression
+also fails the check; an invalid configured expression is a configuration
+error. Bloomery's Rust packages inherit `MIT OR Apache-2.0` from the root
+`[workspace.package]` metadata. The repository includes the corresponding full
+license texts as `LICENSE-MIT` and `LICENSE-APACHE`, with 2026 Actionable Work,
+LLC copyright notices in both files.
+
+Workspace packages are first-party dependencies. The license check accepts them
+without requiring or evaluating their license metadata, overrides, or global
+allow and deny entries. External dependencies continue through the normal
+expression and policy checks.
+
+In addition to SPDX `AND`, `OR`, and `WITH` operators, the parser accepts Cargo's
+deprecated slash-separated license syntax. Each `/` is interpreted as `OR`, so
+legacy metadata remains subject to the same configured policy as an equivalent
+SPDX expression.
 
 `checks.licenses.allow` and `checks.licenses.deny` contain SPDX license IDs or
 license-with-exception pairs. An empty `allow` list means there is no allowlist;
@@ -112,8 +126,8 @@ exceptions = []
 
 [checks.licenses]
 enable = true
-allow = ["MIT", "Apache-2.0"]
-deny = ["GPL-3.0-only"]
+allow = ["Apache-2.0", "BSD-3-Clause", "MIT", "Unicode-3.0"]
+deny = []
 exceptions = []
 
 [checks.licenses.overrides]

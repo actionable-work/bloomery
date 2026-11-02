@@ -9,3 +9,4 @@ topcoat = { workspace = true }
 edition = "2024"
 name = "bloomery-docs-server"
 version = "0.1.0"
+license.workspace = true

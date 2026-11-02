@@ -14,3 +14,4 @@ syn = { workspace = true }
 edition = "2024"
 name = "bloomery-scanning"
 version = "0.1.0"
+license.workspace = true

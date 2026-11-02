@@ -9,3 +9,4 @@ bloomery-cli-app = { workspace = true }
 edition = "2024"
 name = "bloomery-cli"
 version = "0.1.0"
+license.workspace = true

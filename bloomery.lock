@@ -236,6 +236,7 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-check-0.1.0"]
 features = []
@@ -245,6 +246,7 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-check-catalog-0.1.0"]
 features = []
@@ -256,6 +258,7 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-check-command-0.1.0"]
 features = []
@@ -279,6 +282,7 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-check-health-0.1.0"]
 features = []
@@ -296,6 +300,7 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-check-output-0.1.0"]
 features = []
@@ -306,6 +311,7 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-check-retrieval-0.1.0"]
 features = []
@@ -320,6 +326,7 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-check-selection-0.1.0"]
 features = []
@@ -333,6 +340,7 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-check-storage-0.1.0"]
 features = []
@@ -342,6 +350,7 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-check-support-0.1.0"]
 features = []
@@ -351,12 +360,14 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-cli-0.1.0"]
 features = []
 dependencies = ["bloomery-cli-app-0.1.0"]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-cli-app-0.1.0"]
 features = []
@@ -380,6 +391,7 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-cli-output-0.1.0"]
 features = []
@@ -395,6 +407,7 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-cli-parser-0.1.0"]
 features = []
@@ -404,12 +417,14 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-cli-types-0.1.0"]
 features = []
 dependencies = []
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-config-0.1.0"]
 features = []
@@ -422,12 +437,14 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-content-0.1.0"]
 features = []
 dependencies = []
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-disk-0.1.0"]
 features = []
@@ -438,12 +455,14 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-docs-0.1.0"]
 features = []
 dependencies = ["bloomery-docs-server-0.1.0"]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-docs-check-0.1.0"]
 features = []
@@ -453,6 +472,7 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-docs-consistency-0.1.0"]
 features = []
@@ -464,6 +484,7 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-docs-server-0.1.0"]
 features = []
@@ -474,12 +495,14 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-init-0.1.0"]
 features = []
 dependencies = ["bloomery-sync-0.1.0"]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-model-0.1.0"]
 features = []
@@ -489,6 +512,7 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-review-0.1.0"]
 features = []
@@ -498,6 +522,7 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-scanning-0.1.0"]
 features = []
@@ -513,6 +538,7 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-spec-0.1.0"]
 features = []
@@ -527,6 +553,7 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-sync-0.1.0"]
 features = []
@@ -539,12 +566,14 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-test-macros-0.1.0"]
 features = []
 dependencies = []
 proc-macro = true
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-ui-0.1.0"]
 features = []
@@ -554,6 +583,7 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."bloomery-workspace-0.1.0"]
 features = []
@@ -564,6 +594,7 @@ dependencies = [
 ]
 proc-macro = false
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [packages."brotli-8.0.4"]
 features = [

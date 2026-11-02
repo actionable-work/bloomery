@@ -10,3 +10,4 @@ serde_json = { workspace = true }
 edition = "2024"
 name = "bloomery-build-command"
 version = "0.1.0"
+license.workspace = true

@@ -16,6 +16,8 @@
   fixtureDirs = builtins.attrNames (lib.filterAttrs (
     name: type: type == "directory" && builtins.pathExists (root + "/tests/${name}/flake.nix")
   ) (builtins.readDir (root + "/tests")));
+  rootCargoManifest = builtins.readFile (root + "/Cargo.toml");
+  projectConfig = builtins.fromTOML (builtins.readFile (root + "/.bloomery/config.toml"));
 in {
   testRustBinariesResideUnderPackagesRust = {
     expr =
@@ -45,6 +47,30 @@ in {
 
   testRustLibrariesUseOwnershipCategories = {
     expr = builtins.all hasLibraryCategory libraryCategories;
+    expected = true;
+  };
+
+  testWorkspacePackagesInheritTheDualLicense = {
+    expr =
+      lib.hasInfix "[workspace.package]\nlicense = \"MIT OR Apache-2.0\"" rootCargoManifest
+      && builtins.all (
+        member: lib.hasInfix "license.workspace = true" (builtins.readFile (root + "/${member}/Cargo.toml"))
+      )
+      memberPaths;
+    expected = true;
+  };
+
+  testApprovedDependencyLicenseAllowlistIsConfigured = {
+    expr = projectConfig.checks.licenses.allow;
+    expected = ["Apache-2.0" "BSD-3-Clause" "MIT" "Unicode-3.0"];
+  };
+
+  testProjectIncludesBothLicenseTexts = {
+    expr =
+      builtins.pathExists (root + "/LICENSE-MIT")
+      && builtins.pathExists (root + "/LICENSE-APACHE")
+      && lib.hasInfix "Copyright (c) 2026 Actionable Work, LLC" (builtins.readFile (root + "/LICENSE-MIT"))
+      && lib.hasInfix "Copyright 2026 Actionable Work, LLC" (builtins.readFile (root + "/LICENSE-APACHE"));
     expected = true;
   };
 

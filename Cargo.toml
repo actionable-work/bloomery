@@ -97,3 +97,6 @@ tracing-subscriber = { default-features = false, features = [
   "registry",
   "std",
 ], version = "0.3" }
+
+[workspace.package]
+license = "MIT OR Apache-2.0"

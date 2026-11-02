@@ -37,6 +37,24 @@
     memberId = "app-1.0.0";
     inherit context packages lockPackages;
   };
+  workspaceLicenseContext = {
+    "app-1.0.0" = {dependencies = ["workspace-unlicensed-1.0.0" "workspace-gpl-1.0.0"];};
+    "workspace-unlicensed-1.0.0" = {dependencies = [];};
+    "workspace-gpl-1.0.0" = {dependencies = [];};
+  };
+  workspaceLicensePackages = {
+    "app-1.0.0" = packages."app-1.0.0";
+    "workspace-unlicensed-1.0.0" = {
+      name = "workspace-unlicensed";
+      version = "1.0.0";
+      isWorkspace = true;
+    };
+    "workspace-gpl-1.0.0" = {
+      name = "workspace-gpl";
+      version = "1.0.0";
+      isWorkspace = true;
+    };
+  };
 in {
   testPolicyWalksTransitiveContextAndExcludesMember = {
     expr = map (entry: entry.id) entries;
@@ -105,5 +123,22 @@ in {
         expression = null;
       }
     ];
+  };
+  testWorkspaceDependenciesDoNotNeedAllowedLicenseMetadata = {
+    expr = map (entry: entry.kind) (policy.licensesCheck {
+      memberId = "app-1.0.0";
+      context = workspaceLicenseContext;
+      packages = workspaceLicensePackages;
+      lockPackages = {
+        "workspace-gpl-1.0.0" = {license = "GPL-3.0-only";};
+      };
+      config = {
+        allow = ["MIT"];
+        deny = [];
+        exceptions = [];
+        overrides = {};
+      };
+    });
+    expected = [];
   };
 }

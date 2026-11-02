@@ -7,3 +7,4 @@ serde_json = { workspace = true }
 edition = "2024"
 name = "bloomery-check-output"
 version = "0.1.0"
+license.workspace = true

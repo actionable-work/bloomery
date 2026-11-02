@@ -3,8 +3,8 @@
     lib.filter (token: token != "")
     (lib.splitString " "
       (builtins.replaceStrings
-        ["\n" "\r" "\t" "(" ")"]
-        [" " " " " " " ( " " ) "]
+        ["\n" "\r" "\t" "(" ")" "/"]
+        [" " " " " " " ( " " ) " " OR "]
         expression));
 
   validIdentifier = value:

@@ -4,3 +4,4 @@
 edition = "2024"
 name = "bloomery-cli-types"
 version = "0.1.0"
+license.workspace = true

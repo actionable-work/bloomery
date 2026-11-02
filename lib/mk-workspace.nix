@@ -1403,7 +1403,7 @@ in
       then {}
       else
         lib.listToAttrs (lib.concatMap (member: let
-            findings = evaluate member (policyEntriesFor member);
+            findings = map (finding: finding // {member = member.id;}) (evaluate member (policyEntriesFor member));
             warnings = builtins.filter (finding: (finding.outcome or "deny") == "warn") findings;
             violations = builtins.filter (finding: (finding.outcome or "deny") != "warn") findings;
           in [

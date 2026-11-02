@@ -117,7 +117,9 @@
             deny = config.deny;
           };
     in
-      if expression == null
+      if entry.package.isWorkspace or false
+      then []
+      else if expression == null
       then [(entry // {kind = "missing-license";})]
       else if parsed == null
       then [

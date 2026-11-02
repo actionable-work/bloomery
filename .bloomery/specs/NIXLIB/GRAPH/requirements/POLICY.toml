@@ -72,10 +72,10 @@ ears = { type = "ubiquitous", system = "the license check", action = "evaluate S
 
 [[requirements]]
 id = "NIXLIB-GRAPH-POLICY-011"
-title = "Missing license expressions fail without an override"
+title = "External dependencies without license expressions fail without an override"
 manual = false
 design = "design/dependency-policy-checks.md#license-compatibility"
-ears = { type = "unwanted_behavior", trigger = "a dependency has no SPDX license expression and no matching license override", system = "the license check", action = "fail the member check and report the package" }
+ears = { type = "unwanted_behavior", trigger = "an external dependency has no SPDX license expression and no matching license override", system = "the license check", action = "fail the member check and report the package" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-POLICY-012"
@@ -118,3 +118,38 @@ title = "Ignored advisory IDs suppress all matching findings"
 manual = false
 design = "design/dependency-policy-checks.md#vulnerability-scan"
 ears = { type = "event", trigger = "an advisory matches a dependency and its ID appears in checks.vulnerabilities.ignoreAdvisories", system = "the vulnerability check", action = "suppress the advisory regardless of its informational category" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-018"
+title = "Legacy Cargo license separators are alternatives"
+manual = false
+design = "design/dependency-policy-checks.md#license-compatibility"
+ears = { type = "event", trigger = "a dependency declares a Cargo license string with legacy slash separators", system = "the license check", action = "interpret each slash as an OR operator before evaluating license policy" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-019"
+title = "Workspace dependencies bypass license evaluation"
+manual = false
+design = "design/dependency-policy-checks.md#license-compatibility"
+ears = { type = "event", trigger = "a dependency is a member of the current Cargo workspace", system = "the license check", action = "accept the dependency without requiring or evaluating license metadata" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-020"
+title = "Bloomery workspace packages declare the dual license"
+manual = false
+design = "design/dependency-policy-checks.md#license-compatibility"
+ears = { type = "ubiquitous", system = "the Bloomery Rust workspace", action = "inherit the MIT OR Apache-2.0 license expression from the root workspace package metadata" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-021"
+title = "Bloomery restricts dependency licenses to its approved allowlist"
+manual = false
+design = "design/dependency-policy-checks.md#license-compatibility"
+ears = { type = "ubiquitous", system = "Bloomery license configuration", action = "allow only Apache-2.0, BSD-3-Clause, MIT, and Unicode-3.0 dependency license entries" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-POLICY-022"
+title = "Bloomery includes the full text of both project licenses"
+manual = false
+design = "design/dependency-policy-checks.md#license-compatibility"
+ears = { type = "ubiquitous", system = "the Bloomery repository", action = "include the complete MIT and Apache-2.0 license texts and identify Actionable Work, LLC as the 2026 copyright holder in both license files" }
