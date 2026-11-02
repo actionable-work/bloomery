@@ -70,7 +70,10 @@ An attribute that cannot produce a derivation path is recorded as that check's
 evaluation failure while the remaining attributes continue to evaluate. A
 catalog-wide evaluation failure is an operational error. Do not silently report
 an incomplete catalog as a full passing run. Evaluation remaining pure and
-lockfile writes being disabled apply to this phase.
+lockfile writes being disabled apply to this phase. Catalog evaluation inspects
+check names and derivation metadata only; it does not realize check outputs or
+run builders. Batched realization is the only phase that builds selected
+checks.
 
 Catalog evaluation also resolves the selected derivations' output and
 dependency metadata in a single structured query, so substitution and build

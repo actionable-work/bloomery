@@ -52,6 +52,8 @@ and failed plan entries.
 | --- | --- | --- |
 | Aliased checks | Nix projection preserves both names with equal derivation paths; adapter submits one batch with each derivation installable once; runner retains an outcome for each alias | `CLI-CHECK-NIX-007`, `008`, `009`, `019`, `020` |
 | Unusual names | Nix projection and adapter decoding preserve spaces, quotes, Unicode, newlines, tabs, control characters, percent signs and fragments; realization arguments contain only derivation installables | `CLI-CHECK-NIX-006`, `016` |
+| Metadata-only catalog evaluation | Catalog discovery and planning inspect check names and derivation paths without realizing fixture builders | `CLI-CHECK-NIX-032` |
+| Fatal Nix evaluation error after notices | The bounded operational error names the failed operation and fatal cause, includes concise builder detail when available, and does not report a preceding trace or warning as the cause | `CLI-CHECK-OUTPUT-017` |
 | Missing system | Adapter handles an unsuccessful catalog command as an operational error and runner rejects the explicit selection | `CLI-CHECK-SELECT-011` |
 | Empty system | Adapter decodes a successful empty catalog and runner accepts it when other selected work exists | `CLI-CHECK-SELECT-020` |
 | Mixed batch results | Production adapter processes a failed batch with valid sibling outputs; runner retains individual pass/fail outcomes | `CLI-CHECK-NIX-021`, `023`, `027` |

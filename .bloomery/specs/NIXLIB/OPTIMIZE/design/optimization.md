@@ -194,8 +194,9 @@ table builds the release binary instead of failing.
 The training script, training fixtures, training tools, environment, and merged
 profile data are inputs of the optimized derivations only,
 so changing them changes the optimized binary identity while leaving the
-release binary, its dev apps, and its checks unchanged. Changing the release
-binary's selected compilation sources changes both identities.
+release binary, its dev apps, and generated workspace package checks unchanged.
+Changing the release binary's selected compilation sources changes both
+identities.
 
 ## Verification
 
@@ -208,4 +209,9 @@ platforms fail evaluation, that a non-empty `systems` table restricts
 optimization to listed systems and leaves unlisted systems on the release
 build, that PGO and BOLT can be disabled independently, and that changing only
 the training script, fixtures,
-or tools leaves the release derivations used by dev apps and checks unchanged.
+or tools leaves the release derivations used by dev apps and generated workspace
+package checks unchanged. The default optimization unit tests validate package
+and pipeline metadata without realizing optimized binaries or training
+derivations. The root flake exposes the repository fixture's optimized-binary
+smoke run as `checks.<system>.optimization-smoke`; the default `bloomery check`
+and `nix flake check` include it.

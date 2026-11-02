@@ -172,7 +172,10 @@ impl NixCli {
             return Err(if detail.is_empty() {
                 format!("Nix {operation} failed with {}", status_text(output.status))
             } else {
-                format!("Nix {operation} failed: {detail}")
+                format!(
+                    "Nix {operation} failed with {}: {detail}",
+                    status_text(output.status)
+                )
             });
         }
         Ok(output.stdout)
@@ -193,7 +196,10 @@ impl NixCli {
             return Err(if detail.is_empty() {
                 format!("Nix log failed with {}", status_text(output.status))
             } else {
-                format!("Nix log failed: {detail}")
+                format!(
+                    "Nix log failed with {}: {detail}",
+                    status_text(output.status)
+                )
             });
         }
         let mut log = output.stdout;
@@ -1217,18 +1223,52 @@ fn status_text(status: ExitStatus) -> String {
 fn bounded_process_error(bytes: &[u8]) -> String {
     let text = String::from_utf8_lossy(bytes);
     let safe = super::details::normalize_display_text(&text);
-    let first_line = safe
+    let lines = safe
         .lines()
-        .find(|line| !line.trim().is_empty())
-        .unwrap_or("");
-    super::model::truncate_utf8(first_line.trim(), 512).0
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>();
+    let fatal = lines.iter().enumerate().find_map(|(index, line)| {
+        let remainder = line.strip_prefix("error:")?.trim();
+        if remainder.is_empty() {
+            lines
+                .iter()
+                .skip(index + 1)
+                .copied()
+                .find(|line| !is_nix_notice(line))
+        } else {
+            Some(remainder)
+        }
+    });
+    let cause = fatal.unwrap_or_else(|| {
+        lines
+            .iter()
+            .copied()
+            .find(|line| !is_nix_notice(line))
+            .unwrap_or("")
+    });
+    let builder_detail = lines.iter().copied().find_map(|line| {
+        let detail = line.strip_prefix("error:").unwrap_or(line).trim();
+        let lower = detail.to_ascii_lowercase();
+        (lower.contains("builder for ") && lower.contains("failed")).then_some(detail)
+    });
+    let message = match builder_detail {
+        Some(detail) if !cause.contains(detail) => format!("{cause}; {detail}"),
+        _ => cause.to_owned(),
+    };
+    super::model::truncate_utf8(&message, 512).0
+}
+
+fn is_nix_notice(line: &str) -> bool {
+    let line = line.to_ascii_lowercase();
+    line.starts_with("trace:") || line.starts_with("warning:")
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        NixBackend, NixCli, NixTaskResult, PlannedSystem, batch_build_args, discover_catalog,
-        drain_progress_stderr, format_args, group_output_paths, host_nix_system,
+        NixBackend, NixCli, NixTaskResult, PlannedSystem, batch_build_args, bounded_process_error,
+        discover_catalog, drain_progress_stderr, format_args, group_output_paths, host_nix_system,
         nix_log_store_path, parse_nix_id, parse_valid_outputs, plan_args, target_nix_system,
         validity_args,
     };
@@ -1241,6 +1281,36 @@ mod tests {
     use std::fs;
     use std::io::{self, Read, Write};
     use std::path::Path;
+
+    #[test]
+    fn bounded_process_error_selects_the_fatal_detail_after_notices() {
+        let error = bounded_process_error(
+            b"trace: Obsolete option programs.ruff.enable was renamed\nwarning: compatibility notice\nerror: builder for '/nix/store/opt-app-pgo-training.drv' failed with exit code 139\n",
+        );
+
+        assert_eq!(
+            error,
+            "builder for '/nix/store/opt-app-pgo-training.drv' failed with exit code 139"
+        );
+    }
+
+    #[test]
+    fn bounded_process_error_ignores_notice_only_stderr() {
+        let error = bounded_process_error(
+            b"trace: Obsolete option programs.ruff.enable was renamed\nwarning: compatibility notice\n",
+        );
+
+        assert!(error.is_empty());
+    }
+
+    #[test]
+    fn bounded_process_error_uses_context_when_no_fatal_prefix_exists() {
+        let error = bounded_process_error(
+            b"trace: Obsolete option programs.ruff.enable was renamed\nevaluation context could not be loaded\n",
+        );
+
+        assert_eq!(error, "evaluation context could not be loaded");
+    }
 
     struct CatalogStub {
         names: Vec<String>,

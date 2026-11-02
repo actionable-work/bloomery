@@ -42,6 +42,20 @@ Diagnostics do not cause automatic repairs. Preserve complete structured
 messages, locations, and notes in the run store; default output is a summary,
 not the complete compiler-style rendering.
 
+## Operational Nix evaluation errors
+
+When a Nix operation fails, the bounded operational message names the failed
+operation and its fatal cause. If Nix reports a failed builder, include one
+concise builder detail when available. Nonfatal trace and warning lines may be
+reported as advisory context, but never as the cause of failure. Human and JSON
+errors carry the same operation and cause.
+
+```text
+error: Nix check catalog evaluation failed
+cause: <fatal Nix error>
+detail: <concise builder failure detail, when available>
+```
+
 ## Bounded summary
 
 Print one aggregate outcome line, a failure page, and any relevant retrieval

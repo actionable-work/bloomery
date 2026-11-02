@@ -152,6 +152,7 @@ fn latest(root: &Path, cache: &Path) -> crate::check_command::model::RunRecord {
 #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-016"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-019"))]
 #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-020"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-032"))]
 fn production_adapter_preserves_names_and_builds_shared_derivations_once() {
     let (root, cache) = fixture(true);
     fs::write(root.join("flake.lock"), "fixture lock\n").unwrap();
@@ -242,6 +243,81 @@ fn production_adapter_distinguishes_missing_and_empty_systems() {
             .iter()
             .any(|outcome| outcome.id == "static:structure" && outcome.outcome == Outcome::Passed)
     );
+    script.verify().unwrap();
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-017"))]
+fn operational_catalog_error_reports_the_fatal_cause_after_notices() {
+    let mut messages = Vec::new();
+
+    for json_mode in [true, false] {
+        let (root, cache) = fixture(true);
+        let mut script = NixFixture::new(&root);
+        discover_calls(&mut script, "x86_64-linux", &["core:unit-tests"]);
+        formatter(&mut script);
+        let failed_plan = script.expect(&eval_args("x86_64-linux", true), "");
+        fs::write(failed_plan.join("status"), "1").unwrap();
+        fs::write(
+            failed_plan.join("stderr"),
+            "trace: Obsolete option programs.ruff.enable was renamed\nwarning: compatibility notice\nerror: builder for '/nix/store/opt-app-pgo-training.drv' failed with exit code 139\n",
+        )
+        .unwrap();
+
+        let backend = script.backend();
+        let (status, stdout, stderr) = invoke(selected(), &root, &cache, &backend, json_mode);
+        assert_eq!(status, ExitCode::from(2));
+
+        let message = if json_mode {
+            let error: Value = serde_json::from_slice(&stdout).expect("JSON operational error");
+            error["error"]["message"]
+                .as_str()
+                .expect("error message")
+                .to_owned()
+        } else {
+            let rendered = String::from_utf8_lossy(&stderr);
+            let message_start = rendered
+                .find("Nix check catalog evaluation failed")
+                .unwrap_or_else(|| panic!("human error message missing from: {rendered}"));
+            rendered[message_start..]
+                .trim()
+                .trim_end_matches("\u{1b}[0m")
+                .to_owned()
+        };
+
+        assert!(message.contains("Nix check catalog evaluation failed"));
+        assert!(message.contains(
+            "builder for '/nix/store/opt-app-pgo-training.drv' failed with exit code 139"
+        ));
+        assert!(!message.contains("Obsolete option"));
+        messages.push(message);
+        script.verify().unwrap();
+    }
+
+    assert_eq!(messages[0], messages[1]);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-OUTPUT-017"))]
+fn operational_nix_error_falls_back_to_status_and_non_notice_detail() {
+    let (root, _) = fixture(true);
+    let mut script = NixFixture::new(&root);
+    let failed_discovery = script.expect(&eval_args("x86_64-linux", false), "");
+    fs::write(failed_discovery.join("status"), "7").unwrap();
+    fs::write(
+        failed_discovery.join("stderr"),
+        "trace: Obsolete option programs.ruff.enable was renamed\nwarning: compatibility notice\nevaluation context could not be loaded\n",
+    )
+    .unwrap();
+
+    let backend = script.backend();
+    let error = backend
+        .discover(&root, "x86_64-linux")
+        .expect_err("failed Nix discovery");
+
+    assert!(error.contains("Nix check discovery failed with exit code 7"));
+    assert!(error.contains("evaluation context could not be loaded"));
+    assert!(!error.contains("Obsolete option"));
     script.verify().unwrap();
 }
 

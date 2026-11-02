@@ -61,6 +61,18 @@
         plan = expectedPlan;
       };
     };
+    testMetadataOnlyPlanDoesNotRealizeBuilders = {
+      expr = plan {"never-build" = shared;};
+      expected = {
+        legacy = false;
+        plan = {
+          "never-build" = {
+            success = true;
+            drvPath = shared.drvPath;
+          };
+        };
+      };
+    };
     testEmpty = {
       expr = plan {};
       expected = {
@@ -121,6 +133,7 @@ in
         "CLI-CHECK-NIX-010"
         "CLI-CHECK-NIX-015"
         "CLI-CHECK-NIX-016"
+        "CLI-CHECK-NIX-032"
         "NIXLIB-FLAKE-ENTRYPOINTS-026"
       ];
     };

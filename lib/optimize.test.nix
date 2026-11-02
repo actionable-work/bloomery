@@ -173,14 +173,18 @@
 
   stage = base.optimizedBinaries."opt-app";
   release = base.checks."opt-app:bin";
+  trainingPaths = map (name: stage.${name}.drvPath) ["pgoTraining" "boltTraining"];
 
   # Force a real end-to-end build of the optimized binary through a smoke run.
-  smokeRun = pkgs.runCommand "opt-app-smoke-run" {} ''
-    result="$(${base.packages."opt-app"}/bin/opt-app)"
-    test "$result" = "opt-app result: 332833507"
-    mkdir -p "$out"
-    printf '%s' "$result" > "$out/result"
-  '';
+  smokeRun =
+    pkgs.runCommand "opt-app-smoke-run" {
+      passthru.bloomery = ["NIXLIB-OPTIMIZE-PIPELINE-034"];
+    } ''
+      result="$(${base.packages."opt-app"}/bin/opt-app)"
+      test "$result" = "opt-app result: 332833507"
+      mkdir -p "$out"
+      printf '%s' "$result" > "$out/result"
+    '';
 
   stageNames = [
     "instrumented"
@@ -622,11 +626,17 @@ in {
       packageCheckIsRelease = base.checks."opt-app:bin".drvPath == release.drvPath;
       releaseDiffersFromOptimized = release.drvPath != stage.package.drvPath;
       checkSetHasNoOptimized = !(lib.any (value: value.drvPath or "" == stage.package.drvPath) (builtins.attrValues base.checks));
+      checkSetHasNoTraining =
+        lib.all (
+          trainingPath: !(lib.any (value: value.drvPath or "" == trainingPath) (builtins.attrValues base.checks))
+        )
+        trainingPaths;
     };
     expected = {
       packageCheckIsRelease = true;
       releaseDiffersFromOptimized = true;
       checkSetHasNoOptimized = true;
+      checkSetHasNoTraining = true;
     };
   };
 
@@ -662,11 +672,5 @@ in {
     expr = fails missingTools.packages."opt-app".drvPath;
     expected = true;
   };
-
-  # ── End-to-end acceptance ──────────────────────────────────────────────────
-
-  testOptimizedBinaryRuns = {
-    expr = builtins.readFile "${smokeRun}/result";
-    expected = "opt-app result: 332833507";
-  };
+  optimizedBinarySmoke = smokeRun;
 }

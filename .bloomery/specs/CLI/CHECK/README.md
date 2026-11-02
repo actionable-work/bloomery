@@ -65,6 +65,8 @@ without specification passes.
   derivation in no-write Nix check work for every selected system.
 - Run independent static and Nix work concurrently with bounded scheduling,
   realizing the selected Nix derivations in one batched invocation.
+- Keep catalog evaluation metadata-only; realize selected derivations only in
+  the batched Nix build.
 - Include package checks only when `checks.packages.enable` enables them;
   the default suite omits them.
 - Discover and realize checks elevated from configured sub-flakes as ordinary

@@ -161,3 +161,10 @@ title = "Successful summaries report checks once"
 manual = false
 design = "design/diagnostics.md#bounded-summary"
 ears = { type = "event", trigger = "the check run status is passed", system = "bloomery check", action = "report the passed status followed by the check count without repeating the passed label" }
+
+[[requirements]]
+id = "CLI-CHECK-OUTPUT-017"
+title = "Operational Nix errors preserve the fatal cause"
+manual = false
+design = "design/diagnostics.md#operational-nix-evaluation-errors"
+ears = { type = "event", trigger = "Nix catalog evaluation emits trace or warning lines before a fatal evaluation error", system = "bloomery check", action = "report the failed Nix operation and fatal cause, include concise builder detail when available, and treat preceding trace or warning lines only as advisory context" }

@@ -15,7 +15,8 @@
   repositoryLayoutTests = import ./repository-layout.test.nix {inherit lib;};
   templatesSourceTests = import ./templates-source.test.nix {inherit pkgs lib;};
   sourceIsolationTests = import ./source-isolation.test.nix {inherit pkgs lib;};
-  optimizeTests = import ./optimize.test.nix {inherit pkgs lib;};
+  optimizeTestSuite = import ./optimize.test.nix {inherit pkgs lib;};
+  optimizeTests = builtins.removeAttrs optimizeTestSuite ["optimizedBinarySmoke"];
   graphTests = import ./graph.test.nix {inherit pkgs lib;};
 
   # Aggregate all colocated unit tests
@@ -37,6 +38,7 @@
   failedTests = lib.runTests testCases;
 in {
   inherit testCases failedTests;
+  optimizedBinarySmoke = optimizeTestSuite.optimizedBinarySmoke;
 
   # Derivation for flake check
   check =

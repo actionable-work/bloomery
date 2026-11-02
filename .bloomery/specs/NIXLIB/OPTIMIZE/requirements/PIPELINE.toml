@@ -198,14 +198,10 @@ action = "keep dev apps on the dev profile while release apps use the optimized 
 
 [[requirements]]
 id = "NIXLIB-OPTIMIZE-PIPELINE-018"
-title = "Optimized binaries are not checks"
+title = "Generated package checks use release binaries"
 manual = false
 design = "design/optimization.md#outputs"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the workspace builder"
-action = "keep optimized binaries and their training runs out of checks and bloomery check"
+ears = { type = "ubiquitous", system = "the workspace builder", action = "use release binaries for generated package checks and exclude optimized binaries and their training derivations" }
 
 [[requirements]]
 id = "NIXLIB-OPTIMIZE-PIPELINE-019"
@@ -385,3 +381,10 @@ type = "event"
 trigger = "a system entry sets targetCpu while both PGO and BOLT are disabled"
 system = "the workspace builder"
 action = "build and export a target-CPU-tuned binary instead of the untuned release binary"
+
+[[requirements]]
+id = "NIXLIB-OPTIMIZE-PIPELINE-034"
+title = "Optimized binary smoke run is a default check"
+manual = false
+design = "design/optimization.md#verification"
+ears = { type = "event", trigger = "the repository optimization fixture is enabled", system = "the root flake", action = "expose the optimized binary smoke run as checks.<system>.optimization-smoke and include it in the default check catalog" }

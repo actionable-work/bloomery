@@ -319,3 +319,10 @@ design = "design/workspace-check.md#catalog-evaluation"
 type = "ubiquitous"
 system = "bloomery check with --no-write"
 action = "evaluate selected system check IDs and selected derivation paths together once per system before realization"
+
+[[requirements]]
+id = "CLI-CHECK-NIX-032"
+title = "Catalog planning does not realize checks"
+manual = false
+design = "design/workspace-check.md#catalog-evaluation"
+ears = { type = "ubiquitous", system = "bloomery check catalog evaluation", action = "inspect check names and derivation metadata without realizing outputs or running builders" }

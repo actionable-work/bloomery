@@ -98,7 +98,10 @@
                   --prefix PATH : "${lib.makeBinPath [pkgs.cargo]}"
               '';
           in
-            perSystemWorkspace.${system}.packages // {bloomery-wrapped = wrapped;}
+            perSystemWorkspace.${system}.packages
+            // {
+              bloomery-wrapped = wrapped;
+            }
         );
         apps = eachSystem (
           system: let

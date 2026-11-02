@@ -21,3 +21,6 @@ in
     inherit lib pkgs system;
     bloomery = self;
   })
+  // {
+    "optimization-smoke" = bloomery.tests.optimizedBinarySmoke;
+  }
