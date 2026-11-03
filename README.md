@@ -154,3 +154,9 @@ Every supported setup style is verified by an isolated sub-flake in CI:
 | [`tests/flake-parts-workspace`](./tests/flake-parts-workspace) | Internal flake-parts module | Exercises the internal flake-parts module directly; the public API is `mkFlake` |
 | [`tests/edge-cases-workspace`](./tests/edge-cases-workspace) | Config-driven `mkFlake` | Root package, glob members, excluded crates, build cfgs, integration tests, and multiple binary layouts |
 | [`tests/overrides-workspace`](./tests/overrides-workspace) | Multi-Crate Overrides | Validates colocated member overrides and flake-level overrides merging in a multi-crate workspace |
+
+Run `nix run .#template-checks` from the repository root to initialize each
+bundled template with real lockfiles and run the default `bloomery check` in
+the generated workspace. This host-run suite requires Cargo, Nix daemon access,
+and network access for fresh flake inputs; run it alongside the repository's
+own `bloomery check`.

@@ -28,8 +28,10 @@ Every template provides the same bootstrap files:
   The generated `nixpkgs` input follows the input declared by Bloomery, and
   `mkFlake` receives that shared input. The generated workspace inherits the
   default development shell, including the Bloomery CLI.
-- `Cargo.toml` declares a `[workspace]` with `resolver = "2"` and the
-  template's member crates.
+- `Cargo.toml` declares a `[workspace]` with `resolver = "2"`, the template's
+  member crates, and shared dependencies under `[workspace.dependencies]`.
+  Every shared dependency disables default features, and member manifests
+  inherit dependencies with `workspace = true`.
 - `.bloomery/config.toml` declares the current configuration format version
   and includes every key with a recommended default in Bloomery's
   [configuration schema catalog](../../../PARSER/CONFIGURATION/design/schema-catalog.md),
@@ -44,6 +46,13 @@ Every template provides the same bootstrap files:
 Every template is a multi-crate workspace. Binaries are thin entry points that
 delegate to library crates holding the application logic.
 
+## Library crates
+
+Library crate package names use stable template-defined Rust identifiers:
+`app_core` for the basic core library, `app_server` for server libraries, and
+`app_ui` for the Topcoat UI library. Their directory names use the derived
+project name. Binary package names use the derived project name.
+
 ## Seeded specifications
 
 Each template seeds a minimal specification tree: one area README, one or two
@@ -55,6 +64,16 @@ test in the matching library crate tagged with
 validation and coverage with no proc-macro dependency. Seeded IDs follow the
 normal area-feature-group-sequence scheme and seed paths match the template's
 crate layout.
+
+## End-to-end validation
+
+Every bundled template is validated through a freshly initialized workspace,
+including project-name substitution, generated configuration, source files,
+and lockfiles. The generated workspace must complete the default write-mode
+`bloomery check` successfully with the Bloomery implementation under test. This
+exercises the same formatting, workspace, dependency, code-health, and
+specification checks that a user runs after initialization. The first
+write-mode check may create the configured code-health baseline.
 
 ## Basic workspace
 

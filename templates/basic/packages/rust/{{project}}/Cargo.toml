@@ -1,5 +1,5 @@
 [dependencies]
-app_core = { package = "{{project}}_core", path = "../{{project}}_core" }
+app_core = { workspace = true }
 
 [package]
 edition = "2024"

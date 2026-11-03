@@ -295,3 +295,24 @@ title = "Generated configurations declare the current format"
 manual = false
 design = "design/templates.md#common-files"
 ears = { type = "ubiquitous", system = "the Bloomery template catalog", action = "write .bloomery/config.toml with the current configuration format version" }
+
+[[requirements]]
+id = "CLI-INIT-FILES-029"
+title = "Workspace dependencies disable defaults"
+manual = false
+design = "design/templates.md#common-files"
+ears = { type = "ubiquitous", system = "a generated template workspace dependency", action = "set default-features = false on every workspace.dependencies entry" }
+
+[[requirements]]
+id = "CLI-INIT-FILES-030"
+title = "Template library crate names are stable"
+manual = false
+design = "design/templates.md#library-crates"
+ears = { type = "ubiquitous", system = "a generated template library crate", action = "use its template-defined stable Cargo package name" }
+
+[[requirements]]
+id = "CLI-INIT-FILES-031"
+title = "Members inherit workspace dependencies"
+manual = false
+design = "design/templates.md#common-files"
+ears = { type = "ubiquitous", system = "a generated template member manifest", action = "declare every dependency with workspace = true" }

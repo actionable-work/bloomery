@@ -1,18 +1,9 @@
 [dependencies]
-app_ui = { package = "{{project}}_ui", path = "../{{project}}_ui" }
-tokio = { default-features = false, features = [
-  "net",
-  "rt-multi-thread",
-], version = "1" }
-topcoat = { default-features = false, features = [
-  "asset",
-  "compression",
-  "router",
-  "serve",
-  "view",
-], version = "0.9.0" }
+app_ui = { workspace = true }
+tokio = { workspace = true }
+topcoat = { workspace = true }
 
 [package]
 edition = "2024"
-name = "{{project}}_server"
+name = "app_server"
 version = "0.1.0"

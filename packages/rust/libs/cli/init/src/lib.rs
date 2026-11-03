@@ -413,6 +413,58 @@ mod tests {
         super::template::files(name).collect()
     }
 
+    fn workspace_dependencies_disable_defaults(manifest: &str) -> bool {
+        let mut in_workspace_dependencies = false;
+        let mut found_dependency = false;
+
+        for line in manifest.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with('[') {
+                if in_workspace_dependencies {
+                    break;
+                }
+                in_workspace_dependencies = trimmed == "[workspace.dependencies]";
+                continue;
+            }
+            if !in_workspace_dependencies {
+                continue;
+            }
+
+            let starts_dependency = !line.starts_with(' ')
+                && !line.starts_with('\t')
+                && !trimmed.starts_with(']')
+                && trimmed.contains(" = ");
+            if starts_dependency {
+                found_dependency = true;
+                if !trimmed.contains("default-features = false") {
+                    return false;
+                }
+            }
+        }
+
+        found_dependency
+    }
+
+    fn member_dependencies_inherit_workspace(manifest: &str) -> bool {
+        let mut in_dependencies = false;
+        for line in manifest.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with('[') {
+                in_dependencies = trimmed == "[dependencies]";
+                continue;
+            }
+            if in_dependencies
+                && !line.starts_with(' ')
+                && !line.starts_with('\t')
+                && trimmed.contains(" = ")
+                && !trimmed.contains("workspace = true")
+            {
+                return false;
+            }
+        }
+        true
+    }
+
     #[test]
     #[cfg_attr(any(), bloomery("CLI-INIT-COMMAND-004"))]
     #[cfg_attr(any(), bloomery("CLI-INIT-COMMAND-009"))]
@@ -694,6 +746,9 @@ mod tests {
     #[cfg_attr(any(), bloomery("CLI-INIT-FILES-012"))]
     #[cfg_attr(any(), bloomery("CLI-INIT-FILES-013"))]
     #[cfg_attr(any(), bloomery("CLI-INIT-FILES-028"))]
+    #[cfg_attr(any(), bloomery("CLI-INIT-FILES-029"))]
+    #[cfg_attr(any(), bloomery("CLI-INIT-FILES-030"))]
+    #[cfg_attr(any(), bloomery("CLI-INIT-FILES-031"))]
     #[cfg_attr(any(), bloomery("CLI-INIT-TEMPLATES-004"))]
     fn every_template_carries_the_common_scaffolding() {
         assert_eq!(TEMPLATE_NAMES, &["basic", "axum", "topcoat"]);
@@ -720,6 +775,37 @@ mod tests {
             let manifest = files.get("Cargo.toml").expect("manifest");
             assert!(manifest.contains("[workspace]"), "{name} workspace");
             assert!(manifest.contains("resolver = \"2\""), "{name} resolver");
+            assert!(
+                workspace_dependencies_disable_defaults(manifest),
+                "{name} workspace dependencies disable default features:\n{manifest}"
+            );
+            for (path, content) in files
+                .iter()
+                .filter(|(path, _)| path.ends_with("Cargo.toml") && **path != "Cargo.toml")
+            {
+                assert!(
+                    member_dependencies_inherit_workspace(content),
+                    "{name} member manifest {path} inherits workspace dependencies"
+                );
+            }
+            let library_packages: &[(&str, &str)] = match *name {
+                "basic" => &[("packages/rust/{{project}}_core/Cargo.toml", "app_core")],
+                "axum" => &[("packages/rust/{{project}}_server/Cargo.toml", "app_server")],
+                "topcoat" => &[
+                    ("packages/rust/{{project}}_server/Cargo.toml", "app_server"),
+                    ("packages/rust/{{project}}_ui/Cargo.toml", "app_ui"),
+                ],
+                _ => unreachable!("template names were checked above"),
+            };
+            for (path, package_name) in library_packages {
+                let manifest = files.get(*path).expect("library manifest");
+                assert!(
+                    manifest
+                        .lines()
+                        .any(|line| line.trim() == format!("name = \"{package_name}\"")),
+                    "{name} library at {path} has stable package name {package_name}"
+                );
+            }
             let config = files.get(".bloomery/config.toml").expect("config");
             assert!(config.contains("version = 2"), "{name} config version");
             assert!(files.contains_key(".gitignore"), "{name} gitignore");

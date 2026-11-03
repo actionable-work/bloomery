@@ -31,10 +31,11 @@ skeleton, and then locks the generated workspace so it is immediately usable.
 - Resolve a template from Bloomery's bundled catalog named after each
   immediate child of the repository's `templates/` directory.
 - Derive and validate the project name used by the `{{project}}` placeholder.
-- Write the common scaffolding: `flake.nix`, `Cargo.toml`,
+- Write the common scaffolding: `flake.nix`, a resolver-2 `Cargo.toml` with
+  centralized dependencies, disabled default features, and member inheritance;
   `.bloomery/config.toml` with the current format version and every recommended
-  configuration default, a seeded `.bloomery/specs` skeleton, `.gitignore`,
-  and `.envrc`.
+  configuration default; a seeded `.bloomery/specs` skeleton; `.gitignore`; and
+  `.envrc`.
 - Provide the `basic`, `axum`, and `topcoat` multi-crate templates with thin
   binaries over library crates.
 - Lock the generated workspace by creating `Cargo.lock`, `bloomery.lock`, and
@@ -60,4 +61,7 @@ runners and asserting the created paths, generated contents, template
 selection, placeholder substitution, seeded specs, lockfiles, force/guard
 behavior, and failure handling. Locking coverage includes targets inside Git
 worktrees with untracked scaffold files and targets whose `.envrc` has not been
-approved by direnv.
+approved by direnv. Each bundled template is also initialized into a fresh
+workspace and checked with the default `bloomery check` command; the complete
+check must succeed for every generated workspace. Run the host-side end-to-end
+suite with `nix run .#template-checks`.

@@ -1,5 +1,5 @@
 [dependencies]
-app_server = { package = "{{project}}_server", path = "../{{project}}_server" }
+app_server = { workspace = true }
 
 [package]
 edition = "2024"

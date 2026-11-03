@@ -5,3 +5,18 @@ members = [
   "packages/rust/{{project}}_ui",
 ]
 resolver = "2"
+
+[workspace.dependencies]
+app_server = { default-features = false, path = "packages/rust/{{project}}_server" }
+app_ui = { default-features = false, path = "packages/rust/{{project}}_ui" }
+tokio = { default-features = false, features = [
+  "net",
+  "rt-multi-thread",
+], version = "1" }
+topcoat = { default-features = false, features = [
+  "asset",
+  "compression",
+  "router",
+  "serve",
+  "view",
+], version = "0.9.0" }

@@ -123,3 +123,10 @@ type = "unwanted_behavior"
 trigger = "the derived project name is not a valid Cargo package name"
 system = "bloomery init"
 action = "fail before writing any file"
+
+[[requirements]]
+id = "CLI-INIT-TEMPLATES-012"
+title = "Freshly initialized templates pass bloomery check"
+manual = false
+design = "design/templates.md#end-to-end-validation"
+ears = { type = "event", trigger = "a fresh workspace is initialized from any bundled template", system = "Bloomery", action = "complete the default bloomery check successfully" }

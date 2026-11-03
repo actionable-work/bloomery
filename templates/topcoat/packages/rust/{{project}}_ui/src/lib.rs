@@ -10,7 +10,7 @@ pub const HOME_TITLE: &str = "{{project}}";
 #[page("/")]
 pub async fn home() -> Result<impl View, Error> {
     Ok(view! {
-        <!doctype html>
+        <!DOCTYPE html>
         <html>
             <head>
                 <title>(HOME_TITLE)</title>

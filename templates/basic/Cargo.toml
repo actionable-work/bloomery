@@ -1,3 +1,6 @@
 [workspace]
 members = ["packages/rust/{{project}}", "packages/rust/{{project}}_core"]
 resolver = "2"
+
+[workspace.dependencies]
+app_core = { default-features = false, path = "packages/rust/{{project}}_core" }
