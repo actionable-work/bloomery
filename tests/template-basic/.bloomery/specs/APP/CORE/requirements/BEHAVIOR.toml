@@ -1,0 +1,13 @@
+group = "BEHAVIOR"
+
+[[requirements]]
+id = "APP-CORE-BEHAVIOR-001"
+title = "The core library greets a name"
+manual = false
+design = "design/behavior.md"
+
+[requirements.ears]
+type = "event"
+trigger = "the core library is asked to greet a name"
+system = "the core library"
+action = "return a greeting containing that name"

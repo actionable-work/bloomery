@@ -127,22 +127,6 @@
                 exec ${pkgs.bash}/bin/bash ${./benchmarks/run.sh} "$@"
               '';
             };
-            templateChecks = pkgs.writeShellApplication {
-              name = "bloomery-template-checks";
-              runtimeInputs = [pkgs.nix];
-              text = ''
-                if [ ! -f packages/rust/bins/cli/tests/template_checks.rs ]; then
-                  echo "run this command from the Bloomery repository root" >&2
-                  exit 2
-                fi
-
-                exec nix develop . --command cargo test \
-                  --package bloomery-cli \
-                  --test template_checks -- \
-                  --ignored --exact initialized_templates_pass_bloomery_check \
-                  --test-threads=1
-              '';
-            };
           in
             perSystemWorkspace.${system}.apps
             // {
@@ -153,10 +137,6 @@
               bench = {
                 type = "app";
                 program = "${bench}/bin/bloomery-bench";
-              };
-              template-checks = {
-                type = "app";
-                program = "${templateChecks}/bin/bloomery-template-checks";
               };
             }
         );

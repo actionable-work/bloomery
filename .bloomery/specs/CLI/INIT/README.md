@@ -61,7 +61,6 @@ runners and asserting the created paths, generated contents, template
 selection, placeholder substitution, seeded specs, lockfiles, force/guard
 behavior, and failure handling. Locking coverage includes targets inside Git
 worktrees with untracked scaffold files and targets whose `.envrc` has not been
-approved by direnv. Each bundled template is also initialized into a fresh
-workspace and checked with the default `bloomery check` command; the complete
-check must succeed for every generated workspace. Run the host-side end-to-end
-suite with `nix run .#template-checks`.
+approved by direnv. The root flake builds each template workspace's generated
+checks, and a source check verifies each workspace fixture matches its template
+after project-name substitution.

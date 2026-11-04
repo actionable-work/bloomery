@@ -1,0 +1,6 @@
+[workspace]
+members = ["packages/rust/template_basic", "packages/rust/template_basic_core"]
+resolver = "2"
+
+[workspace.dependencies]
+app_core = { default-features = false, path = "packages/rust/template_basic_core" }

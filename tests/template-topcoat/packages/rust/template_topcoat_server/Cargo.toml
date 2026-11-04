@@ -1,0 +1,9 @@
+[dependencies]
+app_ui = { workspace = true }
+tokio = { workspace = true }
+topcoat = { workspace = true }
+
+[package]
+edition = "2024"
+name = "app_server"
+version = "0.1.0"

@@ -1,0 +1,12 @@
+group = "PAGES"
+
+[[requirements]]
+id = "SITE-UI-PAGES-001"
+title = "The home page title is set"
+manual = false
+design = "design/pages.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the website UI"
+action = "expose the configured home page title"

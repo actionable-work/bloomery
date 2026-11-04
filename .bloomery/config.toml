@@ -152,6 +152,18 @@ path = "tests/single-crate-workspace"
 checks = "aggregate"
 path = "tests/source-isolation-workspace"
 
+[flakes.template-axum]
+checks = "aggregate"
+path = "tests/template-axum"
+
+[flakes.template-basic]
+checks = "aggregate"
+path = "tests/template-basic"
+
+[flakes.template-topcoat]
+checks = "aggregate"
+path = "tests/template-topcoat"
+
 [formatters]
 
 [formatters.alejandra]

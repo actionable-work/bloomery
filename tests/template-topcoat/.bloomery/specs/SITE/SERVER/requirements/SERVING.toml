@@ -1,0 +1,12 @@
+group = "SERVING"
+
+[[requirements]]
+id = "SITE-SERVER-SERVING-001"
+title = "The server builds a router"
+manual = false
+design = "design/serving.md"
+
+[requirements.ears]
+type = "ubiquitous"
+system = "the website server"
+action = "build a router containing the registered UI pages"

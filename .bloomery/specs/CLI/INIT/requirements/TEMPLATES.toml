@@ -126,7 +126,7 @@ action = "fail before writing any file"
 
 [[requirements]]
 id = "CLI-INIT-TEMPLATES-012"
-title = "Freshly initialized templates pass bloomery check"
+title = "Template workspaces pass Bloomery checks"
 manual = false
 design = "design/templates.md#end-to-end-validation"
-ears = { type = "event", trigger = "a fresh workspace is initialized from any bundled template", system = "Bloomery", action = "complete the default bloomery check successfully" }
+ears = { type = "event", trigger = "a workspace fixture represents any bundled template after project-name substitution", system = "Bloomery's root flake", action = "build all generated workspace checks successfully" }
