@@ -1,0 +1,50 @@
+group = "TREES"
+
+[[requirements]]
+id = "PARSER-SCANNING-TREES-001"
+title = "Virtual and filesystem trees share static discovery"
+manual = false
+design = "design/source-trees.md"
+ears = { type = "ubiquitous", system = "source tree analysis", action = "produce identical repository-relative references and test sites for identical tree content and scanner configuration" }
+
+[[requirements]]
+id = "PARSER-SCANNING-TREES-002"
+title = "Source tree paths are unambiguous"
+manual = false
+design = "design/source-trees.md"
+ears = { type = "ubiquitous", system = "source tree analysis", action = "reject noncanonical, duplicate and file/directory-colliding source paths" }
+
+[[requirements]]
+id = "PARSER-SCANNING-TREES-003"
+title = "Missing source content fails analysis"
+manual = false
+design = "design/source-trees.md"
+ears = { type = "ubiquitous", system = "source tree analysis", action = "return a diagnostic when selected source content is unavailable" }
+
+[[requirements]]
+id = "PARSER-SCANNING-TREES-004"
+title = "Discovery completeness is explicit"
+manual = false
+design = "design/source-trees.md"
+ears = { type = "ubiquitous", system = "source tree analysis", action = "report disabled and unmatched scanners explicitly without claiming complete discovery" }
+
+[[requirements]]
+id = "PARSER-SCANNING-TREES-005"
+title = "Explicit scanner configuration is validated"
+manual = false
+design = "design/source-trees.md"
+ears = { type = "ubiquitous", system = "source tree analysis", action = "reject invalid scanner configuration before reading source content" }
+
+[[requirements]]
+id = "PARSER-SCANNING-TREES-006"
+title = "Discovery ordering is deterministic"
+manual = false
+design = "design/source-trees.md"
+ears = { type = "ubiquitous", system = "source tree analysis", action = "order references, test sites and diagnostics independently of source tree insertion order" }
+
+[[requirements]]
+id = "PARSER-SCANNING-TREES-007"
+title = "Filesystem discovery avoids symbolic links"
+manual = false
+design = "design/source-trees.md"
+ears = { type = "ubiquitous", system = "source tree analysis", action = "exclude symbolic links from filesystem source discovery" }

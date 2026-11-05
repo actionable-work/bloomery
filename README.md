@@ -93,6 +93,10 @@ output is colorized automatically and honors `NO_COLOR`. `bloomery config
 document` annotates configured keys with the schema catalog documentation
 without changing values or adding absent keys.
 
+The [public static discovery library](packages/rust/libs/shared/scanning/README.md)
+accepts virtual or filesystem source trees with explicit scanner configuration.
+It returns syntactic references and test bindings without executing checks.
+
 ### Per-Crate Overrides
 
 Overrides carry arbitrary Nix values, so they stay in Nix. Pass them through the

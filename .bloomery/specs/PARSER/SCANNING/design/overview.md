@@ -1,6 +1,8 @@
 # Scanner architecture
 
-Evidence scanning runs after configuration and requirement parsing. Rust health
+CLI evidence scanning runs after configuration and requirement parsing. The
+[source-tree API](source-trees.md) accepts explicit configuration independently
+of requirement parsing. Rust health
 analysis requires configuration and production source discovery, independently
 of requirements. Both use [shared Rust ingestion](health-analysis.md). Every
 source-specific scanner emits the same logical evidence record:

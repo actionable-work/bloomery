@@ -134,7 +134,7 @@ pub struct Area {
     pub features: Vec<Feature>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Evidence {
     pub id: String,
     pub location: SourceLocation,
@@ -143,7 +143,7 @@ pub struct Evidence {
 
 /// A statically discovered test declaration with the requirement references it
 /// carries. An empty `references` vector marks an untied graduation candidate.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestSite {
     pub scanner: &'static str,
     pub name: Option<String>,

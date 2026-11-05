@@ -21,10 +21,8 @@ fn walk_files(
         let entry = entry.map_err(|error| format!("unable to read directory entry: {error}"))?;
         let path = entry.path();
         let name = entry.file_name();
-        if matches!(
-            name.to_str(),
-            Some(".git" | "target" | ".direnv" | "result" | "node_modules")
-        ) {
+        let file_type = entry.file_type().map_err(|error| error.to_string())?;
+        if name.to_str().is_some_and(ignored_name) || file_type.is_symlink() {
             continue;
         }
         if path.is_dir() {
@@ -44,7 +42,14 @@ fn walk_files(
     Ok(())
 }
 
-fn glob_matches(pattern: &str, path: &Path) -> bool {
+pub(crate) fn ignored_name(name: &str) -> bool {
+    matches!(
+        name,
+        ".git" | "target" | ".direnv" | "result" | "node_modules"
+    )
+}
+
+pub(crate) fn glob_matches(pattern: &str, path: &Path) -> bool {
     let pattern_parts: Vec<&str> = pattern.trim_matches('/').split('/').collect();
     let path_string = path
         .to_string_lossy()

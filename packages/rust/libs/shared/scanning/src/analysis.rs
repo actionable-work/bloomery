@@ -44,16 +44,26 @@ impl AnalysisSession {
     pub fn rust_file(&self, path: &Path) -> Result<Rc<ParsedRustFile>, String> {
         let canonical = fs::canonicalize(path)
             .map_err(|error| format!("Unable to resolve Rust source: {error}"))?;
+        self.rust_source_file(&canonical, || {
+            fs::read_to_string(&canonical)
+                .map_err(|error| format!("Unable to read Rust source: {error}"))
+        })
+    }
+
+    pub(crate) fn rust_source_file(
+        &self,
+        path: &Path,
+        read: impl FnOnce() -> Result<String, String>,
+    ) -> Result<Rc<ParsedRustFile>, String> {
         let mut files = self
             .files
             .lock()
             .map_err(|_| "Rust analysis cache lock was poisoned".to_owned())?;
-        if let Some(cached) = files.get(&canonical) {
+        if let Some(cached) = files.get(path) {
             return cached.clone();
         }
         let parsed = (|| {
-            let source = fs::read_to_string(&canonical)
-                .map_err(|error| format!("Unable to read Rust source: {error}"))?;
+            let source = read()?;
             #[cfg(test)]
             self.parsed_files.fetch_add(1, Ordering::Relaxed);
             let tokens = TokenStream::from_str(&source)
@@ -61,13 +71,13 @@ impl AnalysisSession {
             let syntax = syn::parse2(tokens.clone())
                 .map_err(|error| format!("Unable to parse Rust source: {error}"))?;
             Ok(Rc::new(ParsedRustFile {
-                path: canonical.clone(),
+                path: path.to_path_buf(),
                 source,
                 tokens,
                 syntax,
             }))
         })();
-        files.insert(canonical, parsed.clone());
+        files.insert(path.to_path_buf(), parsed.clone());
         parsed
     }
 }

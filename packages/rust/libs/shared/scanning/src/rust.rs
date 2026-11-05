@@ -1,24 +1,28 @@
 use crate::ScanOutput;
+use crate::SourceTree;
 use crate::analysis::AnalysisSession;
-use crate::files::expand_globs;
 use bloomery_model::{Diagnostic, Evidence, SourceLocation, TestSite};
 use std::path::Path;
 use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
 
 pub fn scan(
-    root: &Path,
-    patterns: &[String],
+    tree: &dyn SourceTree,
+    paths: &[std::path::PathBuf],
     session: &AnalysisSession,
+    filesystem_root: Option<&Path>,
 ) -> Result<ScanOutput, Vec<Diagnostic>> {
-    let paths = match expand_globs(root, patterns) {
-        Ok(paths) => paths,
-        Err(error) => return Err(vec![Diagnostic::new("ScannerError", error)]),
-    };
     let mut output = ScanOutput::default();
     let mut diagnostics = Vec::new();
     for path in paths {
-        let parsed = match session.rust_file(&path) {
+        let parsed = match filesystem_root {
+            Some(root) => session.rust_file(&root.join(path)),
+            None => session.rust_source_file(path, || {
+                tree.read(path.to_str().expect("validated path"))
+                    .map_err(|error| format!("Unable to read Rust source: {error}"))
+            }),
+        };
+        let parsed = match parsed {
             Ok(parsed) => parsed,
             Err(error) => {
                 let code = if error.starts_with("Unable to parse")
@@ -28,12 +32,12 @@ pub fn scan(
                 } else {
                     "RustScanError"
                 };
-                diagnostics.push(Diagnostic::new(code, error).at(path, Some(1)));
+                diagnostics.push(Diagnostic::new(code, error).at(path.clone(), Some(1)));
                 continue;
             }
         };
         let mut visitor = Visitor {
-            path: &parsed.path,
+            path,
             output: ScanOutput::default(),
             diagnostics: Vec::new(),
         };

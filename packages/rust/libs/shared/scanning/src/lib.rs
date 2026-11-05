@@ -1,10 +1,35 @@
+//! Static discovery over caller-authorized source trees.
+//!
+//! ```
+//! use bloomery_model::config::ScannersConfig;
+//! use bloomery_scanning::{MemoryTree, scan_tree};
+//!
+//! let tree = MemoryTree::new([("tests/a.rs", "#[test] fn example() {}")])?;
+//! let mut config = ScannersConfig::default();
+//! config.rust.paths = vec!["tests/**/*.rs".into()];
+//! config.playwright.enabled = false;
+//! config.nix.enabled = false;
+//! let analysis = scan_tree(&tree, &config).map_err(|errors| format!("{errors:?}"))?;
+//! assert_eq!(analysis.output.tests[0].name.as_deref(), Some("example"));
+//! assert!(!analysis.is_complete());
+//! # Ok::<(), String>(())
+//! ```
+
 mod analysis;
 mod clippy;
 mod files;
 mod health;
 mod nix;
 mod rust;
+mod tree;
+mod tree_scan;
 mod typescript;
+
+pub use tree::{FilesystemTree, MemoryTree, SourceTree};
+pub use tree_scan::{DiscoveryState, ScanAnalysis, ScanScope, ScannerDiscovery, scan_tree};
+
+#[cfg(test)]
+mod tree_tests;
 
 pub use analysis::AnalysisSession;
 use bloomery_model::{Context, Diagnostic, Evidence, TestSite};
@@ -15,7 +40,7 @@ pub use health::{
 };
 
 /// One scanner pass: requirement references plus discovered test sites.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct ScanOutput {
     pub evidence: Vec<Evidence>,
     pub tests: Vec<TestSite>,
@@ -37,36 +62,27 @@ pub fn scan_all_with_session(
     context: &Context,
     session: &AnalysisSession,
 ) -> Result<ScanOutput, Vec<Diagnostic>> {
-    let mut output = ScanOutput::default();
-    let mut diagnostics = Vec::new();
-    let scanners = &context.config.scanners;
-    if scanners.rust.enabled {
-        match rust::scan(&context.root, &scanners.rust.paths, session) {
-            Ok(found) => output.absorb(found),
-            Err(errors) => diagnostics.extend(errors),
+    let mut analysis = tree_scan::scan_with_session(
+        &FilesystemTree::new(&context.root),
+        &context.config.scanners,
+        session,
+        Some(&context.root),
+    )
+    .map_err(|mut diagnostics| {
+        for diagnostic in &mut diagnostics {
+            if let Some(location) = &mut diagnostic.location {
+                location.path = context.root.join(&location.path);
+            }
         }
+        diagnostics
+    })?;
+    for item in &mut analysis.output.evidence {
+        item.location.path = context.root.join(&item.location.path);
     }
-    if scanners.playwright.enabled {
-        match typescript::scan(
-            &context.root,
-            &scanners.playwright.paths,
-            &scanners.playwright.tag_prefix,
-        ) {
-            Ok(found) => output.absorb(found),
-            Err(errors) => diagnostics.extend(errors),
-        }
+    for test in &mut analysis.output.tests {
+        test.location.path = context.root.join(&test.location.path);
     }
-    if scanners.nix.enabled {
-        match nix::scan(&context.root, &scanners.nix) {
-            Ok(found) => output.absorb(found),
-            Err(errors) => diagnostics.extend(errors),
-        }
-    }
-    if diagnostics.is_empty() {
-        Ok(output)
-    } else {
-        Err(diagnostics)
-    }
+    Ok(analysis.output)
 }
 
 #[cfg(test)]
@@ -91,7 +107,7 @@ mod tests {
     /// not perturbed by other tests running in parallel.
     static SCAN_LOCK: Mutex<()> = Mutex::new(());
 
-    fn scan_lock() -> std::sync::MutexGuard<'static, ()> {
+    pub(super) fn scan_lock() -> std::sync::MutexGuard<'static, ()> {
         SCAN_LOCK
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)

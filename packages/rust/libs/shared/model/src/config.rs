@@ -290,25 +290,7 @@ fn validate_config_version(raw: &toml::Value, path: &Path) -> Result<(), Diagnos
 impl Config {
     fn validate(&self) -> Result<(), Diagnostic> {
         self.validate_specs_dir()?;
-        validate_file_scanner(
-            "rust",
-            self.scanners.rust.enabled,
-            &self.scanners.rust.paths,
-        )?;
-        validate_file_scanner(
-            "playwright",
-            self.scanners.playwright.enabled,
-            &self.scanners.playwright.paths,
-        )?;
-        if self.scanners.playwright.enabled && self.scanners.playwright.tag_prefix.is_empty() {
-            return Err(Diagnostic::new(
-                "ConfigurationError",
-                "scanners.playwright.tag_prefix must not be empty",
-            ));
-        }
-        validate_file_scanner("nix", self.scanners.nix.enabled, &self.scanners.nix.paths)?;
-        validate_paths("scanners.nix.testPaths", &self.scanners.nix.test_paths)?;
-        Ok(())
+        self.scanners.validate()
     }
 
     fn validate_specs_dir(&self) -> Result<(), Diagnostic> {
@@ -345,6 +327,27 @@ impl Config {
             Some(enabled) => enabled,
             None => self.specs_root(root).is_ok_and(|path| path.is_dir()),
         }
+    }
+}
+
+impl ScannersConfig {
+    /// Validate explicit scanner configuration without a configuration file.
+    pub fn validate(&self) -> Result<(), Diagnostic> {
+        validate_file_scanner("rust", self.rust.enabled, &self.rust.paths)?;
+        validate_file_scanner(
+            "playwright",
+            self.playwright.enabled,
+            &self.playwright.paths,
+        )?;
+        if self.playwright.enabled && self.playwright.tag_prefix.is_empty() {
+            return Err(Diagnostic::new(
+                "ConfigurationError",
+                "scanners.playwright.tag_prefix must not be empty",
+            ));
+        }
+        validate_file_scanner("nix", self.nix.enabled, &self.nix.paths)?;
+        validate_paths("scanners.nix.testPaths", &self.nix.test_paths)?;
+        Ok(())
     }
 }
 

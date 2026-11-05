@@ -1,8 +1,7 @@
 use crate::ScanOutput;
-use crate::files::expand_globs;
-use bloomery_model::{Diagnostic, Evidence, SourceLocation, TestSite, config::NixScannerConfig};
+use crate::SourceTree;
+use bloomery_model::{Diagnostic, Evidence, SourceLocation, TestSite};
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 #[cfg(test)]
@@ -11,30 +10,25 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 #[cfg(test)]
 pub(crate) static PARSE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
-pub fn scan(root: &Path, config: &NixScannerConfig) -> Result<ScanOutput, Vec<Diagnostic>> {
-    let reference_paths = match expand_globs(root, &config.paths) {
-        Ok(paths) => paths,
-        Err(error) => return Err(vec![Diagnostic::new("ScannerError", error)]),
-    };
-    let test_paths = match expand_globs(root, &config.test_paths) {
-        Ok(paths) => paths,
-        Err(error) => return Err(vec![Diagnostic::new("ScannerError", error)]),
-    };
-
+pub fn scan(
+    tree: &dyn SourceTree,
+    reference_paths: &[PathBuf],
+    test_paths: &[PathBuf],
+) -> Result<ScanOutput, Vec<Diagnostic>> {
     // Reference extraction reads `paths`; test discovery reads `testPaths`. The
     // union is scanned once so a file matched by both roles is parsed once.
     let mut wanted: BTreeMap<PathBuf, (bool, bool)> = BTreeMap::new();
     for path in reference_paths {
-        wanted.entry(path).or_default().0 = true;
+        wanted.entry(path.clone()).or_default().0 = true;
     }
     for path in test_paths {
-        wanted.entry(path).or_default().1 = true;
+        wanted.entry(path.clone()).or_default().1 = true;
     }
 
     let mut output = ScanOutput::default();
     let mut diagnostics = Vec::new();
     for (path, (_, is_test)) in wanted {
-        let contents = match fs::read_to_string(&path) {
+        let contents = match tree.read(path.to_str().expect("validated path")) {
             Ok(contents) => contents,
             Err(error) => {
                 diagnostics.push(
@@ -47,7 +41,7 @@ pub fn scan(root: &Path, config: &NixScannerConfig) -> Result<ScanOutput, Vec<Di
                 continue;
             }
         };
-        let (found, errors) = scan_source(root, &path, &contents);
+        let (found, errors) = scan_source(&path, &contents);
         diagnostics.extend(errors);
         if is_test {
             let references = found.iter().map(|entry| entry.id.clone()).collect();
@@ -71,7 +65,7 @@ pub fn scan(root: &Path, config: &NixScannerConfig) -> Result<ScanOutput, Vec<Di
     }
 }
 
-fn scan_source(root: &Path, path: &Path, source: &str) -> (Vec<Evidence>, Vec<Diagnostic>) {
+fn scan_source(path: &Path, source: &str) -> (Vec<Evidence>, Vec<Diagnostic>) {
     #[cfg(test)]
     PARSE_COUNT.fetch_add(1, Ordering::Relaxed);
     let tokens = tokenize(source);
@@ -106,15 +100,6 @@ fn scan_source(root: &Path, path: &Path, source: &str) -> (Vec<Evidence>, Vec<Di
         index += 1;
     }
 
-    if !path.starts_with(root) {
-        diagnostics.push(
-            Diagnostic::new(
-                "NixScanError",
-                "Nix source path escaped the repository root",
-            )
-            .at(path, Some(1)),
-        );
-    }
     (evidence, diagnostics)
 }
 

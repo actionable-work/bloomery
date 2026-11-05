@@ -13,6 +13,7 @@
   "core:library-name-reader" = import ./library-name-reader.nix {inherit pkgs lib;};
   "core:unit-tests" = import ./unit-tests.nix {inherit bloomery;};
   "core:proc-macro-crate-type" = import ./proc-macro-crate-type.nix {inherit pkgs workspace;};
+  "core:static-scanning-parity" = import ./static-scanning-parity.nix {inherit pkgs workspace;};
   "core:treefmt-check" = import ./treefmt-check.nix {
     inherit pkgs treefmt root;
   };

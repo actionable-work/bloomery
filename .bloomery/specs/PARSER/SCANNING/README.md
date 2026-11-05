@@ -22,6 +22,7 @@ candidate projection over untagged tests belongs to
 ## Design documents
 
 - [Scanner architecture](design/overview.md)
+- [Public source tree inputs](design/source-trees.md)
 - [Rust scanning](design/rust.md)
 - [Shared Rust health analysis](design/health-analysis.md)
 - [Playwright scanning](design/playwright.md)
@@ -49,10 +50,12 @@ and test discovery share one command-scoped parse cache. See the
 
 ## Safety boundary
 
-Evidence scanning is invoked only when specification management is enabled.
+CLI evidence scanning is invoked only when specification management is enabled.
+The public source-tree API accepts explicit scanner configuration independently
+of workspace specification loading.
 Rust health analysis is independently enabled and uses production target
 discovery. Both share ingestion, traversal facts, and source diagnostics. The
-scanners may read configured files and, for Nix metadata, invoke the
-configured evaluation operation. They do not execute test functions, launch
+scanners read configured files and inspect Nix metadata without evaluation.
+They do not execute test functions, launch
 applications, instantiate derivations, fetch dependencies, or open network
 connections.

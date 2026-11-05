@@ -1,5 +1,5 @@
 use crate::ScanOutput;
-use crate::files::expand_globs;
+use crate::SourceTree;
 use bloomery_model::{Diagnostic, Evidence, SourceLocation, TestSite};
 use oxc_allocator::Allocator;
 use oxc_ast::{
@@ -11,7 +11,6 @@ use oxc_ast::{
 };
 use oxc_parser::Parser;
 use oxc_span::SourceType;
-use std::fs;
 use std::path::Path;
 
 #[cfg(test)]
@@ -21,18 +20,14 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 pub(crate) static PARSE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 pub fn scan(
-    root: &Path,
-    patterns: &[String],
+    tree: &dyn SourceTree,
+    paths: &[std::path::PathBuf],
     tag_prefix: &str,
 ) -> Result<ScanOutput, Vec<Diagnostic>> {
-    let paths = match expand_globs(root, patterns) {
-        Ok(paths) => paths,
-        Err(error) => return Err(vec![Diagnostic::new("ScannerError", error)]),
-    };
     let mut output = ScanOutput::default();
     let mut diagnostics = Vec::new();
     for path in paths {
-        let contents = match fs::read_to_string(&path) {
+        let contents = match tree.read(path.to_str().expect("validated path")) {
             Ok(contents) => contents,
             Err(error) => {
                 diagnostics.push(
@@ -40,7 +35,7 @@ pub fn scan(
                         "PlaywrightScanError",
                         format!("Unable to read source: {error}"),
                     )
-                    .at(path, Some(1)),
+                    .at(path.clone(), Some(1)),
                 );
                 continue;
             }
@@ -57,14 +52,14 @@ pub fn scan(
                         parsed.errors.len()
                     ),
                 )
-                .at(path, Some(1)),
+                .at(path.clone(), Some(1)),
             );
             continue;
         }
 
         let mut visitor = PlaywrightVisitor {
             source: &contents,
-            path: &path,
+            path,
             tag_prefix,
             output: ScanOutput::default(),
         };
