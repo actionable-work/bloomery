@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -20,8 +20,12 @@ pub(crate) struct BloomeryLock {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub(crate) struct BloomeryPackage {
+    #[serde(rename = "lib-name", skip_serializing_if = "Option::is_none")]
+    pub lib_name: Option<String>,
     pub features: Vec<String>,
     pub dependencies: Vec<String>,
+    #[serde(rename = "dependency-edges")]
+    pub dependency_edges: Vec<BloomeryDependencyEdge>,
     #[serde(rename = "proc-macro")]
     pub proc_macro: bool,
     pub edition: String,
@@ -37,6 +41,19 @@ pub(crate) struct BloomeryPackage {
 pub(crate) struct BloomeryContextPackage {
     pub features: Vec<String>,
     pub dependencies: Vec<String>,
+    #[serde(rename = "dependency-edges")]
+    pub dependency_edges: Vec<BloomeryDependencyEdge>,
+}
+
+/// An extern binding belongs to a consumer and never renames its artifact.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct BloomeryDependencyEdge {
+    pub package: String,
+    #[serde(rename = "extern-name")]
+    pub extern_name: String,
+    pub kind: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -61,9 +78,9 @@ pub(crate) fn serialize_candidate(lock: &BloomeryLock) -> Result<Vec<u8>, String
 }
 
 fn validate_lock(lock: &BloomeryLock) -> Result<(), String> {
-    if lock.version != 2 {
+    if lock.version != 3 {
         return Err(format!(
-            "unsupported Bloomery lock version {}; expected version 2",
+            "unsupported Bloomery lock version {}; expected version 3",
             lock.version
         ));
     }
@@ -80,6 +97,14 @@ fn validate_lock(lock: &BloomeryLock) -> Result<(), String> {
         if key.is_empty() {
             return Err("Bloomery lock package keys must not be empty".to_owned());
         }
+        if package
+            .lib_name
+            .as_deref()
+            .is_some_and(|name| !valid_crate_name(name))
+        {
+            return Err(format!("package '{key}' has an invalid lib-name"));
+        }
+        validate_edges(key, &package.dependencies, &package.dependency_edges, lock)?;
         if package.edition.is_empty() {
             return Err(format!("package '{key}' has an empty edition"));
         }
@@ -112,6 +137,7 @@ fn validate_lock(lock: &BloomeryLock) -> Result<(), String> {
                     "context '{member}' references unknown package '{key}'"
                 ));
             }
+            validate_edges(key, &package.dependencies, &package.dependency_edges, lock)?;
             if !is_strictly_sorted(&package.features) {
                 return Err(format!(
                     "context '{member}' package '{key}' features must be sorted and deduplicated"
@@ -129,6 +155,65 @@ fn validate_lock(lock: &BloomeryLock) -> Result<(), String> {
                     ));
                 }
             }
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn valid_crate_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    chars.next().is_some_and(|c| c == '_' || c.is_alphabetic())
+        && chars.all(|c| c == '_' || c.is_alphanumeric())
+}
+
+fn validate_edges(
+    key: &str,
+    dependencies: &[String],
+    edges: &[BloomeryDependencyEdge],
+    lock: &BloomeryLock,
+) -> Result<(), String> {
+    if !edges.windows(2).all(|pair| pair[0] < pair[1]) {
+        return Err(format!(
+            "package '{key}' dependency-edges must be sorted and deduplicated"
+        ));
+    }
+    let projection: Vec<_> = edges
+        .iter()
+        .map(|edge| edge.package.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    if projection != dependencies {
+        return Err(format!(
+            "package '{key}' dependencies differ from the dependency-edges projection"
+        ));
+    }
+    let mut bindings = BTreeMap::new();
+    for edge in edges {
+        let Some(dependency) = lock.packages.get(&edge.package) else {
+            return Err(format!(
+                "package '{key}' has an unresolved edge to '{}'",
+                edge.package
+            ));
+        };
+        if dependency.lib_name.is_none()
+            || !valid_crate_name(&edge.extern_name)
+            || !matches!(edge.kind.as_str(), "normal" | "build" | "dev")
+            || edge.target.as_deref() == Some("")
+        {
+            return Err(format!(
+                "package '{key}' has an invalid dependency edge to '{}'",
+                edge.package
+            ));
+        }
+        let binding = (&edge.extern_name, &edge.kind, &edge.target);
+        if let Some(previous) = bindings.insert(binding, &edge.package)
+            && previous != &edge.package
+        {
+            return Err(format!(
+                "package '{key}' has conflicting extern '{}'",
+                edge.extern_name
+            ));
         }
     }
     Ok(())
@@ -254,8 +339,8 @@ impl Drop for TempFileGuard {
 #[cfg(test)]
 mod tests {
     use super::{
-        BloomeryContextPackage, BloomeryLock, BloomeryPackage, PublicationOutcome,
-        publish_candidate, publish_candidate_with, serialize_candidate,
+        BloomeryContextPackage, BloomeryDependencyEdge, BloomeryLock, BloomeryPackage,
+        PublicationOutcome, publish_candidate, publish_candidate_with, serialize_candidate,
     };
     use std::collections::BTreeMap;
     use std::fs;
@@ -293,14 +378,21 @@ mod tests {
 
     fn sample_lock() -> BloomeryLock {
         BloomeryLock {
-            version: 2,
+            version: 3,
             cargo_lock_hash: "a".repeat(64),
             packages: BTreeMap::from([
                 (
                     "crate-a-1.0.0".to_owned(),
                     BloomeryPackage {
+                        lib_name: Some("crate_a".to_owned()),
                         features: vec!["alpha".to_owned(), "zeta".to_owned()],
                         dependencies: vec!["crate-b-2.0.0".to_owned()],
+                        dependency_edges: vec![BloomeryDependencyEdge {
+                            package: "crate-b-2.0.0".to_owned(),
+                            extern_name: "crate_b".to_owned(),
+                            kind: "normal".to_owned(),
+                            target: None,
+                        }],
                         proc_macro: false,
                         edition: "2024".to_owned(),
                         license: Some("MIT OR Apache-2.0".to_owned()),
@@ -310,8 +402,10 @@ mod tests {
                 (
                     "crate-b-2.0.0".to_owned(),
                     BloomeryPackage {
+                        lib_name: Some("crate_b".to_owned()),
                         features: Vec::new(),
                         dependencies: Vec::new(),
+                        dependency_edges: Vec::new(),
                         proc_macro: true,
                         edition: "2021".to_owned(),
                         license: None,
@@ -327,6 +421,12 @@ mod tests {
                         BloomeryContextPackage {
                             features: vec!["alpha".to_owned(), "zeta".to_owned()],
                             dependencies: vec!["crate-b-2.0.0".to_owned()],
+                            dependency_edges: vec![BloomeryDependencyEdge {
+                                package: "crate-b-2.0.0".to_owned(),
+                                extern_name: "crate_b".to_owned(),
+                                kind: "normal".to_owned(),
+                                target: None,
+                            }],
                         },
                     ),
                     (
@@ -334,6 +434,7 @@ mod tests {
                         BloomeryContextPackage {
                             features: Vec::new(),
                             dependencies: Vec::new(),
+                            dependency_edges: Vec::new(),
                         },
                     ),
                 ]),
@@ -358,13 +459,13 @@ mod tests {
     #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-006"))]
     #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-019"))]
     #[cfg_attr(any(), bloomery("CLI-SYNC-LOCKS-020"))]
-    fn candidate_is_a_valid_version_two_lock_with_sorted_tables_and_fields() {
+    fn candidate_is_a_valid_version_three_lock_with_sorted_tables_and_fields() {
         let candidate = serialize_candidate(&sample_lock()).expect("serialized candidate");
         let text = String::from_utf8(candidate.clone()).expect("UTF-8 TOML");
         assert!(text.starts_with(
             "# This file is automatically @generated by Bloomery.\n# It is not intended for manual editing.\n"
         ));
-        assert!(text.contains("version = 2\n"));
+        assert!(text.contains("version = 3\n"));
         assert!(text.contains("cargo-lock-hash = \""));
         assert!(text.contains("license = \"MIT OR Apache-2.0\""));
         assert!(text.contains("license-file = \"LICENSE.txt\""));
@@ -383,7 +484,7 @@ mod tests {
         assert!(
             serialize_candidate(&old_version)
                 .expect_err("version one lock")
-                .contains("expected version 2")
+                .contains("expected version 3")
         );
 
         let mut invalid = sample_lock();
@@ -410,8 +511,10 @@ mod tests {
         lock.packages.insert(
             unusual_key.clone(),
             BloomeryPackage {
+                lib_name: Some("escaped_name".to_owned()),
                 features: vec![unusual_feature.clone()],
                 dependencies: Vec::new(),
+                dependency_edges: Vec::new(),
                 proc_macro: false,
                 edition: "2021".to_owned(),
                 license: None,

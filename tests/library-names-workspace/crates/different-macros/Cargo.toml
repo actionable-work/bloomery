@@ -1,0 +1,8 @@
+[lib]
+name = "actual_macro"
+proc-macro = true
+
+[package]
+edition = "2021"
+name = "different-macros"
+version = "0.1.0"

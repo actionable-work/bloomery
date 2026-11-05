@@ -89,11 +89,14 @@
     entry ? null,
     crateDrv ? null,
     dependencies ? [],
+    dependencyBindings ? null,
+    buildScriptBindings ? dependencyBindings,
     # Profile variants of the workspace dependency closure. Defaults keep the
     # release closure, which is what direct builder tests use.
     instrumentedCrateDrv ? crateDrv,
     instrumentedDependencies ? dependencies,
-    mkProfileUseDeps ? (_merged: {inherit crateDrv dependencies;}),
+    instrumentedDependencyBindings ? dependencyBindings,
+    mkProfileUseDeps ? (_merged: {inherit crateDrv dependencies dependencyBindings buildScriptBindings;}),
     override ? {},
     profile ? {},
     defaultRustcFlags ? ["-Copt-level=3"],
@@ -256,6 +259,8 @@
             ;
           crateDrv = instrumentedCrateDrv;
           dependencies = instrumentedDependencies;
+          dependencyBindings = instrumentedDependencyBindings;
+          inherit buildScriptBindings;
           override =
             override
             // {
@@ -307,6 +312,8 @@
             ;
           crateDrv = profileUse.crateDrv;
           dependencies = profileUse.dependencies;
+          dependencyBindings = profileUse.dependencyBindings or dependencyBindings;
+          inherit buildScriptBindings;
           override =
             override
             // {
@@ -333,6 +340,8 @@
             entry
             crateDrv
             dependencies
+            dependencyBindings
+            buildScriptBindings
             edition
             workspaceAssets
             workspaceStatic
@@ -412,6 +421,8 @@
         entry
         crateDrv
         dependencies
+        dependencyBindings
+        buildScriptBindings
         edition
         workspaceAssets
         workspaceStatic

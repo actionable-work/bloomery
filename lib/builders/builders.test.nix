@@ -36,9 +36,8 @@
       name = "bloomery-test-macros"
       version = "0.1.0"
     '';
-    source.bloomeryLock = builtins.toFile "proc-macro-builder-tests-bloomery.lock" ''
-      version = 2
-    '';
+    source.bloomeryLock = null;
+    features.cratesIoIndex = ../../tests/crates-index;
     checks.includePackageChecks = false;
     devShell.enable = false;
   };
@@ -259,7 +258,7 @@ in {
   testCrateBuilderDependencyWiringAndMetadata = {
     expr = {
       wiresExterns = lib.hasInfix "--extern" crateDrv.configurePhase;
-      handlesRenamedDependencies = lib.hasInfix "package" crateDrv.configurePhase;
+      handlesRenamedDependencies = lib.hasInfix "add_extern_bindings" crateDrv.configurePhase;
       writesMeta = lib.hasInfix "nix-support/meta.sh" crateDrv.installPhase;
       propagatesLibraryArchive = lib.hasInfix "DEP_LIB_ARCHIVE" crateDrv.installPhase;
       propagatesLibraryName = lib.hasInfix "DEP_LIB_NAME" crateDrv.installPhase;
@@ -360,8 +359,8 @@ in {
 
   testCrateBuilderMetadataOnly = {
     expr = {
-      emitsMetadata = lib.hasInfix "--emit=metadata" metadataCrateDrv.buildPhase;
-      omitsLink = !(lib.hasInfix "--emit=link,metadata" metadataCrateDrv.buildPhase);
+      emitsMetadata = lib.hasInfix "EMIT_KIND=\"metadata\"" metadataCrateDrv.configurePhase;
+      omitsLink = lib.hasInfix "--emit=\"$EMIT_KIND\"" metadataCrateDrv.buildPhase;
       metadataFlag = metadataCrateDrv.METADATA_ONLY == "1";
       selectsRmeta = lib.hasInfix ".rmeta" metadataCrateDrv.installPhase;
       splitsBuildScriptDeps =

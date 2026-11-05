@@ -17,13 +17,15 @@ evaluation errors that name the offending dependency.
 
 ## bloomery.lock
 
-A version-2 `bloomery.lock` supplies the resolved global package graph and one
+A version-3 `bloomery.lock` supplies the resolved global package graph and one
 resolution context per workspace member. The global `packages` view records, for
 every package, its active features and activated dependencies as resolved with
 workspace-wide unification. Each context records the same information for one
 member's fully-unified dependency closure. The lock also records proc-macro,
 edition, optional Cargo license expression, and optional license-file path per
-package, plus a SHA-256 digest of `Cargo.lock`. License metadata is shared by
+package, plus a SHA-256 digest of `Cargo.lock`. Package library target names and
+resolved named dependency edges follow the
+[library naming contract](library-names.md). License metadata is shared by
 all contexts. Contexts are
 independent of `build.unify`, so changing that setting neither invalidates the
 lock nor changes its bytes. `workspace:lock` reports a digest mismatch, and
@@ -70,6 +72,11 @@ Edges always follow the resolved graph for the node's context; a node never
 depends on a package that its active features do not activate. Transitive crates
 are exposed through a propagated closure so downstream compilation can resolve
 indirect crates and proc-macro helpers.
+
+Package IDs select graph nodes; library target names select compiled artifacts;
+edge names select the consumer's extern identifiers. These identities remain
+separate in every graph variant. Edges retain dependency kind and target
+conditions until the consuming build unit selects its dependencies.
 
 ## Sources
 

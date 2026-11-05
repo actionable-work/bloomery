@@ -1,0 +1,9 @@
+[dependencies]
+object_store = { default-features = false, features = [
+  "aws",
+], version = "=0.14.2" }
+
+[package]
+edition = "2021"
+name = "aws-fixture"
+version = "0.1.0"

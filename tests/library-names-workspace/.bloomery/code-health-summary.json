@@ -1,0 +1,144 @@
+{
+  "algorithm_version": 2,
+  "crates": [
+    {
+      "manifest_path": "crates/build-package/Cargo.toml",
+      "name": "build-package",
+      "overall_score": 100.0,
+      "sloc": 3,
+      "subscores": {
+        "complexity": 0.0,
+        "crateSize": 0.0,
+        "duplication": 0.0,
+        "nesting": 0.0,
+        "size": 0.0
+      }
+    },
+    {
+      "manifest_path": "crates/consumer-package/Cargo.toml",
+      "name": "consumer-package",
+      "overall_score": 100.0,
+      "sloc": 18,
+      "subscores": {
+        "complexity": 0.0,
+        "crateSize": 0.0,
+        "duplication": 0.0,
+        "nesting": 0.0,
+        "size": 0.0
+      }
+    },
+    {
+      "manifest_path": "crates/dev-package/Cargo.toml",
+      "name": "dev-package",
+      "overall_score": 100.0,
+      "sloc": 3,
+      "subscores": {
+        "complexity": 0.0,
+        "crateSize": 0.0,
+        "duplication": 0.0,
+        "nesting": 0.0,
+        "size": 0.0
+      }
+    },
+    {
+      "manifest_path": "crates/different-macros/Cargo.toml",
+      "name": "different-macros",
+      "overall_score": 100.0,
+      "sloc": 5,
+      "subscores": {
+        "complexity": 0.0,
+        "crateSize": 0.0,
+        "duplication": 0.0,
+        "nesting": 0.0,
+        "size": 0.0
+      }
+    },
+    {
+      "manifest_path": "crates/different-name/Cargo.toml",
+      "name": "different-name",
+      "overall_score": 100.0,
+      "sloc": 5,
+      "subscores": {
+        "complexity": 0.0,
+        "crateSize": 0.0,
+        "duplication": 0.0,
+        "nesting": 0.0,
+        "size": 0.0
+      }
+    },
+    {
+      "manifest_path": "crates/different-name/Cargo.toml",
+      "name": "renamed",
+      "overall_score": 100.0,
+      "sloc": 5,
+      "subscores": {
+        "complexity": 0.0,
+        "crateSize": 0.0,
+        "duplication": 0.0,
+        "nesting": 0.0,
+        "size": 0.0
+      }
+    },
+    {
+      "manifest_path": "crates/other-package/Cargo.toml",
+      "name": "other-package",
+      "overall_score": 100.0,
+      "sloc": 3,
+      "subscores": {
+        "complexity": 0.0,
+        "crateSize": 0.0,
+        "duplication": 0.0,
+        "nesting": 0.0,
+        "size": 0.0
+      }
+    },
+    {
+      "manifest_path": "crates/renamed-consumer/Cargo.toml",
+      "name": "renamed-consumer",
+      "overall_score": 100.0,
+      "sloc": 6,
+      "subscores": {
+        "complexity": 0.0,
+        "crateSize": 0.0,
+        "duplication": 0.0,
+        "nesting": 0.0,
+        "size": 0.0
+      }
+    }
+  ],
+  "input_digest": "bedc3e9f92210b24a476e337a18c37501585b9ec5c36fd8dbae43468c24fa3c0",
+  "policy": {
+    "scoring": {
+      "crateSlocLimit": 1500,
+      "cyclomaticLimit": 10,
+      "duplicateMinTokens": 64,
+      "duplicationFreeRatio": 0.02,
+      "functionTokensLimit": 250,
+      "nestingLimit": 4,
+      "weights": {
+        "complexity": 25.0,
+        "crateSize": 30.0,
+        "duplication": 15.0,
+        "nesting": 10.0,
+        "size": 20.0
+      }
+    },
+    "selection": {
+      "manifest": "Cargo.toml",
+      "members": null
+    }
+  },
+  "schema_version": 4,
+  "workspace": {
+    "crate_count": 8,
+    "overall_score": 100.0,
+    "sloc": 48,
+    "subscores": {
+      "complexity": 0.0,
+      "crateSize": 0.0,
+      "duplication": 0.0,
+      "nesting": 0.0,
+      "size": 0.0
+    }
+  }
+}

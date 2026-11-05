@@ -30,6 +30,8 @@
   pkg,
   src,
   dependencies ? [],
+  dependencyBindings ? null,
+  buildScriptBindings ? dependencyBindings,
   override ? {},
   features ? [],
   defaultRustcFlags ? ["-Copt-level=3"],
@@ -39,6 +41,7 @@
   metadataOnly ? false,
   buildScriptDependencies ? dependencies,
 }: let
+  compilerFlags = import ./compiler-flags.nix {inherit pkgs lib stdenv;};
   pname = pkg.name;
   version = pkg.version;
   crateName = pkg.crateName;
@@ -90,6 +93,11 @@ in
 
       # Environment variables
       RUSTC = "${rustc}/bin/rustc";
+      BUILD_RUSTC = "${
+        if stdenv.buildPlatform.system == stdenv.hostPlatform.system
+        then rustc
+        else pkgs.buildPackages.rustc
+      }/bin/rustc";
       CRATE_NAME = crateName;
       PKG_NAME = pname;
       PKG_VERSION = version;
@@ -108,7 +116,7 @@ in
       CARGO_CRATE_NAME = crateName;
 
       passthru = {
-        inherit pkg crateName;
+        inherit pkg crateName dependencyBindings buildScriptBindings;
       };
 
       unpackPhase = ''
@@ -129,6 +137,7 @@ in
         runHook preConfigure
 
         export CARGO_MANIFEST_DIR="$PWD"
+        ${import ./library-metadata.nix {inherit lib;} {inherit pkg;}}
 
         # Determine Edition (Cargo specification: defaults to 2015 if unspecified)
         EDITION="${
@@ -172,6 +181,16 @@ in
           IS_PROC_MACRO=1
           CRATE_TYPE="proc-macro"
           EXTRA_FLAGS+=("--extern" "proc_macro")
+        fi
+        EMIT_KIND="${
+          if metadataOnly
+          then "metadata"
+          else "link,metadata"
+        }"
+        if [ "$IS_PROC_MACRO" = 1 ]; then
+          METADATA_ONLY=0
+          EMIT_KIND="link,metadata"
+          RUSTC="$BUILD_RUSTC"
         fi
         EXTRA_CRATE_TYPES=()
         if [ -f Cargo.toml ] && [ "$IS_PROC_MACRO" = "0" ]; then
@@ -219,101 +238,7 @@ in
           ENTRY="src/lib.rs"
         fi
 
-        # Resolve a dependency list into extern flags. The named array receives
-        # --extern flags, and each dependency's archive and transitive closure
-        # are extracted into the given directory.
-        resolve_deps() {
-          local extern_name="$1"
-          shift
-          local link_name="$1"
-          shift
-          local deps_dir="$1"
-          shift
-          local -n extern_ref="$extern_name"
-          local -n link_ref="$link_name"
-          local dep fname cname f target
-          for dep in "$@"; do
-            DEP_LIB_PATH=""
-            dep_is_proc_macro=0
-            if [ -f "$dep/nix-support/meta.sh" ]; then
-              # Load structured metadata
-              source "$dep/nix-support/meta.sh"
-              dep_is_proc_macro="''${DEP_IS_PROC_MACRO:-0}"
-              if [ -n "$DEP_LIB_ARCHIVE" ] && [ -f "$DEP_LIB_ARCHIVE" ]; then
-                tar --zstd -xf "$DEP_LIB_ARCHIVE" -C "$deps_dir"
-                DEP_LIB_PATH="$deps_dir/$DEP_LIB_NAME"
-              fi
-              if [ -n "$DEP_CRATE_NAME" ] && [ -n "$DEP_LIB_PATH" ] && [ -f "$DEP_LIB_PATH" ]; then
-                extern_ref+=("--extern" "$DEP_CRATE_NAME=$DEP_LIB_PATH")
-                if [ -f Cargo.toml ]; then
-                  PKG_SEARCH="''${DEP_PKG_NAME:-$DEP_CRATE_NAME}"
-                  ALIASES=$(awk -v pkg="$PKG_SEARCH" -v crate="$DEP_CRATE_NAME" '
-                    /^\[.*dependencies\.([a-zA-Z0-9_-]+)\]/ {
-                      match($0, /^\[.*dependencies\.([a-zA-Z0-9_-]+)\]/, m)
-                      current_alias = m[1]
-                    }
-                    /^\[/ && !/^\[.*dependencies\./ {
-                      current_alias = ""
-                    }
-                    current_alias != "" && $0 ~ "package[[:space:]]*=[[:space:]]*\"(" pkg "|" crate ")\"" {
-                      print current_alias
-                    }
-                    /^[[:space:]]*[a-zA-Z0-9_-]+[[:space:]]*=[[:space:]]*\{.*package[[:space:]]*=/ {
-                      if ($0 ~ "package[[:space:]]*=[[:space:]]*\"(" pkg "|" crate ")\"") {
-                        match($0, /^[[:space:]]*([a-zA-Z0-9_-]+)/, m)
-                        print m[1]
-                      }
-                    }
-                  ' Cargo.toml | sort -u)
-                  for alias in $ALIASES; do
-                    alias_ident=$(echo "$alias" | tr '-' '_')
-                    extern_ref+=("--extern" "$alias_ident=$DEP_LIB_PATH")
-                  done
-                fi
-              fi
-              if [ -n "$DEP_RUSTC_LINK_FLAGS" ]; then
-                link_ref+=($DEP_RUSTC_LINK_FLAGS)
-              fi
-            elif [ -d "$dep/lib" ]; then
-              for f in "$dep/lib"/*; do
-                if [ -f "$f" ]; then
-                  fname=$(basename "$f")
-                  cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
-                  extern_ref+=("--extern" "$cname=$f")
-                fi
-              done
-            fi
-
-            # A proc-macro is loaded directly. Its full release closure is not
-            # part of a metadata search path, so skipping it avoids duplicate
-            # crate versions in the dependency directory.
-            if [ "$SKIP_PROC_MACRO_CLOSURE" = "1" ] && [ "$dep_is_proc_macro" = "1" ]; then
-              continue
-            fi
-
-            # Collect all transitive dependencies from closure
-            if [ -d "$dep/nix-support/deps-closure" ]; then
-              for f in "$dep/nix-support/deps-closure"/*; do
-                if [ -e "$f" ]; then
-                  case "$f" in
-                    *.tar.zst) tar --zstd -xf "$f" -C "$deps_dir" ;;
-                    *) ln -sf "$(readlink -f "$f")" "$deps_dir/$(basename "$f")" ;;
-                  esac
-                fi
-              done
-            fi
-            if [ -d "$dep/lib" ]; then
-              for f in "$dep/lib"/*; do
-                if [ -e "$f" ]; then
-                  target=$(readlink -f "$f")
-                  ln -sf "$target" "$deps_dir/$(basename "$f")"
-                fi
-              done
-            fi
-          done
-        }
-
-        mkdir -p _deps
+        ${import ./dependencies.nix {inherit lib;} {inherit dependencyBindings buildScriptBindings;}}
         EXTERN_FLAGS=("''${EXTRA_FLAGS[@]}")
         EXTRA_LINK_FLAGS=()
         SKIP_PROC_MACRO_CLOSURE=${
@@ -322,20 +247,11 @@ in
           else "0"
         }
         resolve_deps EXTERN_FLAGS EXTRA_LINK_FLAGS _deps $dependencies
-
-        # A metadata-only target compiles its build script against full release
-        # dependencies, because build scripts link and execute object code.
-        BUILD_SCRIPT_DEPS_DIR="_deps"
-        BUILD_SCRIPT_EXTERN_FLAGS=("''${EXTERN_FLAGS[@]}")
-        BUILD_SCRIPT_DEP_LINK_FLAGS=("''${EXTRA_LINK_FLAGS[@]}")
-        if [ "$METADATA_ONLY" = "1" ]; then
-          mkdir -p _deps_bs
-          BUILD_SCRIPT_DEPS_DIR="_deps_bs"
-          BUILD_SCRIPT_EXTERN_FLAGS=("''${EXTRA_FLAGS[@]}")
-          BUILD_SCRIPT_DEP_LINK_FLAGS=()
-          SKIP_PROC_MACRO_CLOSURE=0
-          resolve_deps BUILD_SCRIPT_EXTERN_FLAGS BUILD_SCRIPT_DEP_LINK_FLAGS _deps_bs $buildScriptDependencies
-        fi
+        BUILD_SCRIPT_DEPS_DIR="_deps_bs"
+        BUILD_SCRIPT_EXTERN_FLAGS=()
+        BUILD_SCRIPT_DEP_LINK_FLAGS=()
+        SKIP_PROC_MACRO_CLOSURE=0
+        resolve_deps BUILD_SCRIPT_EXTERN_FLAGS BUILD_SCRIPT_DEP_LINK_FLAGS _deps_bs $buildScriptDependencies
 
         # Resolve active features and expand implied features from Cargo.toml
         ACTIVE_FEATURES=(${lib.escapeShellArgs (
@@ -343,6 +259,8 @@ in
           then featureList
           else ["default"]
         )})
+
+        REQUESTED_FEATURES=("''${ACTIVE_FEATURES[@]}")
 
         # Helper: check if a target is an optional dependency missing from _deps
         is_missing_dep() {
@@ -431,7 +349,9 @@ in
 
         FEATURE_FLAGS=()
         for feat in "''${ACTIVE_FEATURES[@]}"; do
-          if ! is_missing_optional_dep "$feat"; then
+          # Cargo-resolved requested features are authoritative. Only additional
+          # manifest implications are filtered by optional dependency presence.
+          if [[ " ''${REQUESTED_FEATURES[*]} " == *" $feat "* ]] || ! is_missing_optional_dep "$feat"; then
             FEATURE_FLAGS+=("--cfg=feature=\"$feat\"")
           fi
         done
@@ -461,8 +381,8 @@ in
 
         mkdir -p _build_script/out
         export OUT_DIR="$PWD/_build_script/out"
-        export TARGET="$($RUSTC -vV | sed -n 's/host: //p')"
-        export HOST="$TARGET"
+        export TARGET="${stdenv.hostPlatform.rust.rustcTarget or stdenv.hostPlatform.config}"
+        export HOST="${stdenv.buildPlatform.rust.rustcTarget or stdenv.buildPlatform.config}"
         export NUM_JOBS="$NIX_BUILD_CORES"
         export OPT_LEVEL="3"
         export PROFILE="release"
@@ -486,7 +406,8 @@ in
         BUILD_SCRIPT_LINK_FLAGS=()
         if [ -n "$BUILD_SCRIPT" ]; then
           echo "Compiling build script $BUILD_SCRIPT for $PKG_NAME..."
-          $RUSTC "$BUILD_SCRIPT" \
+          CARGO_CRATE_NAME=build_script_build $BUILD_RUSTC "$BUILD_SCRIPT" \
+            ${lib.escapeShellArgs compilerFlags.buildScript} \
             --crate-name build_script_build \
             --crate-type bin \
             $EDITION_FLAG \
@@ -502,8 +423,8 @@ in
 
           export OUT_DIR="$PWD/_build_script/out"
           mkdir -p "$OUT_DIR"
-          export TARGET="$($RUSTC -vV | sed -n 's/host: //p')"
-          export HOST="$TARGET"
+          export TARGET="${stdenv.hostPlatform.rust.rustcTarget or stdenv.hostPlatform.config}"
+          export HOST="${stdenv.buildPlatform.rust.rustcTarget or stdenv.buildPlatform.config}"
           export NUM_JOBS="''${NIX_BUILD_CORES:-1}"
           export OPT_LEVEL="3"
           export PROFILE="release"
@@ -581,17 +502,13 @@ in
           --crate-name "$CRATE_NAME" \
           --crate-type "$CRATE_TYPE" \
           "''${EXTRA_CRATE_TYPES[@]}" \
-          ${
-          if metadataOnly
-          then "--emit=metadata"
-          else "--emit=link,metadata"
-        } \
+          --emit="$EMIT_KIND" \
           $EDITION_FLAG \
           -L dependency=_deps \
           "''${EXTERN_FLAGS[@]}" \
           "''${BUILD_SCRIPT_FLAGS[@]}" \
           "''${EXTRA_LINK_FLAGS[@]}" \
-          ${lib.escapeShellArgs extraRustcFlags} \
+          ${lib.escapeShellArgs (extraRustcFlags ++ compilerFlags.target)} \
           "''${FEATURE_FLAGS[@]}" \
           --out-dir "$out/lib"
 
@@ -603,22 +520,22 @@ in
 
         OUT_LIB=""
         if [ "$METADATA_ONLY" = "1" ]; then
-          OUT_LIB=$(ls $out/lib/lib${crateName}*.rmeta 2>/dev/null | head -n 1)
+          OUT_LIB=$(ls $out/lib/lib$CRATE_NAME*.rmeta 2>/dev/null | head -n 1)
           if [ -z "$OUT_LIB" ]; then
             OUT_LIB=$(ls $out/lib/*.rmeta 2>/dev/null | head -n 1)
           fi
         elif [ "$IS_PROC_MACRO" = "1" ] || [ "$CRATE_TYPE" = "proc-macro" ]; then
-          OUT_LIB=$(ls $out/lib/lib${crateName}*.so $out/lib/lib${crateName}*.dylib 2>/dev/null | head -n 1)
+          OUT_LIB=$(ls $out/lib/lib$CRATE_NAME*.so $out/lib/lib$CRATE_NAME*.dylib 2>/dev/null | head -n 1)
           if [ -z "$OUT_LIB" ]; then
             OUT_LIB=$(ls $out/lib/*.so $out/lib/*.dylib 2>/dev/null | head -n 1)
           fi
         else
-          OUT_LIB=$(ls $out/lib/lib${crateName}*.rlib 2>/dev/null | head -n 1)
+          OUT_LIB=$(ls $out/lib/lib$CRATE_NAME*.rlib 2>/dev/null | head -n 1)
           if [ -z "$OUT_LIB" ]; then
             OUT_LIB=$(ls $out/lib/*.rlib 2>/dev/null | head -n 1)
           fi
           if [ -z "$OUT_LIB" ]; then
-            OUT_LIB=$(ls $out/lib/lib${crateName}*.a $out/lib/lib${crateName}*.so $out/lib/lib${crateName}*.dylib 2>/dev/null | head -n 1)
+            OUT_LIB=$(ls $out/lib/lib$CRATE_NAME*.a $out/lib/lib$CRATE_NAME*.so $out/lib/lib$CRATE_NAME*.dylib 2>/dev/null | head -n 1)
           fi
         fi
         if [ -z "$OUT_LIB" ]; then

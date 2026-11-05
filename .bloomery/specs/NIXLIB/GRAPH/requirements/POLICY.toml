@@ -107,10 +107,10 @@ ears = { type = "event", trigger = "a package matches checks.licenses.exceptions
 
 [[requirements]]
 id = "NIXLIB-GRAPH-POLICY-016"
-title = "Dependency policy checks require a fresh version-2 lock"
+title = "Dependency policy checks require a fresh version-3 lock"
 manual = false
 design = "design/dependency-policy-checks.md#check-selection"
-ears = { type = "unwanted_behavior", trigger = "checks.enable and a dependency policy enable key are true and bloomery.lock is missing, not version 2, or has a Cargo.lock digest mismatch", system = "the workspace builder", action = "fail evaluation with guidance to run bloomery sync" }
+ears = { type = "unwanted_behavior", trigger = "checks.enable and a dependency policy enable key are true and bloomery.lock is missing, not version 3, or has a Cargo.lock digest mismatch", system = "the workspace builder", action = "fail evaluation with guidance to run bloomery sync" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-POLICY-017"

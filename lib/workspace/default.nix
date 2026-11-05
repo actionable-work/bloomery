@@ -24,6 +24,12 @@
     if pkgs != null
     then import ./lock-check.test.nix {inherit pkgs lib;}
     else {};
+  namingTests =
+    if pkgs != null
+    then
+      (import ./dependency-bindings.test.nix {inherit pkgs lib;})
+      // (import ./target-condition.test.nix {inherit lib;})
+    else {};
   optionsTests =
     if pkgs != null
     then import ./options.test.nix {inherit pkgs lib;}
@@ -36,5 +42,5 @@ in {
   inherit manifestPolicy;
   inherit sources;
   inherit options;
-  tests = discoverTests // healthSourceTests // featuresTests // parseLockTests // manifestPolicyTests // licensesTests // dependencyPolicyTests // vulnerabilityTests // lockCheckTests // optionsTests;
+  tests = discoverTests // healthSourceTests // featuresTests // parseLockTests // manifestPolicyTests // licensesTests // dependencyPolicyTests // vulnerabilityTests // lockCheckTests // optionsTests // namingTests;
 }

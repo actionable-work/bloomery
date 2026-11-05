@@ -1,0 +1,7 @@
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.dependencies]
+different-name = { default-features = false, path = "crates/different-name" }
+renamed = { default-features = false, package = "different-name", path = "crates/different-name" }

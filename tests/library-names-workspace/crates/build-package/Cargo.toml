@@ -1,0 +1,7 @@
+[lib]
+name = "actual_build"
+
+[package]
+edition = "2021"
+name = "build-package"
+version = "0.1.0"

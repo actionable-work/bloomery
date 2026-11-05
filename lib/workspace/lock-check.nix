@@ -11,6 +11,7 @@
     then root + "/bloomery.lock"
     else null
   ),
+  lockManifest ? null,
   discoveredMembers,
   parsed,
   ...
@@ -33,7 +34,7 @@
     then workspacePackage.${field} or null
     else value;
 
-  bloomeryLockExists = bloomeryLock != null && builtins.pathExists bloomeryLock;
+  bloomeryLockExists = bloomeryLock != null && (builtins.isAttrs bloomeryLock || builtins.pathExists bloomeryLock);
 
   cargoLockHash =
     if cargoLockExists
@@ -41,7 +42,9 @@
     else null;
 
   bloomeryLockData =
-    if bloomeryLockExists
+    if lockManifest != null
+    then lockManifest
+    else if bloomeryLockExists
     then
       (
         if builtins.isAttrs bloomeryLock
@@ -83,7 +86,18 @@
         # Extract all direct dependencies from member Cargo.toml
         extractDeps = table:
           if builtins.isAttrs table
-          then builtins.attrNames table
+          then
+            lib.mapAttrsToList (name: spec: let
+              workspaceSpec = rootToml.workspace.dependencies.${name} or {};
+              effective =
+                if builtins.isAttrs spec && (spec.workspace or false)
+                then workspaceSpec
+                else spec;
+            in
+              if builtins.isAttrs effective
+              then effective.package or name
+              else name)
+            table
           else [];
 
         targetDeps = lib.concatLists (

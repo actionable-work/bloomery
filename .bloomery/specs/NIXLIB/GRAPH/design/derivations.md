@@ -12,8 +12,9 @@ covered independently of evidence annotations.
 
 ## Dependency wiring and metadata
 
-Direct dependencies are exposed with `--extern` from each dependency's
-`nix-support/meta.sh`, including aliases declared with `package = ...`. Each
+Direct dependencies are exposed with `--extern <edge-name>=<artifact-path>`
+using resolved edge names and each dependency's `nix-support/meta.sh`, following
+[Library names and dependency aliases](library-names.md). Each
 crate records its name, library path, proc-macro flag, link flags, assets, and
 sys-crate `DEP_<LINKS>_<KEY>` values in that metadata, and publishes a
 `deps-closure` of transitive libraries for downstream compilation.

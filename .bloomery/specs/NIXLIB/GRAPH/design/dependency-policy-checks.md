@@ -16,7 +16,7 @@ policy is enabled. A check covers that member's transitive dependency context,
 excluding the member itself. `build.members` limits the members with checks;
 `build.unify` does not change their dependency contexts.
 
-Every dependency policy check requires a version-2 `bloomery.lock` whose
+Every dependency policy check requires a version-3 `bloomery.lock` whose
 `cargo-lock-hash` matches the current `Cargo.lock`. This freshness requirement
 applies even when `checks.lockFreshness.enable` is disabled. A missing, older,
 or stale Bloomery lock fails evaluation with guidance to run `bloomery sync`.

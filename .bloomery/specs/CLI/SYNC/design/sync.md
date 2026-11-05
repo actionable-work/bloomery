@@ -86,25 +86,60 @@ separate from rejecting an invalid configuration file.
 
 ## Bloomery lock format and publication
 
-Emit the version-2 TOML contract consumed by the Nix builders:
+Emit the version-3 TOML contract consumed by the Nix builders:
 
-- Generated-file header and `version = 2`.
+- Generated-file header and `version = 3`.
 - `cargo-lock-hash`: SHA-256 of final `Cargo.lock`, normalizing CRLF to LF,
   matching the Nix lock validator.
 - A `packages` table keyed by `name-version`, covering resolved packages with
   their workspace-wide active features, activated dependencies, `proc-macro`,
-  edition metadata, and optional `license` and `license-file` metadata from
-  the final `cargo metadata` package records.
+  edition metadata, optional `lib-name`, and optional `license` and
+  `license-file` metadata from the final `cargo metadata` package records.
 - A `contexts` table keyed by workspace member. Each context maps every package
   in that member's fully-unified closure to its active features and activated
-  dependencies.
+  dependencies. Global and context records also carry `dependency-edges`.
 
-Global and context records capture only dependencies that Cargo activates, so
-the lock never carries optional, weak, or target-specific edges that Cargo would
-not build. Contexts do not depend on `build.unify`; toggling that setting leaves
+### Library names and dependency edges
+
+`lib-name` is the library target's `targets[].name` from the final locked Cargo
+metadata, including proc-macro targets. It is absent only for packages without
+a library target. A binary, example, test, or build-script target is not a
+library. Package keys remain `name-version`; library names never replace them.
+
+Each `dependency-edges` entry records `package` (the resolved package key),
+`extern-name` (Cargo's resolved dependency name), `kind` (`normal`, `build`, or
+`dev`), and optional `target` (Cargo's target condition). Derive these from
+`resolve.nodes[].deps` and its `dep_kinds`, joined by exact Cargo package
+identity. Retain distinct aliases of the same package and aliases selecting
+different package versions. Do not reconstruct these identities from a package
+name or a textual manifest search. Feature activation still uses the Cargo
+dependency declaration key, which can differ from both `lib-name` and
+`extern-name`.
+
+Every global and context record contains the edges active in that resolution;
+its `dependencies` list is their sorted, deduplicated package projection.
+Keep dependency kind and target conditions until build-unit selection. An edge
+alias belongs to its consumer and never changes the dependency's artifact name.
+The graph and builder contract is defined in
+[Library names and dependency aliases](../../../NIXLIB/GRAPH/design/library-names.md).
+
+Canonical edge order is `(package, extern-name, kind, target)`, with an absent
+target sorting before a present target. Deduplicate only identical edge records.
+Validate library names, edge identifiers, referenced packages, and dependency
+projections before publication. Reject conflicting aliases within one active
+compilation unit; mutually exclusive target or host/build edges may reuse a
+name. A package without a library cannot satisfy a Rust library dependency.
+
+### Canonical publication
+
+Global and context records capture only dependencies activated by their Cargo
+resolution, excluding inactive optional and weak edges. Retain target predicates
+on activated edges so build-unit selection can exclude inapplicable branches.
+Contexts do not depend on `build.unify`; toggling that setting leaves
 the lock valid and byte-identical on regeneration. Derive graph edges and package
 license metadata from the same final locked Cargo metadata snapshot, retaining
 the edition fallback (`2021`). License metadata adds no Cargo invocation.
+Library and edge metadata use that snapshot without additional Cargo invocations.
 
 Canonical output sorts package keys, context keys, feature names, and
 deduplicated dependency identifiers and correctly escapes TOML strings.
@@ -127,7 +162,7 @@ guidance. Entries must refer to keys supported by that Bloomery release;
 recommendations do not imply a new config schema or remotely fetched policy.
 This advisory subset is derived from the CLI-owned recommended-default catalog
 defined by
-[PARSER/CONFIGURATION](../../PARSER/CONFIGURATION/design/config-file.md#recommended-default-catalog);
+[PARSER/CONFIGURATION](../../../PARSER/CONFIGURATION/design/config-file.md#recommended-default-catalog);
 the corresponding default value is materialized by `bloomery config upgrade`.
 
 The initial catalog targets existing check/evidence scanner switches:

@@ -1,0 +1,190 @@
+group = "NAMING"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-001"
+title = "Library nodes use Cargo target names"
+manual = false
+design = "design/library-names.md#identities"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "use the Cargo library target name for library crate names while retaining the package ID for graph selection" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-002"
+title = "Artifact metadata preserves intrinsic library names"
+manual = false
+design = "design/library-names.md#builder-wiring"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "publish the intrinsic library name separately from package identity and consumer aliases" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-003"
+title = "Library archives retain intrinsic names"
+manual = false
+design = "design/library-names.md#builder-wiring"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "locate archived rmeta, rlib, and proc-macro artifacts using their intrinsic library names" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-004"
+title = "Consumer aliases preserve artifact identity"
+manual = false
+design = "design/library-names.md#builder-wiring"
+ears = { type = "event", trigger = "a dependency is explicitly renamed", system = "the Bloomery builders", action = "bind the selected edge name without renaming the artifact or adding a package-derived extern binding" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-005"
+title = "Library builds resolve custom names and aliases"
+manual = false
+design = "design/library-names.md#builder-wiring"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "compile a library that uses an unrenamed custom-name dependency and an explicitly renamed dependency through their selected extern names" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-006"
+title = "Binary builds resolve custom names and aliases"
+manual = false
+design = "design/library-names.md#builder-wiring"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "compile a binary that uses an unrenamed custom-name dependency and an explicitly renamed dependency through their selected extern names" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-007"
+title = "Metadata checks resolve custom names and aliases"
+manual = false
+design = "design/library-names.md#builder-wiring"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "type-check a fixture using custom library names and explicit aliases against metadata-only dependency artifacts" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-008"
+title = "Unit tests resolve custom names and aliases"
+manual = false
+design = "design/library-names.md#builder-wiring"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "compile and execute unit tests that use custom library names and explicit dependency aliases" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-009"
+title = "Integration tests resolve custom names and aliases"
+manual = false
+design = "design/library-names.md#builder-wiring"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "compile and execute integration tests that use custom library names and explicit dependency aliases" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-010"
+title = "Doctests resolve custom names and aliases"
+manual = false
+design = "design/library-names.md#builder-wiring"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "execute doctests that import custom library names and explicit dependency aliases" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-011"
+title = "Documentation resolves custom names and aliases"
+manual = false
+design = "design/library-names.md#builder-wiring"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "generate rustdoc output for a fixture that uses custom library names and explicit dependency aliases" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-012"
+title = "Clippy resolves custom names and aliases"
+manual = false
+design = "design/library-names.md#builder-wiring"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "run clippy-driver successfully on a fixture that uses custom library names and explicit dependency aliases" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-013"
+title = "Own libraries use their target names"
+manual = false
+design = "design/library-names.md#builder-wiring"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "bind a package's own library under its Cargo library target name for binary, integration-test, and doctest compilation" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-014"
+title = "Build scripts resolve host dependency aliases"
+manual = false
+design = "design/library-names.md#graph-lowering"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "compile build scripts using their selected host build-dependency extern names" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-015"
+title = "Version aliases select distinct library nodes"
+manual = false
+design = "design/library-names.md#graph-lowering"
+ears = { type = "event", trigger = "aliases select different versions of one dependency", system = "the Bloomery builders", action = "bind each alias to its exact resolved package version without package-name matching" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-016"
+title = "Distinct aliases survive input deduplication"
+manual = false
+design = "design/library-names.md#graph-lowering"
+ears = { type = "event", trigger = "several valid aliases resolve to one package", system = "the Bloomery builders", action = "emit every selected alias binding while sharing the dependency derivation" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-017"
+title = "Contexts retain separate alias bindings"
+manual = false
+design = "design/library-names.md#graph-lowering"
+ears = { type = "event", trigger = "build.unify is disabled", system = "the Bloomery builders", action = "lower each member's aliases only against its own selected resolution context" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-018"
+title = "Dependency bindings respect unit kind"
+manual = false
+design = "design/library-names.md#graph-lowering"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "expose only dependency edges applicable to the normal, build-script, or test unit being compiled" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-019"
+title = "Dependency bindings respect target conditions"
+manual = false
+design = "design/library-names.md#graph-lowering"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "select extern bindings using target conditions evaluated for the applicable Cargo build unit's host or target" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-020"
+title = "Proc macros retain library names and host execution"
+manual = false
+design = "design/library-names.md#graph-lowering"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "load proc-macro artifacts by their intrinsic Cargo library names using host-built dependencies" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-021"
+title = "Inactive dependencies have no extern binding"
+manual = false
+design = "design/library-names.md#graph-lowering"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "omit extern bindings for dependency edges inactive in the selected resolution" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-022"
+title = "Unsupported locks request regeneration"
+manual = false
+design = "design/library-names.md#lock-contract"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "reject unsupported lock versions with bloomery sync guidance before scheduling dependent builds" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-023"
+title = "Incomplete naming locks fail read-only validation"
+manual = false
+design = "design/library-names.md#lock-contract"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "reject invalid or missing naming metadata required by a dependency even when the Cargo.lock digest matches" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-024"
+title = "Index fallback preserves library names and aliases"
+manual = false
+design = "design/library-names.md#graph-lowering"
+ears = { type = "event", trigger = "resolution uses the configured index fallback", system = "the Bloomery builders", action = "preserve custom library names and resolved aliases without source fetching or import from derivation during evaluation" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-025"
+title = "Object store AWS fixture passes the public check path"
+manual = false
+design = "design/library-names.md#automated-verification"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "pass bloomery check for an independently synced object_store =0.14.2 AWS fixture covering library and binary builds, metadata, unit and integration tests, doctests, documentation, and Clippy" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-026"
+title = "Public compatibility fixtures retain their checks"
+manual = false
+design = "design/library-names.md#automated-verification"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "retain passing public workspace, mkFlake, flake-parts, export, and index-fallback compatibility fixtures in full flake validation" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-NAMING-027"
+title = "Uncompressed dependencies retain alias bindings"
+manual = false
+design = "design/library-names.md#builder-wiring"
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "use selected edge names with supported uncompressed dependency artifacts" }

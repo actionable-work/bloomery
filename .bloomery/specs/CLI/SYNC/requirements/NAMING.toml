@@ -1,0 +1,85 @@
+group = "NAMING"
+
+[[requirements]]
+id = "CLI-SYNC-NAMING-001"
+title = "Library names come from Cargo library targets"
+manual = false
+design = "design/sync.md#library-names-and-dependency-edges"
+ears = { type = "ubiquitous", system = "the Bloomery lock generator", action = "record each library target name from the final locked Cargo metadata as package lib-name" }
+
+[[requirements]]
+id = "CLI-SYNC-NAMING-002"
+title = "Packages without libraries have no library name"
+manual = false
+design = "design/sync.md#library-names-and-dependency-edges"
+ears = { type = "event", trigger = "a resolved package has no library target", system = "the Bloomery lock generator", action = "omit lib-name instead of selecting a binary, test, example, or build-script target" }
+
+[[requirements]]
+id = "CLI-SYNC-NAMING-003"
+title = "Resolved edges retain Cargo extern names"
+manual = false
+design = "design/sync.md#library-names-and-dependency-edges"
+ears = { type = "ubiquitous", system = "the Bloomery lock generator", action = "record the resolved Cargo extern name separately from the dependency package key for every edge" }
+
+[[requirements]]
+id = "CLI-SYNC-NAMING-004"
+title = "Dependency edges retain their kind"
+manual = false
+design = "design/sync.md#library-names-and-dependency-edges"
+ears = { type = "ubiquitous", system = "the Bloomery lock generator", action = "record the normal, build, or dev kind of each resolved dependency edge" }
+
+[[requirements]]
+id = "CLI-SYNC-NAMING-005"
+title = "Dependency edges retain target conditions"
+manual = false
+design = "design/sync.md#library-names-and-dependency-edges"
+ears = { type = "ubiquitous", system = "the Bloomery lock generator", action = "record each resolved edge target condition without merging it with a differently conditioned edge" }
+
+[[requirements]]
+id = "CLI-SYNC-NAMING-006"
+title = "Aliases resolve to exact package identities"
+manual = false
+design = "design/sync.md#library-names-and-dependency-edges"
+ears = { type = "ubiquitous", system = "the Bloomery lock generator", action = "retain the exact Cargo package identity when aliases select different versions of one package" }
+
+[[requirements]]
+id = "CLI-SYNC-NAMING-007"
+title = "Multiple aliases for one package are preserved"
+manual = false
+design = "design/sync.md#library-names-and-dependency-edges"
+ears = { type = "ubiquitous", system = "the Bloomery lock generator", action = "retain distinct active extern names even when they reference one dependency package" }
+
+[[requirements]]
+id = "CLI-SYNC-NAMING-008"
+title = "Context edges retain their own bindings"
+manual = false
+design = "design/sync.md#library-names-and-dependency-edges"
+ears = { type = "event", trigger = "a per-member resolution context is emitted", system = "the Bloomery lock generator", action = "record named dependency edges from that context rather than another member or the global view" }
+
+[[requirements]]
+id = "CLI-SYNC-NAMING-009"
+title = "Dependency lists project named edges"
+manual = false
+design = "design/sync.md#library-names-and-dependency-edges"
+ears = { type = "ubiquitous", system = "the Bloomery lock generator", action = "make each global and context dependency list the sorted deduplicated package projection of its dependency-edges" }
+
+[[requirements]]
+id = "CLI-SYNC-NAMING-010"
+title = "Naming metadata is deterministic"
+manual = false
+design = "design/sync.md#library-names-and-dependency-edges"
+ears = { type = "ubiquitous", system = "the Bloomery lock generator", action = "emit byte-identical library names and canonically ordered deduplicated edge records for identical Cargo metadata" }
+
+[[requirements]]
+id = "CLI-SYNC-NAMING-011"
+title = "Candidate naming metadata is validated"
+manual = false
+design = "design/sync.md#library-names-and-dependency-edges"
+ears = { type = "ubiquitous", system = "the Bloomery lock generator", action = "validate library identifiers, edge identifiers, package references, and dependency projections before publication" }
+
+[[requirements]]
+id = "CLI-SYNC-NAMING-012"
+title = "Feature requests retain declaration keys"
+manual = false
+design = "design/sync.md#library-names-and-dependency-edges"
+ears = { type = "ubiquitous", system = "the Bloomery lock generator", action = "use the dependency declaration key for feature activation independently of its resolved extern and library names" }

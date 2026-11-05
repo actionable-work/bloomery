@@ -1,5 +1,7 @@
 mod lockfile;
 mod metadata;
+#[cfg(test)]
+mod naming_tests;
 mod nix_migration;
 mod recommendations;
 mod runner;
@@ -665,14 +667,14 @@ mod tests {
                     "name": "fixture-a",
                     "version": "1.0.0",
                     "edition": "2021",
-                    "targets": [{"kind": ["lib"]}]
+                    "targets": [{"kind": ["lib"], "name": "fixture_a"}]
                 },
                 {
                     "id": PACKAGE_B,
                     "name": "fixture-b",
                     "version": "2.0.0",
                     "edition": "2021",
-                    "targets": [{"kind": ["proc-macro"]}]
+                    "targets": [{"kind": ["proc-macro"], "name": "fixture_b"}]
                 }
             ],
             "resolve": {
@@ -680,7 +682,7 @@ mod tests {
                     {
                         "id": PACKAGE_A,
                         "features": ["default"],
-                        "deps": [{"pkg": PACKAGE_B}]
+                        "deps": [{"pkg": PACKAGE_B, "name": "fixture_b", "dep_kinds": [{"kind": null, "target": null}]}]
                     },
                     {"id": PACKAGE_B, "features": [], "deps": []}
                 ]

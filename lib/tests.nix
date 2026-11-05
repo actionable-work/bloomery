@@ -18,6 +18,7 @@
   optimizeTestSuite = import ./optimize.test.nix {inherit pkgs lib;};
   optimizeTests = builtins.removeAttrs optimizeTestSuite ["optimizedBinarySmoke"];
   graphTests = import ./graph.test.nix {inherit pkgs lib;};
+  namingTests = import ./naming.test.nix {inherit pkgs lib;};
 
   # Aggregate all colocated unit tests
   testCases =
@@ -33,7 +34,8 @@
     // templatesSourceTests
     // sourceIsolationTests
     // optimizeTests
-    // graphTests;
+    // graphTests
+    // namingTests;
 
   failedTests = lib.runTests testCases;
 in {
@@ -145,6 +147,11 @@ in {
           "NIXLIB-GRAPH-RESOLUTION-005"
           "NIXLIB-GRAPH-RESOLUTION-024"
           "NIXLIB-GRAPH-RESOLUTION-025"
+          "NIXLIB-GRAPH-NAMING-018"
+          "NIXLIB-GRAPH-NAMING-019"
+          "NIXLIB-GRAPH-NAMING-021"
+          "NIXLIB-GRAPH-NAMING-022"
+          "NIXLIB-GRAPH-NAMING-023"
           "NIXLIB-GRAPH-RESOLUTION-006"
           "NIXLIB-GRAPH-RESOLUTION-007"
           "NIXLIB-GRAPH-RESOLUTION-008"

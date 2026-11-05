@@ -18,6 +18,10 @@
           // (args.checks or {});
       });
   parseLock = import ./workspace/parse-lock.nix {inherit lib;};
+  fixtureLock = content: let
+    base = builtins.removeAttrs (builtins.fromTOML (builtins.readFile ../tests/basic-workspace/bloomery.lock)) ["cargo-lock-hash"];
+  in
+    (import ./test-lock.nix {inherit lib;}) (lib.recursiveUpdate base (builtins.fromTOML content));
   metadataWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
   };
@@ -34,14 +38,17 @@
       name = "bloomery-test-macros"
       version = "0.1.0"
     '';
-    source.bloomeryLock = builtins.toFile "proc-macro-graph-tests-bloomery.lock" ''
-      version = 2
+    source.bloomeryLock = fixtureLock ''
+      version = 3
 
       [packages."bloomery-test-macros-0.1.0"]
+      lib-name = "bloomery_test_macros"
       features = []
       dependencies = []
+      dependency-edges = [  ]
       proc-macro = true
       edition = "2024"
+
     '';
     checks.includePackageChecks = false;
     devShell.enable = false;
@@ -53,120 +60,154 @@
   };
   lockDrivenWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
-    source.bloomeryLock = builtins.toFile "lock-driven-bloomery.lock" ''
-      version = 2
+    source.bloomeryLock = fixtureLock ''
+      version = 3
 
       [packages."bin-calc-0.1.0"]
       features = [ "custom-feature" ]
       dependencies = [ ]
+      dependency-edges = [  ]
       proc-macro = false
       edition = "2018"
 
       [contexts."bin-calc-0.1.0"."bin-calc-0.1.0"]
       features = [ "custom-feature" ]
       dependencies = [ ]
+      dependency-edges = [  ]
+
     '';
   };
   multiContextWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
-    source.bloomeryLock = builtins.toFile "multi-context-bloomery.lock" ''
-      version = 2
+    source.bloomeryLock = fixtureLock ''
+      version = 3
 
       [packages."lib-calc-0.1.0"]
+      lib-name = "lib_calc"
       features = [ "alpha", "beta" ]
       dependencies = [ "lib-core-0.1.0" ]
+      dependency-edges = [ { package = "lib-core-0.1.0", extern-name = "lib_core", kind = "normal" } ]
       proc-macro = false
       edition = "2021"
 
       [packages."lib-core-0.1.0"]
+      lib-name = "lib_core"
       features = [ ]
       dependencies = [ ]
+      dependency-edges = [  ]
       proc-macro = false
       edition = "2021"
 
       [contexts."lib-calc-0.1.0"."lib-calc-0.1.0"]
       features = [ "alpha" ]
       dependencies = [ "lib-core-0.1.0" ]
+      dependency-edges = [ { package = "lib-core-0.1.0", extern-name = "lib_core", kind = "normal" } ]
 
       [contexts."lib-calc-0.1.0"."lib-core-0.1.0"]
       features = [ ]
       dependencies = [ ]
+      dependency-edges = [  ]
 
       [contexts."bin-calc-0.1.0"."bin-calc-0.1.0"]
       features = [ ]
       dependencies = [ "lib-calc-0.1.0", "lib-core-0.1.0" ]
+      dependency-edges = [ { package = "lib-calc-0.1.0", extern-name = "lib_calc", kind = "normal" }, { package = "lib-core-0.1.0", extern-name = "lib_core", kind = "normal" } ]
 
       [contexts."bin-calc-0.1.0"."lib-calc-0.1.0"]
       features = [ "beta" ]
       dependencies = [ "lib-core-0.1.0" ]
+      dependency-edges = [ { package = "lib-core-0.1.0", extern-name = "lib_core", kind = "normal" } ]
 
       [contexts."bin-calc-0.1.0"."lib-core-0.1.0"]
       features = [ ]
       dependencies = [ ]
+      dependency-edges = [  ]
+
     '';
   };
   nonUnifiedWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
     build.unify = false;
     createLibPackages = true;
-    source.bloomeryLock = builtins.toFile "non-unified-bloomery.lock" ''
-      version = 2
+    source.bloomeryLock = fixtureLock ''
+      version = 3
 
       [packages."lib-calc-0.1.0"]
+      lib-name = "lib_calc"
       features = [ "alpha", "beta" ]
       dependencies = [ "lib-core-0.1.0" ]
+      dependency-edges = [ { package = "lib-core-0.1.0", extern-name = "lib_core", kind = "normal" } ]
       proc-macro = false
       edition = "2021"
 
       [packages."lib-core-0.1.0"]
+      lib-name = "lib_core"
       features = [ ]
       dependencies = [ ]
+      dependency-edges = [  ]
       proc-macro = false
       edition = "2021"
 
       [contexts."lib-calc-0.1.0"."lib-calc-0.1.0"]
       features = [ "alpha" ]
       dependencies = [ "lib-core-0.1.0" ]
+      dependency-edges = [ { package = "lib-core-0.1.0", extern-name = "lib_core", kind = "normal" } ]
 
       [contexts."lib-calc-0.1.0"."lib-core-0.1.0"]
       features = [ ]
       dependencies = [ ]
+      dependency-edges = [  ]
 
       [contexts."bin-calc-0.1.0"."bin-calc-0.1.0"]
       features = [ ]
       dependencies = [ "lib-calc-0.1.0", "lib-core-0.1.0" ]
+      dependency-edges = [ { package = "lib-calc-0.1.0", extern-name = "lib_calc", kind = "normal" }, { package = "lib-core-0.1.0", extern-name = "lib_core", kind = "normal" } ]
 
       [contexts."bin-calc-0.1.0"."lib-calc-0.1.0"]
       features = [ "beta" ]
       dependencies = [ "lib-core-0.1.0" ]
+      dependency-edges = [ { package = "lib-core-0.1.0", extern-name = "lib_core", kind = "normal" } ]
 
       [contexts."bin-calc-0.1.0"."lib-core-0.1.0"]
       features = [ ]
       dependencies = [ ]
+      dependency-edges = [  ]
+
     '';
   };
   fallbackWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
-    source.bloomeryLock = builtins.toFile "no-edges-bloomery.lock" ''
-      version = 2
+    source.bloomeryLock = fixtureLock ''
+      version = 3
+
+      [packages."bin-calc-0.1.0"]
+      features = []
+      dependencies = []
+      dependency-edges = []
 
       [packages."lib-calc-0.1.0"]
+      lib-name = "lib_calc"
       features = [ ]
       dependencies = [ "lib-core-0.1.0" ]
+      dependency-edges = [ { package = "lib-core-0.1.0", extern-name = "lib_core", kind = "normal" } ]
       proc-macro = false
       edition = "2021"
+
     '';
   };
   featureOverrideWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
-    source.bloomeryLock = builtins.toFile "feature-precedence-bloomery.lock" ''
-      version = 2
+    source.bloomeryLock = fixtureLock ''
+      version = 3
 
       [packages."lib-calc-0.1.0"]
+      lib-name = "lib_calc"
       features = [ "locked-feature" ]
       dependencies = [ "lib-core-0.1.0" ]
+      dependency-edges = [ { package = "lib-core-0.1.0", extern-name = "lib_core", kind = "normal" } ]
       proc-macro = false
       edition = "2021"
+
     '';
     overrides.lib-calc.features = ["override-feature"];
   };
@@ -185,14 +226,17 @@
       source = "sparse+https://example.com/index"
       checksum = "0000000000000000000000000000000000000000000000000000000000000000"
     '';
-    source.bloomeryLock = builtins.toFile "unsupported-bloomery.lock" ''
-      version = 2
+    source.bloomeryLock = fixtureLock ''
+      version = 3
 
       [packages."unsupported-dep-1.0.0"]
+      lib-name = "unsupported_dep"
       features = [ ]
       dependencies = [ ]
+      dependency-edges = [  ]
       proc-macro = false
       edition = "2021"
+
     '';
   };
   missingDepLock = ''

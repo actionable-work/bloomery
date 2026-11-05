@@ -10,6 +10,8 @@
 }: let
   builders = import ./builders {inherit pkgs lib;};
   workspace = import ./workspace {inherit pkgs lib;};
+  naming = import ./workspace/dependency-bindings.nix {inherit lib;};
+  targetCondition = import ./workspace/target-condition.nix {inherit lib;};
   profileMod = import ./profile {inherit lib;};
   defaultOverrides = import ./overrides {inherit pkgs lib;};
   optionsMod = import ./workspace/options.nix {inherit pkgs lib;};
@@ -315,7 +317,30 @@ in
 
     # Workspace members whose outputs are generated. Unselected members stay in
     # the crate graph as dependency sources only.
-    selectedWorkspacePackages = builtins.filter (pkg: selectedWorkspaceMembers ? ${pkg.name}) parsed.workspacePackages;
+    namedPackage = pkg: let
+      locked =
+        if lockManifest != null
+        then lockManifest.packages.${pkg.id} or {}
+        else {};
+      manifest =
+        if pkg.isWorkspace && discoveredMembers ? ${pkg.name}
+        then builtins.fromTOML (builtins.readFile (discoveredMembers.${pkg.name} + "/Cargo.toml"))
+        else {};
+      libName =
+        if lockManifest != null
+        then locked.lib-name or null
+        else manifest.lib.name or null;
+    in
+      pkg
+      // {
+        crateName =
+          if libName != null
+          then libName
+          else lib.replaceStrings ["-"] ["_"] pkg.name;
+        inherit libName;
+        procMacro = locked."proc-macro" or manifest.lib.proc-macro or false;
+      };
+    selectedWorkspacePackages = map namedPackage (builtins.filter (pkg: selectedWorkspaceMembers ? ${pkg.name}) parsed.workspacePackages);
 
     # Load and validate bloomery.lock if available
     lockName =
@@ -324,7 +349,7 @@ in
       else "<inline>";
     lockManifest =
       if bloomeryLock == null && dependencyPolicyChecksEnabled
-      then throw "bloomery: Dependency policy checks require a version-2 bloomery.lock. Run 'bloomery sync' to generate it."
+      then throw "bloomery: Dependency policy checks require a version-3 bloomery.lock. Run 'bloomery sync' to generate it."
       else if bloomeryLock != null
       then let
         lockData =
@@ -336,16 +361,16 @@ in
         expectedHash = builtins.hashString "sha256" (lib.replaceStrings ["\r\n"] ["\n"] (builtins.readFile cargoLock));
         actualHash = lockData."cargo-lock-hash" or lockData.cargo_lock_hash or null;
       in
-        if (lockData.version or null) != 2
-        then throw "bloomery: Unsupported bloomery.lock version in '${lockName}'; expected version 2. Run 'bloomery sync' to regenerate it."
+        if (lockData.version or null) != 3
+        then throw "bloomery: Unsupported bloomery.lock version in '${lockName}'; expected version 3. Run 'bloomery sync' to regenerate it."
         else if dependencyPolicyChecksEnabled && actualHash != expectedHash
         then throw "bloomery: Dependency policy checks require bloomery.lock to match Cargo.lock. Run 'bloomery sync' to update it."
         else if throwOnOutOfDate && actualHash != null && actualHash != expectedHash
         then throw "bloomery: Lock manifest '${lockName}' is out of date with '${toString cargoLock}'. Run 'bloomery sync' to update it."
-        else lockData
+        else naming.validate lockData
       else null;
 
-    # Resolve features across the workspace (unifyFeatures determines unified vs per-crate)
+    # Resolve the global feature view; member contexts use separate seeds below.
     resolvedFeatures =
       if lockManifest != null
       then let
@@ -377,7 +402,7 @@ in
       else if featureIndex != null
       then
         workspace.resolveFeatures {
-          inherit root cargoTomlPath discoveredMembers unifyFeatures;
+          inherit root cargoTomlPath discoveredMembers;
           cratesIoIndex = featureIndex;
           lockPackages = parsed.packages;
         }
@@ -426,10 +451,6 @@ in
       ++ devRustcFlags;
 
     # Active dependencies for the global unified package view.
-    getDepIds = id: defaultDepIds:
-      if resolvedFeatures ? __activeDeps && resolvedFeatures.__activeDeps ? ${id}
-      then lib.filter (depId: builtins.elem depId defaultDepIds) resolvedFeatures.__activeDeps.${id}
-      else [];
 
     fetchGitCrate = {
       url,
@@ -491,20 +512,50 @@ in
         }
       else throw "Unsupported source for package ${pkg.name}: ${builtins.toString pkg.source}";
 
+    edgesFor = rootId: package:
+      if rootId != null && !unifyFeatures && lockContexts ? ${rootId}
+      then lockContexts.${rootId}.${package}.dependency-edges
+      else if lockManifest != null
+      then lockManifest.packages.${package}.dependency-edges
+      else resolvedFeatures.__activeEdges.${package} or [];
+    selectEdges = platform: kinds: edges:
+      naming.select {
+        inherit platform kinds edges;
+        matches = targetCondition.matches;
+      };
+    bindingsFor = resolver: edges:
+      map (edge: {
+        dependency = resolver edge.package;
+        externName = edge.extern-name or null;
+      })
+      edges;
+    bindingInputs = bindings: lib.unique (map (binding: binding.dependency) bindings);
+    hostPlatform = stdenv.buildPlatform;
+    targetPlatform = stdenv.hostPlatform;
+    nativeBuild = hostPlatform.system == targetPlatform.system;
+    builderHostCrate =
+      if nativeBuild
+      then builderCrate
+      else
+        (import ./builders {
+          pkgs = pkgs.buildPackages;
+          inherit lib;
+        }).buildCrateWith {defaultLinker = null;};
+
     # Build one crate node from a resolved entry.
     mkCrateNode = {
       key,
       package,
       features ? null,
-      dependencies ? null,
       rustFlags,
       resolveDep,
       variantName ? null,
       metadataOnly ? false,
-      releaseDep ? null,
-      fullBuildScriptDeps ? false,
+      edges ? null,
+      resolveHostDep ? (dep: globalHostCrates.${dep}),
+      hostUnit ? false,
     }: let
-      pkg = parsed.byId.${package} or (throw "Bloomery build node '${key}' references unknown package '${package}'");
+      pkg = namedPackage (parsed.byId.${package} or (throw "Bloomery build node '${key}' references unknown package '${package}'"));
       pkgLock =
         if lockManifest != null
         then (lockManifest.packages.${package} or {})
@@ -524,23 +575,34 @@ in
         else if resolvedFeatures ? ${pkg.crateName}
         then resolvedFeatures.${pkg.crateName}
         else ["default"];
-      depIds =
-        if dependencies != null
-        then dependencies
-        else getDepIds key pkg.depIds;
-      depDrvs = map resolveDep depIds;
-      # Metadata-only targets resolve build-script dependencies separately so
-      # build scripts link object code while the target stays metadata-only.
-      buildScriptDrvs =
-        if metadataOnly && fullBuildScriptDeps && releaseDep != null
-        then map releaseDep depIds
-        else depDrvs;
+      resolvedEdges =
+        if edges != null
+        then edges
+        else edgesFor null package;
+      isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or (namedPackage pkg).procMacro;
+      forHost = hostUnit || isProcMacro;
+      platform =
+        if forHost
+        then hostPlatform
+        else targetPlatform;
+      targetEdges = selectEdges platform ["normal"] resolvedEdges;
+      buildEdges = selectEdges hostPlatform ["build"] resolvedEdges;
+      resolveTarget =
+        if forHost
+        then resolveHostDep
+        else resolveDep;
+      dependencyBindings = bindingsFor resolveTarget targetEdges;
+      buildScriptBindings = bindingsFor resolveHostDep buildEdges;
+      build =
+        if forHost
+        then builderHostCrate
+        else builderCrate;
     in
-      builderCrate {
-        inherit pkg;
+      build {
+        inherit pkg dependencyBindings buildScriptBindings;
         src = resolveCrateSrc pkg;
-        dependencies = depDrvs;
-        buildScriptDependencies = buildScriptDrvs;
+        dependencies = bindingInputs dependencyBindings;
+        buildScriptDependencies = bindingInputs buildScriptBindings;
         metadataOnly = metadataOnly;
         override = cOverride;
         features = pkgFeatures;
@@ -571,7 +633,7 @@ in
           if lockManifest != null
           then (lockManifest.packages.${pkgKey} or {})
           else {};
-        isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or false;
+        isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or (namedPackage pkg).procMacro;
       in
         if isProcMacro
         then globalCrates.${pkgKey}
@@ -581,9 +643,7 @@ in
             package = pkgKey;
             rustFlags = defaultRustcFlags;
             resolveDep = dep: graph.${dep};
-            releaseDep = dep: globalCrates.${dep};
             metadataOnly = true;
-            fullBuildScriptDeps = !pkg.isWorkspace || memberHasBuildScript pkg.name;
             variantName = "metadata";
           })
       parsed.byId;
@@ -613,25 +673,68 @@ in
       if lockManifest != null && (lockManifest ? contexts) && lockManifest.contexts != {}
       then lockManifest.contexts
       else
-        lib.genAttrs (map (member: member.id) parsed.workspacePackages) (_:
+        lib.genAttrs (map (member: member.id) parsed.workspacePackages) (rootId: let
+          resolution = workspace.resolveFeatures {
+            inherit root cargoTomlPath discoveredMembers;
+            lockPackages = parsed.packages;
+            cratesIoIndex = featureIndex;
+            seedPackageIds = [rootId];
+          };
+        in
           lib.mapAttrs (pkgKey: _: {
-            features = resolvedFeatures.${pkgKey} or ["default"];
-            dependencies = resolvedFeatures.__activeDeps.${pkgKey} or [];
-          })
-          parsed.byId);
+            features = resolution.${pkgKey} or [];
+            dependencies = resolution.__activeDeps.${pkgKey} or [];
+            dependency-edges = resolution.__activeEdges.${pkgKey} or [];
+          }) (lib.filterAttrs (pkgKey: _: resolution.__activeDeps ? ${pkgKey}) parsed.byId));
 
     contextCrates = lib.mapAttrs (root: context:
       lib.mapAttrs (pkgKey: entry:
         mkCrateNode {
           key = pkgKey;
           package = pkgKey;
-          inherit (entry) features dependencies;
+          inherit (entry) features;
+          edges = entry.dependency-edges;
+          resolveHostDep = dep: contextHostCrates.${root}.${dep};
           rustFlags = defaultRustcFlags;
           resolveDep = dep: contextCrates.${root}.${dep};
           variantName = root;
         })
       context)
     lockContexts;
+
+    globalHostCrates =
+      if nativeBuild
+      then globalCrates
+      else
+        lib.mapAttrs (pkgKey: _:
+          mkCrateNode {
+            key = pkgKey;
+            package = pkgKey;
+            rustFlags = defaultRustcFlags;
+            hostUnit = true;
+            resolveDep = dep: globalHostCrates.${dep};
+            resolveHostDep = dep: globalHostCrates.${dep};
+          })
+        parsed.byId;
+    contextHostCrates =
+      if nativeBuild
+      then contextCrates
+      else
+        lib.mapAttrs (root: context:
+          lib.mapAttrs (pkgKey: entry:
+            mkCrateNode {
+              key = pkgKey;
+              package = pkgKey;
+              inherit (entry) features;
+              edges = entry.dependency-edges;
+              rustFlags = defaultRustcFlags;
+              hostUnit = true;
+              resolveDep = dep: contextHostCrates.${root}.${dep};
+              resolveHostDep = dep: contextHostCrates.${root}.${dep};
+              variantName = root;
+            })
+          context)
+        lockContexts;
 
     # Profile variants of the crate graph. Workspace crates are rebuilt with the
     # extra PGO flags so profile data covers the CLI logic; registry crates reuse
@@ -673,7 +776,9 @@ in
           mkCrateNode {
             key = pkgKey;
             package = pkgKey;
-            inherit (entry) features dependencies;
+            inherit (entry) features;
+            edges = entry.dependency-edges;
+            resolveHostDep = dep: contextHostCrates.${root}.${dep};
             rustFlags = defaultRustcFlags ++ extraFlags;
             resolveDep = dep: graph.${dep};
             variantName = "${root}-${variantName}";
@@ -697,7 +802,9 @@ in
               mkCrateNode {
                 key = pkgKey;
                 package = pkgKey;
-                inherit (entry) features dependencies;
+                inherit (entry) features;
+                edges = entry.dependency-edges;
+                resolveHostDep = dep: contextHostCrates.${root}.${dep};
                 rustFlags = devCrateRustcFlags;
                 resolveDep = dep: contextDevCrates.${root}.${dep};
                 variantName = root;
@@ -713,7 +820,7 @@ in
           if lockManifest != null
           then (lockManifest.packages.${pkgKey} or {})
           else {};
-        isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or false;
+        isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or (namedPackage pkg).procMacro;
       in
         if isProcMacro
         then contextCrates.${root}.${pkgKey}
@@ -721,12 +828,12 @@ in
           mkCrateNode {
             key = pkgKey;
             package = pkgKey;
-            inherit (entry) features dependencies;
+            inherit (entry) features;
+            edges = entry.dependency-edges;
+            resolveHostDep = dep: contextHostCrates.${root}.${dep};
             rustFlags = defaultRustcFlags;
             resolveDep = dep: graph.${dep};
-            releaseDep = dep: contextCrates.${root}.${dep};
             metadataOnly = true;
-            fullBuildScriptDeps = !pkg.isWorkspace || memberHasBuildScript pkg.name;
             variantName = "${root}-metadata";
           })
       context;
@@ -748,10 +855,6 @@ in
       if unifyFeatures || !(lockContexts ? ${root})
       then globalMetadataCrates
       else contextMetadataCrates.${root};
-    getDepIdsFor = root: id: defaultDepIds:
-      if unifyFeatures || !(lockContexts ? ${root})
-      then getDepIds id defaultDepIds
-      else lockContexts.${root}.${id}.dependencies or [];
 
     profileCratesFor = {
       extraFlags,
@@ -772,19 +875,29 @@ in
       then globalDevCrates
       else {};
 
+    hostCratesFor = rootId:
+      if unifyFeatures || !(lockContexts ? ${rootId})
+      then globalHostCrates
+      else contextHostCrates.${rootId};
+    unitBindings = rootId: package: graph: kinds:
+      bindingsFor (dep: graph.${dep}) (selectEdges targetPlatform kinds (edgesFor rootId package));
+    scriptBindings = rootId: package:
+      bindingsFor (dep: (hostCratesFor rootId).${dep}) (selectEdges hostPlatform ["build"] (edgesFor rootId package));
+
     # Find and build binaries for workspace crates (both release and dev profiles)
     workspaceBinaries =
       lib.concatMap (
         wpkg: let
           crates = cratesFor wpkg.id;
           devCrates = devCratesFor wpkg.id;
-          getDepIds = getDepIdsFor wpkg.id;
           cratePath = discoveredMembers.${wpkg.name} or null;
           buildPath = buildMembers.${wpkg.name} or null;
-          depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
+          dependencyBindings = unitBindings wpkg.id wpkg.id crates ["normal"];
+          buildScriptBindings = scriptBindings wpkg.id wpkg.id;
+          depDrvs = bindingInputs dependencyBindings;
           depDevDrvs =
             if createDevPackages
-            then map (depId: devCrates.${depId}) (getDepIds wpkg.id wpkg.depIds)
+            then bindingInputs (unitBindings wpkg.id wpkg.id devCrates ["normal"])
             else depDrvs;
           cOverride = getOverride wpkg.name;
           materializedOverride =
@@ -869,7 +982,8 @@ in
                 root = wpkg.id;
                 scope = pgoScope;
               };
-              variantDeps = map (depId: variantCrates.${depId}) (getDepIds wpkg.id wpkg.depIds);
+              variantBindings = unitBindings wpkg.id wpkg.id variantCrates ["normal"];
+              variantDeps = bindingInputs variantBindings;
               variantCrateDrv =
                 if hasLib
                 then (variantCrates.${wpkg.id} or null)
@@ -877,6 +991,8 @@ in
             in {
               crateDrv = variantCrateDrv;
               dependencies = variantDeps;
+              dependencyBindings = variantBindings;
+              inherit buildScriptBindings;
             };
             instrumentedVariant = profileVariantArgs ["-Cprofile-generate"] "pgo-generate";
             mkProfileUseVariant = merged:
@@ -890,6 +1006,7 @@ in
               inherit crateDrv edition;
               inherit workspaceAssets workspaceStatic workspacePublic;
               dependencies = depDrvs;
+              inherit dependencyBindings buildScriptBindings;
               override = materializedOverride;
               profile = effectiveBinaryProfile;
               inherit defaultRustcFlags;
@@ -911,6 +1028,7 @@ in
                   inherit entry crateDrv edition;
                   inherit workspaceAssets workspaceStatic workspacePublic;
                   dependencies = depDrvs;
+                  inherit dependencyBindings buildScriptBindings;
                   override = materializedOverride;
                   profile = optimizedProfile;
                   inherit defaultRustcFlags;
@@ -925,6 +1043,7 @@ in
                   trainingEnv = optimizeOverride.env or {};
                   instrumentedCrateDrv = instrumentedVariant.crateDrv;
                   instrumentedDependencies = instrumentedVariant.dependencies;
+                  instrumentedDependencyBindings = instrumentedVariant.dependencyBindings;
                   mkProfileUseDeps = mkProfileUseVariant;
                 };
             optimizedDrv =
@@ -949,6 +1068,8 @@ in
                   inherit edition;
                   inherit workspaceAssets workspaceStatic workspacePublic;
                   dependencies = depDevDrvs;
+                  dependencyBindings = unitBindings wpkg.id wpkg.id devCrates ["normal"];
+                  inherit buildScriptBindings;
                   override = cOverrideDev;
                   profile = effectiveDevBinaryProfile;
                   defaultRustcFlags = devRustcFlags;
@@ -1091,9 +1212,10 @@ in
       map (
         wpkg: let
           crates = devCratesFor wpkg.id;
-          getDepIds = getDepIdsFor wpkg.id;
           cratePath = buildTestMembers.${wpkg.name};
-          depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
+          dependencyBindings = unitBindings wpkg.id wpkg.id crates ["normal" "dev"];
+          buildScriptBindings = scriptBindings wpkg.id wpkg.id;
+          depDrvs = bindingInputs dependencyBindings;
           cOverride = testOverridesFor wpkg.name;
           hasLib = testMemberHasLib wpkg.name;
           crateDrv =
@@ -1112,6 +1234,7 @@ in
             src = cratePath;
             inherit crateDrv edition;
             dependencies = depDrvs;
+            inherit dependencyBindings buildScriptBindings;
             override = cOverride;
             defaultRustcFlags = testRustcFlags;
             isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or null;
@@ -1126,15 +1249,11 @@ in
       map (
         wpkg: let
           crates = metadataCratesFor wpkg.id;
-          releaseCrates = cratesFor wpkg.id;
-          getDepIds = getDepIdsFor wpkg.id;
           cratePath = buildMembers.${wpkg.name};
-          depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
+          dependencyBindings = unitBindings wpkg.id wpkg.id crates ["normal"];
+          buildScriptBindings = scriptBindings wpkg.id wpkg.id;
+          depDrvs = bindingInputs dependencyBindings;
           hasBuildScript = memberHasBuildScript wpkg.name;
-          buildScriptDepDrvs =
-            if hasBuildScript
-            then map (depId: releaseCrates.${depId}) (getDepIds wpkg.id wpkg.depIds)
-            else depDrvs;
           cOverride = getOverride wpkg.name;
           pkgLock =
             if lockManifest != null
@@ -1148,7 +1267,8 @@ in
             src = cratePath;
             inherit edition;
             dependencies = depDrvs;
-            buildScriptDependencies = buildScriptDepDrvs;
+            inherit dependencyBindings buildScriptBindings;
+            buildScriptDependencies = bindingInputs buildScriptBindings;
             splitBuildScriptDeps = hasBuildScript;
             override = cOverride;
             defaultRustcFlags = clippyRustcFlags;
@@ -1164,15 +1284,11 @@ in
       map (
         wpkg: let
           crates = metadataCratesFor wpkg.id;
-          releaseCrates = cratesFor wpkg.id;
-          getDepIds = getDepIdsFor wpkg.id;
           cratePath = buildMembers.${wpkg.name};
-          depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
+          dependencyBindings = unitBindings wpkg.id wpkg.id crates ["normal"];
+          buildScriptBindings = scriptBindings wpkg.id wpkg.id;
+          depDrvs = bindingInputs dependencyBindings;
           hasBuildScript = memberHasBuildScript wpkg.name;
-          buildScriptDepDrvs =
-            if hasBuildScript
-            then map (depId: releaseCrates.${depId}) (getDepIds wpkg.id wpkg.depIds)
-            else depDrvs;
           cOverride = getOverride wpkg.name;
           pkgLock =
             if lockManifest != null
@@ -1186,7 +1302,8 @@ in
             src = cratePath;
             inherit edition;
             dependencies = depDrvs;
-            buildScriptDependencies = buildScriptDepDrvs;
+            inherit dependencyBindings buildScriptBindings;
+            buildScriptDependencies = bindingInputs buildScriptBindings;
             splitBuildScriptDeps = hasBuildScript;
             override = cOverride;
             defaultRustcFlags = defaultRustcFlags;
@@ -1202,15 +1319,11 @@ in
       map (
         wpkg: let
           crates = metadataCratesFor wpkg.id;
-          releaseCrates = cratesFor wpkg.id;
-          getDepIds = getDepIdsFor wpkg.id;
           cratePath = buildMembers.${wpkg.name};
-          depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
+          dependencyBindings = unitBindings wpkg.id wpkg.id crates ["normal"];
+          buildScriptBindings = scriptBindings wpkg.id wpkg.id;
+          depDrvs = bindingInputs dependencyBindings;
           hasBuildScript = memberHasBuildScript wpkg.name;
-          buildScriptDepDrvs =
-            if hasBuildScript
-            then map (depId: releaseCrates.${depId}) (getDepIds wpkg.id wpkg.depIds)
-            else depDrvs;
           cOverride = getOverride wpkg.name;
           pkgLock =
             if lockManifest != null
@@ -1224,7 +1337,8 @@ in
             src = cratePath;
             inherit edition;
             dependencies = depDrvs;
-            buildScriptDependencies = buildScriptDepDrvs;
+            inherit dependencyBindings buildScriptBindings;
+            buildScriptDependencies = bindingInputs buildScriptBindings;
             splitBuildScriptDeps = hasBuildScript;
             override = cOverride;
             defaultRustdocFlags = docRustdocFlags;
@@ -1241,10 +1355,11 @@ in
         map (
           wpkg: let
             crates = devCratesFor wpkg.id;
-            getDepIds = getDepIdsFor wpkg.id;
             cratePath = buildMembers.${wpkg.name};
             hasLib = memberHasLib wpkg.name;
-            depDrvs = map (depId: crates.${depId}) (getDepIds wpkg.id wpkg.depIds);
+            dependencyBindings = unitBindings wpkg.id wpkg.id crates ["normal" "dev"];
+            buildScriptBindings = scriptBindings wpkg.id wpkg.id;
+            depDrvs = bindingInputs dependencyBindings;
             cOverride = getOverride wpkg.name;
             pkgLock =
               if lockManifest != null
@@ -1261,6 +1376,7 @@ in
                 crateDrv = crates.${wpkg.id} or null;
                 inherit edition;
                 dependencies = depDrvs;
+                inherit dependencyBindings buildScriptBindings;
                 override = cOverride;
                 defaultRustdocFlags = doctestRustdocFlags;
                 isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or null;

@@ -17,6 +17,10 @@
           }
           // (args.checks or {});
       });
+  fixtureLock = content: let
+    base = builtins.removeAttrs (builtins.fromTOML (builtins.readFile ../tests/basic-workspace/bloomery.lock)) ["cargo-lock-hash"];
+  in
+    (import ./test-lock.nix {inherit lib;}) (lib.recursiveUpdate base (builtins.fromTOML content));
   library = import ./default.nix {inherit pkgs lib;};
   lockCheckSource = builtins.readFile ./workspace/lock-check.nix;
   manifestCheckSource = builtins.readFile ./workspace/manifest-check.nix;
@@ -144,13 +148,15 @@
     root = ../tests/basic-workspace;
     devShell.enable = false;
   };
-  staleLock = builtins.toFile "stale-bloomery.lock" ''
-    version = 2
+  staleLock = fixtureLock ''
+    version = 3
     cargo-lock-hash = "0000000000000000000000000000000000000000000000000000000000000000"
 
     [packages."bin-calc-0.1.0"]
     features = [ ]
     dependencies = [ ]
+      dependency-edges = [  ]
+
   '';
   staleWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
@@ -168,6 +174,17 @@
   };
   allPolicyWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
+    source.bloomeryLock = let
+      base = builtins.fromTOML (builtins.readFile ../tests/basic-workspace/bloomery.lock);
+    in
+      (import ./test-lock.nix {inherit lib;}) (base
+        // {
+          packages =
+            base.packages
+            // {
+              "itoa-1.0.18" = builtins.removeAttrs base.packages."itoa-1.0.18" ["license" "license-file"];
+            };
+        });
     rustsecAdvisoryDb = ./workspace/fixtures/rustsec-db;
     checks.bans.enable = true;
     checks.licenses.enable = true;
@@ -298,7 +315,7 @@ in {
     };
   };
 
-  testDependencyPolicyRequiresFreshVersionTwoLockAndRustSecInput = {
+  testDependencyPolicyRequiresFreshVersionThreeLockAndRustSecInput = {
     expr = {
       missingLockFails = !(builtins.tryEval (builtins.deepSeq missingPolicyLockWorkspace.checks."bin-calc:bans".drvPath true)).success;
       staleLockFailsEvenWithoutOrdinaryFreshness = !(builtins.tryEval (builtins.deepSeq stalePolicyLockWorkspace.checks."bin-calc:licenses".drvPath true)).success;

@@ -1,0 +1,13 @@
+[dependencies]
+optional_alias = { optional = true, package = "other-package", path = "../other-package" }
+
+[features]
+extra = ["dep:optional_alias"]
+
+[lib]
+name = "actual_library"
+
+[package]
+edition = "2021"
+name = "different-name"
+version = "0.1.0"

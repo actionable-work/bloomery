@@ -86,10 +86,9 @@ in {
       res = features.resolveFeatures {
         root = ./.;
         cargoTomlPath = ./does-not-exist-Cargo.toml;
-        unifyFeatures = true;
       };
     in
-      res ? "tokio" || (builtins.removeAttrs res ["__activeDeps"] == {});
+      res ? "tokio" || (builtins.removeAttrs res ["__activeDeps" "__activeEdges"] == {});
     expected = true;
   };
 
@@ -129,7 +128,6 @@ in {
           }
         ];
         readToml = name: mockTomls.${name} or null;
-        unifyFeatures = true;
       };
     in
       !(res ? "topcoat-mail")
@@ -167,7 +165,6 @@ in {
           }
         ];
         readToml = name: mockTomls.${name} or null;
-        unifyFeatures = true;
       };
     in
       (builtins.elem "parse" (res.toml_edit or []))

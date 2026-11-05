@@ -44,7 +44,13 @@
       createLibPackages = true;
       createDevPackages = true;
       source.cargoLock = fixtures + "/git.Cargo.lock";
-      source.bloomeryLock = fixtures + "/git.bloomery.lock";
+      source.bloomeryLock =
+        (import ./test-lock.nix {inherit lib;})
+        ((builtins.fromTOML (builtins.readFile (fixtures + "/git.bloomery.lock")))
+          // {
+            # The source-fetch seam substitutes a fixed remote package identity.
+            cargo-lock-hash = builtins.hashString "sha256" (builtins.readFile (fixtures + "/git.Cargo.lock"));
+          });
     };
   gitBase = mkGitWorkspace (fixtures + "/base");
   gitUnselected = mkGitWorkspace (fixtures + "/unselected");

@@ -1,4 +1,6 @@
-use crate::lockfile::{BloomeryContextPackage, BloomeryLock, BloomeryPackage};
+use crate::lockfile::{
+    BloomeryContextPackage, BloomeryDependencyEdge, BloomeryLock, BloomeryPackage,
+};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -31,6 +33,7 @@ struct CargoPackage {
 
 #[derive(Debug, Deserialize, Clone)]
 struct CargoTarget {
+    name: String,
     #[serde(default)]
     kind: Vec<String>,
 }
@@ -48,6 +51,8 @@ struct CargoDependency {
     features: Vec<String>,
     #[serde(default)]
     kind: Option<String>,
+    #[serde(default)]
+    target: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -67,7 +72,37 @@ struct ResolveNode {
 
 #[derive(Debug, Deserialize)]
 struct ResolvedDependency {
+    name: String,
     pkg: String,
+    dep_kinds: Vec<DependencyKind>,
+}
+
+#[derive(Debug, Deserialize)]
+struct DependencyKind {
+    kind: Option<String>,
+    target: Option<String>,
+}
+
+impl CargoPackage {
+    fn library_name(&self) -> Option<&str> {
+        self.targets
+            .iter()
+            .find(|target| {
+                target.kind.iter().any(|kind| {
+                    matches!(
+                        kind.as_str(),
+                        "lib" | "rlib" | "dylib" | "cdylib" | "staticlib" | "proc-macro"
+                    )
+                })
+            })
+            .map(|target| target.name.as_str())
+    }
+}
+
+struct ActivatedDependency {
+    id: String,
+    edge: BloomeryDependencyEdge,
+    features: BTreeSet<String>,
 }
 
 fn default_true() -> bool {
@@ -85,9 +120,8 @@ fn sorted(values: BTreeSet<String>) -> Vec<String> {
 struct Resolver {
     packages_by_id: BTreeMap<String, CargoPackage>,
     key_by_id: BTreeMap<String, String>,
-    name_to_ids: BTreeMap<String, Vec<String>>,
     unified_features: BTreeMap<String, BTreeSet<String>>,
-    candidates: BTreeMap<String, BTreeSet<String>>,
+    resolved_deps: BTreeMap<String, Vec<ResolvedDependency>>,
     workspace_members: BTreeSet<String>,
 }
 
@@ -120,125 +154,111 @@ impl Resolver {
         active
     }
 
-    fn dep_aliases<'a>(&self, package: &'a CargoPackage) -> BTreeMap<String, &'a CargoDependency> {
-        let mut aliases: BTreeMap<String, &'a CargoDependency> = BTreeMap::new();
-        for dependency in &package.dependencies {
-            let alias = dependency
-                .rename
-                .clone()
-                .unwrap_or_else(|| dependency.name.clone());
-            let is_dev = dependency.kind.as_deref() == Some("dev");
-            match aliases.get(&alias) {
-                Some(existing) if existing.kind.as_deref() != Some("dev") && is_dev => {}
-                _ => {
-                    aliases.insert(alias, dependency);
+    /// Features refer to declaration keys; extern bindings refer to Cargo's
+    /// resolved names. Join them through the exact resolved package and unit.
+    fn active_edges(
+        &self,
+        package: &CargoPackage,
+        active: &BTreeSet<String>,
+    ) -> Vec<ActivatedDependency> {
+        let mut strong = BTreeSet::new();
+        let mut requests: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        let mut weak: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        for feature in active {
+            for entry in package.features.get(feature).into_iter().flatten() {
+                if let Some(alias) = entry.strip_prefix("dep:") {
+                    strong.insert(alias.to_owned());
+                } else if let Some((left, feature)) = entry.split_once('/') {
+                    let alias = left.trim_end_matches('?').to_owned();
+                    if left.ends_with('?') {
+                        weak.entry(alias).or_default().insert(feature.to_owned());
+                    } else {
+                        strong.insert(alias.clone());
+                        requests
+                            .entry(alias)
+                            .or_default()
+                            .insert(feature.to_owned());
+                    }
+                } else {
+                    strong.insert(entry.clone());
                 }
             }
         }
-        aliases
+
+        let mut result = Vec::new();
+        for declaration in &package.dependencies {
+            let alias = declaration.rename.as_deref().unwrap_or(&declaration.name);
+            let kind = declaration.kind.as_deref().unwrap_or("normal");
+            if (declaration.optional && !strong.contains(alias))
+                || (kind == "dev" && !self.workspace_members.contains(&package.id))
+            {
+                continue;
+            }
+            let mut features = requests.get(alias).cloned().unwrap_or_default();
+            features.extend(weak.get(alias).into_iter().flatten().cloned());
+            features.extend(declaration.features.iter().cloned());
+            if declaration.uses_default_features {
+                features.insert("default".to_owned());
+            }
+            for resolved in self.resolved_deps.get(&package.id).into_iter().flatten() {
+                let dependency = &self.packages_by_id[&resolved.pkg];
+                let extern_name = declaration
+                    .rename
+                    .as_ref()
+                    .map(|name| name.replace('-', "_"));
+                let expected_name = extern_name.as_deref().or_else(|| dependency.library_name());
+                if dependency.name != declaration.name
+                    || expected_name != Some(resolved.name.as_str())
+                {
+                    continue;
+                }
+                for unit in &resolved.dep_kinds {
+                    if unit.kind.as_deref().unwrap_or("normal") == kind
+                        && unit.target == declaration.target
+                    {
+                        result.push(ActivatedDependency {
+                            id: resolved.pkg.clone(),
+                            edge: BloomeryDependencyEdge {
+                                package: self.key_by_id[&resolved.pkg].clone(),
+                                extern_name: resolved.name.clone(),
+                                kind: kind.to_owned(),
+                                target: unit.target.clone(),
+                            },
+                            features: features.clone(),
+                        });
+                    }
+                }
+            }
+        }
+        result
     }
 
-    fn find_target(
-        &self,
-        dependency: &CargoDependency,
-        candidates: &BTreeSet<String>,
-    ) -> Option<String> {
-        if let Some(found) = candidates.iter().find(|id| {
-            self.packages_by_id
-                .get(*id)
-                .is_some_and(|package| package.name == dependency.name)
-        }) {
-            return Some(found.clone());
-        }
-        let by_name = self.name_to_ids.get(&dependency.name)?;
-        if by_name.len() == 1 {
-            Some(by_name[0].clone())
-        } else {
-            None
-        }
-    }
-
-    /// Compute the dependency edges activated by `active` features, keyed by the
-    /// target package id. Only activated optional/weak/target-relevant edges are
-    /// returned.
     fn dep_requests(
         &self,
         package: &CargoPackage,
         active: &BTreeSet<String>,
     ) -> BTreeMap<String, BTreeSet<String>> {
-        let aliases = self.dep_aliases(package);
-        let mut strong = BTreeSet::new();
-        let mut requests: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-        let mut weak: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-        for feature in active {
-            let Some(entries) = package.features.get(feature) else {
-                continue;
-            };
-            for entry in entries {
-                if let Some(dependency) = entry.strip_prefix("dep:") {
-                    strong.insert(dependency.to_owned());
-                } else if let Some((left, feature)) = entry.split_once('/') {
-                    let is_weak = left.ends_with('?');
-                    let alias = left.trim_end_matches('?');
-                    if is_weak {
-                        weak.entry(alias.to_owned())
-                            .or_default()
-                            .insert(feature.to_owned());
-                    } else {
-                        strong.insert(alias.to_owned());
-                        requests
-                            .entry(alias.to_owned())
-                            .or_default()
-                            .insert(feature.to_owned());
-                    }
-                } else if aliases.contains_key(entry) {
-                    strong.insert(entry.clone());
-                }
-            }
+        let mut requests = BTreeMap::new();
+        for dependency in self.active_edges(package, active) {
+            requests
+                .entry(dependency.id)
+                .or_insert_with(BTreeSet::new)
+                .extend(dependency.features);
         }
-        for (alias, dependency) in &aliases {
-            let activated = !dependency.optional || strong.contains(alias);
-            if !activated {
-                continue;
-            }
-            let entry = requests.entry(alias.clone()).or_default();
-            entry.extend(dependency.features.iter().cloned());
-            if dependency.uses_default_features {
-                entry.insert("default".to_owned());
-            }
-        }
-        for (alias, features) in &weak {
-            let activated =
-                aliases.get(alias).is_some_and(|dep| !dep.optional) || strong.contains(alias);
-            if activated {
-                requests
-                    .entry(alias.clone())
-                    .or_default()
-                    .extend(features.iter().cloned());
-            }
-        }
+        requests
+    }
 
-        let empty = BTreeSet::new();
-        let candidates = self.candidates.get(&package.id).unwrap_or(&empty);
-
-        let mut edges = BTreeMap::new();
-        for (alias, features) in requests {
-            let Some(dependency) = aliases.get(&alias) else {
-                continue;
-            };
-            if dependency.kind.as_deref() == Some("dev")
-                && !self.workspace_members.contains(&package.id)
-            {
-                continue;
-            }
-            if let Some(target) = self.find_target(dependency, candidates) {
-                edges
-                    .entry(target)
-                    .or_insert_with(BTreeSet::new)
-                    .extend(features);
-            }
-        }
-        edges
+    fn dependency_edges(
+        &self,
+        package: &CargoPackage,
+        active: &BTreeSet<String>,
+    ) -> Vec<BloomeryDependencyEdge> {
+        self.active_edges(package, active)
+            .into_iter()
+            .map(|dependency| dependency.edge)
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect()
     }
 
     /// Resolve one fully-unified context per workspace member. Within a context
@@ -300,8 +320,9 @@ impl Resolver {
                 context.insert(
                     self.key_by_id[id].clone(),
                     BloomeryContextPackage {
-                        features: sorted(active),
+                        features: sorted(active.clone()),
                         dependencies,
+                        dependency_edges: self.dependency_edges(package, &active),
                     },
                 );
             }
@@ -330,29 +351,21 @@ pub(crate) fn create_lock(metadata_json: &[u8], cargo_lock: &[u8]) -> Result<Blo
 
     let mut key_by_id = BTreeMap::new();
     let mut id_by_key = BTreeMap::new();
-    let mut name_to_ids: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for (id, package) in &packages_by_id {
         let key = package_key(package);
         if let Some(previous_identity) = id_by_key.get(&key)
             && previous_identity != id
         {
             return Err(format!(
-                "unsupported Cargo resolution: distinct package identities '{previous_identity}' and '{id}' both map to bloomery.lock key '{key}'. The version-2 lock format keys packages by name-version; resolve the collision before syncing."
+                "unsupported Cargo resolution: distinct package identities '{previous_identity}' and '{id}' both map to bloomery.lock key '{key}'. The version-3 lock format keys packages by name-version; resolve the collision before syncing."
             ));
         }
         id_by_key.insert(key.clone(), id.clone());
         key_by_id.insert(id.clone(), key);
-        name_to_ids
-            .entry(package.name.clone())
-            .or_default()
-            .push(id.clone());
-    }
-    for ids in name_to_ids.values_mut() {
-        ids.sort();
     }
 
     let mut unified_features = BTreeMap::new();
-    let mut candidates: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut resolved_deps = BTreeMap::new();
     let mut node_ids = BTreeSet::new();
     for node in resolve.nodes {
         if !node_ids.insert(node.id.clone()) {
@@ -378,10 +391,10 @@ pub(crate) fn create_lock(metadata_json: &[u8], cargo_lock: &[u8]) -> Result<Blo
                         dependency.pkg, node.id
                     ));
                 }
-                Ok(dependency.pkg)
+                Ok(dependency)
             })
-            .collect::<Result<BTreeSet<_>, String>>()?;
-        candidates.insert(node.id, deps);
+            .collect::<Result<Vec<_>, String>>()?;
+        resolved_deps.insert(node.id, deps);
     }
 
     let workspace_members = if metadata.workspace_members.is_empty() {
@@ -393,9 +406,8 @@ pub(crate) fn create_lock(metadata_json: &[u8], cargo_lock: &[u8]) -> Result<Blo
     let resolver = Resolver {
         packages_by_id,
         key_by_id,
-        name_to_ids,
         unified_features,
-        candidates,
+        resolved_deps,
         workspace_members,
     };
 
@@ -429,8 +441,10 @@ pub(crate) fn create_lock(metadata_json: &[u8], cargo_lock: &[u8]) -> Result<Blo
         lock_packages.insert(
             key,
             BloomeryPackage {
-                features: sorted(active),
+                features: sorted(active.clone()),
                 dependencies,
+                dependency_edges: resolver.dependency_edges(package, &active),
+                lib_name: package.library_name().map(str::to_owned),
                 proc_macro,
                 edition,
                 license: package.license.clone(),
@@ -440,7 +454,7 @@ pub(crate) fn create_lock(metadata_json: &[u8], cargo_lock: &[u8]) -> Result<Blo
     }
 
     Ok(BloomeryLock {
-        version: 2,
+        version: 3,
         cargo_lock_hash: sha256_normalized_crlf(cargo_lock),
         packages: lock_packages,
         contexts,
@@ -471,7 +485,17 @@ pub(crate) fn sha256_normalized_crlf(contents: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{create_lock, sha256_normalized_crlf};
+    use super::sha256_normalized_crlf;
+
+    fn create_lock(
+        metadata: &[u8],
+        cargo_lock: &[u8],
+    ) -> Result<crate::lockfile::BloomeryLock, String> {
+        super::create_lock(
+            &crate::naming_tests::default_target_metadata(metadata),
+            cargo_lock,
+        )
+    }
 
     fn metadata(nodes: &str) -> Vec<u8> {
         format!(
@@ -612,7 +636,7 @@ mod tests {
             .expect_err("colliding package identities");
         assert!(error.contains("distinct package identities"));
         assert!(error.contains("crate-a-1.0.0"));
-        assert!(error.contains("version-2 lock format"));
+        assert!(error.contains("version-3 lock format"));
     }
 
     #[test]

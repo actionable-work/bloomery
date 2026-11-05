@@ -38,10 +38,10 @@ action = "invoke nix flake update in the workspace root"
 
 [[requirements]]
 id = "CLI-SYNC-LOCKS-004"
-title = "Every successful sync generates a version-2 Bloomery lock"
+title = "Every successful sync generates a version-3 Bloomery lock"
 manual = false
 design = "design/sync.md#bloomery-lock-format-and-publication"
-ears = { type = "ubiquitous", system = "bloomery sync", action = "generate a version-2 bloomery.lock on every successful invocation" }
+ears = { type = "ubiquitous", system = "bloomery sync", action = "generate a version-3 bloomery.lock on every successful invocation" }
 
 [[requirements]]
 id = "CLI-SYNC-LOCKS-005"
@@ -489,11 +489,7 @@ id = "CLI-SYNC-LOCKS-043"
 title = "Lock records only activated dependency edges"
 manual = false
 design = "design/sync.md#bloomery-lock-format-and-publication"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the Bloomery lock generator"
-action = "record only dependency edges that Cargo activates for a global or context record, omitting optional, weak, and target-specific edges that are not built"
+ears = { type = "ubiquitous", system = "the Bloomery lock generator", action = "record only dependency edges activated by the global or context resolution, excluding inactive optional and weak edges while retaining target conditions for build-unit selection" }
 
 [[requirements]]
 id = "CLI-SYNC-LOCKS-044"

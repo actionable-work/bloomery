@@ -1,0 +1,53 @@
+{
+  "algorithm_version": 2,
+  "crates": [
+    {
+      "manifest_path": "crates/aws-fixture/Cargo.toml",
+      "name": "aws-fixture",
+      "overall_score": 100.0,
+      "sloc": 23,
+      "subscores": {
+        "complexity": 0.0,
+        "crateSize": 0.0,
+        "duplication": 0.0,
+        "nesting": 0.0,
+        "size": 0.0
+      }
+    }
+  ],
+  "input_digest": "d70d7023328875d6140b5c6447cfa775b3ca10935e8375b1b333019880754299",
+  "policy": {
+    "scoring": {
+      "crateSlocLimit": 1500,
+      "cyclomaticLimit": 10,
+      "duplicateMinTokens": 64,
+      "duplicationFreeRatio": 0.02,
+      "functionTokensLimit": 250,
+      "nestingLimit": 4,
+      "weights": {
+        "complexity": 25.0,
+        "crateSize": 30.0,
+        "duplication": 15.0,
+        "nesting": 10.0,
+        "size": 20.0
+      }
+    },
+    "selection": {
+      "manifest": "Cargo.toml",
+      "members": null
+    }
+  },
+  "schema_version": 4,
+  "workspace": {
+    "crate_count": 1,
+    "overall_score": 100.0,
+    "sloc": 23,
+    "subscores": {
+      "complexity": 0.0,
+      "crateSize": 0.0,
+      "duplication": 0.0,
+      "nesting": 0.0,
+      "size": 0.0
+    }
+  }
+}

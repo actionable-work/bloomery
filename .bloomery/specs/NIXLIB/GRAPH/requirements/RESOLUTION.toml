@@ -268,7 +268,7 @@ ears = { type = "event", trigger = "bloomery.lock is present", system = "the wor
 
 [[requirements]]
 id = "NIXLIB-GRAPH-RESOLUTION-025"
-title = "Graph parsing accepts the license metadata lock format"
+title = "Graph parsing accepts the library naming lock format"
 manual = false
 design = "design/resolution.md#bloomery-lock"
-ears = { type = "event", trigger = "a version-2 bloomery.lock is present", system = "the workspace builder", action = "require the version-2 lock contract and read its package metadata and per-member contexts" }
+ears = { type = "event", trigger = "a version-3 bloomery.lock is present", system = "the workspace builder", action = "require the version-3 lock contract and read its package metadata and per-member contexts" }

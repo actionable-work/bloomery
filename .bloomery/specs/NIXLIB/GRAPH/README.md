@@ -19,6 +19,7 @@ build.
 ## Design documents
 
 - [Lock data and graph resolution](design/resolution.md)
+- [Library names and dependency aliases](design/library-names.md)
 - [Derivation contracts](design/derivations.md)
 - [Metadata-only check compilation](design/metadata-check.md)
 - [Check profile selection](design/check-profiles.md)
@@ -29,7 +30,8 @@ build.
 ## Scope
 
 This feature covers graph inputs, workspace discovery, feature and dependency
-resolution, feature unification modes, crate sourcing, crate identity, binary
+resolution, library names and dependency aliases, feature unification modes,
+crate sourcing, crate identity, binary
 discovery, build scripts, build-script native artifacts, propagation metadata,
 asset flow, lock validation, metadata-only check compilation, check profile
 selection, manifest policy checks, dependency policy checks, and the workspace

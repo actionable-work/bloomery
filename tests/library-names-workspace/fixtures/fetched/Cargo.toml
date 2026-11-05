@@ -1,0 +1,9 @@
+[dependencies]
+different-name = "0.1.0"
+
+[package]
+edition = "2021"
+name = "fetched-consumer"
+version = "0.1.0"
+
+[workspace]

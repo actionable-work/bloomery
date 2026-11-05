@@ -8,6 +8,8 @@
   pkg,
   src,
   dependencies ? [],
+  dependencyBindings ? null,
+  buildScriptBindings ? dependencyBindings,
   override ? {},
   defaultRustcFlags ? [],
   denyWarnings ? true,
@@ -16,6 +18,7 @@
   buildScriptDependencies ? dependencies,
   splitBuildScriptDeps ? false,
 }: let
+  compilerFlags = import ./compiler-flags.nix {inherit pkgs lib stdenv;};
   pname = pkg.name;
   version = pkg.version;
   crateName = pkg.crateName;
@@ -42,9 +45,16 @@ in
 
       CLIPPY_DRIVER = "${clippy}/bin/clippy-driver";
       RUSTC = "${rustc}/bin/rustc";
+      BUILD_RUSTC = "${
+        if stdenv.buildPlatform.system == stdenv.hostPlatform.system
+        then rustc
+        else pkgs.buildPackages.rustc
+      }/bin/rustc";
       CRATE_NAME = crateName;
       CARGO_CRATE_NAME = crateName;
       PKG_NAME = pname;
+      CARGO_PKG_NAME = pkg.name;
+      CARGO_PKG_VERSION = version;
       PKG_VERSION = version;
 
       unpackPhase = ''
@@ -65,6 +75,7 @@ in
         runHook preConfigure
 
         export CARGO_MANIFEST_DIR="$PWD"
+        ${import ./library-metadata.nix {inherit lib;} {inherit pkg;}}
 
         EDITION="${
           if edition != null
@@ -130,105 +141,16 @@ in
           exit 0
         fi
 
-        # Resolve a dependency list into extern flags. The named array receives
-        # --extern flags and the given directory receives extracted archives.
-        resolve_deps() {
-          local extern_name="$1"
-          shift
-          local link_name="$1"
-          shift
-          local deps_dir="$1"
-          shift
-          local -n extern_ref="$extern_name"
-          local -n link_ref="$link_name"
-          local dep fname cname f target
-          local -A seen=()
-          for dep in "$@"; do
-            DEP_LIB_PATH=""
-            dep_is_proc_macro=0
-            if [ -f "$dep/nix-support/meta.sh" ]; then
-              source "$dep/nix-support/meta.sh"
-              dep_is_proc_macro="''${DEP_IS_PROC_MACRO:-0}"
-              if [ -n "$DEP_LIB_ARCHIVE" ] && [ -f "$DEP_LIB_ARCHIVE" ]; then
-                tar --zstd -xf "$DEP_LIB_ARCHIVE" -C "$deps_dir"
-                DEP_LIB_PATH="$deps_dir/$DEP_LIB_NAME"
-              fi
-              if [ -n "$DEP_CRATE_NAME" ] && [ -n "$DEP_LIB_PATH" ] && [ -f "$DEP_LIB_PATH" ]; then
-                if [ -z "''${seen[$DEP_CRATE_NAME]:-}" ]; then
-                  extern_ref+=("--extern" "$DEP_CRATE_NAME=$DEP_LIB_PATH")
-                  seen["$DEP_CRATE_NAME"]=1
-                fi
-              fi
-              if [ -n "$DEP_RUSTC_LINK_FLAGS" ]; then
-                link_ref+=($DEP_RUSTC_LINK_FLAGS)
-              fi
-              for env_var in $(compgen -v | grep '^DEP_'); do
-                export "$env_var"
-              done
-            elif [ -d "$dep/lib" ]; then
-              for f in "$dep/lib"/*; do
-                if [ -f "$f" ]; then
-                  fname=$(basename "$f")
-                  cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
-                  if [ -z "''${seen[$cname]:-}" ]; then
-                    extern_ref+=("--extern" "$cname=$f")
-                    seen["$cname"]=1
-                  fi
-                fi
-              done
-            fi
-
-            if [ "$SKIP_PROC_MACRO_CLOSURE" = "1" ] && [ "$dep_is_proc_macro" = "1" ]; then
-              continue
-            fi
-
-            if [ -d "$dep/nix-support/deps-closure" ]; then
-              for f in "$dep/nix-support/deps-closure"/*; do
-                if [ -e "$f" ]; then
-                  case "$f" in
-                    *.tar.zst) tar --zstd -xf "$f" -C "$deps_dir" ;;
-                    *) ln -sf "$(readlink -f "$f")" "$deps_dir/$(basename "$f")" ;;
-                  esac
-                fi
-              done
-            fi
-            if [ -d "$dep/lib" ]; then
-              for f in "$dep/lib"/*; do
-                if [ -e "$f" ]; then
-                  target=$(readlink -f "$f")
-                  ln -sf "$target" "$deps_dir/$(basename "$f")"
-                fi
-              done
-            fi
-          done
-
-          for f in "$deps_dir"/lib*.rlib "$deps_dir"/lib*.so "$deps_dir"/lib*.dylib; do
-            if [ -f "$f" ]; then
-              fname=$(basename "$f")
-              cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
-              if [ -z "''${seen[$cname]:-}" ]; then
-                extern_ref+=("--extern" "$cname=$f")
-                seen["$cname"]=1
-              fi
-            fi
-          done
-        }
-
-        mkdir -p _deps
+        ${import ./dependencies.nix {inherit lib;} {inherit dependencyBindings buildScriptBindings;}}
         EXTERN_FLAGS=()
         EXTRA_LINK_FLAGS=()
         SKIP_PROC_MACRO_CLOSURE=1
         resolve_deps EXTERN_FLAGS EXTRA_LINK_FLAGS _deps $dependencies
-
-        BUILD_SCRIPT_DEPS_DIR="_deps"
-        BUILD_SCRIPT_EXTERN_FLAGS=("''${EXTERN_FLAGS[@]}")
-        if [ "$SPLIT_BUILD_SCRIPT_DEPS" = "1" ]; then
-          mkdir -p _deps_bs
-          BUILD_SCRIPT_DEPS_DIR="_deps_bs"
-          BUILD_SCRIPT_EXTERN_FLAGS=()
-          SKIP_PROC_MACRO_CLOSURE=0
-          resolve_deps BUILD_SCRIPT_EXTERN_FLAGS _bs_link_flags _deps_bs $buildScriptDependencies
-        fi
+        BUILD_SCRIPT_DEPS_DIR="_deps_bs"
+        BUILD_SCRIPT_EXTERN_FLAGS=()
+        BUILD_SCRIPT_DEP_LINK_FLAGS=()
+        SKIP_PROC_MACRO_CLOSURE=0
+        resolve_deps BUILD_SCRIPT_EXTERN_FLAGS BUILD_SCRIPT_DEP_LINK_FLAGS _deps_bs $buildScriptDependencies
 
         runHook postConfigure
       '';
@@ -240,7 +162,8 @@ in
         BUILD_SCRIPT_LINK_FLAGS=()
         if [ -f build.rs ]; then
           mkdir -p _build_script
-          $RUSTC build.rs \
+          CARGO_CRATE_NAME=build_script_build $BUILD_RUSTC build.rs \
+            ${lib.escapeShellArgs compilerFlags.buildScript} \
             --crate-name build_script_build \
             --crate-type bin \
             $EDITION_FLAG \
@@ -250,8 +173,8 @@ in
 
           export OUT_DIR="$PWD/_build_script/out"
           mkdir -p "$OUT_DIR"
-          export TARGET="$($RUSTC -vV | sed -n 's/host: //p')"
-          export HOST="$TARGET"
+          export TARGET="${stdenv.hostPlatform.rust.rustcTarget or stdenv.hostPlatform.config}"
+          export HOST="${stdenv.buildPlatform.rust.rustcTarget or stdenv.buildPlatform.config}"
           export NUM_JOBS="$NIX_BUILD_CORES"
           export OPT_LEVEL="0"
           export PROFILE="debug"
@@ -309,7 +232,7 @@ in
           "''${EXTERN_FLAGS[@]}" \
           "''${BUILD_SCRIPT_FLAGS[@]}" \
           "''${EXTRA_LINK_FLAGS[@]}" \
-          ${lib.escapeShellArgs extraRustcFlags} \
+          ${lib.escapeShellArgs (extraRustcFlags ++ compilerFlags.target)} \
           ${lib.escapeShellArgs warningFlags}
 
         runHook postBuild

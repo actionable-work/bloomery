@@ -167,10 +167,11 @@
     cargoTomlPath ? root + "/Cargo.toml",
     discoveredMembers ? {},
     lockPackages ? [],
-    unifyFeatures ? true,
     cratesIoIndex ? null,
+    seedPackageIds ? null,
     readToml ? null, # Deprecated / kept for interface compatibility
   }: let
+    semver = import ./vulnerabilities.nix {inherit lib;};
     # Index lockfile packages by ID ("name-version") and group by name
     byId = lib.listToAttrs (map (
         p: let
@@ -225,7 +226,7 @@
       if localToml != null
       then let
         toml = localToml;
-        includeDev = unifyFeatures && isWorkspace;
+        includeDev = isWorkspace;
 
         targetDeps =
           if toml ? target && builtins.isAttrs toml.target
@@ -236,14 +237,17 @@
               in
                 (lib.mapAttrsToList (dname: spec: {
                   inherit dname spec;
+                  target = t;
                   kind = "normal";
                 }) (tTable.dependencies or {}))
                 ++ (lib.mapAttrsToList (dname: spec: {
                   inherit dname spec;
+                  target = t;
                   kind = "build";
                 }) (tTable.build-dependencies or {}))
                 ++ (lib.optionals includeDev (lib.mapAttrsToList (dname: spec: {
                   inherit dname spec;
+                  target = t;
                   kind = "dev";
                 }) (tTable.dev-dependencies or {})))
             ) (builtins.attrNames toml.target)
@@ -271,7 +275,11 @@
 
         depSpecs = map (
           entry: let
-            spec = entry.spec;
+            rawSpec = entry.spec;
+            spec =
+              if builtins.isAttrs rawSpec && (rawSpec.workspace or false)
+              then (rootToml.workspace.dependencies.${entry.dname} or {}) // (builtins.removeAttrs rawSpec ["workspace"])
+              else rawSpec;
             isAttr = builtins.isAttrs spec;
           in {
             name = entry.dname;
@@ -299,10 +307,13 @@
                 if isAttr
                 then (spec.optional or false)
                 else false;
-              target =
+              target = entry.target or null;
+              requirement =
                 if isAttr
-                then (spec.target or null)
-                else null;
+                then spec.version or "*"
+                else if builtins.isString spec
+                then spec
+                else "*";
               kind = entry.kind;
             };
           }
@@ -330,7 +341,11 @@
                 default-features = d.default_features or true;
                 optional = d.optional or false;
                 target = d.target or null;
-                kind = d.kind or "normal";
+                requirement = d.req or "*";
+                kind =
+                  if (d.kind or null) == null
+                  then "normal"
+                  else d.kind;
               };
             }) (lib.filter (d: (d.kind or "normal") != "dev") (idxEntry.deps or []));
             isWorkspace = false;
@@ -347,57 +362,23 @@
         if dep.spec.package != null
         then dep.spec.package
         else dep.name;
-      actualNorm = normalizeCrateName actualName;
-      actualHyphen = denormalizeCrateName actualName;
-
-      # First check the package's resolved dependencies from Cargo.lock
-      pkgDepMap = lib.foldl' (
-        acc: depId: let
-          depPkg = byId.${depId} or null;
-          dname =
-            if depPkg != null
-            then depPkg.name
-            else null;
-          dnorm =
-            if dname != null
-            then normalizeCrateName dname
-            else null;
-          dhyphen =
-            if dname != null
-            then denormalizeCrateName dname
-            else null;
-        in
-          if depPkg != null
-          then
-            acc
-            // {
-              "${dname}" = depPkg;
-            }
-            // (lib.optionalAttrs (dnorm != dname) {
-              "${dnorm}" = depPkg;
-            })
-            // (lib.optionalAttrs (dhyphen != dname && dhyphen != dnorm) {
-              "${dhyphen}" = depPkg;
-            })
-          else acc
-      ) {} (pkg.depIds or []);
-
-      fromDepMap = pkgDepMap.${actualName} or (pkgDepMap.${actualNorm} or (pkgDepMap.${actualHyphen} or null));
-
-      # Fallback to byName lookup ONLY if depIds is not available (e.g. root package or mock)
-      fromByName =
-        if (pkg.depIds or []) == []
-        then let
-          matches = byName.${actualName} or (byName.${actualNorm} or (byName.${actualHyphen} or []));
-        in
-          if builtins.length matches > 0
-          then builtins.head matches
-          else null
-        else null;
+      candidates =
+        if (pkg.depIds or []) != []
+        then map (id: byId.${id}) pkg.depIds
+        else byName.${actualName} or [];
+      matching = builtins.filter (candidate:
+        candidate.name
+        == actualName
+        && (!(candidate ? version)
+          || candidate.version == null
+          || semver.matchesRange candidate.version (dep.spec.requirement or "*")))
+      candidates;
     in
-      if fromDepMap != null
-      then fromDepMap
-      else fromByName;
+      if builtins.length matching == 1
+      then builtins.head matching
+      else if matching == []
+      then null
+      else throw "bloomery: Ambiguous fallback dependency '${dep.name}' of '${pkg.name}'; run 'bloomery sync'.";
 
     # Expand internal features declared within a crate's [features] table
     expandFeatures = featTable: initialFeats: let
@@ -429,6 +410,7 @@
             inherit pkgId;
             demands = [];
             activeDeps = [];
+            activeEdges = [];
           }
           else let
             manifest = getManifest pkg;
@@ -477,43 +459,13 @@
               lib.concatMap (
                 dep: let
                   dname = dep.name;
-                  dnameNorm = normalizeCrateName dname;
-                  dnameHyphen = denormalizeCrateName dname;
                   isOpt = dep.spec.optional;
                   defFeats = dep.spec.default-features;
                   specFeats = dep.spec.features;
 
-                  pkgName =
-                    if dep.spec.package != null
-                    then dep.spec.package
-                    else dname;
-                  pkgNameNorm = normalizeCrateName pkgName;
-                  pkgNameHyphen = denormalizeCrateName pkgName;
-
-                  featActivations =
-                    lib.filter (
-                      x:
-                        x.dep
-                        == dname
-                        || x.dep == dnameNorm
-                        || x.dep == dnameHyphen
-                        || x.dep == pkgName
-                        || x.dep == pkgNameNorm
-                        || x.dep == pkgNameHyphen
-                    )
-                    enabledDepsFromFeatures;
-
-                  hasStrongActivation = lib.any (x: !x.isWeak) featActivations;
-
-                  isActivated =
-                    (!isOpt)
-                    || hasStrongActivation
-                    || (builtins.elem dname allActiveFeats)
-                    || (builtins.elem dnameNorm allActiveFeats)
-                    || (builtins.elem dnameHyphen allActiveFeats)
-                    || (builtins.elem pkgName allActiveFeats)
-                    || (builtins.elem pkgNameNorm allActiveFeats)
-                    || (builtins.elem pkgNameHyphen allActiveFeats);
+                  featActivations = lib.filter (activation: activation.dep == dname) enabledDepsFromFeatures;
+                  hasStrongActivation = lib.any (activation: !activation.isWeak) featActivations;
+                  isActivated = !isOpt || hasStrongActivation || builtins.elem dname allActiveFeats;
 
                   targetPkg = resolveTargetDep pkg dep;
                   actualName =
@@ -545,6 +497,15 @@
                     {
                       inherit targetId;
                       features = reqFeats;
+                      edge = {
+                        package = targetId;
+                        extern-name =
+                          if dep.spec.package != null
+                          then normalizeCrateName dname
+                          else null;
+                        kind = dep.spec.kind;
+                        target = dep.spec.target;
+                      };
                     }
                   ]
                   else []
@@ -556,6 +517,7 @@
             inherit pkgId;
             demands = depDemands;
             inherit activeDeps;
+            activeEdges = lib.unique (map (d: d.edge) depDemands);
           }
       ) (builtins.attrNames state.activatedPackages);
 
@@ -591,6 +553,11 @@
       activatedPackages = nextActivated;
       packageFeatures = nextPackageFeatures;
       activeDeps = nextActiveDeps;
+      activeEdges = lib.listToAttrs (map (p: {
+          name = p.pkgId;
+          value = p.activeEdges;
+        })
+        processed);
     };
 
     # Seed packages: workspace packages and root
@@ -599,7 +566,9 @@
       namedRoot = builtins.filter (p: rootPkgName != null && p.name == rootPkgName) lockPackages;
       members = lib.concatMap (m: byName.${m} or []) (builtins.attrNames discoveredMembers);
     in
-      if wsPkgs != []
+      if seedPackageIds != null
+      then map (id: byId.${id}) seedPackageIds
+      else if wsPkgs != []
       then wsPkgs
       else if namedRoot != []
       then namedRoot
@@ -633,6 +602,7 @@
       activatedPackages = initialActivated;
       packageFeatures = initialFeatures;
       activeDeps = {};
+      activeEdges = {};
     };
 
     solve = n: state: let
@@ -682,6 +652,7 @@
       ) {} (builtins.attrNames finalState.packageFeatures))
       // {
         __activeDeps = finalState.activeDeps;
+        __activeEdges = finalState.activeEdges;
       });
   in
     expandedResult;

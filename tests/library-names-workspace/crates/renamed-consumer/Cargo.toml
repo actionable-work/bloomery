@@ -1,0 +1,7 @@
+[dependencies]
+renamed.workspace = true
+
+[package]
+edition = "2021"
+name = "renamed-consumer"
+version = "0.1.0"

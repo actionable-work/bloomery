@@ -10,6 +10,7 @@
   root ? ../..,
 }: {
   "core:check-command-catalog" = import ./check-command-catalog.test.nix {inherit pkgs lib system;};
+  "core:library-name-reader" = import ./library-name-reader.nix {inherit pkgs lib;};
   "core:unit-tests" = import ./unit-tests.nix {inherit bloomery;};
   "core:proc-macro-crate-type" = import ./proc-macro-crate-type.nix {inherit pkgs workspace;};
   "core:treefmt-check" = import ./treefmt-check.nix {

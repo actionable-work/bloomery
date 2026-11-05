@@ -1,0 +1,7 @@
+[lib]
+name = "actual_test"
+
+[package]
+edition = "2021"
+name = "dev-package"
+version = "0.1.0"

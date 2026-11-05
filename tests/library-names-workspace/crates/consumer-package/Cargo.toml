@@ -1,0 +1,22 @@
+[[bin]]
+name = "named-binary"
+path = "src/main.rs"
+
+[build-dependencies]
+build_alias = { package = "build-package", path = "../build-package" }
+
+[dependencies]
+different-name = { features = ["extra"], workspace = true }
+macro_alias = { package = "different-macros", path = "../different-macros" }
+renamed_other = { package = "other-package", path = "../other-package" }
+
+[dev-dependencies]
+test_alias = { package = "dev-package", path = "../dev-package" }
+
+[lib]
+name = "consumer_library"
+
+[package]
+edition = "2021"
+name = "consumer-package"
+version = "0.1.0"

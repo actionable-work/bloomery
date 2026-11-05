@@ -31,11 +31,19 @@
   src,
   crateDrv ? null,
   dependencies ? [],
+  dependencyBindings ? null,
+  buildScriptBindings ? dependencyBindings,
+  buildScriptDependencies ? (
+    if buildScriptBindings == null
+    then dependencies
+    else map (binding: binding.dependency) buildScriptBindings
+  ),
   override ? {},
   defaultRustcFlags ? [],
   edition ? null,
   isProcMacro ? null,
 }: let
+  compilerFlags = import ./compiler-flags.nix {inherit pkgs lib stdenv;};
   pname = pkg.name;
   version = pkg.version;
   crateName = pkg.crateName;
@@ -53,7 +61,7 @@
   nativeBuildInputs =
     (override.nativeBuildInputs or [])
     ++ [rustc pkgs.stdenv.cc pkgs.zstd]
-    ++ lib.optional (pname == "bloomery-check-command") pkgs.cargo
+    ++ lib.optional (builtins.elem pname ["bloomery-check-command" "bloomery-sync"]) pkgs.cargo
     ++ lib.optional (linkerPackage != null) linkerPackage;
   buildInputs = override.buildInputs or [];
   extraRustcFlags = (override.rustcFlags or []) ++ defaultRustcFlags ++ linkerFlags;
@@ -66,12 +74,19 @@ in
 
       nativeBuildInputs = nativeBuildInputs;
       buildInputs = buildInputs;
-      inherit dependencies;
+      inherit dependencies buildScriptDependencies;
 
       RUSTC = "${rustc}/bin/rustc";
+      BUILD_RUSTC = "${
+        if stdenv.buildPlatform.system == stdenv.hostPlatform.system
+        then rustc
+        else pkgs.buildPackages.rustc
+      }/bin/rustc";
       CRATE_NAME = crateName;
       CARGO_CRATE_NAME = crateName;
       PKG_NAME = pname;
+      CARGO_PKG_NAME = pkg.name;
+      CARGO_PKG_VERSION = version;
       PKG_VERSION = version;
 
       doCheck = true;
@@ -94,6 +109,7 @@ in
         runHook preConfigure
 
         export CARGO_MANIFEST_DIR="$PWD"
+        ${import ./library-metadata.nix {inherit lib;} {inherit pkg;}}
 
         EDITION="${
           if edition != null
@@ -154,114 +170,19 @@ in
           exit 0
         fi
 
-        mkdir -p _deps
-        declare -A SEEN_EXTERNS=()
+        ${import ./dependencies.nix {inherit lib;} {inherit dependencyBindings buildScriptBindings;}}
         EXTERN_FLAGS=()
         EXTRA_LINK_FLAGS=()
-
-        for dep in $dependencies; do
-          DEP_LIB_PATH=""
-          if [ -f "$dep/nix-support/meta.sh" ]; then
-            source "$dep/nix-support/meta.sh"
-            if [ -n "$DEP_LIB_ARCHIVE" ] && [ -f "$DEP_LIB_ARCHIVE" ]; then
-              tar --zstd -xf "$DEP_LIB_ARCHIVE" -C _deps
-              DEP_LIB_PATH="_deps/$DEP_LIB_NAME"
-            fi
-            if [ -n "$DEP_CRATE_NAME" ] && [ -n "$DEP_LIB_PATH" ] && [ -f "$DEP_LIB_PATH" ]; then
-              if [ -z "''${SEEN_EXTERNS[$DEP_CRATE_NAME]:-}" ]; then
-                EXTERN_FLAGS+=("--extern" "$DEP_CRATE_NAME=$DEP_LIB_PATH")
-                SEEN_EXTERNS["$DEP_CRATE_NAME"]=1
-              fi
-            fi
-            if [ -n "$DEP_RUSTC_LINK_FLAGS" ]; then
-              EXTRA_LINK_FLAGS+=($DEP_RUSTC_LINK_FLAGS)
-            fi
-          elif [ -d "$dep/lib" ]; then
-            for f in "$dep/lib"/*; do
-              if [ -f "$f" ]; then
-                fname=$(basename "$f")
-                cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
-                if [ -z "''${SEEN_EXTERNS[$cname]:-}" ]; then
-                  EXTERN_FLAGS+=("--extern" "$cname=$f")
-                  SEEN_EXTERNS["$cname"]=1
-                fi
-              fi
-            done
-          fi
-
-          if [ -d "$dep/nix-support/deps-closure" ]; then
-            for f in "$dep/nix-support/deps-closure"/*; do
-              if [ -e "$f" ]; then
-                case "$f" in
-                  *.tar.zst) tar --zstd -xf "$f" -C _deps ;;
-                  *) ln -sf "$(readlink -f "$f")" "_deps/$(basename "$f")" ;;
-                esac
-              fi
-            done
-          fi
-          if [ -d "$dep/lib" ]; then
-            for f in "$dep/lib"/*; do
-              if [ -e "$f" ]; then
-                target=$(readlink -f "$f")
-                ln -sf "$target" "_deps/$(basename "$f")"
-              fi
-            done
-          fi
-        done
-
-        # If crateDrv is provided, link the crate's own .rlib
-        if [ -n "$crateDrv" ] && [ -d "$crateDrv" ]; then
-          DEP_LIB_PATH=""
-          if [ -f "$crateDrv/nix-support/meta.sh" ]; then
-            source "$crateDrv/nix-support/meta.sh"
-            if [ -n "$DEP_LIB_ARCHIVE" ] && [ -f "$DEP_LIB_ARCHIVE" ]; then
-              tar --zstd -xf "$DEP_LIB_ARCHIVE" -C _deps
-              DEP_LIB_PATH="_deps/$DEP_LIB_NAME"
-            fi
-            if [ -n "$DEP_CRATE_NAME" ] && [ -n "$DEP_LIB_PATH" ] && [ -f "$DEP_LIB_PATH" ]; then
-              if [ -z "''${SEEN_EXTERNS[$DEP_CRATE_NAME]:-}" ]; then
-                EXTERN_FLAGS+=("--extern" "$DEP_CRATE_NAME=$DEP_LIB_PATH")
-                SEEN_EXTERNS["$DEP_CRATE_NAME"]=1
-              fi
-            fi
-            if [ -n "$DEP_RUSTC_LINK_FLAGS" ]; then
-              EXTRA_LINK_FLAGS+=($DEP_RUSTC_LINK_FLAGS)
-            fi
-          elif [ -d "$crateDrv/lib" ]; then
-            for f in "$crateDrv/lib"/*; do
-              if [ -f "$f" ]; then
-                fname=$(basename "$f")
-                cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
-                if [ -z "''${SEEN_EXTERNS[$cname]:-}" ]; then
-                  EXTERN_FLAGS+=("--extern" "$cname=$f")
-                  SEEN_EXTERNS["$cname"]=1
-                fi
-              fi
-            done
-          fi
-
-          if [ -d "$crateDrv/lib" ]; then
-            for f in "$crateDrv/lib"/*; do
-              if [ -e "$f" ]; then
-                target=$(readlink -f "$f")
-                ln -sf "$target" "_deps/$(basename "$f")"
-              fi
-            done
-          fi
+        SKIP_PROC_MACRO_CLOSURE=0
+        resolve_deps EXTERN_FLAGS EXTRA_LINK_FLAGS _deps $dependencies
+        if [ -n "$crateDrv" ]; then
+          resolve_deps EXTERN_FLAGS EXTRA_LINK_FLAGS _deps "$crateDrv"
         fi
-
-        # Make transitive dependencies in _deps available as extern crates (e.g. for proc-macro code generation)
-        # without overriding direct dependencies or repeating crate names
-        for f in _deps/lib*.rlib _deps/lib*.so _deps/lib*.dylib; do
-          if [ -f "$f" ]; then
-            fname=$(basename "$f")
-            cname=$(echo "$fname" | sed -E 's/^lib([^.-]+).*$/\1/')
-            if [ -z "''${SEEN_EXTERNS[$cname]:-}" ]; then
-              EXTERN_FLAGS+=("--extern" "$cname=$f")
-              SEEN_EXTERNS["$cname"]=1
-            fi
-          fi
-        done
+        BUILD_SCRIPT_DEPS_DIR="_deps_bs"
+        BUILD_SCRIPT_EXTERN_FLAGS=()
+        BUILD_SCRIPT_DEP_LINK_FLAGS=()
+        SKIP_PROC_MACRO_CLOSURE=0
+        resolve_deps BUILD_SCRIPT_EXTERN_FLAGS BUILD_SCRIPT_DEP_LINK_FLAGS _deps_bs $buildScriptDependencies
 
         runHook postConfigure
       '';
@@ -273,18 +194,19 @@ in
         BUILD_SCRIPT_LINK_FLAGS=()
         if [ -f build.rs ]; then
           mkdir -p _build_script
-          $RUSTC build.rs \
+          CARGO_CRATE_NAME=build_script_build $BUILD_RUSTC build.rs \
+            ${lib.escapeShellArgs compilerFlags.buildScript} \
             --crate-name build_script_build \
             --crate-type bin \
             $EDITION_FLAG \
-            -L dependency=_deps \
-            "''${EXTERN_FLAGS[@]}" \
+            -L dependency=$BUILD_SCRIPT_DEPS_DIR \
+            "''${BUILD_SCRIPT_EXTERN_FLAGS[@]}" \
             -o _build_script/build_script_build
 
           export OUT_DIR="$PWD/_build_script/out"
           mkdir -p "$OUT_DIR"
-          export TARGET="$($RUSTC -vV | sed -n 's/host: //p')"
-          export HOST="$TARGET"
+          export TARGET="${stdenv.hostPlatform.rust.rustcTarget or stdenv.hostPlatform.config}"
+          export HOST="${stdenv.buildPlatform.rust.rustcTarget or stdenv.buildPlatform.config}"
           export NUM_JOBS="$NIX_BUILD_CORES"
           export OPT_LEVEL="0"
           export PROFILE="debug"
@@ -333,7 +255,7 @@ in
             "''${EXTERN_FLAGS[@]}" \
             "''${BUILD_SCRIPT_FLAGS[@]}" \
             "''${EXTRA_LINK_FLAGS[@]}" \
-            ${lib.escapeShellArgs extraRustcFlags} \
+            ${lib.escapeShellArgs (extraRustcFlags ++ compilerFlags.target)} \
             -o _unit_test_runner
         fi
 
@@ -353,7 +275,7 @@ in
             if [ -f "$testfile" ]; then
               testname=$(basename "$testfile" .rs)
               echo "Compiling integration test $testname..."
-              $RUSTC --test "$testfile" \
+              CARGO_CRATE_NAME="$testname" $RUSTC --test "$testfile" \
                 --crate-name "$testname" \
                 $EDITION_FLAG \
                 -L dependency=_deps \
@@ -369,7 +291,7 @@ in
             if [ -d "$testdir" ] && [ -f "$testdir/main.rs" ]; then
               testname=$(basename "$testdir")
               echo "Compiling integration test $testname from $testdir/main.rs..."
-              $RUSTC --test "$testdir/main.rs" \
+              CARGO_CRATE_NAME="$testname" $RUSTC --test "$testdir/main.rs" \
                 --crate-name "$testname" \
                 $EDITION_FLAG \
                 -L dependency=_deps \

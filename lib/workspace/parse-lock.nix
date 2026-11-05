@@ -48,7 +48,6 @@
         isRegistry = source != null && lib.hasPrefix "registry+" source;
         isGit = source != null && lib.hasPrefix "git+" source;
         id = "${name}-${version}";
-        crateName = lib.replaceStrings ["-"] ["_"] name;
       })
       rawPackages;
 
