@@ -1,7 +1,10 @@
 mod loader;
 mod markdown;
+pub mod source;
+#[cfg(test)]
+mod tree_tests;
 
-pub use loader::load;
+pub use loader::{load, load_tree};
 
 #[cfg(test)]
 mod tests {
@@ -12,7 +15,7 @@ mod tests {
 
     static FIXTURE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-    fn fixture() -> PathBuf {
+    pub(super) fn fixture() -> PathBuf {
         let suffix = FIXTURE_COUNTER.fetch_add(1, Ordering::Relaxed);
         let root = std::env::temp_dir().join(format!(
             "bloomery-workspace-{}-{suffix}",

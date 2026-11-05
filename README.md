@@ -96,6 +96,8 @@ without changing values or adding absent keys.
 The [public static discovery library](packages/rust/libs/shared/scanning/README.md)
 accepts virtual or filesystem source trees with explicit scanner configuration.
 It returns syntactic references and test bindings without executing checks.
+The [static specification loader](packages/rust/libs/shared/workspace/README.md)
+uses the same tree adapters to discover specs directly from repository files.
 
 ### Per-Crate Overrides
 

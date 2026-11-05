@@ -1,4 +1,4 @@
-use bloomery_model::{Context, Diagnostic};
+use bloomery_model::{Context, Diagnostic, Evidence, sort_diagnostics};
 use bloomery_scanning::scan_all_with_session;
 use std::collections::BTreeMap;
 
@@ -28,13 +28,18 @@ pub fn run_with_session(
     session: &AnalysisSession,
 ) -> Result<(), Vec<Diagnostic>> {
     let evidence = scan_all_with_session(context, session)?.evidence;
+    validate_evidence(context, &evidence)
+}
+
+/// Validate static references against repository specifications. Does not run tests.
+pub fn validate_evidence(context: &Context, evidence: &[Evidence]) -> Result<(), Vec<Diagnostic>> {
     let mut diagnostics = Vec::new();
     let mut declared = BTreeMap::new();
     for (area, feature, requirement) in context.requirements() {
         declared.insert(requirement.entry.id.clone(), (area, feature, requirement));
     }
     let mut references = BTreeMap::new();
-    for item in &evidence {
+    for item in evidence {
         references
             .entry(item.id.clone())
             .or_insert_with(Vec::new)
@@ -66,7 +71,11 @@ pub fn run_with_session(
                     .at(item.location.path.clone(), item.location.line)
                     .note(format!(
                         "Requirement is declared at {}:{}",
-                        requirement.path.display(),
+                        requirement
+                            .path
+                            .strip_prefix(&context.root)
+                            .unwrap_or(&requirement.path)
+                            .display(),
                         requirement.line
                     )),
                 );
@@ -88,6 +97,7 @@ pub fn run_with_session(
             );
         }
     }
+    sort_diagnostics(&mut diagnostics);
     if diagnostics.is_empty() {
         Ok(())
     } else {

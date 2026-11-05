@@ -26,7 +26,7 @@ impl SourceLocation {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {
     pub code: String,
     pub message: String,

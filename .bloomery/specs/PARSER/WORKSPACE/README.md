@@ -21,6 +21,7 @@ remain in their normal repository locations and are found through
 ## Design documents
 
 - [Workspace layout](design/layout.md)
+- [Static repository tree inputs](design/source-trees.md)
 - [Area and feature document contracts](design/document-contracts.md)
 
 ## Responsibilities
@@ -35,6 +36,9 @@ remain in their normal repository locations and are found through
 - Require every feature to contain a `requirements/` directory with at least
   one grouped TOML file.
 - Resolve feature-local design links and optional Markdown anchors.
+- Apply the same static loading rules to filesystem and caller-authorized trees.
+- Discover specifications solely from repository files; hosted lifecycle changes
+  use those same files.
 
 ## Dependencies
 

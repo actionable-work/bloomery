@@ -17,15 +17,13 @@
 
 mod analysis;
 mod clippy;
-mod files;
 mod health;
 mod nix;
 mod rust;
-mod tree;
 mod tree_scan;
 mod typescript;
 
-pub use tree::{FilesystemTree, MemoryTree, SourceTree};
+pub use bloomery_workspace::source::{FilesystemTree, MemoryTree, SourceTree};
 pub use tree_scan::{DiscoveryState, ScanAnalysis, ScanScope, ScannerDiscovery, scan_tree};
 
 #[cfg(test)]
@@ -129,6 +127,7 @@ mod tests {
         nix_test_paths: &[&str],
     ) -> Context {
         Context {
+            specs_enabled: true,
             root: root.to_path_buf(),
             config: Config {
                 specs: SpecsConfig {

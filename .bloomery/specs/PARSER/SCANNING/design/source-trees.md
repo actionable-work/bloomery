@@ -3,6 +3,8 @@
 The public `bloomery_scanning` library accepts a `SourceTree` and explicit
 `ScannersConfig`. `MemoryTree` owns immutable UTF-8 content keyed by canonical
 repository-relative paths. `FilesystemTree` adapts a repository directory.
+These tree types and their validated index are owned by `bloomery_workspace::source`
+and re-exported by scanning.
 Both use the same glob selection, parsers, reference extraction and test discovery.
 No temporary checkout, configuration file, subprocess or network is required by
 the memory adapter.

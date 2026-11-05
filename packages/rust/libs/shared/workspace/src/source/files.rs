@@ -1,42 +1,41 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-pub fn expand_globs(root: &Path, patterns: &[String]) -> Result<Vec<PathBuf>, String> {
+pub(super) fn filesystem_entries(root: &Path) -> Result<(Vec<String>, Vec<String>), String> {
     let mut files = Vec::new();
-    walk_files(root, root, patterns, &mut files)?;
+    let mut directories = Vec::new();
+    walk_files(root, root, &mut files, &mut directories)?;
     files.sort();
-    files.dedup();
-    Ok(files)
+    directories.sort();
+    Ok((files, directories))
 }
 
 fn walk_files(
     root: &Path,
     directory: &Path,
-    patterns: &[String],
-    files: &mut Vec<PathBuf>,
+    files: &mut Vec<String>,
+    directories: &mut Vec<String>,
 ) -> Result<(), String> {
     let entries = fs::read_dir(directory)
         .map_err(|error| format!("unable to read {}: {error}", directory.display()))?;
     for entry in entries {
         let entry = entry.map_err(|error| format!("unable to read directory entry: {error}"))?;
         let path = entry.path();
-        let name = entry.file_name();
         let file_type = entry.file_type().map_err(|error| error.to_string())?;
-        if name.to_str().is_some_and(ignored_name) || file_type.is_symlink() {
+        if entry.file_name().to_str().is_some_and(ignored_name) || file_type.is_symlink() {
             continue;
         }
-        if path.is_dir() {
-            walk_files(root, &path, patterns, files)?;
-        } else if path.is_file() {
-            let relative = path
-                .strip_prefix(root)
-                .map_err(|_| format!("path escaped root: {}", path.display()))?;
-            if patterns
-                .iter()
-                .any(|pattern| glob_matches(pattern, relative))
-            {
-                files.push(path);
-            }
+        let relative = path
+            .strip_prefix(root)
+            .ok()
+            .and_then(Path::to_str)
+            .ok_or_else(|| "source path is not repository-relative UTF-8".to_owned())?
+            .replace(std::path::MAIN_SEPARATOR, "/");
+        if file_type.is_dir() {
+            directories.push(relative);
+            walk_files(root, &path, files, directories)?;
+        } else if file_type.is_file() {
+            files.push(relative);
         }
     }
     Ok(())

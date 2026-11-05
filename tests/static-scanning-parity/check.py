@@ -10,7 +10,6 @@ import tempfile
 cli, consumer = sys.argv[1:]
 with tempfile.TemporaryDirectory() as directory:
     root = pathlib.Path(directory)
-    expected = subprocess.check_output([consumer, directory], text=True).splitlines()
     (root / "flake.nix").write_text("{}\n")
     specs = root / ".bloomery/custom/DEMO"
     feature = specs / "TESTS"
@@ -41,6 +40,8 @@ paths = ["e2e/**/*.ts"]
 paths = ["checks/**/*.nix"]
 testPaths = ["checks/**/*.test.nix"]
 ''')
+
+    expected = subprocess.check_output([consumer, directory], text=True).splitlines()
 
     def run(*args, status=0):
         result = subprocess.run(

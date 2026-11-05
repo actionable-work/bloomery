@@ -1,15 +1,7 @@
 use bloomery_model::{Diagnostic, MarkdownFrontmatter};
-use std::fs;
 use std::path::Path;
 
-pub fn read_frontmatter(path: &Path) -> Result<MarkdownFrontmatter, Diagnostic> {
-    let contents = fs::read_to_string(path).map_err(|error| {
-        Diagnostic::new(
-            "MissingDocument",
-            format!("Unable to read Markdown document: {error}"),
-        )
-        .at(path, Some(1))
-    })?;
+pub fn parse_frontmatter(path: &Path, contents: &str) -> Result<MarkdownFrontmatter, Diagnostic> {
     let mut lines = contents.lines();
     if lines.next().map(str::trim) != Some("---") {
         return Err(Diagnostic::new(
@@ -39,14 +31,7 @@ pub fn read_frontmatter(path: &Path) -> Result<MarkdownFrontmatter, Diagnostic> 
     .at(path, Some(1)))
 }
 
-pub fn has_anchor(path: &Path, anchor: &str) -> Result<bool, Diagnostic> {
-    let contents = fs::read_to_string(path).map_err(|error| {
-        Diagnostic::new(
-            "MissingDesignFile",
-            format!("Unable to read design document: {error}"),
-        )
-        .at(path, Some(1))
-    })?;
+pub fn has_anchor(contents: &str, anchor: &str) -> bool {
     let mut occurrences = std::collections::BTreeMap::<String, usize>::new();
     for line in contents.lines() {
         let trimmed = line.trim_start();
@@ -70,11 +55,11 @@ pub fn has_anchor(path: &Path, anchor: &str) -> Result<bool, Diagnostic> {
             };
             *count += 1;
             if candidate == anchor {
-                return Ok(true);
+                return true;
             }
         }
     }
-    Ok(false)
+    false
 }
 
 fn slugify(value: &str) -> String {

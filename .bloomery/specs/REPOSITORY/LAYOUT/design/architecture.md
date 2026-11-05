@@ -11,7 +11,7 @@ packages/rust/
 └── libs/
     ├── shared/
     │   ├── model/              # domain types, configuration, diagnostics
-    │   ├── workspace/          # filesystem, Markdown, and TOML loading
+    │   ├── workspace/          # source trees, static Markdown and TOML loading
     │   ├── scanning/           # Rust, Playwright, and Nix evidence scanners
     │   ├── check/              # evidence and traceability validation
     │   └── test-macros/         # proc-macro build-graph fixture
@@ -40,7 +40,7 @@ bins/cli ──► cli-app ──► cli-parser ──► cli-types
 
 bins/docs ──► docs-server ──► ui ──► content
 
-check ──► scanning ──► model
+check ──► scanning ──► workspace ──► model
 ```
 
 The parser produces Clap-independent request data; command libraries do not
@@ -49,6 +49,8 @@ command crate owns its domain operations and exposes injectable dependencies
 for testing.
 
 The Nix scanner is static: it reads source metadata and does not evaluate Nix.
+Workspace and scanning share repository-tree inputs. Specification discovery is
+static over repository files; hosted lifecycle management changes those files.
 The docs server library owns environment configuration, router setup, asset
 loading, listener binding, and serving. The documentation UI and its content
 catalog remain separate from the server lifecycle.

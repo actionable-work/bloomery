@@ -3,7 +3,7 @@ use crate::diagnostics::SourceLocation;
 use serde::Deserialize;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct MarkdownFrontmatter {
     pub id: String,
     pub name: String,
@@ -11,13 +11,13 @@ pub struct MarkdownFrontmatter {
     pub description: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct RequirementGroupFile {
     pub group: String,
     pub requirements: Vec<RequirementEntry>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct RequirementEntry {
     pub id: String,
     pub title: String,
@@ -26,7 +26,7 @@ pub struct RequirementEntry {
     pub ears: EarsStatement,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EarsStatement {
     Ubiquitous {
@@ -95,14 +95,14 @@ impl EarsStatement {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DesignReference {
     pub path: PathBuf,
     pub display: String,
     pub anchor: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Requirement {
     pub entry: RequirementEntry,
     pub group: String,
@@ -111,14 +111,14 @@ pub struct Requirement {
     pub design: DesignReference,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RequirementGroup {
     pub group: String,
     pub path: PathBuf,
     pub requirements: Vec<Requirement>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Feature {
     pub id: String,
     pub path: PathBuf,
@@ -126,7 +126,7 @@ pub struct Feature {
     pub groups: Vec<RequirementGroup>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Area {
     pub id: String,
     pub path: PathBuf,
@@ -155,13 +155,15 @@ pub struct TestSite {
 pub struct Context {
     pub root: PathBuf,
     pub config: Config,
+    /// Specification enablement resolved against the analyzed tree.
+    pub specs_enabled: bool,
     pub areas: Vec<Area>,
 }
 
 impl Context {
     /// Whether specification management is active for this workspace.
     pub fn spec_management_enabled(&self) -> bool {
-        self.config.spec_management_enabled(&self.root)
+        self.specs_enabled
     }
 
     pub fn requirements(&self) -> impl Iterator<Item = (&Area, &Feature, &Requirement)> {

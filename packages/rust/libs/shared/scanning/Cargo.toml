@@ -1,5 +1,6 @@
 [dependencies]
 bloomery-model = { workspace = true }
+bloomery-workspace = { workspace = true }
 oxc_allocator = { workspace = true }
 oxc_ast = { workspace = true }
 oxc_parser = { workspace = true }

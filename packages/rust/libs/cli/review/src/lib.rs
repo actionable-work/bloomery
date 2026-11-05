@@ -169,6 +169,7 @@ mod tests {
             });
         }
         Context {
+            specs_enabled: true,
             root: PathBuf::new(),
             config: Config::default(),
             areas,

@@ -1,6 +1,9 @@
 //! Authorized source content for static discovery. Paths always use `/`.
 
-use crate::files::{expand_globs, glob_matches, ignored_name};
+mod files;
+mod index;
+use files::{filesystem_entries, ignored_name};
+pub use index::TreeIndex;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -12,17 +15,29 @@ use std::path::{Path, PathBuf};
 pub trait SourceTree {
     fn paths(&self) -> Result<Vec<String>, String>;
     fn read(&self, path: &str) -> Result<String, String>;
+    /// Explicit directories, including empty ones. File ancestors are inferred.
+    fn directories(&self) -> Result<Vec<String>, String> {
+        Ok(Vec::new())
+    }
 }
 
 /// An immutable virtual tree. Construction rejects ambiguous paths.
 #[derive(Debug, Clone)]
 pub struct MemoryTree {
     files: BTreeMap<String, String>,
+    directories: Vec<String>,
 }
 
 impl MemoryTree {
     pub fn new<P: Into<String>, S: Into<String>>(
         files: impl IntoIterator<Item = (P, S)>,
+    ) -> Result<Self, String> {
+        Self::with_directories(files, std::iter::empty::<String>())
+    }
+
+    pub fn with_directories<P: Into<String>, S: Into<String>, D: Into<String>>(
+        files: impl IntoIterator<Item = (P, S)>,
+        directories: impl IntoIterator<Item = D>,
     ) -> Result<Self, String> {
         let mut contents = BTreeMap::new();
         for (path, source) in files {
@@ -32,12 +47,20 @@ impl MemoryTree {
                 return Err(format!("duplicate source path: {path}"));
             }
         }
-        validate_index(contents.keys().cloned().collect())?;
-        Ok(Self { files: contents })
+        let tree = Self {
+            files: contents,
+            directories: directories.into_iter().map(Into::into).collect(),
+        };
+        TreeIndex::new(&tree)?;
+        Ok(tree)
     }
 }
 
 impl SourceTree for MemoryTree {
+    fn directories(&self) -> Result<Vec<String>, String> {
+        Ok(self.directories.clone())
+    }
+
     fn paths(&self) -> Result<Vec<String>, String> {
         Ok(self.files.keys().cloned().collect())
     }
@@ -64,16 +87,11 @@ impl FilesystemTree {
 
 impl SourceTree for FilesystemTree {
     fn paths(&self) -> Result<Vec<String>, String> {
-        expand_globs(&self.root, &["**".to_owned()])?
-            .iter()
-            .map(|path| {
-                path.strip_prefix(&self.root)
-                    .ok()
-                    .and_then(Path::to_str)
-                    .map(|path| path.replace(std::path::MAIN_SEPARATOR, "/"))
-                    .ok_or_else(|| "source path is not repository-relative UTF-8".to_owned())
-            })
-            .collect()
+        Ok(filesystem_entries(&self.root)?.0)
+    }
+
+    fn directories(&self) -> Result<Vec<String>, String> {
+        Ok(filesystem_entries(&self.root)?.1)
     }
 
     fn read(&self, path: &str) -> Result<String, String> {
@@ -108,15 +126,10 @@ pub(crate) fn validate_index(mut paths: Vec<String>) -> Result<Vec<String>, Stri
     Ok(paths)
 }
 
-pub(crate) fn select(paths: &[String], patterns: &[String]) -> Vec<PathBuf> {
-    paths
-        .iter()
-        .filter(|path| {
-            !path.split('/').any(ignored_name)
-                && patterns
-                    .iter()
-                    .any(|pattern| glob_matches(pattern, Path::new(path)))
-        })
-        .map(PathBuf::from)
-        .collect()
+/// Canonical key for already validated repository-relative paths.
+pub(crate) fn path_key(path: &Path) -> String {
+    path.components()
+        .map(|part| part.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/")
 }

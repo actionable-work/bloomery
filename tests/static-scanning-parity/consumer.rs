@@ -43,6 +43,7 @@ fn main() {
     );
     assert!(virtual_analysis.is_complete());
     let context = Context {
+        specs_enabled: true,
         root: root.clone(),
         config: Config {
             scanners: config.clone(),
@@ -68,6 +69,7 @@ fn main() {
             .into();
     }
     assert_eq!(output, virtual_analysis.output);
+    check_specification_parity(&root, &config);
     // Export only the fields supported by the existing CLI projections.
     for item in &output.evidence {
         println!(
@@ -137,4 +139,100 @@ fn main() {
         memory.read("tests/a.rs").expect("original"),
     )
     .expect("restore fixture");
+}
+
+fn repository_snapshot(disk: &FilesystemTree) -> MemoryTree {
+    MemoryTree::with_directories(
+        disk.paths()
+            .expect("repository paths")
+            .into_iter()
+            .filter(|path| path != ".bloomery/config.toml")
+            .map(|path| {
+                let text = disk.read(&path).expect("repository content");
+                (path, text)
+            }),
+        disk.directories().expect("repository directories"),
+    )
+    .expect("repository snapshot")
+}
+
+fn relative_diagnostics(
+    root: &std::path::Path,
+    mut diagnostics: Vec<bloomery_model::Diagnostic>,
+) -> Vec<bloomery_model::Diagnostic> {
+    for diagnostic in &mut diagnostics {
+        if let Some(location) = &mut diagnostic.location {
+            location.path = location
+                .path
+                .strip_prefix(root)
+                .expect("relative diagnostic")
+                .into();
+        }
+    }
+    diagnostics
+}
+
+fn check_specification_parity(root: &std::path::Path, scanners: &ScannersConfig) {
+    let disk = FilesystemTree::new(root);
+    let memory = repository_snapshot(&disk);
+    let mut config = Config {
+        scanners: scanners.clone(),
+        ..Config::default()
+    };
+    config.specs.dir = "custom".into();
+    let virtual_context =
+        bloomery_workspace::load_tree(&memory, config.clone()).expect("virtual specs");
+    let filesystem_context = bloomery_workspace::load(root).expect("filesystem specs");
+    let relative_context =
+        bloomery_workspace::load_tree(&disk, config.clone()).expect("filesystem tree specs");
+    assert_eq!(virtual_context.areas, relative_context.areas);
+    assert!(virtual_context.spec_management_enabled());
+    let virtual_scan = scan_tree(&memory, scanners).expect("virtual discovery");
+    let filesystem_scan = scan_tree(&disk, scanners).expect("filesystem discovery");
+    assert_eq!(virtual_scan, filesystem_scan);
+    bloomery_check::validate_evidence(&virtual_context, &virtual_scan.output.evidence)
+        .expect("virtual static relations");
+    bloomery_check::run(&filesystem_context).expect("filesystem static relations");
+    assert_eq!(
+        bloomery_check::validate_evidence(&virtual_context, &[]).expect_err("missing bindings"),
+        relative_diagnostics(
+            root,
+            bloomery_check::validate_evidence(&filesystem_context, &[])
+                .expect_err("missing bindings")
+        ),
+    );
+    let mut unknown = virtual_scan.output.evidence.clone();
+    let mut reference = unknown[0].clone();
+    reference.id = "DEMO-TESTS-BIND-999".into();
+    unknown.push(reference);
+    assert_eq!(
+        bloomery_check::validate_evidence(&virtual_context, &unknown).expect_err("orphan")[0].code,
+        "OrphanTestReference"
+    );
+    // A lifecycle edit is an ordinary repository edit, seen by both loaders.
+    let group = ".bloomery/custom/DEMO/TESTS/requirements/BIND.toml";
+    let original = disk.read(group).expect("original spec");
+    let changed = original.replace("manual = false", "manual = true");
+    std::fs::write(root.join(group), &changed).expect("repository edit");
+    let edited_memory = repository_snapshot(&disk);
+    let edited_virtual =
+        bloomery_workspace::load_tree(&edited_memory, config).expect("edited virtual specs");
+    let edited_filesystem = bloomery_workspace::load(root).expect("edited filesystem specs");
+    assert_ne!(virtual_context.areas, edited_virtual.areas);
+    let virtual_errors =
+        bloomery_check::validate_evidence(&edited_virtual, &virtual_scan.output.evidence)
+            .expect_err("manual automation");
+    assert!(
+        virtual_errors
+            .iter()
+            .all(|error| error.code == "IllegalManualAutomation")
+    );
+    assert_eq!(
+        virtual_errors,
+        relative_diagnostics(
+            root,
+            bloomery_check::run(&edited_filesystem).expect_err("manual automation")
+        )
+    );
+    std::fs::write(root.join(group), original).expect("restore spec");
 }

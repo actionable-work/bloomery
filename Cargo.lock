@@ -443,6 +443,7 @@ name = "bloomery-scanning"
 version = "0.1.0"
 dependencies = [
  "bloomery-model",
+ "bloomery-workspace",
  "oxc_allocator",
  "oxc_ast",
  "oxc_parser",

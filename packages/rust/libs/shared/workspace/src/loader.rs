@@ -1,30 +1,76 @@
 use crate::markdown;
+use crate::source::{FilesystemTree, SourceTree, TreeIndex, path_key};
 use bloomery_model::{
     Area, Context, DesignReference, Diagnostic, Feature, MarkdownFrontmatter, Requirement,
     RequirementEntry, RequirementGroup, RequirementGroupFile, config,
 };
+use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::collections::{BTreeSet, HashSet};
-use std::fs;
 use std::path::{Component, Path, PathBuf};
+use std::rc::Rc;
 
+/// Load repository specifications from the local filesystem.
 pub fn load(root: &Path) -> Result<Context, Vec<Diagnostic>> {
-    let mut diagnostics = Vec::new();
-    let configuration = match config::load(root) {
-        Ok(configuration) => configuration,
-        Err(diagnostic) => return Err(vec![diagnostic]),
-    };
-    if !configuration.spec_management_enabled(root) {
-        return Ok(Context {
-            root: root.to_path_buf(),
-            config: configuration,
-            areas: Vec::new(),
-        });
+    let configuration = config::load(root).map_err(|error| vec![error])?;
+    let mut context =
+        load_tree(&FilesystemTree::new(root), configuration).map_err(|mut errors| {
+            for error in &mut errors {
+                if let Some(location) = &mut error.location {
+                    location.path = root.join(&location.path);
+                }
+            }
+            errors
+        })?;
+    context.root = root.to_path_buf();
+    for area in &mut context.areas {
+        area.path = root.join(&area.path);
+        for feature in &mut area.features {
+            feature.path = root.join(&feature.path);
+            for group in &mut feature.groups {
+                group.path = root.join(&group.path);
+                for requirement in &mut group.requirements {
+                    requirement.path = root.join(&requirement.path);
+                    requirement.design.path = root.join(&requirement.design.path);
+                }
+            }
+        }
     }
-    let specs_root = match configuration.specs_root(root) {
-        Ok(path) => path,
-        Err(diagnostic) => return Err(vec![diagnostic]),
+    Ok(context)
+}
+
+/// Discover specifications solely from caller-authorized repository content.
+/// All returned paths are repository-relative; no configuration file is read.
+pub fn load_tree(
+    tree: &dyn SourceTree,
+    configuration: bloomery_model::Config,
+) -> Result<Context, Vec<Diagnostic>> {
+    configuration.validate().map_err(|error| vec![error])?;
+    let mut context = Context {
+        root: PathBuf::new(),
+        config: configuration,
+        specs_enabled: false,
+        areas: Vec::new(),
     };
-    if !specs_root.is_dir() {
+    if context.config.specs.enable == Some(false) {
+        return Ok(context);
+    }
+    let loader = Loader {
+        tree,
+        index: TreeIndex::new(tree)
+            .map_err(|error| vec![Diagnostic::new("SourceTreeError", error)])?,
+        documents: RefCell::new(BTreeMap::new()),
+    };
+    let specs_root = PathBuf::from(path_key(
+        &context
+            .config
+            .specs_root(Path::new(""))
+            .map_err(|error| vec![error])?,
+    ));
+    if !loader.index.is_dir(&specs_root) {
+        if context.config.specs.enable != Some(true) {
+            return Ok(context);
+        }
         return Err(vec![
             Diagnostic::new(
                 "MissingSpecsDirectory",
@@ -33,38 +79,59 @@ pub fn load(root: &Path) -> Result<Context, Vec<Diagnostic>> {
             .at(specs_root, Some(1)),
         ]);
     }
-
-    let area_paths = match child_directories(&specs_root) {
-        Ok(paths) => paths,
-        Err(diagnostic) => return Err(vec![diagnostic]),
-    };
-    let mut areas = Vec::new();
+    context.specs_enabled = true;
+    let mut diagnostics = Vec::new();
     let mut all_ids = HashSet::new();
-    for area_path in area_paths {
-        if let Some(area) = load_area(root, &area_path, &mut all_ids, &mut diagnostics) {
-            areas.push(area);
+    for area_path in loader.index.child_directories(&specs_root) {
+        if let Some(area) = load_area(&loader, &area_path, &mut all_ids, &mut diagnostics) {
+            context.areas.push(area);
         }
     }
-    areas.sort_by(|left, right| left.id.cmp(&right.id));
+    context.areas.sort_by(|a, b| a.id.cmp(&b.id));
+    bloomery_model::sort_diagnostics(&mut diagnostics);
     if diagnostics.is_empty() {
-        Ok(Context {
-            root: root.to_path_buf(),
-            config: configuration,
-            areas,
-        })
+        Ok(context)
     } else {
         Err(diagnostics)
     }
 }
 
+struct Loader<'a> {
+    tree: &'a dyn SourceTree,
+    index: TreeIndex,
+    documents: RefCell<BTreeMap<PathBuf, Result<Rc<str>, String>>>,
+}
+
+impl Loader<'_> {
+    fn read(&self, path: &Path, code: &str, description: &str) -> Result<Rc<str>, Diagnostic> {
+        let path = PathBuf::from(path_key(path));
+        let result = self
+            .documents
+            .borrow_mut()
+            .entry(path.clone())
+            .or_insert_with(|| {
+                if !self.index.is_file(&path) {
+                    return Err("file is not present in the repository tree".to_owned());
+                }
+                self.tree
+                    .read(path.to_str().expect("canonical path"))
+                    .map(Rc::from)
+            })
+            .clone();
+        result.map_err(|error| {
+            Diagnostic::new(code, format!("{description}: {error}")).at(path, Some(1))
+        })
+    }
+}
+
 fn load_area(
-    root: &Path,
+    loader: &Loader<'_>,
     path: &Path,
     all_ids: &mut HashSet<String>,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Option<Area> {
     let readme = path.join("README.md");
-    let frontmatter = read_frontmatter(&readme, diagnostics)?;
+    let frontmatter = read_frontmatter(loader, &readme, diagnostics)?;
     let id = path
         .file_name()
         .and_then(|name| name.to_str())
@@ -82,16 +149,10 @@ fn load_area(
             .at(readme.clone(), Some(2)),
         );
     }
-    let feature_paths = match child_directories(path) {
-        Ok(paths) => paths,
-        Err(diagnostic) => {
-            diagnostics.push(diagnostic);
-            return None;
-        }
-    };
+    let feature_paths = loader.index.child_directories(path);
     let mut features = Vec::new();
     for feature_path in feature_paths {
-        if let Some(feature) = load_feature(root, path, &feature_path, all_ids, diagnostics) {
+        if let Some(feature) = load_feature(loader, path, &feature_path, all_ids, diagnostics) {
             features.push(feature);
         }
     }
@@ -105,14 +166,14 @@ fn load_area(
 }
 
 fn load_feature(
-    root: &Path,
+    loader: &Loader<'_>,
     area_path: &Path,
     path: &Path,
     all_ids: &mut HashSet<String>,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Option<Feature> {
     let readme = path.join("README.md");
-    let frontmatter = read_frontmatter(&readme, diagnostics)?;
+    let frontmatter = read_frontmatter(loader, &readme, diagnostics)?;
     let id = path
         .file_name()
         .and_then(|name| name.to_str())
@@ -131,7 +192,7 @@ fn load_feature(
         );
     }
     let design_dir = path.join("design");
-    if !design_dir.is_dir() {
+    if !loader.index.is_dir(&design_dir) {
         diagnostics.push(
             Diagnostic::new(
                 "MissingDesignDirectory",
@@ -141,7 +202,7 @@ fn load_feature(
         );
     }
     let requirements_dir = path.join("requirements");
-    let group_paths = match requirement_paths(&requirements_dir) {
+    let group_paths = match requirement_paths(loader, &requirements_dir) {
         Ok(paths) if !paths.is_empty() => paths,
         Ok(_) => {
             diagnostics.push(
@@ -161,7 +222,7 @@ fn load_feature(
     let mut groups = Vec::new();
     for group_path in group_paths {
         if let Some(group) = load_group(
-            root,
+            loader,
             area_path,
             path,
             &readme,
@@ -182,7 +243,7 @@ fn load_feature(
 }
 
 fn load_group(
-    root: &Path,
+    loader: &Loader<'_>,
     area_path: &Path,
     feature_path: &Path,
     readme: &Path,
@@ -190,16 +251,10 @@ fn load_group(
     all_ids: &mut HashSet<String>,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Option<RequirementGroup> {
-    let contents = match fs::read_to_string(path) {
+    let contents = match loader.read(path, "ParseError", "Unable to read requirement group") {
         Ok(contents) => contents,
         Err(error) => {
-            diagnostics.push(
-                Diagnostic::new(
-                    "ParseError",
-                    format!("Unable to read requirement group: {error}"),
-                )
-                .at(path.to_path_buf(), Some(1)),
-            );
+            diagnostics.push(error);
             return None;
         }
     };
@@ -240,7 +295,7 @@ fn load_group(
         if let Some(design) = validate_requirement(
             &entry,
             RequirementValidation {
-                root,
+                loader,
                 area_path,
                 feature_path,
                 readme,
@@ -269,7 +324,7 @@ fn load_group(
 }
 
 struct RequirementValidation<'a> {
-    root: &'a Path,
+    loader: &'a Loader<'a>,
     area_path: &'a Path,
     feature_path: &'a Path,
     readme: &'a Path,
@@ -286,7 +341,7 @@ fn validate_requirement(
     validation: RequirementValidation<'_>,
 ) -> Option<DesignReference> {
     let RequirementValidation {
-        root,
+        loader,
         area_path,
         feature_path,
         readme,
@@ -374,8 +429,8 @@ fn validate_requirement(
         );
         return None;
     }
-    let design_path = feature_path.join(relative);
-    if !design_path.is_file() {
+    let design_path = PathBuf::from(path_key(&feature_path.join(relative)));
+    if !loader.index.is_file(&design_path) {
         diagnostics.push(
             Diagnostic::new(
                 "MissingDesignFile",
@@ -395,23 +450,32 @@ fn validate_requirement(
             .at(group_path.to_path_buf(), Some(line)),
         );
     }
-    if let Some(anchor) = &anchor {
-        match markdown::has_anchor(&design_path, anchor) {
-            Ok(true) => {}
-            Ok(false) => diagnostics.push(
-                Diagnostic::new(
-                    "DanglingDesignAnchor",
-                    "Heading anchor was not found in the target design document",
-                )
-                .at(group_path.to_path_buf(), Some(line))
-                .note(format!("Anchor not found: #{anchor}")),
-            ),
-            Err(diagnostic) => diagnostics.push(diagnostic),
+    let design_contents = match loader.read(
+        &design_path,
+        "MissingDesignFile",
+        "Unable to read design document",
+    ) {
+        Ok(contents) => contents,
+        Err(error) => {
+            diagnostics.push(error);
+            return None;
         }
+    };
+    if let Some(anchor) = &anchor
+        && !markdown::has_anchor(&design_contents, anchor)
+    {
+        diagnostics.push(
+            Diagnostic::new(
+                "DanglingDesignAnchor",
+                "Heading anchor was not found in the target design document",
+            )
+            .at(group_path.to_path_buf(), Some(line))
+            .note(format!("Anchor not found: #{anchor}")),
+        );
     }
     Some(DesignReference {
         path: design_path.clone(),
-        display: display_path(root, &design_path),
+        display: path_key(&design_path),
         anchor,
     })
 }
@@ -423,17 +487,15 @@ fn split_design_reference(reference: &str) -> (String, Option<String>) {
     }
 }
 
-fn display_path(root: &Path, path: &Path) -> String {
-    path.strip_prefix(root)
-        .map(|path| {
-            path.to_string_lossy()
-                .replace(std::path::MAIN_SEPARATOR, "/")
-        })
-        .unwrap_or_else(|_| path.to_string_lossy().into_owned())
-}
-
-fn read_frontmatter(path: &Path, diagnostics: &mut Vec<Diagnostic>) -> Option<MarkdownFrontmatter> {
-    match markdown::read_frontmatter(path) {
+fn read_frontmatter(
+    loader: &Loader<'_>,
+    path: &Path,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Option<MarkdownFrontmatter> {
+    let result = loader
+        .read(path, "MissingDocument", "Unable to read Markdown document")
+        .and_then(|contents| markdown::parse_frontmatter(path, &contents));
+    match result {
         Ok(frontmatter) => Some(frontmatter),
         Err(diagnostic) => {
             diagnostics.push(diagnostic);
@@ -442,48 +504,21 @@ fn read_frontmatter(path: &Path, diagnostics: &mut Vec<Diagnostic>) -> Option<Ma
     }
 }
 
-fn child_directories(path: &Path) -> Result<Vec<PathBuf>, Diagnostic> {
-    let entries = fs::read_dir(path).map_err(|error| {
-        Diagnostic::new(
-            "WorkspaceReadError",
-            format!("Unable to read workspace directory: {error}"),
-        )
-        .at(path.to_path_buf(), Some(1))
-    })?;
-    let mut paths = entries
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| path.is_dir())
-        .collect::<Vec<_>>();
-    paths.sort();
-    Ok(paths)
-}
-
-fn requirement_paths(path: &Path) -> Result<Vec<PathBuf>, Diagnostic> {
-    if !path.is_dir() {
+fn requirement_paths(loader: &Loader<'_>, path: &Path) -> Result<Vec<PathBuf>, Diagnostic> {
+    if !loader.index.is_dir(path) {
         return Err(Diagnostic::new(
             "MissingRequirementsDirectory",
             "Every feature must contain a requirements directory",
         )
-        .at(path.to_path_buf(), Some(1)));
+        .at(path, Some(1)));
     }
-    let entries = fs::read_dir(path).map_err(|error| {
-        Diagnostic::new(
-            "WorkspaceReadError",
-            format!("Unable to read requirements directory: {error}"),
-        )
-        .at(path.to_path_buf(), Some(1))
-    })?;
-    let mut paths = entries
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
+    Ok(loader
+        .index
+        .child_files(path)
+        .into_iter()
         .filter(|path| {
-            path.is_file()
-                && path
-                    .extension()
-                    .is_some_and(|extension| extension == "toml")
+            path.extension()
+                .is_some_and(|extension| extension == "toml")
         })
-        .collect::<Vec<_>>();
-    paths.sort();
-    Ok(paths)
+        .collect())
 }

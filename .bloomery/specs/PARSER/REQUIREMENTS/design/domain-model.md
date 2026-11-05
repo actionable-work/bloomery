@@ -5,6 +5,7 @@ The in-memory context is a resolved graph:
 ```text
 Context
 ├── Configuration
+├── ResolvedSpecificationEnablement
 ├── Areas[*]
 │   ├── Frontmatter
 │   └── Features[*]
@@ -29,6 +30,11 @@ Core value types include:
 The EARS enum owns canonical statement generation. The context owns resolution
 and identity alignment. Formatters consume these types without reparsing TOML,
 Markdown, or source files.
+
+`Context.specs_enabled` retains enablement resolved against the analyzed tree.
+Reading that state never probes the host filesystem. Virtual contexts use
+repository-relative paths and an empty root; filesystem adapters root domain
+paths at the repository directory.
 
 Static scanning additionally produces test sites that pair a source location
 with zero or more requirement references, as specified by the

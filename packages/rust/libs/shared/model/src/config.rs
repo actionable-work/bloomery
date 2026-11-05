@@ -288,7 +288,17 @@ fn validate_config_version(raw: &toml::Value, path: &Path) -> Result<(), Diagnos
 }
 
 impl Config {
-    fn validate(&self) -> Result<(), Diagnostic> {
+    /// Validate an explicit configuration without reading repository files.
+    pub fn validate(&self) -> Result<(), Diagnostic> {
+        if self.version != CURRENT_CONFIG_VERSION {
+            return Err(Diagnostic::new(
+                "ConfigurationError",
+                format!(
+                    "unsupported config format version {}; supported version is {CURRENT_CONFIG_VERSION}",
+                    self.version
+                ),
+            ));
+        }
         self.validate_specs_dir()?;
         self.scanners.validate()
     }

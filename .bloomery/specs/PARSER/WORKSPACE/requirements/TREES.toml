@@ -1,0 +1,57 @@
+group = "TREES"
+
+[[requirements]]
+id = "PARSER-WORKSPACE-TREES-001"
+title = "Virtual and filesystem inputs share specification loading"
+manual = false
+design = "design/source-trees.md"
+ears = { type = "ubiquitous", system = "static repository analysis", action = "discover identical specification definitions and design references from identical repository content and explicit configuration" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-TREES-002"
+title = "Specifications are discovered only from repository files"
+manual = false
+design = "design/source-trees.md"
+ears = { type = "ubiquitous", system = "static repository analysis", action = "derive the effective specification set solely by static inspection of the configured repository tree" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-TREES-003"
+title = "Disabled specification loading avoids tree access"
+manual = false
+design = "design/source-trees.md"
+ears = { type = "ubiquitous", system = "static repository analysis", action = "return an empty context without enumerating or reading the source tree when specifications are explicitly disabled" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-TREES-004"
+title = "Virtual loading preserves active root selection"
+manual = false
+design = "design/source-trees.md"
+ears = { type = "ubiquitous", system = "static repository analysis", action = "apply configured specification paths and enablement without merging inactive roots" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-TREES-005"
+title = "Virtual loading validates specification structure"
+manual = false
+design = "design/source-trees.md"
+ears = { type = "ubiquitous", system = "static repository analysis", action = "report the same malformed-document, duplicate-ID and design-link diagnostics across repository tree adapters" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-TREES-006"
+title = "Unavailable virtual document content is an error"
+manual = false
+design = "design/source-trees.md"
+ears = { type = "ubiquitous", system = "static repository analysis", action = "reject unavailable selected Markdown, requirement or design content" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-TREES-007"
+title = "Tree indexes represent empty directories"
+manual = false
+design = "design/source-trees.md"
+ears = { type = "ubiquitous", system = "static repository analysis", action = "preserve explicit empty directories in the repository tree index" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-TREES-008"
+title = "Static relational validation accepts discovered evidence"
+manual = false
+design = "design/source-trees.md"
+ears = { type = "ubiquitous", system = "static repository analysis", action = "apply shared orphan, manual-automation and coverage rules to caller-supplied static evidence without executing checks" }

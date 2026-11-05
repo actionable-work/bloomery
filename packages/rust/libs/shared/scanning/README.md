@@ -24,6 +24,7 @@ assert!(!analysis.is_complete()); // Two scanners are explicitly disabled.
 ```
 
 For a local repository, replace `tree` with `FilesystemTree::new(root)`.
+The adapters are owned by `bloomery_workspace::source` and re-exported here.
 Implement `SourceTree` for other caller-authorized stores; return canonical
 repository-relative UTF-8 paths from `paths()` and content from `read(path)`.
 The index and contents must stay stable during a call. MemoryTree construction
@@ -54,8 +55,9 @@ It compares bindings, locations, ordering, syntactic scope and discovery states
 between library adapters and the fields available in the CLI projections.
 
 The API has no versioned wire report, immutable tree/configuration/spec-set
-digest, or execution/approval result fields. Workspace spec parsing remains
-filesystem-based. Default/custom `.bloomery/<specs.dir>` paths and duplicate-ID
-validation belong to `bloomery-workspace`; configuration-format upgrades do not
+digest, or execution/approval result fields. Static spec parsing through
+`bloomery_workspace::load_tree` accepts the same tree and explicit configuration.
+Default/custom `.bloomery/<specs.dir>` paths and duplicate-ID validation belong
+to `bloomery-workspace`; configuration-format upgrades do not
 constitute a legacy specification-tree migration or preserve spec revision and
 lineage metadata. These are separate public contract work.

@@ -1,5 +1,6 @@
-use crate::{AnalysisSession, ScanOutput, SourceTree, nix, rust, tree, typescript};
+use crate::{AnalysisSession, ScanOutput, SourceTree, nix, rust, typescript};
 use bloomery_model::{Diagnostic, config::ScannersConfig, sort_diagnostics};
+use bloomery_workspace::source::TreeIndex;
 use std::path::Path;
 
 /// Discovery is syntactic: cfg, target and feature conditions are not evaluated.
@@ -55,12 +56,13 @@ pub(crate) fn scan_with_session(
 ) -> Result<ScanAnalysis, Vec<Diagnostic>> {
     config.validate().map_err(|error| vec![error])?;
     // Disabled scanners need neither an index nor file content.
-    let paths = if config.rust.enabled || config.playwright.enabled || config.nix.enabled {
-        tree.paths()
-            .and_then(tree::validate_index)
-            .map_err(|error| vec![Diagnostic::new("SourceTreeError", error)])?
+    let index = if config.rust.enabled || config.playwright.enabled || config.nix.enabled {
+        Some(
+            TreeIndex::new(tree)
+                .map_err(|error| vec![Diagnostic::new("SourceTreeError", error)])?,
+        )
     } else {
-        Vec::new()
+        None
     };
     let mut output = ScanOutput::default();
     let mut diagnostics = Vec::new();
@@ -76,7 +78,10 @@ pub(crate) fn scan_with_session(
         ),
         ("nix", config.nix.enabled, &nix_patterns),
     ] {
-        let selected = tree::select(&paths, patterns);
+        let selected = index
+            .as_ref()
+            .map(|index| index.matching_paths(patterns))
+            .unwrap_or_default();
         let state = if !enabled {
             DiscoveryState::Disabled
         } else if selected.is_empty() {
@@ -88,7 +93,10 @@ pub(crate) fn scan_with_session(
                 _ => nix::scan(
                     tree,
                     &selected,
-                    &tree::select(&paths, &config.nix.test_paths),
+                    &index
+                        .as_ref()
+                        .expect("enabled scanner index")
+                        .matching_paths(&config.nix.test_paths),
                 ),
             };
             match found {

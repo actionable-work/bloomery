@@ -112,6 +112,7 @@ fn adapters_preserve_bindings_locations_scope_and_states() {
             .all(|item| item.location.path.is_relative() && item.location.line.is_some())
     );
     let context = Context {
+        specs_enabled: true,
         root: disk.0.clone(),
         config: Config {
             scanners: config(),

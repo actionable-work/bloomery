@@ -4,6 +4,11 @@
 
 Preserve the existing diagnostic semantics and repository-relative locations:
 
+`bloomery_check::validate_evidence(context, evidence)` applies the static
+relational rules to caller-supplied discovery facts. Filesystem checks delegate
+to it. Both return the same sorted diagnostics; declaration paths in notes are
+repository-relative. This validation does not execute checks or grant approval.
+
 | Code | Meaning |
 | --- | --- |
 | `DirectoryIdMismatch` | Directory and README ID disagree. |
