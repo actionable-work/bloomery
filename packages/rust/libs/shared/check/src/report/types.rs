@@ -19,12 +19,14 @@ pub struct Completeness {
     pub specifications: StageState,
     pub discovery: StageState,
     pub relations: StageState,
+    pub rust_cfg: StageState,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct InputIdentities {
     pub tree: Option<String>,
     pub configuration: String,
+    pub scope: String,
     pub specifications: Option<String>,
     pub parser_contract: String,
     pub specification_schema: String,
@@ -36,6 +38,8 @@ pub struct Scope {
     pub target_resolution: String,
     pub feature_resolution: String,
     pub conditional_compilation: String,
+    pub rust_cfg: Option<super::RustCfg>,
+    pub limitations: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -129,6 +133,7 @@ pub struct TestRecord {
     pub name: Option<String>,
     pub location: Location,
     pub references: Vec<String>,
+    pub rust_cfg: Option<super::ConditionRecord>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -146,6 +151,7 @@ pub struct Binding {
     pub scanner: String,
     pub location: Location,
     pub resolution: BindingResolution,
+    pub rust_cfg: Option<super::ConditionRecord>,
 }
 
 /// Versioned static facts. Never an execution result or approval decision.

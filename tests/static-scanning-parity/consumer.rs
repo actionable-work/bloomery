@@ -156,6 +156,25 @@ fn compare_reports(root: &std::path::Path) {
     )
     .expect("snapshot");
     let config = bloomery_model::config::load(root).expect("configuration");
+    if let Some(json) = std::env::args().nth(3) {
+        let cfg = bloomery_check::report::RustCfg::parse_json(&json).expect("cfg context");
+        assert_eq!(
+            bloomery_scanning::scan_tree_with_conditions(&memory, &config.scanners),
+            bloomery_scanning::scan_tree_with_conditions(&disk, &config.scanners)
+        );
+        let report =
+            bloomery_check::report::analyze_tree_with_cfg(&memory, config.clone(), cfg.clone());
+        assert_eq!(
+            report,
+            bloomery_check::report::analyze_tree_with_cfg(&disk, config.clone(), cfg.clone())
+        );
+        assert_eq!(
+            report,
+            bloomery_check::report::analyze_with_cfg(root, config, cfg)
+        );
+        println!("{}", serde_json::to_string(&report).expect("JSON"));
+        return;
+    }
     let report = bloomery_check::report::analyze_tree(&memory, config.clone());
     assert_eq!(
         report,

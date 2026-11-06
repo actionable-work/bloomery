@@ -1,0 +1,22 @@
+group = "CFG"
+
+[[requirements]]
+id = "PARSER-SCANNING-CFG-001"
+title = "Cfg evaluation uses explicit caller facts"
+manual = false
+design = "design/rust-cfg.md"
+ears = { type = "ubiquitous", system = "static analysis", action = "evaluate Rust feature, flag and named-value predicates only from caller-supplied facts while retaining unknown facts as unresolved" }
+
+[[requirements]]
+id = "PARSER-SCANNING-CFG-002"
+title = "Local cfg gates propagate through syntax"
+manual = false
+design = "design/rust-cfg.md"
+ears = { type = "ubiquitous", system = "static analysis", action = "propagate file, inline-module and test cfg gates with three-valued Boolean logic while preserving static Bloomery tags" }
+
+[[requirements]]
+id = "PARSER-SCANNING-CFG-003"
+title = "Unsupported conditional discovery remains explicit"
+manual = false
+design = "design/rust-cfg.md"
+ears = { type = "ubiquitous", system = "static analysis", action = "retain unsupported or malformed predicates and conditional test attributes as unresolved local conditions" }

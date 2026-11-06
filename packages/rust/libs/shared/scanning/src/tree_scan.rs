@@ -28,6 +28,7 @@ pub struct ScanAnalysis {
     pub scope: ScanScope,
     pub scanners: Vec<ScannerDiscovery>,
     pub output: ScanOutput,
+    pub rust_conditions: Vec<crate::RustCondition>,
 }
 
 impl ScanAnalysis {
@@ -45,7 +46,15 @@ pub fn scan_tree(
     tree: &dyn SourceTree,
     config: &ScannersConfig,
 ) -> Result<ScanAnalysis, Vec<Diagnostic>> {
-    scan_with_session(tree, config, &AnalysisSession::new(), None)
+    scan_with_session(tree, config, &AnalysisSession::new(), None, false)
+}
+
+/// Collect local Rust predicate syntax using the same source ingestion pass.
+pub fn scan_tree_with_conditions(
+    tree: &dyn SourceTree,
+    config: &ScannersConfig,
+) -> Result<ScanAnalysis, Vec<Diagnostic>> {
+    scan_with_session(tree, config, &AnalysisSession::new(), None, true)
 }
 
 pub(crate) fn scan_with_session(
@@ -53,6 +62,7 @@ pub(crate) fn scan_with_session(
     config: &ScannersConfig,
     session: &AnalysisSession,
     filesystem_root: Option<&Path>,
+    collect_conditions: bool,
 ) -> Result<ScanAnalysis, Vec<Diagnostic>> {
     config.validate().map_err(|error| vec![error])?;
     // Disabled scanners need neither an index nor file content.
@@ -65,6 +75,7 @@ pub(crate) fn scan_with_session(
         None
     };
     let mut output = ScanOutput::default();
+    let mut rust_conditions = Vec::new();
     let mut diagnostics = Vec::new();
     let mut scanners = Vec::new();
     let mut nix_patterns = config.nix.paths.clone();
@@ -88,7 +99,17 @@ pub(crate) fn scan_with_session(
             DiscoveryState::NoMatchingFiles
         } else {
             let found = match name {
-                "rust" => rust::scan(tree, &selected, session, filesystem_root),
+                "rust" => rust::scan(
+                    tree,
+                    &selected,
+                    session,
+                    filesystem_root,
+                    collect_conditions,
+                )
+                .map(|(output, conditions)| {
+                    rust_conditions.extend(conditions);
+                    output
+                }),
                 "playwright" => typescript::scan(tree, &selected, &config.playwright.tag_prefix),
                 _ => nix::scan(
                     tree,
@@ -115,48 +136,24 @@ pub(crate) fn scan_with_session(
         return Err(diagnostics);
     }
     sort_output(&mut output);
+    rust_conditions.sort_by(|a, b| a.test.cmp(&b.test));
     Ok(ScanAnalysis {
         scope: ScanScope::Syntactic,
         scanners,
         output,
+        rust_conditions,
     })
 }
 
 fn sort_output(output: &mut ScanOutput) {
-    output.evidence.sort_by(|a, b| {
-        (
-            a.scanner,
-            &a.location.path,
-            a.location.line,
-            a.location.column,
-            &a.id,
-        )
-            .cmp(&(
-                b.scanner,
-                &b.location.path,
-                b.location.line,
-                b.location.column,
-                &b.id,
-            ))
-    });
+    output
+        .evidence
+        .sort_by(|a, b| (a.scanner, &a.location, &a.id).cmp(&(b.scanner, &b.location, &b.id)));
     for test in &mut output.tests {
         test.references.sort();
         test.references.dedup();
     }
-    output.tests.sort_by(|a, b| {
-        (
-            a.scanner,
-            &a.location.path,
-            a.location.line,
-            a.location.column,
-            &a.name,
-        )
-            .cmp(&(
-                b.scanner,
-                &b.location.path,
-                b.location.line,
-                b.location.column,
-                &b.name,
-            ))
-    });
+    output
+        .tests
+        .sort_by(|a, b| (a.scanner, &a.location, &a.name).cmp(&(b.scanner, &b.location, &b.name)));
 }

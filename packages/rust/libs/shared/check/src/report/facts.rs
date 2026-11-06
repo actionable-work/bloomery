@@ -39,6 +39,8 @@ pub(super) fn add_discovery(
     output: &ScanOutput,
     context: Option<&Context>,
     complete: bool,
+    annotations: &BTreeMap<SourceLocation, super::ConditionRecord>,
+    scoped: bool,
 ) {
     let declarations: BTreeMap<_, _> = report
         .requirements
@@ -53,6 +55,7 @@ pub(super) fn add_discovery(
             name: site.name.clone(),
             location: Location::from(&site.location),
             references: site.references.clone(),
+            rust_cfg: annotations.get(&site.location).cloned(),
         })
         .collect();
     let enabled = context.is_some_and(|context| context.specs_enabled);
@@ -63,6 +66,7 @@ pub(super) fn add_discovery(
             requirement_id: item.id.clone(),
             scanner: item.scanner.into(),
             location: Location::from(&item.location),
+            rust_cfg: annotations.get(&item.location).cloned(),
             resolution: if !enabled {
                 BindingResolution::SpecificationsUnavailable
             } else {
@@ -78,6 +82,13 @@ pub(super) fn add_discovery(
         let observed: BTreeSet<_> = output
             .evidence
             .iter()
+            .filter(|item| {
+                !scoped
+                    || item.scanner != "rust"
+                    || annotations.get(&item.location).is_some_and(|condition| {
+                        condition.state == super::ConditionState::Satisfied
+                    })
+            })
             .map(|item| item.id.as_str())
             .collect();
         for requirement in &mut report.requirements {

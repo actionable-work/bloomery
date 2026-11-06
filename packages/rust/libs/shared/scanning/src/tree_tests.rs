@@ -525,3 +525,22 @@ fn diagnostic_spans_are_precise_when_available_and_unknown_otherwise() {
             .is_none_or(|location| location.end_line.is_none() && location.end_column.is_none())
     }));
 }
+
+#[test]
+#[cfg_attr(any(), bloomery("PARSER-SCANNING-CFG-002"))]
+fn conditions_reuse_the_same_rust_ingestion_cache() {
+    let _guard = crate::tests::scan_lock();
+    let tree =
+        MemoryTree::new([("tests/a.rs", "#[cfg(test)] #[test] fn sample() {}")]).expect("tree");
+    let session = crate::AnalysisSession::new();
+    let first = crate::tree_scan::scan_with_session(&tree, &config(), &session, None, true)
+        .expect("conditions");
+    assert_eq!(first.rust_conditions.len(), 1);
+    assert_eq!(session.parse_count(), 1);
+    assert_eq!(
+        first,
+        crate::tree_scan::scan_with_session(&tree, &config(), &session, None, true)
+            .expect("cached")
+    );
+    assert_eq!(session.parse_count(), 1);
+}

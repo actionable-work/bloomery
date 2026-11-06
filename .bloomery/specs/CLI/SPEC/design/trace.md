@@ -40,6 +40,12 @@ shows scope, stage completeness and diagnostics. Exit zero means the report was
 produced, including when it contains static findings or incomplete analysis.
 It does not mean tests passed or approval was granted.
 
+`--rust-cfg JSON` requires `--report` and supplies the explicit cfg context:
+optional `target` string, optional `features` array, `flags` object of Booleans
+and `values` object of string arrays. Unknown keys and invalid shapes are usage
+errors. The target is a label; no host or target facts are inferred. This same
+normalized context is accepted by the virtual-tree and filesystem libraries.
+
 ## Candidates
 
 `bloomery spec candidates` lists discovered test sites that carry no

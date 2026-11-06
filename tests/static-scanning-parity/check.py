@@ -50,13 +50,14 @@ testPaths = ["checks/**/*.test.nix"]
         assert result.returncode == status, result.stdout + result.stderr
         return json.loads(result.stdout)
 
-    def report():
+    def report(cfg=None):
         before = {str(p.relative_to(root)): p.read_bytes() for p in root.rglob("*") if p.is_file()}
-        library = json.loads(subprocess.check_output([consumer, directory, "--report"], text=True))
-        assert library["version"] == 2
-        assert library["inputs"]["parser_contract"] == "bloomery-static-syntax-v2"
+        context_args = [] if cfg is None else [json.dumps(cfg)]
+        library = json.loads(subprocess.check_output([consumer, directory, "--report", *context_args], text=True))
+        assert library["version"] == 3
+        assert library["inputs"]["parser_contract"] == "bloomery-static-syntax-v3"
         assert library["inputs"]["specification_schema"] == "bloomery-grouped-specifications-v1"
-        document = run("trace", "--report")
+        document = run("trace", "--report", *([] if cfg is None else ["--rust-cfg", json.dumps(cfg)]))
         assert document["operation"] == "trace_report", document
         assert document["result"]["report"] == library
         after = {str(p.relative_to(root)): p.read_bytes() for p in root.rglob("*") if p.is_file()}
@@ -64,7 +65,14 @@ testPaths = ["checks/**/*.test.nix"]
         payload = {key: value for key, value in library.items() if key != "identity"}
         canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
         assert library["identity"] == "sha256:" + hashlib.sha256(canonical.encode()).hexdigest()
-        assert library["scope"] == {"kind": "syntactic", "target_resolution": "unsupported", "feature_resolution": "unsupported", "conditional_compilation": "unsupported"}
+        if cfg is None:
+            assert library["scope"]["kind"] == "syntactic" and library["scope"]["rust_cfg"] is None
+            assert all(library["scope"][key] == "unsupported" for key in ["target_resolution", "feature_resolution", "conditional_compilation"])
+        else:
+            assert library["scope"]["kind"] == "syntactic_with_rust_cfg"
+        assert "module_graph" in library["scope"]["limitations"]
+        scope = json.dumps(library["scope"], sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        assert library["inputs"]["scope"] == "sha256:" + hashlib.sha256(scope.encode()).hexdigest()
         for key in ["passed", "approval", "execution"]:
             assert key not in library
         return library
@@ -229,10 +237,65 @@ testPaths = ["checks/**/*.test.nix"]
         assert len(findings) == 3
         assert all(finding["location"] in binding_positions for finding in findings)
     group.write_text('group = "BIND"\n' + record)
+    # Caller facts apply to local Rust predicates, never to Cargo/module resolution.
+    config_path.write_text(config.replace('[scanners.playwright]', '[scanners.playwright]\nenabled = false').replace('[scanners.nix]', '[scanners.nix]\nenabled = false'))
+    rust_source = '//! context fixture\n#[cfg(all(test, feature="fast", target_os="linux"))]\n#[cfg_attr(any(), bloomery("DEMO-TESTS-BIND-001"))]\n#[test] fn conditional() {}'
+    (root / "tests/a.rs").write_text(rust_source)
+    on = {"features": ["fast"], "flags": {"test": True}, "values": {"target_os": ["linux"]}, "target": "x86_64-unknown-linux-gnu"}
+    satisfied = report(on)
+    assert satisfied["requirements"][0]["coverage"] == "bound"
+    assert satisfied["bindings"][0]["rust_cfg"]["state"] == "satisfied"
+    assert satisfied["completeness"]["relations"] == "partial"
+    off = {**on, "features": []}
+    rejected = report(off)
+    assert rejected["bindings"][0]["rust_cfg"]["state"] == "rejected"
+    assert rejected["requirements"][0]["coverage"] == "unresolved"
+    assert satisfied["inputs"]["tree"] == rejected["inputs"]["tree"]
+    assert satisfied["inputs"]["configuration"] == rejected["inputs"]["configuration"]
+    assert satisfied["inputs"]["scope"] != rejected["inputs"]["scope"]
+    assert satisfied["identity"] != rejected["identity"]
+    assert satisfied == report({**on, "features": ["fast", "fast"]})
+    unknown = report({"target": "x86_64-unknown-linux-gnu"})
+    assert unknown["bindings"][0]["rust_cfg"]["state"] == "unresolved"
+    assert unknown["completeness"]["rust_cfg"] == "partial"
+    for changed in [
+        {**on, "flags": {"test": False}},
+        {**on, "values": {"target_os": ["windows"]}},
+        {**on, "target": "another-target-label"},
+    ]:
+        different = report(changed)
+        assert different["inputs"]["tree"] == satisfied["inputs"]["tree"]
+        assert different["inputs"]["scope"] != satisfied["inputs"]["scope"]
+        assert different["identity"] != satisfied["identity"]
+    for predicate in ["unsupported(test)", "not(test, windows)"]:
+        (root / "tests/a.rs").write_text(rust_source.replace('all(test, feature="fast", target_os="linux")', predicate))
+        unresolved = report(on)
+        assert unresolved["bindings"][0]["rust_cfg"]["state"] == "unresolved"
+        assert unresolved["requirements"][0]["coverage"] == "unresolved"
+    (root / "tests/a.rs").write_text(rust_source.replace("#[test]", '#[cfg_attr(feature="fast", test)]'))
+    conditional_test = report(on)
+    assert conditional_test["tests"][0]["rust_cfg"]["state"] == "unresolved"
+    assert conditional_test["requirements"][0]["coverage"] == "unresolved"
+    (root / "tests/a.rs").write_text(rust_source)
+    cfg_config = config_path.read_text()
+    for changed, state in [
+        (cfg_config.replace("[scanners.rust]", "[scanners.rust]\nenabled = false"), "disabled"),
+        (cfg_config.replace("tests/**/*.rs", "missing/**/*.rs"), "partial"),
+    ]:
+        config_path.write_text(changed)
+        absent = report(on)
+        assert absent["completeness"]["rust_cfg"] == state
+        assert absent["requirements"][0]["coverage"] == "unresolved"
+        assert not absent["tests"] and not absent["bindings"]
+    config_path.write_text(config)
+    for invalid_json in ["null", "[]", "{", '{"unknown":true}', '{"features":"fast"}', '{"flags":{"test":1}}']:
+        run("trace", "--report", "--rust-cfg", invalid_json, status=2)
+    run("trace", "DEMO-TESTS-BIND-001", "--rust-cfg", "{}", status=2)
     (root / "tests/a.rs").write_bytes('/* café 🦀 */\t#[cfg_attr(any(), bloomery(123))]\r\n#[test]\r\nfn invalid() {}'.encode())
     (root / "e2e/a.ts").write_bytes('/* café 🦀 */\r\nconst café = ;'.encode())
     (root / "checks/a.test.nix").write_bytes('/* café 🦀 */ { passthru.bloomery = [ "invalid\nID" ]; }'.encode())
     invalid = report()
+    assert report(on)["completeness"]["rust_cfg"] == "failed"
     expected_spans = {"RustReferenceError": "123", "PlaywrightParseError": ";", "NixReferenceError": '"invalid\nID"'}
     assert {d["code"] for d in invalid["diagnostics"]} == set(expected_spans)
     for finding in invalid["diagnostics"]:

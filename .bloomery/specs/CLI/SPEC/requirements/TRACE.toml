@@ -188,3 +188,10 @@ title = "Trace exposes the full static report"
 manual = false
 design = "design/trace.md#full-static-report"
 ears = { type = "ubiquitous", system = "static reporting", action = "return the filesystem library static report when invoked with --report and no requirement IDs" }
+
+[[requirements]]
+id = "CLI-SPEC-TRACE-018"
+title = "Trace accepts explicit Rust cfg context"
+manual = false
+design = "design/trace.md#full-static-report"
+ears = { type = "ubiquitous", system = "static analysis", action = "accept --rust-cfg JSON only with --report and reject malformed or unknown context fields as usage errors" }

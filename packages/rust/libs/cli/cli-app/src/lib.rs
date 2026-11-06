@@ -128,7 +128,7 @@ fn write_required_operation(command: &CliCommand) -> Option<&'static str> {
             bloomery_cli_types::SpecOperation::List { .. }
             | bloomery_cli_types::SpecOperation::Show { .. }
             | bloomery_cli_types::SpecOperation::Trace { .. }
-            | bloomery_cli_types::SpecOperation::TraceReport
+            | bloomery_cli_types::SpecOperation::TraceReport { .. }
             | bloomery_cli_types::SpecOperation::Candidates => None,
         },
         CliCommand::Check(args) => match &args.operation {
@@ -2375,12 +2375,17 @@ mod tests {
         );
         assert_eq!(
             operation(&["bloomery", "spec", "trace", "--report"]),
-            SpecOperation::TraceReport
+            SpecOperation::TraceReport { rust_cfg: None }
         );
         assert!(Cli::try_parse_from(["bloomery", "spec", "trace"]).is_err());
         assert!(
             Cli::try_parse_from(["bloomery", "spec", "trace", "--report", "A-F-G-001"]).is_err()
         );
+        assert!(
+            Cli::try_parse_from(["bloomery", "spec", "trace", "A-F-G-001", "--rust-cfg", "{}"])
+                .is_err()
+        );
+        assert!(Cli::try_parse_from(["bloomery", "spec", "trace", "--rust-cfg", "{}"]).is_err());
 
         assert!(Cli::try_parse_from(["bloomery", "spec", "show", "ID", "--area", "A"]).is_err());
         assert!(Cli::try_parse_from(["bloomery", "spec", "add", "ID", "--ears", "{}"]).is_err());

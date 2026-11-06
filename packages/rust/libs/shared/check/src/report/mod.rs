@@ -7,26 +7,30 @@
 //!
 //! let tree = MemoryTree::new([("tests/example.rs", "#[test] fn example() {}")]).unwrap();
 //! let report = analyze_tree(&tree, Config::default());
-//! assert_eq!(report.version, 2);
+//! assert_eq!(report.version, 3);
 //! assert_eq!(report.completeness.tree, StageState::Complete);
 //! assert_eq!(report.scope.kind, "syntactic");
 //! ```
 
+mod cfg;
+#[cfg(test)]
+mod cfg_tests;
 mod facts;
+pub use cfg::{ConditionRecord, ConditionState, RustCfg};
 mod identity;
 #[cfg(test)]
 mod tests;
 mod types;
 
 use bloomery_model::{Config, Diagnostic};
-use bloomery_scanning::{DiscoveryState, scan_tree};
+use bloomery_scanning::{DiscoveryState, scan_tree, scan_tree_with_conditions};
 use bloomery_workspace::source::{FilesystemTree, SourceTree};
 use identity::{Manifest, identity, snapshot};
 use std::path::Path;
 pub use types::*;
 
-pub const REPORT_VERSION: u32 = 2;
-pub const PARSER_CONTRACT: &str = "bloomery-static-syntax-v2";
+pub const REPORT_VERSION: u32 = 3;
+pub const PARSER_CONTRACT: &str = "bloomery-static-syntax-v3";
 pub const SPECIFICATION_SCHEMA: &str = "bloomery-grouped-specifications-v1";
 
 /// Analyze a local repository with explicit configuration. Paths remain relative.
@@ -37,7 +41,41 @@ pub fn analyze(root: &Path, config: Config) -> StaticReport {
 /// Analyze one caller-authorized tree without filesystem or subprocess access.
 /// Configuration, content and analysis failures are explicit report findings.
 pub fn analyze_tree(tree: &dyn SourceTree, config: Config) -> StaticReport {
+    analyze_input(tree, config, None)
+}
+
+pub fn analyze_with_cfg(root: &Path, config: Config, cfg: RustCfg) -> StaticReport {
+    analyze_tree_with_cfg(&FilesystemTree::new(root), config, cfg)
+}
+
+pub fn analyze_tree_with_cfg(tree: &dyn SourceTree, config: Config, cfg: RustCfg) -> StaticReport {
+    analyze_input(tree, config, Some(cfg))
+}
+
+fn analyze_input(tree: &dyn SourceTree, config: Config, cfg: Option<RustCfg>) -> StaticReport {
     let mut report = empty_report(&config);
+    if let Some(context) = &cfg {
+        report.scope.kind = "syntactic_with_rust_cfg".into();
+        report.scope.target_resolution = "caller_supplied_facts".into();
+        report.scope.feature_resolution = if context.features.is_some() {
+            "caller_supplied_effective_features"
+        } else {
+            "unresolved"
+        }
+        .into();
+        report.scope.conditional_compilation = "local_rust_predicates".into();
+        report.scope.rust_cfg = Some(context.clone());
+    }
+    report.inputs.scope = identity(&report.scope);
+    if let Some(context) = &cfg
+        && let Err(error) = context.validate()
+    {
+        report.completeness.rust_cfg = StageState::Failed;
+        report
+            .diagnostics
+            .push(Diagnostic::new("RustCfgConfigurationError", error).into());
+        return finish(report);
+    }
     if let Err(error) = config.validate() {
         report.completeness.configuration = StageState::Failed;
         report.diagnostics.push(error.into());
@@ -76,9 +114,32 @@ pub fn analyze_tree(tree: &dyn SourceTree, config: Config) -> StaticReport {
             None
         }
     };
-    match scan_tree(&tree, &config.scanners) {
+    let analysis = if cfg.is_some() {
+        scan_tree_with_conditions(&tree, &config.scanners)
+    } else {
+        scan_tree(&tree, &config.scanners)
+    };
+    match analysis {
         Ok(analysis) => {
             let complete = analysis.is_complete();
+            let annotations = cfg
+                .as_ref()
+                .map(|context| cfg::annotations(context, &analysis.rust_conditions))
+                .unwrap_or_default();
+            if cfg.is_some() {
+                report.completeness.rust_cfg = match analysis.scanners[0].state {
+                    DiscoveryState::Disabled => StageState::Disabled,
+                    DiscoveryState::NoMatchingFiles => StageState::Partial,
+                    DiscoveryState::Complete
+                        if annotations
+                            .values()
+                            .any(|condition| condition.state == ConditionState::Unresolved) =>
+                    {
+                        StageState::Partial
+                    }
+                    DiscoveryState::Complete => StageState::Complete,
+                };
+            }
             report.completeness.discovery = if complete {
                 StageState::Complete
             } else {
@@ -96,10 +157,20 @@ pub fn analyze_tree(tree: &dyn SourceTree, config: Config) -> StaticReport {
                     },
                 })
                 .collect();
-            facts::add_discovery(&mut report, &analysis.output, context.as_ref(), complete);
+            facts::add_discovery(
+                &mut report,
+                &analysis.output,
+                context.as_ref(),
+                complete && cfg.is_none(),
+                &annotations,
+                cfg.is_some(),
+            );
         }
         Err(errors) => {
             report.completeness.discovery = StageState::Failed;
+            if cfg.is_some() {
+                report.completeness.rust_cfg = StageState::Failed;
+            }
             for scanner in &mut report.scanners {
                 if scanner.state != ScannerState::Disabled {
                     scanner.state = ScannerState::Unavailable;
@@ -118,6 +189,7 @@ fn empty_report(config: &Config) -> StaticReport {
         inputs: InputIdentities {
             tree: None,
             configuration: identity(config),
+            scope: String::new(),
             specifications: None,
             parser_contract: PARSER_CONTRACT.into(),
             specification_schema: SPECIFICATION_SCHEMA.into(),
@@ -128,6 +200,13 @@ fn empty_report(config: &Config) -> StaticReport {
             target_resolution: "unsupported".into(),
             feature_resolution: "unsupported".into(),
             conditional_compilation: "unsupported".into(),
+            rust_cfg: None,
+            limitations: vec![
+                "cargo_feature_resolution".into(),
+                "required_features_targets".into(),
+                "module_graph".into(),
+                "macro_expansion".into(),
+            ],
         },
         completeness: Completeness {
             configuration: StageState::NotAttempted,
@@ -135,6 +214,7 @@ fn empty_report(config: &Config) -> StaticReport {
             specifications: StageState::NotAttempted,
             discovery: StageState::NotAttempted,
             relations: StageState::NotAttempted,
+            rust_cfg: StageState::NotAttempted,
         },
         scanners: [
             ("rust", config.scanners.rust.enabled),

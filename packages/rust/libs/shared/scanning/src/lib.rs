@@ -17,6 +17,7 @@
 
 mod analysis;
 mod clippy;
+mod conditions;
 mod health;
 mod nix;
 mod positions;
@@ -25,6 +26,8 @@ mod tree_scan;
 mod typescript;
 
 pub use bloomery_workspace::source::{FilesystemTree, MemoryTree, SourceTree};
+pub use conditions::{CfgExpression, RustCondition};
+pub use tree_scan::scan_tree_with_conditions;
 pub use tree_scan::{DiscoveryState, ScanAnalysis, ScanScope, ScannerDiscovery, scan_tree};
 
 #[cfg(test)]
@@ -66,6 +69,7 @@ pub fn scan_all_with_session(
         &context.config.scanners,
         session,
         Some(&context.root),
+        false,
     )
     .map_err(|mut diagnostics| {
         for diagnostic in &mut diagnostics {

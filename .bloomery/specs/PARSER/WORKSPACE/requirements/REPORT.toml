@@ -47,14 +47,14 @@ id = "PARSER-WORKSPACE-REPORT-007"
 title = "Reports state the static analysis boundary"
 manual = false
 design = "design/static-report.md"
-ears = { type = "ubiquitous", system = "static reporting", action = "declare syntactic scope and unsupported target, feature and conditional compilation resolution without execution or approval claims" }
+ears = { type = "ubiquitous", system = "static reporting", action = "declare supported syntactic or local cfg scope and remaining resolution limits without execution or approval claims" }
 
 [[requirements]]
 id = "PARSER-WORKSPACE-REPORT-008"
 title = "Versioned reports preserve complete source locations"
 manual = false
 design = "design/static-report.md"
-ears = { type = "ubiquitous", system = "static analysis", action = "serialize complete available source ranges under report version 2 and parser contract version 2 across tree adapters and the CLI" }
+ears = { type = "ubiquitous", system = "static analysis", action = "serialize complete available source ranges under the current versioned report and parser contracts across tree adapters and the CLI" }
 
 [[requirements]]
 id = "PARSER-WORKSPACE-REPORT-009"
@@ -62,3 +62,17 @@ title = "Relational findings preserve reference ranges"
 manual = false
 design = "design/static-report.md"
 ears = { type = "ubiquitous", system = "static analysis", action = "retain the complete reference location in orphan and manual-automation findings" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-REPORT-010"
+title = "Reports bind explicit cfg scope"
+manual = false
+design = "design/static-report.md"
+ears = { type = "ubiquitous", system = "static analysis", action = "bind normalized caller cfg context and local test conditions in report version 3 across virtual, filesystem and CLI adapters" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-REPORT-011"
+title = "Conditional coverage remains conservative"
+manual = false
+design = "design/static-report.md"
+ears = { type = "ubiquitous", system = "static analysis", action = "credit only satisfied Rust conditions under explicit cfg scope while marking relations partial and absent bindings unresolved" }

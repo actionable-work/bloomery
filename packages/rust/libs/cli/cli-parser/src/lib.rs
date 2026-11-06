@@ -319,6 +319,9 @@ enum RawSpecOperation {
         /// Return the complete versioned static report without executing checks.
         #[arg(long)]
         report: bool,
+        /// Explicit Rust cfg facts as JSON; requires --report.
+        #[arg(long, requires = "report", conflicts_with = "ids", value_name = "JSON")]
+        rust_cfg: Option<String>,
     },
     /// Report discovered tests that are not tied to any requirement.
     Candidates,
@@ -360,7 +363,11 @@ impl From<RawSpecOperation> for SpecOperation {
             },
             RawSpecOperation::Set { id, field, value } => Self::Set { id, field, value },
             RawSpecOperation::Remove { id } => Self::Remove { id },
-            RawSpecOperation::Trace { report: true, .. } => Self::TraceReport,
+            RawSpecOperation::Trace {
+                report: true,
+                rust_cfg,
+                ..
+            } => Self::TraceReport { rust_cfg },
             RawSpecOperation::Trace { ids, .. } => Self::Trace { ids },
             RawSpecOperation::Candidates => Self::Candidates,
         }

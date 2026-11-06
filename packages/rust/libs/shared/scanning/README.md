@@ -67,3 +67,12 @@ to `bloomery-workspace`; configuration-format upgrades do not
 constitute a legacy specification-tree migration or preserve spec revision and
 lineage metadata. Target/feature resolution and explicit legacy migration remain
 separate public contract work.
+
+
+`scan_tree_with_conditions(&tree, &config)` additionally returns owned local
+Rust `CfgExpression` trees in `ScanAnalysis.rust_conditions`. It uses the same
+Rust ingestion/visitor and retains test/reference spans. Conditional test
+attributes become unresolved candidate syntax in this mode. The default
+`scan_tree` path is unchanged and has an empty condition collection.
+`bloomery_check::report::RustCfg` evaluates these facts without host inference;
+Cargo feature resolution, module graph and macro expansion remain outside scope.

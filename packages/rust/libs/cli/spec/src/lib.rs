@@ -163,11 +163,19 @@ pub struct SpecReport {
 
 /// Execute one `bloomery spec` command against the repository rooted at `root`.
 pub fn run_at(operation: &SpecOperation, root: &Path) -> Result<SpecReport, SpecError> {
-    if *operation == SpecOperation::TraceReport {
+    if let SpecOperation::TraceReport { rust_cfg } = operation {
+        let cfg = rust_cfg
+            .as_deref()
+            .map(bloomery_check::report::RustCfg::parse_json)
+            .transpose()
+            .map_err(SpecError::usage)?;
         let config = bloomery_model::config::load(root).map_err(SpecError::from_diagnostic)?;
         return Ok(SpecReport {
             outcome: SpecOutcome::TraceReport {
-                report: Box::new(bloomery_check::report::analyze(root, config)),
+                report: Box::new(match cfg {
+                    Some(cfg) => bloomery_check::report::analyze_with_cfg(root, config, cfg),
+                    None => bloomery_check::report::analyze(root, config),
+                }),
             },
         });
     }
@@ -203,7 +211,7 @@ pub fn run_at(operation: &SpecOperation, root: &Path) -> Result<SpecReport, Spec
         SpecOperation::Set { id, field, value } => editing::set(root, &context, id, field, value)?,
         SpecOperation::Remove { id } => editing::remove(root, &context, id)?,
         SpecOperation::Trace { ids } => trace::trace(&context, root, ids)?,
-        SpecOperation::TraceReport => {
+        SpecOperation::TraceReport { .. } => {
             unreachable!("full report is handled before projection loading")
         }
         SpecOperation::Candidates => trace::candidates(&context, root)?,

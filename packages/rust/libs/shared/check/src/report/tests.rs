@@ -332,6 +332,64 @@ fn same_line_relational_ranges_are_sorted_independent_of_evidence_order() {
     assert!(orphans[0].location < orphans[1].location);
 }
 
+#[test]
+#[cfg_attr(any(), bloomery("PARSER-WORKSPACE-REPORT-011"))]
+fn scoped_coverage_excludes_rejected_and_unresolved_rust_bindings() {
+    let mut files = files();
+    files.insert("tests/a.rs".into(), format!("#[cfg(feature=\"fast\")]\n#[cfg_attr(any(), bloomery(\"{ID}\"))]\n#[test] fn sample() {{}}"));
+    let tree = MemoryTree::new(files).expect("tree");
+    let mut config = config();
+    config.scanners.playwright.enabled = false;
+    config.scanners.nix.enabled = false;
+    for (features, expected, coverage) in [
+        (
+            Some(vec!["fast"]),
+            ConditionState::Satisfied,
+            Coverage::Bound,
+        ),
+        (Some(vec![]), ConditionState::Rejected, Coverage::Unresolved),
+        (None, ConditionState::Unresolved, Coverage::Unresolved),
+    ] {
+        let cfg = RustCfg {
+            features: features.map(|items| items.into_iter().map(String::from).collect()),
+            ..RustCfg::default()
+        };
+        let report = analyze_tree_with_cfg(&tree, config.clone(), cfg);
+        assert_eq!(report.bindings.len(), 1);
+        assert_eq!(
+            report.bindings[0]
+                .rust_cfg
+                .as_ref()
+                .expect("condition")
+                .state,
+            expected
+        );
+        assert_eq!(report.requirements[0].coverage, coverage);
+        assert_eq!(report.completeness.relations, StageState::Partial);
+        assert!(
+            !report
+                .diagnostics
+                .iter()
+                .any(|finding| finding.code == "MissingAutomatedTest")
+        );
+    }
+    config.scanners.rust.enabled = false;
+    assert_eq!(
+        analyze_tree_with_cfg(&tree, config.clone(), RustCfg::default())
+            .completeness
+            .rust_cfg,
+        StageState::Disabled
+    );
+    config.scanners.rust.enabled = true;
+    config.scanners.rust.paths = vec!["missing/**/*.rs".into()];
+    assert_eq!(
+        analyze_tree_with_cfg(&tree, config, RustCfg::default())
+            .completeness
+            .rust_cfg,
+        StageState::Partial
+    );
+}
+
 impl SourceTree for CountingTree {
     fn paths(&self) -> Result<Vec<String>, String> {
         self.memory.paths()

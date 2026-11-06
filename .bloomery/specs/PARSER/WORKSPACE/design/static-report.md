@@ -14,7 +14,7 @@ analysis, without a tree identity or downstream findings.
 
 ## Identity
 
-Report format version 2 binds SHA-256 identities for the snapshot, the complete
+Report format version 3 binds SHA-256 identities for the snapshot, the complete
 typed configuration with defaults, the active specification subtree, and the
 report payload. Hash inputs are compact canonical JSON with sorted object keys;
 file bytes are represented by their SHA-256 digest. Directory identity includes
@@ -34,7 +34,7 @@ references, binding resolution, stable diagnostic codes, notes and repository-
 relative locations. Locations preserve available one-based Unicode scalar start
 and exclusive end line/column positions under the shared
 [source span contract](../../SCANNING/design/source-spans.md). Unknown positions
-remain null. The parser contract is `bloomery-static-syntax-v2`; the specification
+remain null. The parser contract is `bloomery-static-syntax-v3`; the specification
 schema remains `bloomery-grouped-specifications-v1`.
 Orphan and manual-automation findings retain the full reference location.
 
@@ -48,7 +48,23 @@ Unknown IDs and references to manual requirements retain relational findings.
 Specification loading failure or disablement prevents relational validation;
 independent source discovery remains available.
 
-Scope is syntactic over the configured source patterns. Target selection,
-feature resolution and conditional compilation are explicitly unsupported.
+Scope defaults to syntactic over the configured source patterns.
 Static completeness describes completion of these stages, independent of
 whether diagnostics exist. Reports contain no test outcomes or hosted approval.
+
+## Explicit Rust cfg scope
+
+`analyze_tree_with_cfg(tree, config, cfg)` and `analyze_with_cfg(root, config,
+cfg)` attach [local Rust predicate results](../../SCANNING/design/rust-cfg.md)
+to tests and bindings. Scope includes the normalized caller context, its own
+input identity, resolution descriptions and explicit limitations. The parser
+contract is `bloomery-static-syntax-v3`; specification schema 1 is unchanged.
+Default calls retain syntactic behavior and null condition annotations.
+
+Cfg completeness describes only the requested local predicate analysis. Disabled,
+unmatched, failed and unresolved analysis remains explicit. Cargo feature
+resolution, module ancestry and macro expansion remain unsupported. Relations
+are partial whenever cfg scope is requested. Only satisfied Rust conditions
+contribute bindings to coverage; rejected and unresolved references remain in
+the report. Absent bindings remain unresolved. Static orphan/manual findings
+continue to validate literal IDs and retain their locations regardless of cfg.

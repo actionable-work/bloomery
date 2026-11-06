@@ -65,7 +65,9 @@ pub enum SpecOperation {
     Trace {
         ids: Vec<String>,
     },
-    TraceReport,
+    TraceReport {
+        rust_cfg: Option<String>,
+    },
     Candidates,
 }
 
