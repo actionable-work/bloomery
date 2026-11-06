@@ -10,6 +10,7 @@ pub struct RustCfg {
     pub features: Option<BTreeSet<String>>,
     pub flags: BTreeMap<String, bool>,
     pub values: BTreeMap<String, BTreeSet<String>>,
+    pub cargo_test: Option<super::CargoTestSelection>,
 }
 
 impl RustCfg {
@@ -19,6 +20,12 @@ impl RustCfg {
         if !value.is_object() {
             return Err("Rust cfg context must be a JSON object".into());
         }
+        if value
+            .get("cargo_test")
+            .is_some_and(|target| !target.is_null() && !target.is_object())
+        {
+            return Err("cargo_test must be a JSON object".into());
+        }
         let context: Self = serde_json::from_value(value)
             .map_err(|error| format!("invalid Rust cfg context: {error}"))?;
         context.validate()?;
@@ -26,6 +33,10 @@ impl RustCfg {
     }
 
     pub(super) fn validate(&self) -> Result<(), String> {
+        if let Some(target) = &self.cargo_test {
+            bloomery_workspace::cargo::validate_selector(&target.manifest, &target.name)
+                .map_err(|error| error.message)?;
+        }
         if self
             .target
             .as_ref()
@@ -143,7 +154,7 @@ fn known(value: bool) -> ConditionRecord {
     }
 }
 
-fn unknown(reason: &str) -> ConditionRecord {
+pub(super) fn unknown(reason: &str) -> ConditionRecord {
     ConditionRecord {
         state: ConditionState::Unresolved,
         unresolved: BTreeSet::from([reason.into()]),

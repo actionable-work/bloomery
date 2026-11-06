@@ -195,3 +195,10 @@ title = "Trace accepts explicit Rust cfg context"
 manual = false
 design = "design/trace.md#full-static-report"
 ears = { type = "ubiquitous", system = "static analysis", action = "accept --rust-cfg JSON only with --report and reject malformed or unknown context fields as usage errors" }
+
+[[requirements]]
+id = "CLI-SPEC-TRACE-019"
+title = "Trace accepts declared test entrypoint selectors"
+manual = false
+design = "design/trace.md#full-static-report"
+ears = { type = "ubiquitous", system = "static reporting", action = "accept a cargo_test selector through --rust-cfg and reject invalid selector shapes or paths as usage errors" }

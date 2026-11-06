@@ -7,7 +7,7 @@
 //!
 //! let tree = MemoryTree::new([("tests/example.rs", "#[test] fn example() {}")]).unwrap();
 //! let report = analyze_tree(&tree, Config::default());
-//! assert_eq!(report.version, 3);
+//! assert_eq!(report.version, 4);
 //! assert_eq!(report.completeness.tree, StageState::Complete);
 //! assert_eq!(report.scope.kind, "syntactic");
 //! ```
@@ -18,6 +18,10 @@ mod cfg_tests;
 mod facts;
 pub use cfg::{ConditionRecord, ConditionState, RustCfg};
 mod identity;
+mod target;
+pub use target::{CargoTestRecord, CargoTestSelection};
+#[cfg(test)]
+mod target_tests;
 #[cfg(test)]
 mod tests;
 mod types;
@@ -29,8 +33,8 @@ use identity::{Manifest, identity, snapshot};
 use std::path::Path;
 pub use types::*;
 
-pub const REPORT_VERSION: u32 = 3;
-pub const PARSER_CONTRACT: &str = "bloomery-static-syntax-v3";
+pub const REPORT_VERSION: u32 = 4;
+pub const PARSER_CONTRACT: &str = "bloomery-static-syntax-v4";
 pub const SPECIFICATION_SCHEMA: &str = "bloomery-grouped-specifications-v1";
 
 /// Analyze a local repository with explicit configuration. Paths remain relative.
@@ -65,6 +69,18 @@ fn analyze_input(tree: &dyn SourceTree, config: Config, cfg: Option<RustCfg>) ->
         .into();
         report.scope.conditional_compilation = "local_rust_predicates".into();
         report.scope.rust_cfg = Some(context.clone());
+        if context.cargo_test.is_some() {
+            report.scope.target_resolution = "declared_integration_test_entrypoint".into();
+            report
+                .scope
+                .limitations
+                .retain(|limit| limit != "required_features_targets");
+            report.scope.limitations.extend([
+                "cargo_target_auto_discovery".into(),
+                "other_cargo_targets".into(),
+            ]);
+            report.scope.limitations.sort();
+        }
     }
     report.inputs.scope = identity(&report.scope);
     if let Some(context) = &cfg
@@ -92,6 +108,9 @@ fn analyze_input(tree: &dyn SourceTree, config: Config, cfg: Option<RustCfg>) ->
     };
     report.completeness.tree = StageState::Complete;
     report.inputs.tree = Some(identity(&manifest));
+    if let Some(cfg) = &cfg {
+        target::project(&mut report, &tree, cfg, config.scanners.rust.enabled);
+    }
     let context = match bloomery_workspace::load_tree(&tree, config.clone()) {
         Ok(context) => {
             report.completeness.specifications = if context.specs_enabled {
@@ -163,7 +182,6 @@ fn analyze_input(tree: &dyn SourceTree, config: Config, cfg: Option<RustCfg>) ->
                 context.as_ref(),
                 complete && cfg.is_none(),
                 &annotations,
-                cfg.is_some(),
             );
         }
         Err(errors) => {
@@ -208,6 +226,7 @@ fn empty_report(config: &Config) -> StaticReport {
                 "macro_expansion".into(),
             ],
         },
+        cargo_test: None,
         completeness: Completeness {
             configuration: StageState::NotAttempted,
             tree: StageState::NotAttempted,
@@ -215,6 +234,7 @@ fn empty_report(config: &Config) -> StaticReport {
             discovery: StageState::NotAttempted,
             relations: StageState::NotAttempted,
             rust_cfg: StageState::NotAttempted,
+            rust_target: StageState::NotAttempted,
         },
         scanners: [
             ("rust", config.scanners.rust.enabled),

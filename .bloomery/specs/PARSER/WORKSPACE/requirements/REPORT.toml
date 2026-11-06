@@ -68,7 +68,7 @@ id = "PARSER-WORKSPACE-REPORT-010"
 title = "Reports bind explicit cfg scope"
 manual = false
 design = "design/static-report.md"
-ears = { type = "ubiquitous", system = "static analysis", action = "bind normalized caller cfg context and local test conditions in report version 3 across virtual, filesystem and CLI adapters" }
+ears = { type = "ubiquitous", system = "static analysis", action = "bind normalized caller cfg context and local test conditions under the current report contract across virtual, filesystem and CLI adapters" }
 
 [[requirements]]
 id = "PARSER-WORKSPACE-REPORT-011"
@@ -76,3 +76,10 @@ title = "Conditional coverage remains conservative"
 manual = false
 design = "design/static-report.md"
 ears = { type = "ubiquitous", system = "static analysis", action = "credit only satisfied Rust conditions under explicit cfg scope while marking relations partial and absent bindings unresolved" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-REPORT-012"
+title = "Reports bind selected Cargo test entrypoints"
+manual = false
+design = "design/cargo-test-target.md"
+ears = { type = "ubiquitous", system = "static reporting", action = "bind target selectors, resolved entrypoints, required features and explicit projection completeness in version 4 reports with identical adapter results" }

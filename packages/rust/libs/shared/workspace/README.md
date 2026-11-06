@@ -46,3 +46,11 @@ The [versioned report API](../check/README.md) composes loading and discovery
 with canonical identities and explicit completeness. `MemoryTree::from_bytes`
 preserves binary content for snapshots; text constructors remain available.
 Target/feature resolution remains outside syntactic analysis.
+
+`bloomery_workspace::cargo::load_test_target(tree, manifest, name)` projects a
+unique explicit `[[test]]` name/path, required features and harness mode using
+the same tree adapter and existing TOML parser. It normalizes manifest-relative
+entrypoints within the repository and rejects missing files or duplicate names.
+`cargo::validate_selector` checks selector paths/names without reading content.
+This helper performs no Cargo invocation, automatic target discovery, feature
+resolution or hosted specification discovery.

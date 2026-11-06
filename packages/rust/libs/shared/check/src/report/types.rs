@@ -20,6 +20,7 @@ pub struct Completeness {
     pub discovery: StageState,
     pub relations: StageState,
     pub rust_cfg: StageState,
+    pub rust_target: StageState,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -134,6 +135,7 @@ pub struct TestRecord {
     pub location: Location,
     pub references: Vec<String>,
     pub rust_cfg: Option<super::ConditionRecord>,
+    pub rust_target: Option<super::ConditionRecord>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -152,6 +154,7 @@ pub struct Binding {
     pub location: Location,
     pub resolution: BindingResolution,
     pub rust_cfg: Option<super::ConditionRecord>,
+    pub rust_target: Option<super::ConditionRecord>,
 }
 
 /// Versioned static facts. Never an execution result or approval decision.
@@ -163,6 +166,7 @@ pub struct StaticReport {
     pub inputs: InputIdentities,
     pub configuration: serde_json::Value,
     pub scope: Scope,
+    pub cargo_test: Option<super::CargoTestRecord>,
     pub completeness: Completeness,
     pub scanners: Vec<ScannerStatus>,
     pub requirements: Vec<RequirementRecord>,

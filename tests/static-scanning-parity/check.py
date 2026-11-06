@@ -54,8 +54,8 @@ testPaths = ["checks/**/*.test.nix"]
         before = {str(p.relative_to(root)): p.read_bytes() for p in root.rglob("*") if p.is_file()}
         context_args = [] if cfg is None else [json.dumps(cfg)]
         library = json.loads(subprocess.check_output([consumer, directory, "--report", *context_args], text=True))
-        assert library["version"] == 3
-        assert library["inputs"]["parser_contract"] == "bloomery-static-syntax-v3"
+        assert library["version"] == 4
+        assert library["inputs"]["parser_contract"] == "bloomery-static-syntax-v4"
         assert library["inputs"]["specification_schema"] == "bloomery-grouped-specifications-v1"
         document = run("trace", "--report", *([] if cfg is None else ["--rust-cfg", json.dumps(cfg)]))
         assert document["operation"] == "trace_report", document
@@ -287,6 +287,65 @@ testPaths = ["checks/**/*.test.nix"]
         assert absent["completeness"]["rust_cfg"] == state
         assert absent["requirements"][0]["coverage"] == "unresolved"
         assert not absent["tests"] and not absent["bindings"]
+    # Explicit integration-test entrypoints add required-feature eligibility.
+    config_path.write_text(cfg_config)
+    manifest = root / "Cargo.toml"
+    cargo_manifest = '[[test]]\nname="sample"\npath="tests/a.rs"\nrequired-features=["fast"]\n[[test]]\nname="other"\npath="tests/b.rs"\n'
+    manifest.write_text(cargo_manifest)
+    (root / "tests/b.rs").write_text(rust_source.replace("conditional", "other"))
+    selection = {**on, "cargo_test": {"manifest": "Cargo.toml", "name": "sample"}}
+    selected = report(selection)
+    assert selected["cargo_test"]["path"] == "tests/a.rs"
+    assert selected["cargo_test"]["condition"]["state"] == "satisfied"
+    assert selected["completeness"]["rust_target"] == "complete"
+    assert selected["requirements"][0]["coverage"] == "bound"
+    assert [b["rust_target"]["state"] for b in selected["bindings"]] == ["satisfied", "unresolved"]
+    assert selected == report({**selection, "features": ["fast", "fast"]})
+    blocked = report({**selection, "features": []})
+    assert blocked["cargo_test"]["condition"]["state"] == "rejected"
+    assert blocked["requirements"][0]["coverage"] == "unresolved"
+    unspecified = report({"cargo_test": selection["cargo_test"]})
+    assert unspecified["completeness"]["rust_target"] == "partial"
+    assert unspecified["cargo_test"]["condition"]["state"] == "unresolved"
+    other = report({**selection, "cargo_test": {"manifest": "Cargo.toml", "name": "other"}})
+    assert other["inputs"]["tree"] == selected["inputs"]["tree"]
+    assert other["inputs"]["scope"] != selected["inputs"]["scope"]
+    assert other["identity"] != selected["identity"]
+    assert [b["rust_target"]["state"] for b in other["bindings"]] == ["unresolved", "satisfied"]
+    manifest.write_text(cargo_manifest.replace('["fast"]', '[]'))
+    changed = report(selection)
+    assert changed["inputs"]["scope"] == selected["inputs"]["scope"]
+    assert changed["inputs"]["tree"] != selected["inputs"]["tree"]
+    assert changed["identity"] != selected["identity"]
+    manifest.write_text(cargo_manifest.replace('name="sample"', 'name="sample"\nharness=false'))
+    custom = report(selection)
+    assert custom["cargo_test"]["condition"]["state"] == "unresolved"
+    assert custom["requirements"][0]["coverage"] == "unresolved"
+    for bad_manifest, code in [
+        (cargo_manifest + cargo_manifest, "DuplicateCargoTestTarget"),
+        ("invalid [", "CargoTargetManifestError"),
+        (cargo_manifest.replace('path="tests/a.rs"', ''), "UnsupportedCargoTestTarget"),
+        (cargo_manifest.replace('path="tests/a.rs"', 'path="../a.rs"'), "CargoTargetPathError"),
+        (cargo_manifest.replace('path="tests/a.rs"', 'path="missing.rs"'), "CargoTargetPathError"),
+    ]:
+        manifest.write_text(bad_manifest)
+        failed = report(selection)
+        assert failed["completeness"]["rust_target"] == "failed"
+        assert failed["completeness"]["rust_cfg"] == "complete"
+        assert failed["requirements"][0]["coverage"] == "unresolved"
+        assert any(d["code"] == code for d in failed["diagnostics"])
+        assert all(b["rust_target"]["state"] == "unresolved" for b in failed["bindings"])
+    config_path.write_text(cfg_config.replace("[scanners.rust]", "[scanners.rust]\nenabled = false"))
+    disabled = report(selection)
+    assert disabled["completeness"]["rust_target"] == "disabled"
+    assert disabled["cargo_test"] is None
+    assert not disabled["diagnostics"]
+    config_path.write_text(cfg_config)
+    manifest.unlink()
+    assert report(selection)["completeness"]["rust_target"] == "failed"
+    (root / "tests/b.rs").unlink()
+    for selector in [[], ["Cargo.toml", "sample"], {}, {"manifest": "../Cargo.toml", "name": "sample"}, {"manifest": "Cargo.toml", "name": "sample", "extra": True}, {"manifest": "Cargo.toml", "name": ""}]:
+        run("trace", "--report", "--rust-cfg", json.dumps({"cargo_test": selector}), status=2)
     config_path.write_text(config)
     for invalid_json in ["null", "[]", "{", '{"unknown":true}', '{"features":"fast"}', '{"flags":{"test":1}}']:
         run("trace", "--report", "--rust-cfg", invalid_json, status=2)

@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 const ID: &str = "DEMO-TESTS-BIND-001";
 const ROOT: &str = ".bloomery/specs/DEMO/TESTS";
 
-fn config() -> Config {
+pub(super) fn config() -> Config {
     let mut config = Config::default();
     config.scanners.rust.paths = vec!["tests/**/*.rs".into()];
     config.scanners.playwright.paths = vec!["e2e/**/*.ts".into()];
@@ -15,13 +15,13 @@ fn config() -> Config {
     config
 }
 
-fn record(id: &str, manual: bool) -> String {
+pub(super) fn record(id: &str, manual: bool) -> String {
     format!(
         "[[requirements]]\nid = \"{id}\"\ntitle = \"Binding\"\nmanual = {manual}\ndesign = \"design/main.md\"\nears = {{ type = \"ubiquitous\", system = \"example\", action = \"work\" }}\n"
     )
 }
 
-fn files() -> BTreeMap<String, String> {
+pub(super) fn files() -> BTreeMap<String, String> {
     let mut files = BTreeMap::new();
     for (path, id) in [(".bloomery/specs/DEMO", "DEMO"), (ROOT, "TESTS")] {
         files.insert(format!("{path}/README.md"), format!("---\nid: {id}\nname: Example\ntagline: Example\ndescription: Example\n---\n# Example\n"));

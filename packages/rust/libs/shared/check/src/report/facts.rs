@@ -40,8 +40,17 @@ pub(super) fn add_discovery(
     context: Option<&Context>,
     complete: bool,
     annotations: &BTreeMap<SourceLocation, super::ConditionRecord>,
-    scoped: bool,
 ) {
+    let scoped = report.scope.rust_cfg.is_some();
+    let selected = report
+        .scope
+        .rust_cfg
+        .as_ref()
+        .is_some_and(|cfg| cfg.cargo_test.is_some());
+    let target = report.cargo_test.as_ref();
+    let target_condition = |scanner: &str, path: &std::path::Path| {
+        (selected && scanner == "rust").then(|| super::target::condition(target, path))
+    };
     let declarations: BTreeMap<_, _> = report
         .requirements
         .iter()
@@ -56,6 +65,7 @@ pub(super) fn add_discovery(
             location: Location::from(&site.location),
             references: site.references.clone(),
             rust_cfg: annotations.get(&site.location).cloned(),
+            rust_target: target_condition(site.scanner, &site.location.path),
         })
         .collect();
     let enabled = context.is_some_and(|context| context.specs_enabled);
@@ -67,6 +77,7 @@ pub(super) fn add_discovery(
             scanner: item.scanner.into(),
             location: Location::from(&item.location),
             rust_cfg: annotations.get(&item.location).cloned(),
+            rust_target: target_condition(item.scanner, &item.location.path),
             resolution: if !enabled {
                 BindingResolution::SpecificationsUnavailable
             } else {
@@ -85,9 +96,11 @@ pub(super) fn add_discovery(
             .filter(|item| {
                 !scoped
                     || item.scanner != "rust"
-                    || annotations.get(&item.location).is_some_and(|condition| {
+                    || (annotations.get(&item.location).is_some_and(|condition| {
                         condition.state == super::ConditionState::Satisfied
-                    })
+                    }) && target_condition(item.scanner, &item.location.path).is_none_or(
+                        |condition| condition.state == super::ConditionState::Satisfied,
+                    ))
             })
             .map(|item| item.id.as_str())
             .collect();

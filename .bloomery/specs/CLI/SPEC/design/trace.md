@@ -45,6 +45,10 @@ optional `target` string, optional `features` array, `flags` object of Booleans
 and `values` object of string arrays. Unknown keys and invalid shapes are usage
 errors. The target is a label; no host or target facts are inferred. This same
 normalized context is accepted by the virtual-tree and filesystem libraries.
+Its optional `cargo_test` object requires `manifest` and `name` strings and
+selects one explicitly declared integration-test entrypoint. Invalid selector
+shape or noncanonical manifest paths are usage errors; manifest/target failures
+are static report findings. No additional command or discovery source is used.
 
 ## Candidates
 

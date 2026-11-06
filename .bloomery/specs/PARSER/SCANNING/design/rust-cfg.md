@@ -20,6 +20,10 @@ predicate names. Unsupported or malformed predicates remain unresolved.
 Conditional test attributes are retained as unresolved candidate sites when
 cfg analysis is requested. Normal syntactic discovery is unchanged.
 
+The report separately projects an optional
+[declared Cargo test entrypoint](../../WORKSPACE/design/cargo-test-target.md);
+its target condition does not change local cfg semantics.
+
 These results describe local predicates only. Cargo feature unification,
 required-features targets, out-of-line module ancestry and macro expansion
 remain unsupported. A satisfied local predicate is not proof that a test is

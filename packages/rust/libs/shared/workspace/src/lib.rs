@@ -1,3 +1,4 @@
+pub mod cargo;
 mod loader;
 mod markdown;
 pub mod source;

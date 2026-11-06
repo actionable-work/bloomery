@@ -319,7 +319,7 @@ enum RawSpecOperation {
         /// Return the complete versioned static report without executing checks.
         #[arg(long)]
         report: bool,
-        /// Explicit Rust cfg facts as JSON; requires --report.
+        /// Explicit Rust analysis context as JSON; requires --report.
         #[arg(long, requires = "report", conflicts_with = "ids", value_name = "JSON")]
         rust_cfg: Option<String>,
     },

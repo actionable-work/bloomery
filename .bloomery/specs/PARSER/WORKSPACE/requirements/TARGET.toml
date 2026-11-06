@@ -1,0 +1,29 @@
+group = "TARGET"
+
+[[requirements]]
+id = "PARSER-WORKSPACE-TARGET-001"
+title = "Declared Cargo test targets load from trees"
+manual = false
+design = "design/cargo-test-target.md"
+ears = { type = "ubiquitous", system = "static target projection", action = "resolve a unique explicitly named integration-test entrypoint from an authorized Cargo manifest while rejecting malformed or unsupported declarations" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-TARGET-002"
+title = "Target entrypoints stay within the authorized tree"
+manual = false
+design = "design/cargo-test-target.md"
+ears = { type = "ubiquitous", system = "static target projection", action = "normalize manifest-relative entrypoint paths within the repository and reject missing files, escaping paths and duplicate target names" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-TARGET-003"
+title = "Required features gate target eligibility"
+manual = false
+design = "design/cargo-test-target.md"
+ears = { type = "ubiquitous", system = "static target analysis", action = "evaluate required features from explicit effective feature facts while retaining unknown features and custom harnesses as unresolved" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-TARGET-004"
+title = "Target scope limits Rust coverage to the entrypoint"
+manual = false
+design = "design/cargo-test-target.md"
+ears = { type = "ubiquitous", system = "static target analysis", action = "credit Rust coverage only when both local cfg and selected entrypoint conditions are satisfied while retaining other files and failed projection as unresolved" }

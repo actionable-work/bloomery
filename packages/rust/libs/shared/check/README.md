@@ -13,7 +13,7 @@ let tree = MemoryTree::new([("tests/example.rs", "#[test] fn example() {}")])?;
 let mut config = Config::default();
 config.scanners.rust.paths = vec!["tests/**/*.rs".into()];
 let report = analyze_tree(&tree, config);
-assert_eq!(report.version, 3);
+assert_eq!(report.version, 4);
 assert_eq!(report.completeness.tree, StageState::Complete);
 assert_eq!(report.tests[0].name.as_deref(), Some("example"));
 ```
@@ -26,12 +26,12 @@ analysis errors are report findings. The CLI adapter is
 operation `trace_report`. CLI flake/configuration preflights still apply.
 Exit zero means the report was produced, even when it contains findings.
 
-Report format 3 retains optional `end_line` and `end_column` on each location.
+Report format 4 retains optional `end_line` and `end_column` on each location.
 Coordinates use one-based Unicode scalar positions and exclusive ends; tabs count
 as one scalar and LF advances the line, including in CRLF input. Unknown columns
 and ends remain null. References cover quoted literals, Rust test sites cover
 function names, Playwright sites cover calls, and Nix sites cover whole files.
-The parser contract is `bloomery-static-syntax-v3`; specification schema 1 is
+The parser contract is `bloomery-static-syntax-v4`; specification schema 1 is
 unchanged. Rust ingestion errors without retained spans remain line-only.
 
 Reports bind the complete typed configuration, tree snapshot, active specification
@@ -86,10 +86,35 @@ Without cfg scope, these annotations are null and discovery stays syntactic.
 The scanner also exposes owned `CfgExpression` / `RustCondition` facts through
 `scan_tree_with_conditions`, using the existing source ingestion cache.
 
-Report/parser version 3 adds this scope, annotations and `completeness.rust_cfg`;
+Report/parser version 4 includes this scope, annotations and `completeness.rust_cfg`;
 specification schema 1 is unchanged. Only satisfied Rust conditions contribute
 scoped coverage. All literal references and orphan/manual findings remain
 visible. Relations stay partial and absent bindings unresolved. Local cfg
 completeness never establishes Cargo feature unification, required-features
 targets, module ancestry or macro expansion. These limitations remain explicit
 in scope; no compiler, Cargo metadata or environment probing runs.
+
+For an explicitly declared integration-test entrypoint, add a selector:
+
+```rust
+let cfg = RustCfg::parse_json(r#"{"features":["fast"],"flags":{"test":true},"cargo_test":{"manifest":"pkg/Cargo.toml","name":"smoke"}}"#)?;
+```
+
+The selected `[[test]]` must have explicit `name` and `path` fields. The report's
+`cargo_test` projection contains the canonical entrypoint, sorted required
+features, harness mode and eligibility. `completeness.rust_target` tracks this
+projection independently. An absent effective feature set leaves nonempty
+requirements unresolved; custom harnesses are also unresolved.
+
+Each Rust test/binding receives a separate `rust_target` condition. Only tests
+in the selected entrypoint may credit Rust coverage, and both cfg and target
+conditions must be satisfied. Other files have unresolved module membership;
+failed target projection likewise blocks Rust coverage while discovery and
+literal findings continue. Disabled Rust scanning disables projection.
+
+Manifest paths are canonical repository-relative Cargo.toml paths. Entrypoint
+paths resolve relative to that manifest, allowing dot segments within the tree.
+Missing, escaping, malformed, duplicate or inferred entrypoints are findings.
+This is a declared-entrypoint projection, not Cargo manifest validation, target
+auto-discovery or module resolution. No Cargo process runs. Specification schema
+1 and the repository-only specification discovery contract remain unchanged.
