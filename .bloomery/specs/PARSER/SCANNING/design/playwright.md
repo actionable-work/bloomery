@@ -21,3 +21,4 @@ registry.
 Tags in unrelated calls, comments, or arbitrary string literals are not
 references. A malformed source file or invalid tag value is reported with its
 source location.
+Reference literals and test calls retain their complete [source spans](source-spans.md).

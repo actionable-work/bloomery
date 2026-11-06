@@ -347,3 +347,181 @@ fn filesystem_discovery_excludes_symlinks_and_cycles() {
         1
     );
 }
+
+fn span_text<'a>(source: &'a str, location: &bloomery_model::SourceLocation) -> &'a str {
+    fn offset(source: &str, target: (usize, usize)) -> usize {
+        let mut position = (1, 1);
+        for (offset, character) in source.char_indices() {
+            if position == target {
+                return offset;
+            }
+            position = if character == '\n' {
+                (position.0 + 1, 1)
+            } else {
+                (position.0, position.1 + 1)
+            };
+        }
+        assert_eq!(
+            position, target,
+            "coordinate must be inside source or at EOF"
+        );
+        source.len()
+    }
+    let start = offset(
+        source,
+        (
+            location.line.expect("line"),
+            location.column.expect("column"),
+        ),
+    );
+    let end = offset(
+        source,
+        (
+            location.end_line.expect("end line"),
+            location.end_column.expect("end column"),
+        ),
+    );
+    &source[start..end]
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("PARSER-SCANNING-SPANS-001"))]
+#[cfg_attr(any(), bloomery("PARSER-SCANNING-SPANS-002"))]
+#[cfg_attr(any(), bloomery("PARSER-SCANNING-SPANS-003"))]
+fn precise_spans_select_original_literals_and_test_declarations() {
+    let _guard = crate::tests::scan_lock();
+    let files = [
+        (
+            "tests/a.rs",
+            "// café 🦀\r\n#[cfg_attr(any(), /* é 🦀 */ bloomery(\"DEMO-TESTS-BIND-001\"))]\r\n#[test]\r\nfn café() {}\r\n#[cfg_attr(any(), bloomery(r#\"DEMO-TESTS-\nBIND-002\"#))]\n#[test]\nfn multiline() {}\n",
+        ),
+        (
+            "e2e/a.ts",
+            "/* café 🦀 */\t test('é', {\r\n tag: ['@bloomery:DEMO-TESTS-BIND-001', '@bloomery:DEMO-TESTS-BIND-002']\r\n}, async () => {});\r\n",
+        ),
+        (
+            "checks/a.test.nix",
+            "/* café 🦀\r\ncomment */ { passthru = { bloomery = [ \"DEMO-TESTS-BIND-001\" \"DEMO-TESTS-BIND-002\" ]; }; }\r\n",
+        ),
+        ("checks/empty.test.nix", ""),
+    ];
+    let disk = Fixture::new(&files);
+    let memory = MemoryTree::new(files).expect("tree");
+    let analysis = scan_tree(&memory, &config()).expect("scan");
+    assert_eq!(
+        analysis,
+        scan_tree(&FilesystemTree::new(&disk.0), &config()).expect("disk scan")
+    );
+    assert_eq!(
+        analysis,
+        scan_tree(
+            &MemoryTree::new(files.into_iter().rev()).expect("reverse"),
+            &config()
+        )
+        .expect("reversed scan")
+    );
+    assert_eq!(analysis.output.evidence.len(), 6);
+    for evidence in &analysis.output.evidence {
+        let source = memory
+            .read(evidence.location.path.to_str().expect("path"))
+            .expect("content");
+        let literal = span_text(&source, &evidence.location);
+        if evidence.id.contains('\n') {
+            assert_eq!(literal, "r#\"DEMO-TESTS-\nBIND-002\"#");
+            assert!(evidence.location.end_line > evidence.location.line);
+        } else {
+            let prefix = if evidence.scanner == "playwright" {
+                "@bloomery:"
+            } else {
+                ""
+            };
+            assert!(
+                literal == format!("\"{prefix}{}\"", evidence.id)
+                    || literal == format!("'{prefix}{}'", evidence.id)
+            );
+        }
+    }
+    for site in &analysis.output.tests {
+        let source = memory
+            .read(site.location.path.to_str().expect("path"))
+            .expect("source");
+        let declaration = span_text(&source, &site.location);
+        match site.scanner {
+            "rust" => assert_eq!(declaration, site.name.as_deref().expect("name")),
+            "playwright" => {
+                assert!(declaration.starts_with("test("));
+                assert!(declaration.ends_with(')'));
+            }
+            _ => assert_eq!(declaration, source),
+        }
+    }
+    let cafe = analysis
+        .output
+        .tests
+        .iter()
+        .find(|site| site.name.as_deref() == Some("café"))
+        .expect("Unicode name");
+    assert_eq!(
+        (
+            cafe.location.line,
+            cafe.location.column,
+            cafe.location.end_line,
+            cafe.location.end_column
+        ),
+        (Some(4), Some(4), Some(4), Some(8))
+    );
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("PARSER-SCANNING-SPANS-004"))]
+fn diagnostic_spans_are_precise_when_available_and_unknown_otherwise() {
+    let _guard = crate::tests::scan_lock();
+    let files = [
+        (
+            "tests/a.rs",
+            "// é 🦀\r\n#[cfg_attr(any(), bloomery(123))]\r\n#[test]\r\nfn bad() {}",
+        ),
+        ("tests/b.rs", "fn broken( {"),
+        ("e2e/a.ts", "/* é 🦀 */\r\nconst café = ;"),
+        (
+            "checks/a.test.nix",
+            "/* é 🦀 */ { passthru.bloomery = [ \"invalid\nID\" ]; }",
+        ),
+    ];
+    let disk = Fixture::new(&files);
+    let memory = MemoryTree::new(files).expect("tree");
+    let errors = scan_tree(&memory, &config()).expect_err("invalid sources");
+    assert_eq!(
+        diagnostics_key(errors.clone()),
+        diagnostics_key(
+            scan_tree(&FilesystemTree::new(&disk.0), &config()).expect_err("disk errors")
+        )
+    );
+    for error in errors {
+        let location = error.location.expect("location");
+        if error.code == "RustParseError" {
+            assert_eq!(
+                (location.column, location.end_line, location.end_column),
+                (None, None, None)
+            );
+            continue;
+        }
+        let source = memory
+            .read(location.path.to_str().expect("path"))
+            .expect("source");
+        let text = span_text(&source, &location);
+        match error.code.as_str() {
+            "RustReferenceError" => assert_eq!(text, "123"),
+            "NixReferenceError" => assert_eq!(text, "\"invalid\nID\""),
+            "PlaywrightParseError" => assert_eq!(text, ";"),
+            other => panic!("unexpected diagnostic {other}"),
+        }
+    }
+    let read_errors = scan_tree(&MissingTree, &config()).expect_err("unavailable tree");
+    assert!(read_errors.iter().all(|error| {
+        error
+            .location
+            .as_ref()
+            .is_none_or(|location| location.end_line.is_none() && location.end_column.is_none())
+    }));
+}

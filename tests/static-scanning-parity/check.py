@@ -53,6 +53,9 @@ testPaths = ["checks/**/*.test.nix"]
     def report():
         before = {str(p.relative_to(root)): p.read_bytes() for p in root.rglob("*") if p.is_file()}
         library = json.loads(subprocess.check_output([consumer, directory, "--report"], text=True))
+        assert library["version"] == 2
+        assert library["inputs"]["parser_contract"] == "bloomery-static-syntax-v2"
+        assert library["inputs"]["specification_schema"] == "bloomery-grouped-specifications-v1"
         document = run("trace", "--report")
         assert document["operation"] == "trace_report", document
         assert document["result"]["report"] == library
@@ -66,6 +69,7 @@ testPaths = ["checks/**/*.test.nix"]
             assert key not in library
         return library
 
+    source_files = {path: (root / path).read_bytes().decode() for path in ["tests/a.rs", "e2e/a.ts", "checks/a.test.nix", "checks/untied.test.nix"]}
     original = report()
     assert original == report()
     assert original["completeness"]["relations"] == "complete"
@@ -180,6 +184,59 @@ testPaths = ["checks/**/*.test.nix"]
     assert malformed["requirements"][0]["coverage"] == "unresolved"
     assert malformed["tests"] == []
     assert any(d["message"] == failure["error"]["message"] for d in malformed["diagnostics"])
+    position = next(d["location"] for d in malformed["diagnostics"] if d["code"] == "RustParseError")
+    assert position["column"] is None and position["end_line"] is None and position["end_column"] is None
+
+    def span_text(location):
+        source = (root / location["path"]).read_bytes().decode()
+        lines = source.split("\n")
+
+        def offset(line, column):
+            assert 1 <= line <= len(lines) and 1 <= column <= len(lines[line - 1]) + 1
+            return sum(len(part) + 1 for part in lines[:line - 1]) + column - 1
+
+        return source[offset(location["line"], location["column"]):offset(location["end_line"], location["end_column"])]
+
+    # Non-ASCII source preceding literals and CRLF must not turn byte offsets
+    # into character columns. The shared report stays identical in every adapter.
+    for path, source in source_files.items():
+        source = "/* café 🦀 */\t" + source.replace("fn tied()", "fn café()")
+        (root / path).write_bytes(source.replace("\n", "\r\n").encode())
+    precise = report()
+    assert not precise["diagnostics"]
+    assert precise["inputs"]["tree"] != original["inputs"]["tree"]
+    assert precise["inputs"]["configuration"] == original["inputs"]["configuration"]
+    assert precise["inputs"]["specifications"] == original["inputs"]["specifications"]
+    for binding in precise["bindings"]:
+        literal = span_text(binding["location"])
+        prefix = "@bloomery:" if binding["scanner"] == "playwright" else ""
+        assert literal in [f'"{prefix}{binding["requirement_id"]}"', f"'{prefix}{binding['requirement_id']}'"]
+    for site in precise["tests"]:
+        declaration = span_text(site["location"])
+        if site["scanner"] == "rust":
+            assert declaration == site["name"]
+        elif site["scanner"] == "playwright":
+            assert declaration.startswith("test(") and declaration.endswith(")")
+        else:
+            assert declaration == (root / site["location"]["path"]).read_bytes().decode()
+    requirement_position = precise["requirements"][0]["location"]
+    assert all(requirement_position[key] is None for key in ["column", "end_line", "end_column"])
+    for document in [record.replace("manual = false", "manual = true"), record.replace("BIND-001", "BIND-002")]:
+        group.write_text('group = "BIND"\n' + document)
+        relations = report()
+        binding_positions = [binding["location"] for binding in relations["bindings"]]
+        findings = [d for d in relations["diagnostics"] if d["code"] in ["OrphanTestReference", "IllegalManualAutomation"]]
+        assert len(findings) == 3
+        assert all(finding["location"] in binding_positions for finding in findings)
+    group.write_text('group = "BIND"\n' + record)
+    (root / "tests/a.rs").write_bytes('/* café 🦀 */\t#[cfg_attr(any(), bloomery(123))]\r\n#[test]\r\nfn invalid() {}'.encode())
+    (root / "e2e/a.ts").write_bytes('/* café 🦀 */\r\nconst café = ;'.encode())
+    (root / "checks/a.test.nix").write_bytes('/* café 🦀 */ { passthru.bloomery = [ "invalid\nID" ]; }'.encode())
+    invalid = report()
+    expected_spans = {"RustReferenceError": "123", "PlaywrightParseError": ";", "NixReferenceError": '"invalid\nID"'}
+    assert {d["code"] for d in invalid["diagnostics"]} == set(expected_spans)
+    for finding in invalid["diagnostics"]:
+        assert span_text(finding["location"]) == expected_spans[finding["code"]]
 
     fixture = pathlib.Path(__file__).parent
     for path in sorted(fixture.iterdir()):

@@ -1,8 +1,11 @@
 use crate::ScanOutput;
 use crate::SourceTree;
-use bloomery_model::{Diagnostic, Evidence, SourceLocation, TestSite};
+use crate::positions::SourceMap;
+use bloomery_model::{Diagnostic, Evidence, TestSite};
 use std::collections::BTreeMap;
+use std::ops::Range;
 use std::path::{Path, PathBuf};
+type LiteralReference = (String, Range<usize>);
 
 #[cfg(test)]
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -41,7 +44,8 @@ pub fn scan(
                 continue;
             }
         };
-        let (found, errors) = scan_source(&path, &contents);
+        let positions = SourceMap::new(&contents);
+        let (found, errors) = scan_source(&path, &contents, &positions);
         diagnostics.extend(errors);
         if is_test {
             let references = found.iter().map(|entry| entry.id.clone()).collect();
@@ -52,7 +56,7 @@ pub fn scan(
             output.tests.push(TestSite {
                 scanner: "nix",
                 name,
-                location: SourceLocation::new(&path, Some(1)),
+                location: positions.location(&path, 0..contents.len()),
                 references,
             });
         }
@@ -65,7 +69,11 @@ pub fn scan(
     }
 }
 
-fn scan_source(path: &Path, source: &str) -> (Vec<Evidence>, Vec<Diagnostic>) {
+fn scan_source(
+    path: &Path,
+    source: &str,
+    positions: &SourceMap<'_>,
+) -> (Vec<Evidence>, Vec<Diagnostic>) {
     #[cfg(test)]
     PARSE_COUNT.fetch_add(1, Ordering::Relaxed);
     let tokens = tokenize(source);
@@ -75,10 +83,10 @@ fn scan_source(path: &Path, source: &str) -> (Vec<Evidence>, Vec<Diagnostic>) {
 
     while index < tokens.len() {
         if is_direct_metadata_assignment(&tokens, index) {
-            let (ids, errors, next) = metadata_rhs(&tokens, index + 4, path);
-            evidence.extend(ids.into_iter().map(|(id, line)| Evidence {
+            let (ids, errors, next) = metadata_rhs(&tokens, index + 4, path, positions);
+            evidence.extend(ids.into_iter().map(|(id, range)| Evidence {
                 id,
-                location: SourceLocation::new(path, Some(line)),
+                location: positions.location(path, range),
                 scanner: "nix",
             }));
             diagnostics.extend(errors);
@@ -87,10 +95,10 @@ fn scan_source(path: &Path, source: &str) -> (Vec<Evidence>, Vec<Diagnostic>) {
         }
 
         if is_nested_passthru_assignment(&tokens, index) {
-            let (ids, errors, next) = nested_metadata(&tokens, index + 2, path);
-            evidence.extend(ids.into_iter().map(|(id, line)| Evidence {
+            let (ids, errors, next) = nested_metadata(&tokens, index + 2, path, positions);
+            evidence.extend(ids.into_iter().map(|(id, range)| Evidence {
                 id,
-                location: SourceLocation::new(path, Some(line)),
+                location: positions.location(path, range),
                 scanner: "nix",
             }));
             diagnostics.extend(errors);
@@ -151,14 +159,15 @@ fn nested_metadata(
     tokens: &[Token],
     open_brace: usize,
     path: &Path,
-) -> (Vec<(String, usize)>, Vec<Diagnostic>, usize) {
+    positions: &SourceMap<'_>,
+) -> (Vec<LiteralReference>, Vec<Diagnostic>, usize) {
     let mut ids = Vec::new();
     let mut diagnostics = Vec::new();
     let mut depth = 1usize;
     let mut index = open_brace + 1;
     while index < tokens.len() && depth > 0 {
         if depth == 1 && is_nested_bloomery_assignment(tokens, index) {
-            let (found, errors, next) = metadata_rhs(tokens, index + 2, path);
+            let (found, errors, next) = metadata_rhs(tokens, index + 2, path, positions);
             ids.extend(found);
             diagnostics.extend(errors);
             index = next;
@@ -194,7 +203,8 @@ fn metadata_rhs(
     tokens: &[Token],
     start: usize,
     path: &Path,
-) -> (Vec<(String, usize)>, Vec<Diagnostic>, usize) {
+    positions: &SourceMap<'_>,
+) -> (Vec<LiteralReference>, Vec<Diagnostic>, usize) {
     let mut ids = Vec::new();
     let mut diagnostics = Vec::new();
     let mut paren_depth = 0usize;
@@ -207,7 +217,7 @@ fn metadata_rhs(
         match &token.kind {
             TokenKind::String(value) if list_depth > 0 => {
                 if is_requirement_id(value) {
-                    ids.push((value.clone(), token.line));
+                    ids.push((value.clone(), token.range.clone()));
                 } else {
                     diagnostics.push(
                         Diagnostic::new(
@@ -216,7 +226,7 @@ fn metadata_rhs(
                                 "passthru.bloomery contains a string that is not a requirement ID: {value}"
                             ),
                         )
-                        .at(path, Some(token.line)),
+                        .at_location(positions.location(path, token.range.clone())),
                     );
                 }
             }
@@ -261,7 +271,7 @@ fn is_requirement_id(value: &str) -> bool {
 #[derive(Debug)]
 struct Token {
     kind: TokenKind,
-    line: usize,
+    range: Range<usize>,
 }
 
 #[derive(Debug)]
@@ -275,13 +285,9 @@ fn tokenize(source: &str) -> Vec<Token> {
     let bytes = source.as_bytes();
     let mut tokens = Vec::new();
     let mut index = 0;
-    let mut line = 1;
 
     while index < bytes.len() {
         if bytes[index].is_ascii_whitespace() {
-            if bytes[index] == b'\n' {
-                line += 1;
-            }
             index += 1;
             continue;
         }
@@ -290,20 +296,19 @@ fn tokenize(source: &str) -> Vec<Token> {
             continue;
         }
         if bytes[index..].starts_with(b"/*") {
-            index = skip_block_comment(bytes, index, &mut line);
+            index = skip_block_comment(bytes, index);
             continue;
         }
         if bytes[index..].starts_with(b"''") {
-            index = skip_indented_string(bytes, index, &mut line);
+            index = skip_indented_string(bytes, index);
             continue;
         }
         if bytes[index] == b'"' {
-            let token_line = line;
-            let (value, next) = read_string(source, index, &mut line);
+            let (value, next) = read_string(source, index);
             if let Some(value) = value {
                 tokens.push(Token {
                     kind: TokenKind::String(value),
-                    line: token_line,
+                    range: index..next,
                 });
             }
             index = next;
@@ -329,7 +334,7 @@ fn tokenize(source: &str) -> Vec<Token> {
             }
             tokens.push(Token {
                 kind: TokenKind::Identifier(source[start..index].to_owned()),
-                line,
+                range: start..index,
             });
             continue;
         }
@@ -337,7 +342,7 @@ fn tokenize(source: &str) -> Vec<Token> {
         if character.is_ascii_punctuation() {
             tokens.push(Token {
                 kind: TokenKind::Punctuation(character),
-                line,
+                range: index..index + character.len_utf8(),
             });
         }
         index += character.len_utf8();
@@ -345,7 +350,7 @@ fn tokenize(source: &str) -> Vec<Token> {
     tokens
 }
 
-fn read_string(source: &str, start: usize, line: &mut usize) -> (Option<String>, usize) {
+fn read_string(source: &str, start: usize) -> (Option<String>, usize) {
     let bytes = source.as_bytes();
     let mut index = start + 1;
     let content_start = index;
@@ -362,17 +367,10 @@ fn read_string(source: &str, start: usize, line: &mut usize) -> (Option<String>,
                         .chars()
                         .next()
                         .expect("valid UTF-8 after string escape");
-                    if escaped == '\n' {
-                        *line += 1;
-                    }
                     index += escaped.len_utf8();
                 }
             }
             '"' => return (Some(source[content_start..index].to_owned()), index + 1),
-            '\n' => {
-                *line += 1;
-                index += character.len_utf8();
-            }
             _ => index += character.len_utf8(),
         }
     }
@@ -386,7 +384,7 @@ fn skip_line_comment(bytes: &[u8], mut index: usize) -> usize {
     index
 }
 
-fn skip_block_comment(bytes: &[u8], mut index: usize, line: &mut usize) -> usize {
+fn skip_block_comment(bytes: &[u8], mut index: usize) -> usize {
     let mut depth = 1usize;
     index += 2;
     while index < bytes.len() && depth > 0 {
@@ -397,16 +395,13 @@ fn skip_block_comment(bytes: &[u8], mut index: usize, line: &mut usize) -> usize
             depth -= 1;
             index += 2;
         } else {
-            if bytes[index] == b'\n' {
-                *line += 1;
-            }
             index += 1;
         }
     }
     index
 }
 
-fn skip_indented_string(bytes: &[u8], mut index: usize, line: &mut usize) -> usize {
+fn skip_indented_string(bytes: &[u8], mut index: usize) -> usize {
     index += 2;
     while index < bytes.len() {
         if bytes[index..].starts_with(b"'''") {
@@ -416,16 +411,10 @@ fn skip_indented_string(bytes: &[u8], mut index: usize, line: &mut usize) -> usi
         } else if bytes[index..].starts_with(b"''\"") {
             index += 3;
         } else if bytes[index..].starts_with(b"''\\") && index + 3 < bytes.len() {
-            if bytes[index + 3] == b'\n' {
-                *line += 1;
-            }
             index += 4;
         } else if bytes[index..].starts_with(b"''") {
             return index + 2;
         } else {
-            if bytes[index] == b'\n' {
-                *line += 1;
-            }
             index += 1;
         }
     }

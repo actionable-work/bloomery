@@ -1,6 +1,7 @@
 use crate::ScanOutput;
 use crate::SourceTree;
-use bloomery_model::{Diagnostic, Evidence, SourceLocation, TestSite};
+use crate::positions::SourceMap;
+use bloomery_model::{Diagnostic, Evidence, TestSite};
 use oxc_allocator::Allocator;
 use oxc_ast::{
     Visit,
@@ -43,22 +44,32 @@ pub fn scan(
 
         let allocator = Allocator::default();
         let parsed = parse(&allocator, &contents);
+        let positions = SourceMap::new(&contents);
         if !parsed.errors.is_empty() {
-            diagnostics.push(
-                Diagnostic::new(
-                    "PlaywrightParseError",
-                    format!(
-                        "Unable to parse TypeScript source: {} syntax errors",
-                        parsed.errors.len()
-                    ),
-                )
-                .at(path.clone(), Some(1)),
-            );
+            let mut diagnostic = Diagnostic::new(
+                "PlaywrightParseError",
+                format!(
+                    "Unable to parse TypeScript source: {} syntax errors",
+                    parsed.errors.len()
+                ),
+            )
+            .at(path.clone(), Some(1));
+            if let Some(label) = parsed
+                .errors
+                .iter()
+                .flat_map(|error| error.labels.iter().flatten())
+                .min_by_key(|label| label.offset())
+            {
+                diagnostic = diagnostic.at_location(
+                    positions.location(path, label.offset()..label.offset() + label.len()),
+                );
+            }
+            diagnostics.push(diagnostic);
             continue;
         }
 
         let mut visitor = PlaywrightVisitor {
-            source: &contents,
+            positions,
             path,
             tag_prefix,
             output: ScanOutput::default(),
@@ -85,7 +96,7 @@ fn parse<'a>(allocator: &'a Allocator, contents: &'a str) -> oxc_parser::ParserR
 }
 
 struct PlaywrightVisitor<'source> {
-    source: &'source str,
+    positions: SourceMap<'source>,
     path: &'source Path,
     tag_prefix: &'source str,
     output: ScanOutput,
@@ -122,10 +133,12 @@ impl<'ast> Visit<'ast> for PlaywrightVisitor<'_> {
                         let Some(id) = value.strip_prefix(self.tag_prefix) else {
                             continue;
                         };
-                        let line = line_for_offset(self.source, literal.span.start);
                         self.output.evidence.push(Evidence {
                             id: id.to_owned(),
-                            location: SourceLocation::new(self.path, Some(line)),
+                            location: self.positions.location(
+                                self.path,
+                                literal.span.start as usize..literal.span.end as usize,
+                            ),
                             scanner: "playwright",
                         });
                         references.push(id.to_owned());
@@ -133,11 +146,13 @@ impl<'ast> Visit<'ast> for PlaywrightVisitor<'_> {
                 }
             }
             let name = first_string_argument(&expression.arguments);
-            let line = line_for_offset(self.source, expression.span.start);
             self.output.tests.push(TestSite {
                 scanner: "playwright",
                 name,
-                location: SourceLocation::new(self.path, Some(line)),
+                location: self.positions.location(
+                    self.path,
+                    expression.span.start as usize..expression.span.end as usize,
+                ),
                 references,
             });
         }
@@ -175,12 +190,4 @@ fn object_expression<'ast>(
         Argument::ObjectExpression(object) => Some(object),
         _ => None,
     }
-}
-
-fn line_for_offset(source: &str, offset: u32) -> usize {
-    source[..offset as usize]
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
-        + 1
 }

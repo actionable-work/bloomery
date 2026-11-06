@@ -1,0 +1,29 @@
+group = "SPANS"
+
+[[requirements]]
+id = "PARSER-SCANNING-SPANS-001"
+title = "References retain complete literal ranges"
+manual = false
+design = "design/source-spans.md"
+ears = { type = "ubiquitous", system = "static analysis", action = "retain the complete quoted literal range for Rust, Playwright and Nix requirement references" }
+
+[[requirements]]
+id = "PARSER-SCANNING-SPANS-002"
+title = "Test sites retain declaration ranges"
+manual = false
+design = "design/source-spans.md"
+ears = { type = "ubiquitous", system = "static analysis", action = "retain function-name, call-expression and whole-file ranges for Rust, Playwright and Nix test sites respectively" }
+
+[[requirements]]
+id = "PARSER-SCANNING-SPANS-003"
+title = "Coordinates use Unicode scalar positions"
+manual = false
+design = "design/source-spans.md"
+ears = { type = "ubiquitous", system = "static analysis", action = "map UTF-8 offsets to one-based Unicode scalar coordinates with exclusive ends across multiline, tab and CRLF content" }
+
+[[requirements]]
+id = "PARSER-SCANNING-SPANS-004"
+title = "Diagnostics retain available ranges"
+manual = false
+design = "design/source-spans.md"
+ears = { type = "ubiquitous", system = "static analysis", action = "preserve available source diagnostic ranges while leaving unavailable columns and ends absent" }

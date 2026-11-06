@@ -55,12 +55,14 @@ pub struct ScannerStatus {
     pub state: ScannerState,
 }
 
-/// Available one-based source position; no end span is inferred.
+/// Available one-based Unicode scalar positions, with exclusive ends.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct Location {
     pub path: String,
     pub line: Option<usize>,
     pub column: Option<usize>,
+    pub end_line: Option<usize>,
+    pub end_column: Option<usize>,
 }
 
 impl From<&SourceLocation> for Location {
@@ -72,6 +74,8 @@ impl From<&SourceLocation> for Location {
                 .replace(std::path::MAIN_SEPARATOR, "/"),
             line: value.line,
             column: value.column,
+            end_line: value.end_line,
+            end_column: value.end_column,
         }
     }
 }

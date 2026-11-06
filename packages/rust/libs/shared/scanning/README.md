@@ -33,6 +33,11 @@ Filesystem discovery skips `.git`, `.jj`, `target`, `.direnv`, `result`, `node_m
 and symbolic links. It is a local adapter, not a sandbox for hostile live filesystems.
 
 `scan_tree` returns relative locations and deterministically ordered facts.
+Locations preserve one-based Unicode scalar start and exclusive end coordinates
+when available (`line`, `column`, `end_line`, `end_column`). Tabs count as one
+scalar; LF advances the line, including in CRLF input. Reference spans include
+quoted literal delimiters. Rust sites span names, Playwright sites span calls,
+and Nix sites span whole files. Unknown positions remain absent.
 `ScanAnalysis.scope` is `ScanScope::Syntactic`. Each scanner reports
 `DiscoveryState::{Disabled, NoMatchingFiles, Complete}`. Failed input or parsing
 returns diagnostics and no successful analysis. `is_complete()` requires all

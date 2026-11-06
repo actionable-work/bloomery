@@ -48,3 +48,17 @@ title = "Reports state the static analysis boundary"
 manual = false
 design = "design/static-report.md"
 ears = { type = "ubiquitous", system = "static reporting", action = "declare syntactic scope and unsupported target, feature and conditional compilation resolution without execution or approval claims" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-REPORT-008"
+title = "Versioned reports preserve complete source locations"
+manual = false
+design = "design/static-report.md"
+ears = { type = "ubiquitous", system = "static analysis", action = "serialize complete available source ranges under report version 2 and parser contract version 2 across tree adapters and the CLI" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-REPORT-009"
+title = "Relational findings preserve reference ranges"
+manual = false
+design = "design/static-report.md"
+ears = { type = "ubiquitous", system = "static analysis", action = "retain the complete reference location in orphan and manual-automation findings" }

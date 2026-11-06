@@ -57,7 +57,7 @@ pub fn validate_evidence(context: &Context, evidence: &[Evidence]) -> Result<(),
                             item.scanner
                         ),
                     )
-                    .at(item.location.path.clone(), item.location.line),
+                    .at_location(item.location.clone()),
                 );
             }
             continue;
@@ -69,7 +69,7 @@ pub fn validate_evidence(context: &Context, evidence: &[Evidence]) -> Result<(),
                         "IllegalManualAutomation",
                         format!("Manual requirement '{id}' is referenced by automated evidence"),
                     )
-                    .at(item.location.path.clone(), item.location.line)
+                    .at_location(item.location.clone())
                     .note(format!(
                         "Requirement is declared at {}:{}",
                         requirement

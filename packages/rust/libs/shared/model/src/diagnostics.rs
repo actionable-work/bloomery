@@ -1,12 +1,13 @@
-use std::cmp::Ordering;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SourceLocation {
     pub path: PathBuf,
     pub line: Option<usize>,
     pub column: Option<usize>,
+    pub end_line: Option<usize>,
+    pub end_column: Option<usize>,
 }
 
 impl SourceLocation {
@@ -15,6 +16,8 @@ impl SourceLocation {
             path: path.into(),
             line,
             column: None,
+            end_line: None,
+            end_column: None,
         }
     }
 
@@ -53,27 +56,20 @@ impl Diagnostic {
         self.notes.push(note.into());
         self
     }
+
+    pub fn at_location(mut self, location: SourceLocation) -> Self {
+        self.location = Some(Box::new(location));
+        self
+    }
 }
 
 pub fn sort_diagnostics(diagnostics: &mut [Diagnostic]) {
     diagnostics.sort_by(|left, right| {
-        fn location_key(diagnostic: &Diagnostic) -> Option<(&Path, usize)> {
-            diagnostic
-                .location
-                .as_ref()
-                .map(|location| (location.path.as_path(), location.line.unwrap_or(0)))
-        }
-
-        match (location_key(left), location_key(right)) {
-            (Some((left_path, left_line)), Some((right_path, right_line))) => {
-                left_path.cmp(right_path).then(left_line.cmp(&right_line))
-            }
-            (None, Some(_)) => Ordering::Less,
-            (Some(_), None) => Ordering::Greater,
-            (None, None) => Ordering::Equal,
-        }
-        .then_with(|| left.code.cmp(&right.code))
-        .then_with(|| left.message.cmp(&right.message))
+        left.location
+            .cmp(&right.location)
+            .then_with(|| left.code.cmp(&right.code))
+            .then_with(|| left.message.cmp(&right.message))
+            .then_with(|| left.notes.cmp(&right.notes))
     });
 }
 

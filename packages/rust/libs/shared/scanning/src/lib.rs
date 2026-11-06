@@ -19,6 +19,7 @@ mod analysis;
 mod clippy;
 mod health;
 mod nix;
+mod positions;
 mod rust;
 mod tree_scan;
 mod typescript;

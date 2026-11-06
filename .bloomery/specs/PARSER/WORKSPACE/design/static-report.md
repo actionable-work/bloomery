@@ -14,7 +14,7 @@ analysis, without a tree identity or downstream findings.
 
 ## Identity
 
-Report format version 1 binds SHA-256 identities for the snapshot, the complete
+Report format version 2 binds SHA-256 identities for the snapshot, the complete
 typed configuration with defaults, the active specification subtree, and the
 report payload. Hash inputs are compact canonical JSON with sorted object keys;
 file bytes are represented by their SHA-256 digest. Directory identity includes
@@ -31,8 +31,12 @@ not a compiled executable or an execution attestation.
 
 The report contains requirement definitions, discovered test sites and literal
 references, binding resolution, stable diagnostic codes, notes and repository-
-relative locations. Locations preserve available one-based line and column
-positions; unavailable end positions are not fabricated.
+relative locations. Locations preserve available one-based Unicode scalar start
+and exclusive end line/column positions under the shared
+[source span contract](../../SCANNING/design/source-spans.md). Unknown positions
+remain null. The parser contract is `bloomery-static-syntax-v2`; the specification
+schema remains `bloomery-grouped-specifications-v1`.
+Orphan and manual-automation findings retain the full reference location.
 
 Each tree, specification, discovery and relational stage has explicit state.
 Scanner enablement and no-matching-files states remain visible. An aggregate

@@ -7,7 +7,7 @@
 //!
 //! let tree = MemoryTree::new([("tests/example.rs", "#[test] fn example() {}")]).unwrap();
 //! let report = analyze_tree(&tree, Config::default());
-//! assert_eq!(report.version, 1);
+//! assert_eq!(report.version, 2);
 //! assert_eq!(report.completeness.tree, StageState::Complete);
 //! assert_eq!(report.scope.kind, "syntactic");
 //! ```
@@ -25,8 +25,8 @@ use identity::{Manifest, identity, snapshot};
 use std::path::Path;
 pub use types::*;
 
-pub const REPORT_VERSION: u32 = 1;
-pub const PARSER_CONTRACT: &str = "bloomery-static-syntax-v1";
+pub const REPORT_VERSION: u32 = 2;
+pub const PARSER_CONTRACT: &str = "bloomery-static-syntax-v2";
 pub const SPECIFICATION_SCHEMA: &str = "bloomery-grouped-specifications-v1";
 
 /// Analyze a local repository with explicit configuration. Paths remain relative.

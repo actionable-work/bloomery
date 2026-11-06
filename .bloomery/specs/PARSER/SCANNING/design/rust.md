@@ -30,4 +30,5 @@ malformed nested argument or a non-string value is a source diagnostic.
 
 The scanner never compiles or executes Rust. It does not infer requirement IDs
 from function names, comments, or test bodies. The actual token span of the
-`cfg_attr` attribute is retained for orphan and illegal-manual diagnostics.
+quoted requirement literal is retained for orphan and illegal-manual diagnostics.
+Test sites retain the function-name range. See [source spans](source-spans.md).

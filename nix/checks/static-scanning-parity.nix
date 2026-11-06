@@ -6,7 +6,7 @@
 in
   pkgs.runCommand "bloomery-static-scanning-parity" {
     nativeBuildInputs = [pkgs.rustc pkgs.stdenv.cc pkgs.zstd pkgs.python3];
-    passthru.bloomery = ["PARSER-SCANNING-TREES-001" "PARSER-WORKSPACE-TREES-008" "PARSER-WORKSPACE-REPORT-001" "CLI-SPEC-TRACE-017"];
+    passthru.bloomery = ["PARSER-SCANNING-TREES-001" "PARSER-WORKSPACE-TREES-008" "PARSER-WORKSPACE-REPORT-001" "PARSER-WORKSPACE-REPORT-008" "CLI-SPEC-TRACE-017"];
   } ''
     ${dependencies}
     declare -a EXTERN_FLAGS=() LINK_FLAGS=()

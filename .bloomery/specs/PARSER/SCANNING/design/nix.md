@@ -21,8 +21,9 @@ The scanner walks the repository-relative `scanners.nix.paths` globs plus the
 statically tokenizes matching Nix source files. It extracts literal IDs from
 both `passthru.bloomery = [ ... ];` and a nested
 `passthru = { bloomery = [ ... ]; };` attribute set, retaining each string's
-source file and line. Comments and Nix strings outside the metadata list do not
+source file and complete quoted-literal range. Comments and Nix strings outside the metadata list do not
 create evidence.
+File sites and metadata diagnostics follow the shared [source span contract](source-spans.md).
 
 Metadata should contain literal, contract-valid requirement IDs. Dynamically
 computed IDs cannot be discovered statically and are not evidence.

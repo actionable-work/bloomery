@@ -1,6 +1,7 @@
 use crate::ScanOutput;
 use crate::SourceTree;
 use crate::analysis::AnalysisSession;
+use crate::positions::SourceMap;
 use bloomery_model::{Diagnostic, Evidence, SourceLocation, TestSite};
 use std::path::Path;
 use syn::punctuated::Punctuated;
@@ -38,6 +39,7 @@ pub fn scan(
         };
         let mut visitor = Visitor {
             path,
+            positions: SourceMap::new(&parsed.source),
             output: ScanOutput::default(),
             diagnostics: Vec::new(),
         };
@@ -54,6 +56,7 @@ pub fn scan(
 
 struct Visitor<'a> {
     path: &'a Path,
+    positions: SourceMap<'a>,
     output: ScanOutput,
     diagnostics: Vec<Diagnostic>,
 }
@@ -91,31 +94,41 @@ impl<'ast> Visit<'ast> for Visitor<'_> {
                     match list.parse_args::<syn::LitStr>() {
                         Ok(value) => {
                             let id = value.value();
-                            let line = value.span().start().line;
                             self.output.evidence.push(Evidence {
                                 id: id.clone(),
-                                location: SourceLocation::new(self.path, Some(line)),
+                                location: self
+                                    .positions
+                                    .location(self.path, value.span().byte_range()),
                                 scanner: "rust",
                             });
                             references.push(id);
                         }
-                        Err(error) => self.diagnostics.push(
-                            Diagnostic::new(
-                                "RustReferenceError",
-                                format!(
-                                    "Bloomery evidence tag must contain one string ID: {error}"
-                                ),
-                            )
-                            .at(self.path.to_path_buf(), Some(1)),
-                        ),
+                        Err(error) => {
+                            let range = error.span().byte_range();
+                            let location = if range.is_empty() {
+                                SourceLocation::new(self.path, Some(1))
+                            } else {
+                                self.positions.location(self.path, range)
+                            };
+                            self.diagnostics.push(
+                                Diagnostic::new(
+                                    "RustReferenceError",
+                                    format!(
+                                        "Bloomery evidence tag must contain one string ID: {error}"
+                                    ),
+                                )
+                                .at_location(location),
+                            );
+                        }
                     }
                 }
             }
-            let line = item.sig.ident.span().start().line;
             self.output.tests.push(TestSite {
                 scanner: "rust",
                 name: Some(name),
-                location: SourceLocation::new(self.path, Some(line)),
+                location: self
+                    .positions
+                    .location(self.path, item.sig.ident.span().byte_range()),
                 references,
             });
         }

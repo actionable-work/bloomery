@@ -23,6 +23,7 @@ candidate projection over untagged tests belongs to
 
 - [Scanner architecture](design/overview.md)
 - [Public source tree inputs](design/source-trees.md)
+- [Source span coordinates](design/source-spans.md)
 - [Rust scanning](design/rust.md)
 - [Shared Rust health analysis](design/health-analysis.md)
 - [Playwright scanning](design/playwright.md)

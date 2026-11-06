@@ -71,7 +71,8 @@ fn complete_report_preserves_static_facts_scope_and_source_positions() {
         report
             .bindings
             .iter()
-            .all(|binding| binding.location.column.is_none())
+            .all(|binding| binding.location.column.is_some()
+                && binding.location.end_column.is_some())
     );
     assert_eq!(report.scope.kind, "syntactic");
     assert_eq!(report.scope.target_resolution, "unsupported");
@@ -147,10 +148,14 @@ fn identities_are_canonical_and_bind_relevant_inputs() {
     payload["inputs"]["parser_contract"] = PARSER_CONTRACT.into();
     payload["inputs"]["specification_schema"] = "next-schema".into();
     assert_ne!(original.identity, identity(&payload));
+    payload["inputs"]["specification_schema"] = SPECIFICATION_SCHEMA.into();
+    payload["bindings"][0]["location"]["end_column"] = 999.into();
+    assert_ne!(original.identity, identity(&payload));
 }
 
 #[test]
 #[cfg_attr(any(), bloomery("PARSER-WORKSPACE-REPORT-003"))]
+#[cfg_attr(any(), bloomery("PARSER-WORKSPACE-REPORT-009"))]
 fn relational_findings_preserve_missing_manual_and_unknown_references() {
     let mut files = files();
     files
@@ -194,6 +199,35 @@ fn relational_findings_preserve_missing_manual_and_unknown_references() {
             .bindings
             .iter()
             .any(|binding| binding.resolution == BindingResolution::Manual)
+    );
+    for finding in report.diagnostics.iter().filter(|finding| {
+        matches!(
+            finding.code.as_str(),
+            "OrphanTestReference" | "IllegalManualAutomation"
+        )
+    }) {
+        let location = finding.location.as_ref().expect("source location");
+        assert!(
+            location.column.is_some()
+                && location.end_line.is_some()
+                && location.end_column.is_some()
+        );
+        assert!(
+            report
+                .bindings
+                .iter()
+                .any(|binding| binding.location == *location)
+        );
+    }
+    let missing = report
+        .diagnostics
+        .iter()
+        .find(|finding| finding.code == "MissingAutomatedTest")
+        .expect("missing finding");
+    let location = missing.location.as_ref().expect("declaration location");
+    assert_eq!(
+        (location.column, location.end_line, location.end_column),
+        (None, None, None)
     );
 }
 
@@ -271,6 +305,31 @@ fn malformed_specs_and_sources_retain_failures_without_dependent_claims() {
 struct CountingTree {
     memory: MemoryTree,
     reads: RefCell<BTreeMap<String, usize>>,
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("PARSER-WORKSPACE-REPORT-009"))]
+fn same_line_relational_ranges_are_sorted_independent_of_evidence_order() {
+    let mut files = files();
+    files.insert("tests/a.rs".into(), "#[cfg_attr(any(), bloomery(\"DEMO-TESTS-BIND-999\"), bloomery(\"DEMO-TESTS-BIND-999\"))]\n#[test] fn unknown() {}".into());
+    let tree = MemoryTree::new(files).expect("tree");
+    let context = bloomery_workspace::load_tree(&tree, config()).expect("specifications");
+    let mut evidence = scan_tree(&tree, &context.config.scanners)
+        .expect("scan")
+        .output
+        .evidence;
+    let first = crate::validate_evidence(&context, &evidence).expect_err("unknown IDs");
+    evidence.reverse();
+    assert_eq!(
+        first,
+        crate::validate_evidence(&context, &evidence).expect_err("reversed IDs")
+    );
+    let orphans: Vec<_> = first
+        .iter()
+        .filter(|finding| finding.code == "OrphanTestReference")
+        .collect();
+    assert_eq!(orphans.len(), 2);
+    assert!(orphans[0].location < orphans[1].location);
 }
 
 impl SourceTree for CountingTree {
