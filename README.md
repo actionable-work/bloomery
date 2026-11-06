@@ -98,6 +98,9 @@ accepts virtual or filesystem source trees with explicit scanner configuration.
 It returns syntactic references and test bindings without executing checks.
 The [static specification loader](packages/rust/libs/shared/workspace/README.md)
 uses the same tree adapters to discover specs directly from repository files.
+The [versioned static report API](packages/rust/libs/shared/check/README.md)
+combines these facts with canonical input identities and explicit completeness.
+Its CLI adapter is `bloomery --json spec trace --report`.
 
 ### Per-Crate Overrides
 

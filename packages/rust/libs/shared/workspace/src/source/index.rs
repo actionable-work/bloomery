@@ -11,6 +11,16 @@ pub struct TreeIndex {
 }
 
 impl TreeIndex {
+    /// Sorted canonical paths after applying the shared discovery exclusions.
+    pub fn files(&self) -> impl Iterator<Item = &str> {
+        self.files.iter().map(String::as_str)
+    }
+
+    /// Sorted explicit and inferred directory paths.
+    pub fn directories(&self) -> impl Iterator<Item = &str> {
+        self.directories.iter().map(String::as_str)
+    }
+
     pub fn new(tree: &dyn SourceTree) -> Result<Self, String> {
         let files: BTreeSet<_> = validate_index(tree.paths()?)?.into_iter().collect();
         let mut directories = BTreeSet::new();

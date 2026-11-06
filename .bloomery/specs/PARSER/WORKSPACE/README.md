@@ -22,6 +22,7 @@ remain in their normal repository locations and are found through
 
 - [Workspace layout](design/layout.md)
 - [Static repository tree inputs](design/source-trees.md)
+- [Versioned static reports](design/static-report.md)
 - [Area and feature document contracts](design/document-contracts.md)
 
 ## Responsibilities

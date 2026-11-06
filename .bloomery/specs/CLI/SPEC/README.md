@@ -33,6 +33,7 @@ contracts with a typesafe editing and read-only projection layer.
 - Publish mutations atomically.
 - Report the tests statically tied to each requested requirement.
 - Report statically discovered tests that carry no requirement reference.
+- Expose the versioned static report through `spec trace --report`.
 - Support human-readable and JSON output.
 - Return stable exit codes.
 
@@ -40,9 +41,9 @@ contracts with a typesafe editing and read-only projection layer.
 
 Spec mutations edit grouped TOML requirement records below
 `.bloomery/<specs.dir>/`. They never edit area or feature READMEs, design
-documents, configuration, or lockfiles. Spec commands operate only when
-specification management is enabled; when it is disabled they report
-that specification management is disabled. Trace and candidate discovery read
+documents, configuration, or lockfiles. Record projections and editing commands
+require enabled specification management. `spec trace --report` represents
+disablement explicitly in its completeness states. Trace and candidate discovery read
 source configured through `scanners.*` and never execute tests, launch
 applications, or instantiate derivations. Spec does not run checks, manage
 review status, or assign owners.

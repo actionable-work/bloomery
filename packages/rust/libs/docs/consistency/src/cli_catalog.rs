@@ -140,7 +140,7 @@ fn spec_operation_path(operation: &SpecOperation) -> &'static str {
         SpecOperation::Add { .. } => "spec add",
         SpecOperation::Set { .. } => "spec set",
         SpecOperation::Remove { .. } => "spec remove",
-        SpecOperation::Trace { .. } => "spec trace",
+        SpecOperation::Trace { .. } | SpecOperation::TraceReport => "spec trace",
         SpecOperation::Candidates => "spec candidates",
     }
 }

@@ -314,8 +314,11 @@ enum RawSpecOperation {
     /// Report the tests statically tied to one or more requirements.
     Trace {
         /// Full requirement IDs.
-        #[arg(required = true, num_args = 1.., value_name = "ID")]
+        #[arg(required_unless_present = "report", conflicts_with = "report", num_args = 1.., value_name = "ID")]
         ids: Vec<String>,
+        /// Return the complete versioned static report without executing checks.
+        #[arg(long)]
+        report: bool,
     },
     /// Report discovered tests that are not tied to any requirement.
     Candidates,
@@ -357,7 +360,8 @@ impl From<RawSpecOperation> for SpecOperation {
             },
             RawSpecOperation::Set { id, field, value } => Self::Set { id, field, value },
             RawSpecOperation::Remove { id } => Self::Remove { id },
-            RawSpecOperation::Trace { ids } => Self::Trace { ids },
+            RawSpecOperation::Trace { report: true, .. } => Self::TraceReport,
+            RawSpecOperation::Trace { ids, .. } => Self::Trace { ids },
             RawSpecOperation::Candidates => Self::Candidates,
         }
     }

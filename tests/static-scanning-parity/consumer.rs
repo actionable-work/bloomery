@@ -6,6 +6,10 @@ use std::path::PathBuf;
 
 fn main() {
     let root = PathBuf::from(std::env::args().nth(1).expect("fixture root"));
+    if std::env::args().nth(2).as_deref() == Some("--report") {
+        compare_reports(&root);
+        return;
+    }
     let files = [
         (
             "tests/a.rs",
@@ -139,6 +143,26 @@ fn main() {
         memory.read("tests/a.rs").expect("original"),
     )
     .expect("restore fixture");
+}
+
+fn compare_reports(root: &std::path::Path) {
+    let disk = FilesystemTree::new(root);
+    let memory = MemoryTree::from_bytes(
+        disk.paths().expect("paths").into_iter().map(|path| {
+            let bytes = disk.read_bytes(&path).expect("bytes");
+            (path, bytes)
+        }),
+        disk.directories().expect("directories"),
+    )
+    .expect("snapshot");
+    let config = bloomery_model::config::load(root).expect("configuration");
+    let report = bloomery_check::report::analyze_tree(&memory, config.clone());
+    assert_eq!(
+        report,
+        bloomery_check::report::analyze_tree(&disk, config.clone())
+    );
+    assert_eq!(report, bloomery_check::report::analyze(root, config));
+    println!("{}", serde_json::to_string(&report).expect("JSON"));
 }
 
 fn repository_snapshot(disk: &FilesystemTree) -> MemoryTree {

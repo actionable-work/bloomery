@@ -42,5 +42,7 @@ Neither API runs tests or grants hosted approval.
 Compatibility: manually constructed `Context` values must supply resolved
 `specs_enabled`. Filesystem loading follows the shared symlink/ignored-directory
 rules, and unreadable referenced design files fail even without an anchor.
-CLI flags and result envelopes are unchanged. The versioned static wire report,
-canonical input identities and target/feature resolution remain separate work.
+The [versioned report API](../check/README.md) composes loading and discovery
+with canonical identities and explicit completeness. `MemoryTree::from_bytes`
+preserves binary content for snapshots; text constructors remain available.
+Target/feature resolution remains outside syntactic analysis.

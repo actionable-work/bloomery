@@ -4,7 +4,7 @@
 over the resolved requirement model and the statically discovered test sites.
 Both require the shared root `flake.nix` and `.bloomery/config.toml`
 preflights. When specification management is disabled,
-both report an error naming the disabled management instead of loading a
+the ID and candidate projections report an error naming the disabled management instead of loading a
 requirement model. Neither mutates the specification tree, configuration, or lockfiles,
 and neither executes tests.
 
@@ -27,6 +27,18 @@ declared model is a usage error naming the ID.
 Reference ordering is deterministic by scanner, path, and line. Trace uses the
 same `scanners.*` configuration and static boundary as
 [static evidence scanning](../../../PARSER/SCANNING/README.md).
+
+### Full static report
+
+`bloomery spec trace --report` accepts no IDs and returns the complete
+[versioned static report](../../../PARSER/WORKSPACE/design/static-report.md).
+It uses the same filesystem library entry point and explicit parsed
+configuration. Disabled specifications, malformed specifications and scanner
+failures remain report content. Shared configuration and flake preflights still
+apply. JSON carries `result.report` under operation `trace_report`. Human output
+shows scope, stage completeness and diagnostics. Exit zero means the report was
+produced, including when it contains static findings or incomplete analysis.
+It does not mean tests passed or approval was granted.
 
 ## Candidates
 

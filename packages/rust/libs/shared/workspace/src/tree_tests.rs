@@ -343,3 +343,21 @@ fn explicit_directories_preserve_empty_design_folders_and_reject_collisions() {
     assert!(MemoryTree::with_directories(Vec::<(String, String)>::new(), ["a", "a"]).is_err());
     assert!(MemoryTree::with_directories(Vec::<(String, String)>::new(), ["../escape"]).is_err());
 }
+
+#[test]
+#[cfg_attr(any(), bloomery("PARSER-WORKSPACE-REPORT-002"))]
+fn byte_trees_preserve_binary_content_and_canonical_directories() {
+    let bytes = vec![0, 255, 128];
+    let tree =
+        MemoryTree::from_bytes([("images/icon", bytes.clone())], ["empty"]).expect("byte tree");
+    assert_eq!(tree.read_bytes("images/icon").expect("bytes"), bytes);
+    assert!(tree.read("images/icon").is_err());
+    let index = TreeIndex::new(&tree).expect("index");
+    assert_eq!(index.files().collect::<Vec<_>>(), ["images/icon"]);
+    assert_eq!(index.directories().collect::<Vec<_>>(), ["empty", "images"]);
+    let fixture = Fixture::new();
+    fs::write(fixture.0.join("binary"), &bytes).expect("binary file");
+    let disk = FilesystemTree::new(&fixture.0);
+    assert_eq!(disk.read_bytes("binary").expect("filesystem bytes"), bytes);
+    assert!(disk.read("binary").is_err());
+}

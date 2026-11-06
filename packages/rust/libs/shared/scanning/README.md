@@ -29,7 +29,7 @@ Implement `SourceTree` for other caller-authorized stores; return canonical
 repository-relative UTF-8 paths from `paths()` and content from `read(path)`.
 The index and contents must stay stable during a call. MemoryTree construction
 rejects noncanonical paths, duplicates and file/directory collisions.
-Filesystem discovery skips `.git`, `target`, `.direnv`, `result`, `node_modules`
+Filesystem discovery skips `.git`, `.jj`, `target`, `.direnv`, `result`, `node_modules`
 and symbolic links. It is a local adapter, not a sandbox for hostile live filesystems.
 
 `scan_tree` returns relative locations and deterministically ordered facts.
@@ -54,10 +54,11 @@ and compared with the actual CLI by the `core:static-scanning-parity` Nix check.
 It compares bindings, locations, ordering, syntactic scope and discovery states
 between library adapters and the fields available in the CLI projections.
 
-The API has no versioned wire report, immutable tree/configuration/spec-set
-digest, or execution/approval result fields. Static spec parsing through
+The [versioned static report API](../check/README.md) composes these scanners
+with tree/configuration/spec-set identities and explicit completeness. Static spec parsing through
 `bloomery_workspace::load_tree` accepts the same tree and explicit configuration.
 Default/custom `.bloomery/<specs.dir>` paths and duplicate-ID validation belong
 to `bloomery-workspace`; configuration-format upgrades do not
 constitute a legacy specification-tree migration or preserve spec revision and
-lineage metadata. These are separate public contract work.
+lineage metadata. Target/feature resolution and explicit legacy migration remain
+separate public contract work.

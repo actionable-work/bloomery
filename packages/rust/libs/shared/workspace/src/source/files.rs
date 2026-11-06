@@ -44,7 +44,7 @@ fn walk_files(
 pub(crate) fn ignored_name(name: &str) -> bool {
     matches!(
         name,
-        ".git" | "target" | ".direnv" | "result" | "node_modules"
+        ".git" | ".jj" | "target" | ".direnv" | "result" | "node_modules"
     )
 }
 

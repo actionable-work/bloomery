@@ -4,8 +4,9 @@
 records. It requires the shared root `flake.nix` and `.bloomery/config.toml`
 preflights, then loads the specification tree at
 `.bloomery/<specs.dir>/`. When specification management is disabled,
-every `bloomery spec` command reports an error naming the
+every record projection and editing command reports an error naming the
 disabled management instead of loading a tree.
+The full `spec trace --report` represents disabled management in report content.
 
 ## Invocation
 

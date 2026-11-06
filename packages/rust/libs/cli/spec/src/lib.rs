@@ -147,6 +147,9 @@ pub enum SpecOutcome {
     Trace {
         requirements: Vec<TraceRecord>,
     },
+    TraceReport {
+        report: Box<bloomery_check::report::StaticReport>,
+    },
     Candidates {
         candidates: Vec<CandidateRecord>,
     },
@@ -160,6 +163,14 @@ pub struct SpecReport {
 
 /// Execute one `bloomery spec` command against the repository rooted at `root`.
 pub fn run_at(operation: &SpecOperation, root: &Path) -> Result<SpecReport, SpecError> {
+    if *operation == SpecOperation::TraceReport {
+        let config = bloomery_model::config::load(root).map_err(SpecError::from_diagnostic)?;
+        return Ok(SpecReport {
+            outcome: SpecOutcome::TraceReport {
+                report: Box::new(bloomery_check::report::analyze(root, config)),
+            },
+        });
+    }
     let context = bloomery_workspace::load(root).map_err(SpecError::from_diagnostics)?;
     if !context.spec_management_enabled() {
         return Err(SpecError::failure(
@@ -192,6 +203,9 @@ pub fn run_at(operation: &SpecOperation, root: &Path) -> Result<SpecReport, Spec
         SpecOperation::Set { id, field, value } => editing::set(root, &context, id, field, value)?,
         SpecOperation::Remove { id } => editing::remove(root, &context, id)?,
         SpecOperation::Trace { ids } => trace::trace(&context, root, ids)?,
+        SpecOperation::TraceReport => {
+            unreachable!("full report is handled before projection loading")
+        }
         SpecOperation::Candidates => trace::candidates(&context, root)?,
     };
     Ok(SpecReport { outcome })

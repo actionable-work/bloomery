@@ -128,6 +128,7 @@ fn write_required_operation(command: &CliCommand) -> Option<&'static str> {
             bloomery_cli_types::SpecOperation::List { .. }
             | bloomery_cli_types::SpecOperation::Show { .. }
             | bloomery_cli_types::SpecOperation::Trace { .. }
+            | bloomery_cli_types::SpecOperation::TraceReport
             | bloomery_cli_types::SpecOperation::Candidates => None,
         },
         CliCommand::Check(args) => match &args.operation {
@@ -1053,6 +1054,32 @@ fn render_spec_success(report: &SpecReport, color: output::ColorMode, stdout: &m
                                 writeln!(stdout, "    {} {}", reference.scanner, reference.path);
                         }
                     }
+                }
+            }
+        }
+        SpecOutcome::TraceReport { report } => {
+            let _ = writeln!(
+                stdout,
+                "static report v{} ({})",
+                report.version, report.scope.kind
+            );
+            let _ = writeln!(
+                stdout,
+                "tree: {:?}; specifications: {:?}; discovery: {:?}; relations: {:?}",
+                report.completeness.tree,
+                report.completeness.specifications,
+                report.completeness.discovery,
+                report.completeness.relations
+            );
+            for finding in &report.diagnostics {
+                let _ = writeln!(stdout, "[{}] {}", finding.code, finding.message);
+                if let Some(location) = &finding.location {
+                    let _ = writeln!(
+                        stdout,
+                        "    {}:{}",
+                        location.path,
+                        location.line.unwrap_or(1)
+                    );
                 }
             }
         }
@@ -2345,6 +2372,14 @@ mod tests {
         assert_eq!(
             operation(&["bloomery", "spec", "candidates"]),
             SpecOperation::Candidates
+        );
+        assert_eq!(
+            operation(&["bloomery", "spec", "trace", "--report"]),
+            SpecOperation::TraceReport
+        );
+        assert!(Cli::try_parse_from(["bloomery", "spec", "trace"]).is_err());
+        assert!(
+            Cli::try_parse_from(["bloomery", "spec", "trace", "--report", "A-F-G-001"]).is_err()
         );
 
         assert!(Cli::try_parse_from(["bloomery", "spec", "show", "ID", "--area", "A"]).is_err());

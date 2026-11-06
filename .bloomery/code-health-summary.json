@@ -160,14 +160,14 @@
     {
       "manifest_path": "packages/rust/libs/cli/cli-app/Cargo.toml",
       "name": "bloomery-cli-app",
-      "overall_score": 95.18,
-      "sloc": 1079,
+      "overall_score": 95.08,
+      "sloc": 1106,
       "subscores": {
-        "complexity": 1.88,
+        "complexity": 1.95,
         "crateSize": 0.0,
         "duplication": 0.0,
         "nesting": 0.0,
-        "size": 2.95
+        "size": 2.97
       }
     },
     {
@@ -187,7 +187,7 @@
       "manifest_path": "packages/rust/libs/cli/cli-parser/Cargo.toml",
       "name": "bloomery-cli-parser",
       "overall_score": 100.0,
-      "sloc": 635,
+      "sloc": 639,
       "subscores": {
         "complexity": 0.0,
         "crateSize": 0.0,
@@ -200,7 +200,7 @@
       "manifest_path": "packages/rust/libs/cli/cli-types/Cargo.toml",
       "name": "bloomery-cli-types",
       "overall_score": 100.0,
-      "sloc": 176,
+      "sloc": 177,
       "subscores": {
         "complexity": 0.0,
         "crateSize": 0.0,
@@ -264,14 +264,14 @@
     {
       "manifest_path": "packages/rust/libs/cli/spec/Cargo.toml",
       "name": "bloomery-spec",
-      "overall_score": 99.02,
-      "sloc": 676,
+      "overall_score": 98.81,
+      "sloc": 690,
       "subscores": {
-        "complexity": 0.39,
+        "complexity": 0.51,
         "crateSize": 0.0,
-        "duplication": 0.4,
+        "duplication": 0.38,
         "nesting": 0.0,
-        "size": 0.2
+        "size": 0.3
       }
     },
     {
@@ -290,7 +290,7 @@
     {
       "manifest_path": "packages/rust/libs/docs/consistency/Cargo.toml",
       "name": "bloomery-docs-consistency",
-      "overall_score": 98.52,
+      "overall_score": 98.53,
       "sloc": 707,
       "subscores": {
         "complexity": 0.14,
@@ -342,14 +342,14 @@
     {
       "manifest_path": "packages/rust/libs/shared/check/Cargo.toml",
       "name": "bloomery-check",
-      "overall_score": 98.26,
-      "sloc": 304,
+      "overall_score": 98.95,
+      "sloc": 789,
       "subscores": {
-        "complexity": 0.13,
+        "complexity": 0.05,
         "crateSize": 0.0,
         "duplication": 0.0,
         "nesting": 0.0,
-        "size": 1.61
+        "size": 1.0
       }
     },
     {
@@ -394,18 +394,18 @@
     {
       "manifest_path": "packages/rust/libs/shared/workspace/Cargo.toml",
       "name": "bloomery-workspace",
-      "overall_score": 97.92,
-      "sloc": 886,
+      "overall_score": 98.04,
+      "sloc": 918,
       "subscores": {
-        "complexity": 0.24,
+        "complexity": 0.22,
         "crateSize": 0.0,
-        "duplication": 1.34,
+        "duplication": 1.29,
         "nesting": 0.0,
-        "size": 0.5
+        "size": 0.45
       }
     }
   ],
-  "input_digest": "d31c7353a14c6d09ea04f098af3ed22f2f11c03e2b4be312668e881c12fb1d75",
+  "input_digest": "bf4e763f91dec5c50984f4f26a79001c0e72467c565a4e16914cb4bca2cae78c",
   "policy": {
     "scoring": {
       "crateSlocLimit": 1500,
@@ -430,12 +430,12 @@
   "schema_version": 4,
   "workspace": {
     "crate_count": 31,
-    "overall_score": 93.57,
-    "sloc": 25037,
+    "overall_score": 93.68,
+    "sloc": 25600,
     "subscores": {
       "complexity": 0.48,
-      "crateSize": 4.77,
-      "duplication": 0.32,
+      "crateSize": 4.67,
+      "duplication": 0.31,
       "nesting": 0.01,
       "size": 0.86
     }

@@ -14,6 +14,10 @@ The index retains canonical relative file and directory paths, infers ancestors
 and represents explicit empty directories. Duplicate paths and file/directory
 collisions are errors. Filesystem traversal excludes symbolic links and standard
 ignored directories. A selected file whose content is unavailable is an error.
+`SourceTree::read_bytes` preserves raw file content for snapshot identity;
+`read` supplies UTF-8 documents to parsers. Text-only adapters inherit byte
+reads from their text implementation. `MemoryTree::from_bytes` preserves binary
+files and explicit directories without interpreting unselected content.
 
 ## Loading
 

@@ -3,6 +3,7 @@ use bloomery_scanning::scan_all_with_session;
 use std::collections::BTreeMap;
 
 pub mod health;
+pub mod report;
 
 pub use bloomery_scanning::AnalysisSession;
 pub use bloomery_scanning::find_clippy_suppressions;

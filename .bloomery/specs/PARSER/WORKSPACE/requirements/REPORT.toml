@@ -1,0 +1,50 @@
+group = "REPORT"
+
+[[requirements]]
+id = "PARSER-WORKSPACE-REPORT-001"
+title = "Static reports share tree adapters"
+manual = false
+design = "design/static-report.md"
+ears = { type = "ubiquitous", system = "static reporting", action = "produce identical versioned reports from equivalent filesystem and virtual trees" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-REPORT-002"
+title = "Reports bind canonical input identities"
+manual = false
+design = "design/static-report.md"
+ears = { type = "ubiquitous", system = "static reporting", action = "bind deterministic identities that change when tree bytes, directories, configuration or active specification content changes" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-REPORT-003"
+title = "Reports preserve diagnostics and test bindings"
+manual = false
+design = "design/static-report.md"
+ears = { type = "ubiquitous", system = "static reporting", action = "retain stable diagnostics, source positions, test declarations and literal reference resolution" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-REPORT-004"
+title = "Reports expose partial discovery"
+manual = false
+design = "design/static-report.md"
+ears = { type = "ubiquitous", system = "static reporting", action = "mark absent bindings unresolved when discovery is disabled or has no matching files" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-REPORT-005"
+title = "Reports reject unavailable or colliding tree content"
+manual = false
+design = "design/static-report.md"
+ears = { type = "ubiquitous", system = "static reporting", action = "mark tree analysis failed without identities or downstream findings when advertised content is unavailable or paths collide" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-REPORT-006"
+title = "Reports expose failed specification and scanner stages"
+manual = false
+design = "design/static-report.md"
+ears = { type = "ubiquitous", system = "static reporting", action = "retain malformed and duplicate specification or source diagnostics while marking dependent stages unattempted" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-REPORT-007"
+title = "Reports state the static analysis boundary"
+manual = false
+design = "design/static-report.md"
+ears = { type = "ubiquitous", system = "static reporting", action = "declare syntactic scope and unsupported target, feature and conditional compilation resolution without execution or approval claims" }

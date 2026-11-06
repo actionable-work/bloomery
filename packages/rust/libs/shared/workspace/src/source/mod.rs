@@ -8,13 +8,17 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// A stable file index and UTF-8 content for one analysis invocation.
+/// A stable file index and content for one analysis invocation.
 ///
 /// Implementations must not change while an analysis is running. A listed path
 /// must be readable; unavailable content is an error, not an empty file.
 pub trait SourceTree {
     fn paths(&self) -> Result<Vec<String>, String>;
     fn read(&self, path: &str) -> Result<String, String>;
+    /// Raw content for snapshot identities. Text-only adapters need no override.
+    fn read_bytes(&self, path: &str) -> Result<Vec<u8>, String> {
+        self.read(path).map(String::into_bytes)
+    }
     /// Explicit directories, including empty ones. File ancestors are inferred.
     fn directories(&self) -> Result<Vec<String>, String> {
         Ok(Vec::new())
@@ -24,7 +28,7 @@ pub trait SourceTree {
 /// An immutable virtual tree. Construction rejects ambiguous paths.
 #[derive(Debug, Clone)]
 pub struct MemoryTree {
-    files: BTreeMap<String, String>,
+    files: BTreeMap<String, Vec<u8>>,
     directories: Vec<String>,
 }
 
@@ -39,11 +43,24 @@ impl MemoryTree {
         files: impl IntoIterator<Item = (P, S)>,
         directories: impl IntoIterator<Item = D>,
     ) -> Result<Self, String> {
+        Self::from_bytes(
+            files
+                .into_iter()
+                .map(|(path, source)| (path, source.into().into_bytes())),
+            directories,
+        )
+    }
+
+    /// Construct a byte-preserving snapshot, including explicit empty directories.
+    pub fn from_bytes<P: Into<String>, D: Into<String>>(
+        files: impl IntoIterator<Item = (P, Vec<u8>)>,
+        directories: impl IntoIterator<Item = D>,
+    ) -> Result<Self, String> {
         let mut contents = BTreeMap::new();
         for (path, source) in files {
             let path = path.into();
             validate_path(&path)?;
-            if contents.insert(path.clone(), source.into()).is_some() {
+            if contents.insert(path.clone(), source).is_some() {
                 return Err(format!("duplicate source path: {path}"));
             }
         }
@@ -66,6 +83,11 @@ impl SourceTree for MemoryTree {
     }
 
     fn read(&self, path: &str) -> Result<String, String> {
+        String::from_utf8(self.read_bytes(path)?)
+            .map_err(|_| format!("source content is not UTF-8: {path}"))
+    }
+
+    fn read_bytes(&self, path: &str) -> Result<Vec<u8>, String> {
         self.files
             .get(path)
             .cloned()
@@ -97,6 +119,11 @@ impl SourceTree for FilesystemTree {
     fn read(&self, path: &str) -> Result<String, String> {
         validate_path(path)?;
         fs::read_to_string(self.root.join(path)).map_err(|error| error.to_string())
+    }
+
+    fn read_bytes(&self, path: &str) -> Result<Vec<u8>, String> {
+        validate_path(path)?;
+        fs::read(self.root.join(path)).map_err(|error| error.to_string())
     }
 }
 

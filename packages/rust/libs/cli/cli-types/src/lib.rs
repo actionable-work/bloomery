@@ -65,6 +65,7 @@ pub enum SpecOperation {
     Trace {
         ids: Vec<String>,
     },
+    TraceReport,
     Candidates,
 }
 

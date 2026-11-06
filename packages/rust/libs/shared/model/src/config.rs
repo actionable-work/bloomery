@@ -1,9 +1,9 @@
 use crate::Diagnostic;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
     /// Structural format version. This field is metadata rather than a catalogued option.
@@ -54,7 +54,7 @@ impl Default for Config {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SpecsConfig {
     /// Explicit enablement override. `None` auto-detects from the presence of
@@ -65,7 +65,7 @@ pub struct SpecsConfig {
     pub dir: String,
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ScannersConfig {
     #[serde(default)]
@@ -76,7 +76,7 @@ pub struct ScannersConfig {
     pub nix: NixScannerConfig,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RustScannerConfig {
     #[serde(default = "default_true")]
@@ -85,7 +85,7 @@ pub struct RustScannerConfig {
     pub paths: Vec<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct PlaywrightScannerConfig {
     #[serde(default = "default_true")]
@@ -96,7 +96,7 @@ pub struct PlaywrightScannerConfig {
     pub tag_prefix: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct NixScannerConfig {
     #[serde(default = "default_true")]

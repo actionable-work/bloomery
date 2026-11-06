@@ -50,6 +50,60 @@ testPaths = ["checks/**/*.test.nix"]
         assert result.returncode == status, result.stdout + result.stderr
         return json.loads(result.stdout)
 
+    def report():
+        before = {str(p.relative_to(root)): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+        library = json.loads(subprocess.check_output([consumer, directory, "--report"], text=True))
+        document = run("trace", "--report")
+        assert document["operation"] == "trace_report", document
+        assert document["result"]["report"] == library
+        after = {str(p.relative_to(root)): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+        assert before == after, "reporting changed repository files"
+        payload = {key: value for key, value in library.items() if key != "identity"}
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        assert library["identity"] == "sha256:" + hashlib.sha256(canonical.encode()).hexdigest()
+        assert library["scope"] == {"kind": "syntactic", "target_resolution": "unsupported", "feature_resolution": "unsupported", "conditional_compilation": "unsupported"}
+        for key in ["passed", "approval", "execution"]:
+            assert key not in library
+        return library
+
+    original = report()
+    assert original == report()
+    assert original["completeness"]["relations"] == "complete"
+    assert original["requirements"][0]["coverage"] == "bound"
+    assert not original["diagnostics"]
+    # The full report is mutually exclusive with IDs; ID trace still requires IDs.
+    run("trace", "--report", "DEMO-TESTS-BIND-001", status=2)
+    run("trace", status=2)
+    # Unselected binary bytes and empty directories participate in tree identity.
+    binary = root / "asset.bin"
+    binary.write_bytes(b"\x00\xff")
+    first = report()
+    binary.write_bytes(b"\x00\xfe")
+    second = report()
+    assert original["inputs"]["tree"] != first["inputs"]["tree"] != second["inputs"]["tree"]
+    assert original["tests"] == first["tests"] == second["tests"]
+    binary.unlink()
+    (root / "empty").mkdir()
+    assert original["inputs"]["tree"] != report()["inputs"]["tree"]
+    (root / "empty").rmdir()
+    # Active design bytes affect spec-set identity even when bindings are unchanged.
+    design = feature / "design/main.md"
+    design.write_text("# Main\nRevised design\n")
+    assert original["inputs"]["specifications"] != report()["inputs"]["specifications"]
+    design.write_text("# Main\n")
+    # The default root uses the same static discovery contract as custom roots.
+    custom_root = root / ".bloomery/custom"
+    default_root = root / ".bloomery/specs"
+    config_path = root / ".bloomery/config.toml"
+    original_config = config_path.read_text()
+    custom_root.rename(default_root)
+    config_path.write_text(original_config.replace('dir = "custom"\n', ''))
+    default = report()
+    assert default["requirements"][0]["id"] == original["requirements"][0]["id"]
+    assert default["bindings"] == original["bindings"]
+    default_root.rename(custom_root)
+    config_path.write_text(original_config)
+
     trace = run("trace", "DEMO-TESTS-BIND-001")
     references = trace["result"]["requirements"][0]["references"]
     candidates = run("candidates")["result"]["candidates"]
@@ -71,18 +125,61 @@ testPaths = ["checks/**/*.test.nix"]
     config = config_path.read_text()
     config_path.write_text(config.replace('[scanners.rust]', '[scanners.rust]\nenabled = false'))
     assert len(run("trace", "DEMO-TESTS-BIND-001")["result"]["requirements"][0]["references"]) == 2
+    disabled = report()
+    assert disabled["completeness"]["discovery"] == "partial"
+    assert disabled["scanners"][0]["state"] == "disabled"
+    assert original["inputs"]["configuration"] != disabled["inputs"]["configuration"]
+    config_path.write_text(config.replace('tests/**/*.rs', 'missing/**/*.rs'))
+    assert report()["scanners"][0]["state"] == "no_matching_files"
+    # An absent binding under partial discovery is unresolved, never missing.
+    group.write_text('group = "BIND"\n' + record + record.replace('BIND-001', 'BIND-002'))
+    partial = report()
+    assert partial["requirements"][1]["coverage"] == "unresolved"
+    assert not any(d["code"] == "MissingAutomatedTest" for d in partial["diagnostics"])
+    config_path.write_text(config)
+    complete = report()
+    assert complete["requirements"][1]["coverage"] == "missing"
+    assert any(d["code"] == "MissingAutomatedTest" for d in complete["diagnostics"])
+    group.write_text('group = "BIND"\n' + record)
+    # Manual and unknown literal references retain their findings and resolution.
+    group.write_text('group = "BIND"\n' + record.replace('manual = false', 'manual = true'))
+    manual = report()
+    assert any(d["code"] == "IllegalManualAutomation" for d in manual["diagnostics"])
+    assert all(b["resolution"] == "manual" for b in manual["bindings"])
+    group.write_text('group = "BIND"\n' + record.replace('BIND-001', 'BIND-002'))
+    unknown = report()
+    assert any(d["code"] == "OrphanTestReference" for d in unknown["diagnostics"])
+    assert all(b["resolution"] == "unresolved" for b in unknown["bindings"])
+    group.write_text('group = "BIND"\n' + record)
+    config_path.write_text(config.replace('[specs]', '[specs]\nenable = false'))
+    disabled = report()
+    assert disabled["completeness"]["specifications"] == "disabled"
+    assert disabled["completeness"]["relations"] == "not_attempted"
+    assert all(b["resolution"] == "specifications_unavailable" for b in disabled["bindings"])
     config_path.write_text(config)
     # Malformed and duplicate active specs fail before scanning.
     group.write_text('group = "BIND"\n' + record + record)
     run("trace", "DEMO-TESTS-BIND-001", status=1)
+    duplicate = report()
+    assert duplicate["completeness"]["specifications"] == "failed"
+    assert duplicate["inputs"]["specifications"] is None
+    assert duplicate["completeness"]["relations"] == "not_attempted"
+    assert any(d["code"] == "DuplicateSpecId" for d in duplicate["diagnostics"])
     group.write_text("invalid TOML [")
     run("candidates", status=1)
+    assert report()["completeness"]["specifications"] == "failed"
     group.write_text('group = "BIND"\n' + record)
     # Malformed source fails the actual CLI as well as both library adapters.
     (root / "tests/a.rs").write_text("fn broken( {")
     failure = run("candidates", status=1)
     diagnostic = next(line for line in expected if line.startswith("diagnostic\t"))
     assert failure["error"]["message"] == diagnostic.split("\t", 4)[4]
+    malformed = report()
+    assert malformed["completeness"]["discovery"] == "failed"
+    assert malformed["completeness"]["relations"] == "not_attempted"
+    assert malformed["requirements"][0]["coverage"] == "unresolved"
+    assert malformed["tests"] == []
+    assert any(d["message"] == failure["error"]["message"] for d in malformed["diagnostics"])
 
     fixture = pathlib.Path(__file__).parent
     for path in sorted(fixture.iterdir()):

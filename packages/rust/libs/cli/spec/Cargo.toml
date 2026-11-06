@@ -1,4 +1,5 @@
 [dependencies]
+bloomery-check = { workspace = true }
 bloomery-cli-types = { workspace = true }
 bloomery-model = { workspace = true }
 bloomery-scanning = { workspace = true }
