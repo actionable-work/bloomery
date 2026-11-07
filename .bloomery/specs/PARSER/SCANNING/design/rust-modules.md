@@ -29,4 +29,4 @@ conditions and declaration spans. `completeness.rust_modules` describes this
 direct projection; partial, failed, disabled and unattempted states are explicit.
 Nested/inline module membership, conditional paths, macro expansion and complete
 compilation remain unsupported. Relations stay partial. No test execution or
-hosted approval occurs. Report/parser contracts are 6; spec schema remains 1.
+hosted approval occurs. Report/parser contracts are 7; spec schema remains 1.

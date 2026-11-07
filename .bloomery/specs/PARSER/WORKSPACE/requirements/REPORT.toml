@@ -104,3 +104,10 @@ title = "Harness eligibility has versioned adapter parity"
 manual = false
 design = "design/static-report.md"
 ears = { type = "ubiquitous", system = "static reporting", action = "bind independent Rust harness eligibility and completeness under the current report contract with deterministic identities and identical CLI and tree adapter results" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-REPORT-016"
+title = "Reports bind source schema validation"
+manual = false
+design = "design/static-report.md"
+ears = { type = "ubiquitous", system = "static reporting", action = "bind source schema validation to the current parser contract while preserving independent discovery, explicit specification failure and deterministic CLI and tree adapter results" }

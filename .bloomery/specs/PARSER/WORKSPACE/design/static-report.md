@@ -14,7 +14,7 @@ analysis, without a tree identity or downstream findings.
 
 ## Identity
 
-Report format version 6 binds SHA-256 identities for the snapshot, the complete
+Report format version 7 binds SHA-256 identities for the snapshot, the complete
 typed configuration with defaults, the active specification subtree, and the
 report payload. Hash inputs are compact canonical JSON with sorted object keys;
 file bytes are represented by their SHA-256 digest. Directory identity includes
@@ -23,8 +23,8 @@ Specification identity includes active subtree files and directories only when
 specification loading succeeds; disabled specifications have an empty set.
 The payload names the parser contract and specification schema versions.
 The report identity omits its own `identity` field from the hashed payload.
-Parser contract versions change when discovery semantics change; schema versions
-change when specification interpretation changes. These identify contracts,
+Parser contract versions change when parsing, validation or discovery rules
+change; schema versions identify the supported record format. These identify contracts,
 not a compiled executable or an execution attestation.
 
 ## Facts and completeness
@@ -34,7 +34,7 @@ references, binding resolution, stable diagnostic codes, notes and repository-
 relative locations. Locations preserve available one-based Unicode scalar start
 and exclusive end line/column positions under the shared
 [source span contract](../../SCANNING/design/source-spans.md). Unknown positions
-remain null. The parser contract is `bloomery-static-syntax-v6`; the specification
+remain null. The parser contract is `bloomery-static-syntax-v7`; the specification
 schema remains `bloomery-grouped-specifications-v1`.
 Orphan and manual-automation findings retain the full reference location.
 
@@ -58,7 +58,7 @@ whether diagnostics exist. Reports contain no test outcomes or hosted approval.
 cfg)` attach [local Rust predicate results](../../SCANNING/design/rust-cfg.md)
 to tests and bindings. Scope includes the normalized caller context, its own
 input identity, resolution descriptions and explicit limitations. The parser
-contract is `bloomery-static-syntax-v6`; specification schema 1 is unchanged.
+contract is `bloomery-static-syntax-v7`; specification schema 1 is unchanged.
 Default calls retain syntactic cfg behavior and null cfg annotations.
 
 Cfg completeness describes only the requested local predicate analysis. Disabled,
@@ -85,4 +85,10 @@ and bindings. `completeness.rust_harness` describes that projection. Ignored or
 unresolved eligibility never credits coverage; literals remain available for
 relational findings. Harness uncertainty makes relations partial without
 changing syntactic discovery or compilation/target completeness. New fields,
-eligibility and completeness participate in report identity under contract 6.
+eligibility and completeness participate in report identity under contract 7.
+
+The shared loader enforces the grouped-file
+[source version](../../REQUIREMENTS/design/format.md#source-schema-version).
+Unsupported or malformed declarations fail specifications without a successful
+specification identity or fabricated relational coverage. Discovery remains
+independent. Contract 7 binds the validation rules; source format 1 is unchanged.

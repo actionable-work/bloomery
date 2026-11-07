@@ -10,6 +10,27 @@ The root `group` string must equal the file stem. The file contains one or more
 `[[requirements]]` entries. A record contains an `id`, human-readable `title`,
 boolean `manual`, optional `design` reference, and a typed nested `ears` table.
 
+## Source schema version
+
+Grouped files support root-level integer `schema_version = 1`. An omitted
+header means version 1. One header governs all records in that file; a record
+cannot override it. Unknown group, record or EARS keys are grammar errors.
+
+The shared loader rejects unsupported integers with
+`UnsupportedSpecificationSchema`, naming the supported version and locating the
+authored value's line. Wrong types, duplicate keys and misplaced headers produce
+located `ParseError` findings. Validation never coerces a version, ignores an
+unsupported declaration or rewrites the file. Filesystem and virtual loading
+apply identical rules to the configured repository specification root.
+
+Schema rejection fails the report specification stage, leaves its successful
+specification identity absent and relations unattempted, while independent
+source discovery remains available. Disabled or inactive specification roots
+remain unread by the loader. Accepted file bytes participate in identities;
+explicit and implicit version 1 have the same record meaning, while different
+tree bytes have different identities. No hosted registry or lifecycle state is
+consulted. Report/parser contracts are 7; grouped specification schema remains 1.
+
 The `design` path is relative to the feature directory. If omitted, it resolves
 to the feature README. An anchor may be appended after `#`.
 

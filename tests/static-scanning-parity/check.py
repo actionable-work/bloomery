@@ -54,8 +54,8 @@ testPaths = ["checks/**/*.test.nix"]
         before = {str(p.relative_to(root)): p.read_bytes() for p in root.rglob("*") if p.is_file()}
         context_args = [] if cfg is None else [json.dumps(cfg)]
         library = json.loads(subprocess.check_output([consumer, directory, "--report", *context_args], text=True))
-        assert library["version"] == 6
-        assert library["inputs"]["parser_contract"] == "bloomery-static-syntax-v6"
+        assert library["version"] == 7
+        assert library["inputs"]["parser_contract"] == "bloomery-static-syntax-v7"
         assert library["inputs"]["specification_schema"] == "bloomery-grouped-specifications-v1"
         document = run("trace", "--report", *([] if cfg is None else ["--rust-cfg", json.dumps(cfg)]))
         assert document["operation"] == "trace_report", document
@@ -86,6 +86,59 @@ testPaths = ["checks/**/*.test.nix"]
     assert original["completeness"]["relations"] == "complete"
     assert original["requirements"][0]["coverage"] == "bound"
     assert not original["diagnostics"]
+    # Source version validation is shared by loaders, reports and editor preflights.
+    original_group = group.read_text()
+    group.write_text('schema_version = 1\n' + original_group)
+    explicit = report()
+    assert explicit["tests"] == original["tests"] and explicit["bindings"] == original["bindings"]
+    assert explicit["scope"] == original["scope"] and explicit["completeness"] == original["completeness"]
+    assert explicit["inputs"]["configuration"] == original["inputs"]["configuration"]
+    assert explicit["inputs"]["specifications"] != original["inputs"]["specifications"]
+    assert explicit["identity"] != original["identity"]
+    for declaration, code in [
+        ('schema_version = 999', 'UnsupportedSpecificationSchema'),
+        ('schema_version = 2', 'UnsupportedSpecificationSchema'),
+        ('schema_version = 0', 'UnsupportedSpecificationSchema'),
+        ('schema_version = -1', 'UnsupportedSpecificationSchema'),
+        ('schema_version = "1"', 'ParseError'),
+        ('schema_version = true', 'ParseError'),
+        ('schema_version = 1.0', 'ParseError'),
+        ('schema_version = []', 'ParseError'),
+        ('schema_version = {}', 'ParseError'),
+        ('schema_version = 1\nschema_version = 1', 'ParseError'),
+        ('schemaVersion = 1', 'ParseError'),
+    ]:
+        group.write_bytes(('# café 🦀\r\n\r\n' + declaration + '\r\n' + original_group).encode())
+        invalid = report()
+        assert invalid["completeness"]["specifications"] == 'failed'
+        assert invalid["completeness"]["discovery"] == 'complete'
+        assert invalid["completeness"]["relations"] == 'not_attempted'
+        assert invalid["inputs"]["specifications"] is None
+        assert invalid["tests"] == original["tests"]
+        assert all(binding["resolution"] == 'specifications_unavailable' for binding in invalid["bindings"])
+        finding = next(finding for finding in invalid["diagnostics"] if finding["code"] == code)
+        assert finding["location"]["path"] == str(group.relative_to(root))
+        if code == 'UnsupportedSpecificationSchema':
+            assert finding["location"]["line"] == 3
+        before = {str(path.relative_to(root)): path.read_bytes() for path in root.rglob('*') if path.is_file()}
+        run('set', 'DEMO-TESTS-BIND-001', 'title', 'Rejected', status=1)
+        run('add', 'DEMO-TESTS-NEW-001', '--title', 'Rejected', '--ears', '{type="ubiquitous",system="example",action="work"}', status=1)
+        after = {str(path.relative_to(root)): path.read_bytes() for path in root.rglob('*') if path.is_file()}
+        assert before == after
+    group.write_text(original_group.replace('[[requirements]]', '[[requirements]]\nschema_version = 1'))
+    assert any(finding['code'] == 'ParseError' for finding in report()['diagnostics'])
+    group.write_text(original_group.replace('ears = {', 'ears = { schema_version = 1,'))
+    assert any(finding['code'] == 'ParseError' for finding in report()['diagnostics'])
+    group.write_text('schema_version = 1\n' + original_group)
+    run('set', 'DEMO-TESTS-BIND-001', 'title', 'Updated')
+    assert group.read_text().startswith('schema_version = 1\n')
+    run('add', 'DEMO-TESTS-NEW-001', '--title', 'New', '--ears', '{type="ubiquitous",system="example",action="work"}')
+    created = group.parent / 'NEW.toml'
+    assert 'schema_version = 1' in created.read_text()
+    run('remove', 'DEMO-TESTS-NEW-001')
+    assert not created.exists()
+    group.write_text(original_group)
+    assert report() == original
     # The full report is mutually exclusive with IDs; ID trace still requires IDs.
     run("trace", "--report", "DEMO-TESTS-BIND-001", status=2)
     run("trace", status=2)

@@ -37,6 +37,10 @@ creates them. It creates the group file when absent and inserts the record in
 sequence order. `spec set` and `spec remove` resolve the record through the
 loaded tree rather than by re-parsing the ID.
 
+New group files declare the supported `schema_version`. Existing explicit or
+implicit version 1 headers and their formatting survive record edits. An invalid
+source schema fails the initial shared load before any mutation is staged.
+
 The global `--no-write` option is a usage error for `spec add`, `spec set`,
 and `spec remove`. Reject these operations before writing grouped requirement
 files; `spec list`, `show`, and the traceability projections remain available.

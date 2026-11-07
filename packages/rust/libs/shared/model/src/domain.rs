@@ -12,12 +12,17 @@ pub struct MarkdownFrontmatter {
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RequirementGroupFile {
+    pub schema_version: Option<toml::Spanned<i64>>,
     pub group: String,
     pub requirements: Vec<RequirementEntry>,
 }
 
+pub const CURRENT_REQUIREMENT_SCHEMA_VERSION: i64 = 1;
+
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RequirementEntry {
     pub id: String,
     pub title: String,
@@ -27,7 +32,7 @@ pub struct RequirementEntry {
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum EarsStatement {
     Ubiquitous {
         system: String,

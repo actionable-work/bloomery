@@ -1,6 +1,7 @@
 pub mod cargo;
 mod loader;
 mod markdown;
+mod requirements;
 pub mod source;
 #[cfg(test)]
 mod tree_tests;

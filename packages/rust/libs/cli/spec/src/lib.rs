@@ -333,6 +333,7 @@ mod tests {
     #[test]
     #[cfg_attr(any(), bloomery("CLI-SPEC-EDITING-001"))]
     #[cfg_attr(any(), bloomery("CLI-SPEC-EDITING-003"))]
+    #[cfg_attr(any(), bloomery("CLI-SPEC-EDITING-025"))]
     #[cfg_attr(any(), bloomery("CLI-SPEC-EDITING-020"))]
     #[cfg_attr(any(), bloomery("CLI-SPEC-COMMANDS-001"))]
     #[cfg_attr(any(), bloomery("CLI-SPEC-COMMANDS-002"))]
@@ -341,6 +342,14 @@ mod tests {
     fn add_creates_a_group_and_rejects_duplicates() {
         let root = workspace("add");
         let report = run(add("CLI-SPEC-ADDED-001", "Added"), &root).expect("add");
+        let contents =
+            fs::read_to_string(root.join(".bloomery/specs/CLI/SPEC/requirements/ADDED.toml"))
+                .unwrap();
+        let document: toml_edit::DocumentMut = contents.parse().unwrap();
+        assert_eq!(
+            document["schema_version"].as_integer(),
+            Some(bloomery_model::CURRENT_REQUIREMENT_SCHEMA_VERSION)
+        );
         match report.outcome {
             SpecOutcome::Add {
                 id, created_group, ..
@@ -369,6 +378,67 @@ mod tests {
             other => panic!("unexpected outcome: {other:?}"),
         }
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-SPEC-EDITING-026"))]
+    fn mutations_preserve_schema_headers_and_reject_invalid_sources_without_writes() {
+        use bloomery_workspace::source::{FilesystemTree, SourceTree};
+        for header in ["", "# café\nschema_version = 1 # preserve this header\n"] {
+            let root = workspace("schema-edit");
+            let path = root.join(".bloomery/specs/CLI/SPEC/requirements/TRACE.toml");
+            let original = fs::read_to_string(&path).unwrap();
+            fs::write(&path, format!("{header}{original}")).unwrap();
+            for operation in [
+                SpecOperation::Set {
+                    id: "CLI-SPEC-TRACE-001".into(),
+                    field: "title".into(),
+                    value: "Updated".into(),
+                },
+                add("CLI-SPEC-TRACE-002", "Added"),
+                SpecOperation::Remove {
+                    id: "CLI-SPEC-TRACE-002".into(),
+                },
+            ] {
+                run(operation, &root).unwrap();
+                let after = fs::read_to_string(&path).unwrap();
+                assert!(after.starts_with(header));
+                assert_eq!(after.contains("schema_version"), !header.is_empty());
+            }
+            fs::write(&path, format!("schema_version = 999\n{original}")).unwrap();
+            let disk = FilesystemTree::new(&root);
+            let snapshot = || {
+                disk.paths()
+                    .unwrap()
+                    .into_iter()
+                    .map(|path| {
+                        let bytes = disk.read_bytes(&path).unwrap();
+                        (path, bytes)
+                    })
+                    .collect::<std::collections::BTreeMap<_, _>>()
+            };
+            let before = snapshot();
+            for operation in [
+                add("CLI-SPEC-NEW-001", "Rejected"),
+                SpecOperation::Set {
+                    id: "CLI-SPEC-TRACE-001".into(),
+                    field: "title".into(),
+                    value: "Rejected".into(),
+                },
+                SpecOperation::Remove {
+                    id: "CLI-SPEC-TRACE-001".into(),
+                },
+            ] {
+                let error = run(operation, &root).unwrap_err();
+                assert!(
+                    error
+                        .message()
+                        .contains("Unsupported requirement schema version")
+                );
+                assert_eq!(before, snapshot());
+            }
+            fs::remove_dir_all(root).unwrap();
+        }
     }
 
     #[test]

@@ -41,6 +41,133 @@ impl Drop for Fixture {
 const GROUP: &str = ".bloomery/specs/PARSER/WORKSPACE/requirements/STRUCTURE.toml";
 const DESIGN: &str = ".bloomery/specs/PARSER/WORKSPACE/design/overview.md";
 
+#[test]
+#[cfg_attr(any(), bloomery("PARSER-REQUIREMENTS-FORMAT-004"))]
+fn source_schema_versions_have_identical_loader_results_and_locations() {
+    let fixture = Fixture::new();
+    let original = fs::read_to_string(fixture.0.join(GROUP)).unwrap();
+    let implicit = load_tree(&fixture.snapshot(), Config::default()).unwrap();
+    let expected: Vec<_> = implicit
+        .requirements()
+        .map(|(_, _, requirement)| requirement.entry.clone())
+        .collect();
+    fs::write(
+        fixture.0.join(GROUP),
+        format!("schema_version = 1\n{original}"),
+    )
+    .unwrap();
+    let memory = fixture.snapshot();
+    let explicit = load_tree(&memory, Config::default()).unwrap();
+    assert_eq!(
+        expected,
+        explicit
+            .requirements()
+            .map(|(_, _, requirement)| requirement.entry.clone())
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        explicit.areas,
+        load_tree(&FilesystemTree::new(&fixture.0), Config::default())
+            .unwrap()
+            .areas
+    );
+    assert_eq!(explicit.areas, relative(load(&fixture.0).unwrap()).areas);
+    let tree = CountingTree {
+        memory,
+        unavailable: None,
+        reads: RefCell::new(BTreeMap::new()),
+    };
+    assert!(load_tree(&tree, Config::default()).is_ok());
+    assert_eq!(tree.reads.borrow().get(GROUP), Some(&1));
+
+    for (declaration, code) in [
+        ("schema_version = 999", "UnsupportedSpecificationSchema"),
+        ("schema_version = 2", "UnsupportedSpecificationSchema"),
+        ("schema_version = 0", "UnsupportedSpecificationSchema"),
+        ("schema_version = -1", "UnsupportedSpecificationSchema"),
+        ("schema_version = \"1\"", "ParseError"),
+        ("schema_version = true", "ParseError"),
+        ("schema_version = 1.0", "ParseError"),
+        ("schema_version = []", "ParseError"),
+        ("schema_version = {}", "ParseError"),
+        ("schema_version = 1\nschema_version = 1", "ParseError"),
+        ("schemaVersion = 1", "ParseError"),
+    ] {
+        let source = format!("# café 🦀\r\n\r\n{declaration}\r\n{original}");
+        fs::write(fixture.0.join(GROUP), &source).unwrap();
+        let errors = load_tree(&fixture.snapshot(), Config::default()).unwrap_err();
+        assert_eq!(
+            errors,
+            load_tree(&FilesystemTree::new(&fixture.0), Config::default()).unwrap_err()
+        );
+        assert_eq!(
+            errors,
+            relative_errors(&fixture.0, load(&fixture.0).unwrap_err())
+        );
+        assert_eq!(errors[0].code, code, "{declaration}");
+        assert_eq!(errors[0].location.as_ref().unwrap().path, Path::new(GROUP));
+        if code == "UnsupportedSpecificationSchema" {
+            assert_eq!(errors[0].location.as_ref().unwrap().line, Some(3));
+            assert!(errors[0].message.contains("supported version is 1"));
+        }
+    }
+    fs::write(
+        fixture.0.join(GROUP),
+        original.replace("[[requirements]]", "[[requirements]]\nschema_version = 1"),
+    )
+    .unwrap();
+    assert_eq!(
+        load_tree(&fixture.snapshot(), Config::default()).unwrap_err()[0].code,
+        "ParseError"
+    );
+    fs::write(
+        fixture.0.join(GROUP),
+        original.replace(
+            "type = \"ubiquitous\"",
+            "schema_version = 1\ntype = \"ubiquitous\"",
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        load_tree(&fixture.snapshot(), Config::default()).unwrap_err()[0].code,
+        "ParseError"
+    );
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("PARSER-REQUIREMENTS-FORMAT-004"))]
+fn schema_validation_does_not_read_disabled_or_inactive_documents() {
+    let fixture = Fixture::new();
+    let original = fixture.snapshot();
+    let memory = MemoryTree::new(
+        original
+            .paths()
+            .unwrap()
+            .into_iter()
+            .map(|path| {
+                let source = original.read(&path).unwrap();
+                (
+                    path.replace(".bloomery/specs/", ".bloomery/custom/"),
+                    source,
+                )
+            })
+            .chain([(GROUP.to_owned(), "schema_version = 999".into())]),
+    )
+    .unwrap();
+    let tree = CountingTree {
+        memory,
+        unavailable: None,
+        reads: RefCell::new(BTreeMap::new()),
+    };
+    let mut config = Config::default();
+    config.specs.dir = "custom".into();
+    assert_eq!(load_tree(&tree, config).unwrap().requirements().count(), 1);
+    assert!(!tree.reads.borrow().contains_key(GROUP));
+    let mut config = Config::default();
+    config.specs.enable = Some(false);
+    assert!(load_tree(&UnreadableTree, config).unwrap().areas.is_empty());
+}
+
 fn relative(mut context: Context) -> Context {
     let root = context.root.clone();
     for area in &mut context.areas {

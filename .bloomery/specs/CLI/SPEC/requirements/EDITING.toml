@@ -277,3 +277,17 @@ title = "No-write blocks specification mutations"
 manual = false
 design = "design/editing.md#preservation-and-atomicity"
 ears = { type = "event", trigger = "spec add, spec set, or spec remove is invoked with --no-write", system = "bloomery spec", action = "return a usage error before changing any specification record" }
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-025"
+title = "New requirement groups declare their schema version"
+manual = false
+design = "design/editing.md#identifier-derived-location"
+ears = { type = "event", trigger = "spec add creates a requirement group", system = "bloomery spec", action = "write the supported source schema version alongside the group name" }
+
+[[requirements]]
+id = "CLI-SPEC-EDITING-026"
+title = "Record edits preserve source schema declarations"
+manual = false
+design = "design/editing.md#preservation-and-atomicity"
+ears = { type = "ubiquitous", system = "spec mutations", action = "preserve existing explicit or implicit source schema declarations and reject invalid input schemas before changing repository files" }

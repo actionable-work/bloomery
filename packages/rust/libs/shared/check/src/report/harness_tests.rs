@@ -241,5 +241,5 @@ fn harness_identities_bind_source_and_caller_facts_deterministically() {
     assert_ne!(changed.inputs.tree, ignored.inputs.tree);
     assert_eq!(changed.inputs.scope, ignored.inputs.scope);
     assert_ne!(changed.identity, ignored.identity);
-    assert_eq!(first.version, 6);
+    assert_eq!(first.version, REPORT_VERSION);
 }

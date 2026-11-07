@@ -58,3 +58,13 @@ resolution or hosted specification discovery.
 `source::resolve_relative_path(directory, path)` performs shared lexical path
 normalization inside the repository. Cargo entrypoints and module projection use
 this policy; it does not read content or follow symlinks.
+
+Grouped source files accept `schema_version = 1`; omission means version 1.
+`bloomery_model::CURRENT_REQUIREMENT_SCHEMA_VERSION` identifies this format,
+and `RequirementGroupFile.schema_version` retains the optional spanned integer.
+Unknown group/record/EARS keys, misplaced declarations, duplicate keys and wrong
+version types are parse errors. Unsupported integers produce
+`UnsupportedSpecificationSchema` at the authored value's line. The shared loader
+uses the same parser for filesystem, virtual-tree and editor validation. New
+groups created by `spec add` include the header; record edits preserve existing
+explicit or implicit headers. No bulk source rewrite is required.

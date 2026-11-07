@@ -7,7 +7,7 @@
 //!
 //! let tree = MemoryTree::new([("tests/example.rs", "#[test] fn example() {}")]).unwrap();
 //! let report = analyze_tree(&tree, Config::default());
-//! assert_eq!(report.version, 6);
+//! assert_eq!(report.version, 7);
 //! assert_eq!(report.completeness.tree, StageState::Complete);
 //! assert_eq!(report.scope.kind, "syntactic");
 //! ```
@@ -24,6 +24,8 @@ mod modules;
 pub use modules::RustModuleRecord;
 #[cfg(test)]
 mod module_tests;
+#[cfg(test)]
+mod schema_tests;
 mod target;
 pub use target::{CargoTestRecord, CargoTestSelection};
 #[cfg(test)]
@@ -39,8 +41,8 @@ use identity::{Manifest, identity, snapshot};
 use std::path::Path;
 pub use types::*;
 
-pub const REPORT_VERSION: u32 = 6;
-pub const PARSER_CONTRACT: &str = "bloomery-static-syntax-v6";
+pub const REPORT_VERSION: u32 = 7;
+pub const PARSER_CONTRACT: &str = "bloomery-static-syntax-v7";
 pub const SPECIFICATION_SCHEMA: &str = "bloomery-grouped-specifications-v1";
 
 /// Analyze a local repository with explicit configuration. Paths remain relative.

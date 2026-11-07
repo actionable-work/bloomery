@@ -105,6 +105,8 @@ pub(crate) fn add(
         read_document(&group_path)?
     } else {
         let mut document = DocumentMut::new();
+        document["schema_version"] =
+            toml_edit::value(bloomery_model::CURRENT_REQUIREMENT_SCHEMA_VERSION);
         document["group"] = toml_edit::value(parsed.group);
         document
     };

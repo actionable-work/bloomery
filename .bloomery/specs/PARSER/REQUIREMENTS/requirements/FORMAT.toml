@@ -32,3 +32,10 @@ design = "design/format.md"
 type = "ubiquitous"
 system = "requirement loader"
 action = "resolve each grouped record's design reference"
+
+[[requirements]]
+id = "PARSER-REQUIREMENTS-FORMAT-004"
+title = "Grouped schema versions are enforced"
+manual = false
+design = "design/format.md#source-schema-version"
+ears = { type = "ubiquitous", system = "requirement loading", action = "accept implicit or explicit grouped schema version 1 and reject unsupported, malformed or misplaced source version declarations with identical located diagnostics across tree adapters" }

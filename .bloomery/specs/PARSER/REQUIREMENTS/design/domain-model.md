@@ -27,6 +27,11 @@ Core value types include:
 - structured design references containing a feature-relative path and optional
   anchor.
 
+The parsed RequirementGroupFile retains its optional spanned integer
+schema_version. CURRENT_REQUIREMENT_SCHEMA_VERSION identifies the supported
+grouped format. The loader validates that version before resolving records;
+resolved requirements retain their original IDs and verification modes.
+
 The EARS enum owns canonical statement generation. The context owns resolution
 and identity alignment. Formatters consume these types without reparsing TOML,
 Markdown, or source files.

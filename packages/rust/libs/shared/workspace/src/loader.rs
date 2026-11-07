@@ -2,7 +2,7 @@ use crate::markdown;
 use crate::source::{FilesystemTree, SourceTree, TreeIndex, path_key};
 use bloomery_model::{
     Area, Context, DesignReference, Diagnostic, Feature, MarkdownFrontmatter, Requirement,
-    RequirementEntry, RequirementGroup, RequirementGroupFile, config,
+    RequirementEntry, RequirementGroup, config,
 };
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -258,16 +258,10 @@ fn load_group(
             return None;
         }
     };
-    let parsed: RequirementGroupFile = match toml::from_str(&contents) {
+    let parsed = match crate::requirements::parse(&contents, path) {
         Ok(parsed) => parsed,
         Err(error) => {
-            diagnostics.push(
-                Diagnostic::new(
-                    "ParseError",
-                    format!("Unable to parse requirement group: {error}"),
-                )
-                .at(path.to_path_buf(), Some(1)),
-            );
+            diagnostics.push(error);
             return None;
         }
     };
