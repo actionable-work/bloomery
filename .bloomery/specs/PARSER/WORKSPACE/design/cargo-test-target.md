@@ -28,7 +28,7 @@ conditions. All literal bindings and orphan/manual findings remain visible;
 other scanners remain syntactic. Relations stay partial and absent coverage
 unresolved. No execution outcome or approval is implied.
 
-Report/parser contracts are version 7; specification schema 1 is unchanged.
+Report/parser contracts are version 8; specification schema 1 is unchanged.
 The normalized selector participates in scope identity. Manifest and entrypoint
 bytes participate in tree identity; the resolved projection and conditions
 participate in report identity. `completeness.rust_target` describes entrypoint

@@ -118,6 +118,8 @@ pub enum Coverage {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RequirementRecord {
     pub id: String,
+    /// Content identity under the versioned requirement revision contract.
+    pub revision: String,
     pub area: String,
     pub feature: String,
     pub group: String,
@@ -170,6 +172,7 @@ pub struct StaticReport {
     pub inputs: InputIdentities,
     pub configuration: serde_json::Value,
     pub scope: Scope,
+    pub spec_set: Option<super::SpecSetManifest>,
     pub cargo_test: Option<super::CargoTestRecord>,
     pub completeness: Completeness,
     pub scanners: Vec<ScannerStatus>,

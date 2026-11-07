@@ -35,7 +35,7 @@ fn versioned_groups_preserve_meaning_and_bind_authored_bytes() {
     files.insert(GROUP.into(), source);
     let reversed = MemoryTree::new(files.into_iter().rev()).unwrap();
     assert_eq!(explicit, analyze_tree(&reversed, tests::config()));
-    assert_eq!(explicit.version, 7);
+    assert_eq!(explicit.version, REPORT_VERSION);
     assert_eq!(
         explicit.inputs.specification_schema,
         "bloomery-grouped-specifications-v1"

@@ -437,6 +437,7 @@ impl SourceTree for UnreliableTree {
 
 #[test]
 #[cfg_attr(any(), bloomery("PARSER-WORKSPACE-REPORT-005"))]
+#[cfg_attr(any(), bloomery("PARSER-WORKSPACE-REPORT-019"))]
 fn missing_content_and_path_collisions_fail_before_downstream_analysis() {
     for paths in [
         vec!["missing.rs"],
@@ -451,6 +452,7 @@ fn missing_content_and_path_collisions_fail_before_downstream_analysis() {
         let report = analyze_tree(&tree, config());
         assert_eq!(report.completeness.tree, StageState::Failed);
         assert_eq!(report.inputs.tree, None);
+        assert!(report.spec_set.is_none());
         assert_eq!(report.completeness.discovery, StageState::NotAttempted);
         assert!(report.bindings.is_empty());
         assert_eq!(report.diagnostics[0].code, "SourceTreeError");
@@ -464,5 +466,6 @@ fn missing_content_and_path_collisions_fail_before_downstream_analysis() {
     invalid.version = 999;
     let report = analyze_tree(&tree, invalid);
     assert_eq!(report.completeness.configuration, StageState::Failed);
+    assert!(report.spec_set.is_none());
     assert!(tree.reads.borrow().is_empty());
 }

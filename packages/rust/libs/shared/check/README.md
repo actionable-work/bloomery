@@ -13,7 +13,7 @@ let tree = MemoryTree::new([("tests/example.rs", "#[test] fn example() {}")])?;
 let mut config = Config::default();
 config.scanners.rust.paths = vec!["tests/**/*.rs".into()];
 let report = analyze_tree(&tree, config);
-assert_eq!(report.version, 7);
+assert_eq!(report.version, 8);
 assert_eq!(report.completeness.tree, StageState::Complete);
 assert_eq!(report.tests[0].name.as_deref(), Some("example"));
 ```
@@ -26,12 +26,12 @@ analysis errors are report findings. The CLI adapter is
 operation `trace_report`. CLI flake/configuration preflights still apply.
 Exit zero means the report was produced, even when it contains findings.
 
-Report format 7 retains optional `end_line` and `end_column` on each location.
+Report format 8 retains optional `end_line` and `end_column` on each location.
 Coordinates use one-based Unicode scalar positions and exclusive ends; tabs count
 as one scalar and LF advances the line, including in CRLF input. Unknown columns
 and ends remain null. References cover quoted literals, Rust test sites cover
 function names, Playwright sites cover calls, and Nix sites cover whole files.
-The parser contract is `bloomery-static-syntax-v7`; specification schema 1 is
+The parser contract is `bloomery-static-syntax-v8`; specification schema 1 is
 unchanged. Rust ingestion errors without retained spans remain line-only.
 
 Reports bind the complete typed configuration, tree snapshot, active specification
@@ -42,6 +42,43 @@ UTF-8 encoding and sorted object keys. The tree manifest has sorted `files`
 directories). The specification manifest selects that same structure beneath the
 active root, or is empty when specifications are disabled. A failed stage has no
 successful input identity. Contract constants are exported from `report`.
+
+Report 8 adds `RequirementRecord.revision` and `StaticReport.spec_set` containing
+`report::SpecSetManifest`. Source schema 1 and existing analysis entry points are
+unchanged. Consumers accepting only earlier report contracts must explicitly
+adopt version 8.
+
+```rust
+// Existing CLI: bloomery --json spec trace --report
+// Its manifest is result.report.spec_set; the library returns the same value.
+if let Some(manifest) = &report.spec_set {
+    for (id, revision) in &manifest.active {
+        println!("{id}: {revision}");
+    }
+    // Check stage states and diagnostics separately from the presence of a map.
+    assert_eq!(manifest.completeness, report.completeness);
+}
+```
+
+The version 1 manifest maps every discovered ID to a content revision, including
+manual and unbound records. Revisions hash canonical JSON with `version: 1`,
+`id`, `title`, `manual`, typed `ears`, and `design: {path, anchor}`. The design
+path is resolved relative to its feature. Formatting, comments, positions and
+schema headers do not affect a record revision. Design document bytes are bound
+by the source-subtree identity, rather than the record revision.
+
+`SpecSetManifest` binds the resolved source root and source-subtree identity,
+configuration and scope identities, the active map, canonical binding and sorted
+diagnostic identities, and full completeness. Its `identity` hashes its canonical
+payload with `identity` omitted. The enclosing report additionally binds the
+exact tree and parser/schema contracts. Unrelated tree bytes may change the
+report without changing the manifest. No derived manifest is written to source.
+
+Configuration/tree/specification failure leaves `spec_set` null. Disabled
+specifications produce an empty map with disabled completeness. Incomplete or
+failed discovery retains the full parsed map with explicit stage states; a map
+does not imply passing coverage, execution or approval. Revisions identify
+normalized content and are not author-assigned lifecycle revisions.
 
 Analysis snapshots every indexed file once. Use `MemoryTree::from_bytes` or
 override `SourceTree::read_bytes` when binary files are present. Only selected
@@ -61,8 +98,9 @@ that a stage was incomplete.
 Default scope is syntactic; explicit local Rust predicate scope is described below.
 Reports do not execute tests or contain execution
 outcomes, attestations or hosted approval. Specs are discovered solely from
-repository files; lifecycle tools edit those files. Revision/lineage metadata and
-explicit legacy migration are outside this report format. APIs are experimental
+repository files; lifecycle tools edit those files. Authored revision labels,
+supersession/parent metadata and explicit legacy migration remain outside this
+report format. APIs are experimental
 and the crate remains version 0.1.0 under `MIT OR Apache-2.0`.
 
 Use `report::analyze_tree_with_cfg(&tree, config, cfg)` or
@@ -86,7 +124,7 @@ Without cfg scope, these annotations are null and discovery stays syntactic.
 The scanner also exposes owned `CfgExpression` / `RustCondition` facts through
 `scan_tree_with_conditions`, using the existing source ingestion cache.
 
-Report/parser version 7 includes this scope, annotations and `completeness.rust_cfg`;
+Report/parser version 8 includes this scope, annotations and `completeness.rust_cfg`;
 specification schema 1 is unchanged. Only satisfied Rust conditions contribute
 scoped coverage. All literal references and orphan/manual findings remain
 visible. Relations stay partial and absent bindings unresolved. Local cfg
@@ -134,7 +172,7 @@ canonical candidate paths, resolved paths and conditions. Direct projection has
 its own partial/failed/disabled/not-attempted states. Transitive membership,
 out-of-line children below inline modules and conditional paths remain outside
 scope. Relations stay partial; static results cannot establish compilation or
-execution success. Report/parser contract 7 retains specification schema 1.
+execution success. Report/parser contract 8 retains specification schema 1.
 
 Rust tests and bindings always have a separate `rust_harness` eligibility record,
 including in default syntactic reports. Plain `#[ignore]`, reasoned ignore and
@@ -148,7 +186,7 @@ Only satisfied harness eligibility can credit Rust coverage, alongside any
 requested cfg and target conditions. Uncertain eligibility makes relations
 partial and absent coverage unresolved; literal orphan/manual findings remain.
 `completeness.rust_harness` records this stage independently. No harness options
-or execution outcomes are inferred. Report/parser 7 includes these fields; raw
+or execution outcomes are inferred. Report/parser 8 includes these fields; raw
 scanner discovery and specification schema 1 remain syntactic and unchanged.
 
 Grouped specification source versions are validated before relational analysis.
@@ -156,5 +194,5 @@ Explicit `schema_version = 1` and omitted headers use the same format. Unsupport
 integers produce `UnsupportedSpecificationSchema`; malformed types, duplicate
 keys, unknown group/record/EARS fields and misplaced versions produce `ParseError`.
 Specification failure leaves `inputs.specifications` absent and relations
-unattempted while independent discovery continues. Report/parser 7 binds these
+unattempted while independent discovery continues. Report/parser 8 binds these
 validation rules; the grouped specification schema remains version 1.

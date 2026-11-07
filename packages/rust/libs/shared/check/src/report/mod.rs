@@ -7,7 +7,7 @@
 //!
 //! let tree = MemoryTree::new([("tests/example.rs", "#[test] fn example() {}")]).unwrap();
 //! let report = analyze_tree(&tree, Config::default());
-//! assert_eq!(report.version, 7);
+//! assert_eq!(report.version, 8);
 //! assert_eq!(report.completeness.tree, StageState::Complete);
 //! assert_eq!(report.scope.kind, "syntactic");
 //! ```
@@ -26,6 +26,10 @@ pub use modules::RustModuleRecord;
 mod module_tests;
 #[cfg(test)]
 mod schema_tests;
+mod spec_set;
+pub use spec_set::SpecSetManifest;
+#[cfg(test)]
+mod spec_set_tests;
 mod target;
 pub use target::{CargoTestRecord, CargoTestSelection};
 #[cfg(test)]
@@ -41,8 +45,8 @@ use identity::{Manifest, identity, snapshot};
 use std::path::Path;
 pub use types::*;
 
-pub const REPORT_VERSION: u32 = 7;
-pub const PARSER_CONTRACT: &str = "bloomery-static-syntax-v7";
+pub const REPORT_VERSION: u32 = 8;
+pub const PARSER_CONTRACT: &str = "bloomery-static-syntax-v8";
 pub const SPECIFICATION_SCHEMA: &str = "bloomery-grouped-specifications-v1";
 
 /// Analyze a local repository with explicit configuration. Paths remain relative.
@@ -105,12 +109,12 @@ fn analyze_input(tree: &dyn SourceTree, config: Config, cfg: Option<RustCfg>) ->
         report
             .diagnostics
             .push(Diagnostic::new("RustCfgConfigurationError", error).into());
-        return finish(report);
+        return finish(report, &config);
     }
     if let Err(error) = config.validate() {
         report.completeness.configuration = StageState::Failed;
         report.diagnostics.push(error.into());
-        return finish(report);
+        return finish(report, &config);
     }
     report.completeness.configuration = StageState::Complete;
     let (tree, manifest) = match snapshot(tree) {
@@ -118,7 +122,7 @@ fn analyze_input(tree: &dyn SourceTree, config: Config, cfg: Option<RustCfg>) ->
         Err(error) => {
             report.completeness.tree = StageState::Failed;
             report.diagnostics.push(error.into());
-            return finish(report);
+            return finish(report, &config);
         }
     };
     report.completeness.tree = StageState::Complete;
@@ -223,7 +227,7 @@ fn analyze_input(tree: &dyn SourceTree, config: Config, cfg: Option<RustCfg>) ->
             add_findings(&mut report, errors);
         }
     }
-    finish(report)
+    finish(report, &config)
 }
 
 fn condition_completeness(state: DiscoveryState, annotations: &cfg::Annotations) -> StageState {
@@ -268,6 +272,7 @@ fn empty_report(config: &Config) -> StaticReport {
             ],
         },
         cargo_test: None,
+        spec_set: None,
         completeness: Completeness {
             configuration: StageState::NotAttempted,
             tree: StageState::NotAttempted,
@@ -307,8 +312,9 @@ pub(super) fn add_findings(report: &mut StaticReport, errors: Vec<Diagnostic>) {
         .extend(errors.into_iter().map(Finding::from));
 }
 
-fn finish(mut report: StaticReport) -> StaticReport {
+fn finish(mut report: StaticReport, config: &Config) -> StaticReport {
     report.diagnostics.sort();
+    report.spec_set = spec_set::project(&report, config);
     let mut payload = serde_json::to_value(&report).expect("report serializes");
     payload
         .as_object_mut()

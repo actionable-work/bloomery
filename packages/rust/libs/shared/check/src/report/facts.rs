@@ -11,6 +11,7 @@ pub(super) fn requirements(context: &Context) -> Vec<RequirementRecord> {
         .requirements()
         .map(|(area, feature, requirement)| RequirementRecord {
             id: requirement.entry.id.clone(),
+            revision: super::spec_set::revision(requirement, &feature.path),
             area: area.id.clone(),
             feature: feature.id.clone(),
             group: requirement.group.clone(),

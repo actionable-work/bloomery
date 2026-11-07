@@ -23,6 +23,7 @@ remain in their normal repository locations and are found through
 - [Workspace layout](design/layout.md)
 - [Static repository tree inputs](design/source-trees.md)
 - [Versioned static reports](design/static-report.md)
+- [Derived specification sets and record revisions](design/spec-set.md)
 - [Declared Cargo test entrypoints](design/cargo-test-target.md)
 - [Area and feature document contracts](design/document-contracts.md)
 

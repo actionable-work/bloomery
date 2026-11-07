@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::diagnostics::SourceLocation;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -31,7 +31,7 @@ pub struct RequirementEntry {
     pub ears: EarsStatement,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum EarsStatement {
     Ubiquitous {

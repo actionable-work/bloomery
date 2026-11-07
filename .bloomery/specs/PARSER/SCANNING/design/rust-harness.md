@@ -23,4 +23,4 @@ Orphan and manual-reference diagnostics retain literal reference spans.
 failed or unattempted analysis. This projection does not select runner options,
 execute tests or establish execution success. Raw scanner evidence remains a
 syntactic discovery API; execution configuration and hosted policy stay outside
-the static report. Report/parser contracts are 7; specification schema remains 1.
+the static report. Report/parser contracts are 8; specification schema remains 1.

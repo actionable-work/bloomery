@@ -54,8 +54,8 @@ testPaths = ["checks/**/*.test.nix"]
         before = {str(p.relative_to(root)): p.read_bytes() for p in root.rglob("*") if p.is_file()}
         context_args = [] if cfg is None else [json.dumps(cfg)]
         library = json.loads(subprocess.check_output([consumer, directory, "--report", *context_args], text=True))
-        assert library["version"] == 7
-        assert library["inputs"]["parser_contract"] == "bloomery-static-syntax-v7"
+        assert library["version"] == 8
+        assert library["inputs"]["parser_contract"] == "bloomery-static-syntax-v8"
         assert library["inputs"]["specification_schema"] == "bloomery-grouped-specifications-v1"
         document = run("trace", "--report", *([] if cfg is None else ["--rust-cfg", json.dumps(cfg)]))
         assert document["operation"] == "trace_report", document
@@ -65,6 +65,24 @@ testPaths = ["checks/**/*.test.nix"]
         payload = {key: value for key, value in library.items() if key != "identity"}
         canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
         assert library["identity"] == "sha256:" + hashlib.sha256(canonical.encode()).hexdigest()
+        def identity(value):
+            encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+            return "sha256:" + hashlib.sha256(encoded.encode()).hexdigest()
+
+        manifest = library["spec_set"]
+        if library["completeness"]["specifications"] in ["complete", "disabled"]:
+            assert manifest["version"] == 1
+            assert manifest["source_root"] == ".bloomery/" + library["configuration"]["specs"]["dir"]
+            assert manifest["source_identity"] == library["inputs"]["specifications"]
+            assert manifest["configuration"] == library["inputs"]["configuration"]
+            assert manifest["scope"] == library["inputs"]["scope"]
+            assert manifest["active"] == {record["id"]: record["revision"] for record in library["requirements"]}
+            assert manifest["completeness"] == library["completeness"]
+            assert manifest["bindings_identity"] == identity(library["bindings"])
+            assert manifest["diagnostics_identity"] == identity(library["diagnostics"])
+            assert manifest["identity"] == identity({key: value for key, value in manifest.items() if key != "identity"})
+        else:
+            assert manifest is None
         if cfg is None:
             assert library["scope"]["kind"] == "syntactic" and library["scope"]["rust_cfg"] is None
             assert all(library["scope"][key] == "unsupported" for key in ["target_resolution", "feature_resolution", "conditional_compilation"])
@@ -86,6 +104,14 @@ testPaths = ["checks/**/*.test.nix"]
     assert original["completeness"]["relations"] == "complete"
     assert original["requirements"][0]["coverage"] == "bound"
     assert not original["diagnostics"]
+    revision = original["requirements"][0]["revision"]
+    assert revision == "sha256:3ed0815f4c649dbaa661cccb4d6bc72292b12b66da917ea3716f4333708182f6"
+    assert original["spec_set"]["active"] == {"DEMO-TESTS-BIND-001": revision}
+    (root / "unselected.bin").write_bytes(b"new tree content")
+    unrelated = report()
+    assert unrelated["inputs"]["tree"] != original["inputs"]["tree"]
+    assert unrelated["spec_set"] == original["spec_set"]
+    (root / "unselected.bin").unlink()
     # Source version validation is shared by loaders, reports and editor preflights.
     original_group = group.read_text()
     group.write_text('schema_version = 1\n' + original_group)
@@ -95,6 +121,12 @@ testPaths = ["checks/**/*.test.nix"]
     assert explicit["inputs"]["configuration"] == original["inputs"]["configuration"]
     assert explicit["inputs"]["specifications"] != original["inputs"]["specifications"]
     assert explicit["identity"] != original["identity"]
+    assert explicit["spec_set"]["active"] == original["spec_set"]["active"]
+    assert explicit["spec_set"]["identity"] != original["spec_set"]["identity"]
+    group.write_text(original_group.replace('title = "Binding"', 'title = "Changed"'))
+    changed_revision = report()
+    assert changed_revision["requirements"][0]["revision"] != revision
+    assert changed_revision["spec_set"]["identity"] != original["spec_set"]["identity"]
     for declaration, code in [
         ('schema_version = 999', 'UnsupportedSpecificationSchema'),
         ('schema_version = 2', 'UnsupportedSpecificationSchema'),

@@ -29,7 +29,7 @@ source discovery remains available. Disabled or inactive specification roots
 remain unread by the loader. Accepted file bytes participate in identities;
 explicit and implicit version 1 have the same record meaning, while different
 tree bytes have different identities. No hosted registry or lifecycle state is
-consulted. Report/parser contracts are 7; grouped specification schema remains 1.
+consulted. Report/parser contracts are 8; grouped specification schema remains 1.
 
 The `design` path is relative to the feature directory. If omitted, it resolves
 to the feature README. An anchor may be appended after `#`.

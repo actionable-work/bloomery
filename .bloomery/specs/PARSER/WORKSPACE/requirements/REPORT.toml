@@ -111,3 +111,31 @@ title = "Reports bind source schema validation"
 manual = false
 design = "design/static-report.md"
 ears = { type = "ubiquitous", system = "static reporting", action = "bind source schema validation to the current parser contract while preserving independent discovery, explicit specification failure and deterministic CLI and tree adapter results" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-REPORT-017"
+title = "Requirement revisions identify normalized content"
+manual = false
+design = "design/spec-set.md#requirement-revisions"
+ears = { type = "ubiquitous", system = "static reporting", action = "derive each requirement revision from its normalized record fields and resolved feature-relative design reference independently of source formatting and position" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-REPORT-018"
+title = "Manifests bind the complete discovered specification set"
+manual = false
+design = "design/spec-set.md#manifest"
+ears = { type = "ubiquitous", system = "static reporting", action = "emit a versioned canonical manifest binding every discovered ID and revision to the configured source root, source identity, configuration, scope, bindings, completeness and diagnostics" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-REPORT-019"
+title = "Failed specification inputs cannot produce partial manifests"
+manual = false
+design = "design/spec-set.md#manifest"
+ears = { type = "ubiquitous", system = "static reporting", action = "omit the manifest after configuration, tree or specification failure while retaining explicit empty disabled sets and complete discovered sets during incomplete binding analysis" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-REPORT-020"
+title = "Specification manifests have adapter parity"
+manual = false
+design = "design/spec-set.md#manifest"
+ears = { type = "ubiquitous", system = "static reporting", action = "produce identical specification manifests and record revisions across CLI, filesystem and virtual-tree adapters for the same tree and explicit configuration" }
