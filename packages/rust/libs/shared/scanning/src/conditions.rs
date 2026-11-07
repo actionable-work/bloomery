@@ -17,6 +17,7 @@ pub struct RustCondition {
     pub test: SourceLocation,
     pub references: Vec<SourceLocation>,
     pub expression: CfgExpression,
+    pub harness: CfgExpression,
 }
 
 fn syntax(meta: &Meta, depth: usize) -> CfgExpression {
@@ -54,7 +55,11 @@ pub(crate) fn attributes(attrs: &[Attribute]) -> CfgExpression {
     CfgExpression::Attributes(
         attrs
             .iter()
-            .filter(|attr| attr.path().is_ident("cfg") || attr.path().is_ident("cfg_attr"))
+            .filter(|attr| {
+                attr.path().is_ident("cfg")
+                    || attr.path().is_ident("cfg_attr")
+                    || attr.path().is_ident("ignore")
+            })
             .map(|attr| syntax(&attr.meta, 0))
             .collect(),
     )

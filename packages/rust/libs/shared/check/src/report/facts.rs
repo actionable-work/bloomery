@@ -39,8 +39,13 @@ pub(super) fn add_discovery(
     output: &ScanOutput,
     context: Option<&Context>,
     complete: bool,
-    annotations: &BTreeMap<SourceLocation, super::ConditionRecord>,
+    annotations: &super::cfg::Annotations,
+    harness: &super::cfg::Annotations,
 ) {
+    let complete = complete
+        && harness
+            .values()
+            .all(|condition| condition.state == super::ConditionState::Satisfied);
     let scoped = report.scope.rust_cfg.is_some();
     let selected = report
         .scope
@@ -65,6 +70,7 @@ pub(super) fn add_discovery(
             location: Location::from(&site.location),
             references: site.references.clone(),
             rust_cfg: annotations.get(&site.location).cloned(),
+            rust_harness: harness.get(&site.location).cloned(),
             rust_target: target_condition(site.scanner, &site.location.path),
         })
         .collect();
@@ -77,6 +83,7 @@ pub(super) fn add_discovery(
             scanner: item.scanner.into(),
             location: Location::from(&item.location),
             rust_cfg: annotations.get(&item.location).cloned(),
+            rust_harness: harness.get(&item.location).cloned(),
             rust_target: target_condition(item.scanner, &item.location.path),
             resolution: if !enabled {
                 BindingResolution::SpecificationsUnavailable
@@ -90,19 +97,11 @@ pub(super) fn add_discovery(
         })
         .collect();
     if let Some(context) = context.filter(|context| context.specs_enabled) {
-        let observed: BTreeSet<_> = output
-            .evidence
+        let observed: BTreeSet<_> = report
+            .bindings
             .iter()
-            .filter(|item| {
-                !scoped
-                    || item.scanner != "rust"
-                    || (annotations.get(&item.location).is_some_and(|condition| {
-                        condition.state == super::ConditionState::Satisfied
-                    }) && target_condition(item.scanner, &item.location.path).is_none_or(
-                        |condition| condition.state == super::ConditionState::Satisfied,
-                    ))
-            })
-            .map(|item| item.id.as_str())
+            .filter(|binding| credits_coverage(binding, scoped))
+            .map(|binding| binding.requirement_id.as_str())
             .collect();
         for requirement in &mut report.requirements {
             if !requirement.manual {
@@ -131,4 +130,13 @@ pub(super) fn add_discovery(
             StageState::Partial
         };
     }
+}
+
+fn credits_coverage(binding: &Binding, scoped: bool) -> bool {
+    let satisfied =
+        |condition: &super::ConditionRecord| condition.state == super::ConditionState::Satisfied;
+    binding.scanner != "rust"
+        || (binding.rust_harness.as_ref().is_some_and(satisfied)
+            && (!scoped || binding.rust_cfg.as_ref().is_some_and(satisfied))
+            && binding.rust_target.as_ref().is_none_or(satisfied))
 }

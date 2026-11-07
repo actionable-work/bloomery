@@ -51,6 +51,8 @@ shape or noncanonical manifest paths are usage errors; manifest/target failures
 are static report findings. No additional command or discovery source is used.
 Selected targets include direct out-of-line module membership and inherited
 gates, with explicit module completeness and unresolved nested membership.
+Default and cfg-scoped reports expose independent Rust ignored-test eligibility;
+unresolved harness eligibility cannot credit static coverage.
 
 ## Candidates
 

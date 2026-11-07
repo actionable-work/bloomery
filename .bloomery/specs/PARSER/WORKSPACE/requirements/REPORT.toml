@@ -89,4 +89,18 @@ id = "PARSER-WORKSPACE-REPORT-013"
 title = "Reports bind direct module projection"
 manual = false
 design = "design/static-report.md"
-ears = { type = "ubiquitous", system = "static reporting", action = "bind direct module paths, spans, gate conditions and explicit completeness under version 5 with identical tree and CLI adapter results" }
+ears = { type = "ubiquitous", system = "static reporting", action = "bind direct module paths, spans, gate conditions and explicit completeness under the current report contract with identical tree and CLI adapter results" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-REPORT-014"
+title = "Ignored Rust tests cannot credit coverage"
+manual = false
+design = "design/static-report.md"
+ears = { type = "ubiquitous", system = "static reporting", action = "credit Rust binding coverage only when ignored-test eligibility is satisfied in default and explicit cfg reports while retaining unresolved eligibility and literal findings" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-REPORT-015"
+title = "Harness eligibility has versioned adapter parity"
+manual = false
+design = "design/static-report.md"
+ears = { type = "ubiquitous", system = "static reporting", action = "bind independent Rust harness eligibility and completeness under the current report contract with deterministic identities and identical CLI and tree adapter results" }

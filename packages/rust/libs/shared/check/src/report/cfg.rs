@@ -13,6 +13,14 @@ pub struct RustCfg {
     pub cargo_test: Option<super::CargoTestSelection>,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AttributeScope {
+    Compilation,
+    Harness,
+}
+
+pub(super) type Annotations = BTreeMap<bloomery_model::SourceLocation, ConditionRecord>;
+
 impl RustCfg {
     pub fn parse_json(source: &str) -> Result<Self, String> {
         let value: serde_json::Value = serde_json::from_str(source)
@@ -70,7 +78,7 @@ impl RustCfg {
                     .unwrap_or_else(|| unknown(&format!("{name}=\"{value}\"")))
             }
             All(items) => combine(items.iter().map(|item| self.evaluate(item)), false),
-            Attributes(items) => combine(items.iter().map(|item| self.gate(item)), false),
+            Attributes(_) => self.gate(expression, AttributeScope::Compilation),
             List(_, _) if !supported_predicate(expression) => unknown("unsupported cfg predicate"),
             List(name, items) => match name.as_str() {
                 "all" => combine(items.iter().map(|item| self.evaluate(item)), false),
@@ -82,13 +90,18 @@ impl RustCfg {
         }
     }
 
-    fn gate(&self, expression: &CfgExpression) -> ConditionRecord {
+    fn gate(&self, expression: &CfgExpression, scope: AttributeScope) -> ConditionRecord {
         use CfgExpression::*;
         match expression {
-            List(name, items) if name == "cfg" => match items.as_slice() {
-                [predicate] => self.evaluate(predicate),
-                _ => unknown("malformed cfg attribute"),
-            },
+            Attributes(items) | All(items) => {
+                combine(items.iter().map(|item| self.gate(item, scope)), false)
+            }
+            List(name, items) if name == "cfg" && scope == AttributeScope::Compilation => {
+                match items.as_slice() {
+                    [predicate] => self.evaluate(predicate),
+                    _ => unknown("malformed cfg attribute"),
+                }
+            }
             List(name, items) if name == "cfg_attr" => {
                 if items.len() < 2 {
                     return unknown("malformed cfg_attr");
@@ -99,17 +112,28 @@ impl RustCfg {
                 combine(
                     [
                         negate(self.evaluate(&items[0])),
-                        combine(items[1..].iter().map(|item| self.gate(item)), false),
+                        combine(items[1..].iter().map(|item| self.gate(item, scope)), false),
                     ]
                     .into_iter(),
                     true,
                 )
             }
-            Flag(name) | Value(name, _) if name == "cfg" || name == "cfg_attr" => {
+            Flag(name) | Value(name, _)
+                if name == "cfg_attr"
+                    || (name == "cfg" && scope == AttributeScope::Compilation) =>
+            {
                 unknown("malformed cfg attribute")
             }
-            Flag(name) | List(name, _) if name.split("::").last() == Some("test") => {
+            Flag(name) | List(name, _)
+                if scope == AttributeScope::Compilation
+                    && name.split("::").last() == Some("test") =>
+            {
                 unknown("conditional_test_attribute")
+            }
+            Flag(name) | Value(name, _) | List(name, _)
+                if scope == AttributeScope::Harness && name == "ignore" =>
+            {
+                unknown("ignored_test_attribute")
             }
             Unsupported(reason) => unknown(reason),
             _ => known(true),
@@ -197,13 +221,30 @@ pub(super) fn combine(
     }
 }
 
-pub(super) fn annotations(
-    context: &RustCfg,
+pub(super) fn annotations(context: &RustCfg, conditions: &[RustCondition]) -> Annotations {
+    annotate(conditions, |condition| {
+        context.evaluate(&condition.expression)
+    })
+}
+
+pub(super) fn harness_annotations(
+    context: Option<&RustCfg>,
     conditions: &[RustCondition],
-) -> BTreeMap<bloomery_model::SourceLocation, ConditionRecord> {
+) -> Annotations {
+    let fallback = RustCfg::default();
+    let context = context.unwrap_or(&fallback);
+    annotate(conditions, |condition| {
+        context.gate(&condition.harness, AttributeScope::Harness)
+    })
+}
+
+fn annotate(
+    conditions: &[RustCondition],
+    evaluate: impl Fn(&RustCondition) -> ConditionRecord,
+) -> Annotations {
     let mut records = BTreeMap::new();
     for condition in conditions {
-        let result = context.evaluate(&condition.expression);
+        let result = evaluate(condition);
         records.insert(condition.test.clone(), result.clone());
         for reference in &condition.references {
             records.insert(reference.clone(), result.clone());

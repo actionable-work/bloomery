@@ -14,7 +14,7 @@ analysis, without a tree identity or downstream findings.
 
 ## Identity
 
-Report format version 5 binds SHA-256 identities for the snapshot, the complete
+Report format version 6 binds SHA-256 identities for the snapshot, the complete
 typed configuration with defaults, the active specification subtree, and the
 report payload. Hash inputs are compact canonical JSON with sorted object keys;
 file bytes are represented by their SHA-256 digest. Directory identity includes
@@ -34,7 +34,7 @@ references, binding resolution, stable diagnostic codes, notes and repository-
 relative locations. Locations preserve available one-based Unicode scalar start
 and exclusive end line/column positions under the shared
 [source span contract](../../SCANNING/design/source-spans.md). Unknown positions
-remain null. The parser contract is `bloomery-static-syntax-v5`; the specification
+remain null. The parser contract is `bloomery-static-syntax-v6`; the specification
 schema remains `bloomery-grouped-specifications-v1`.
 Orphan and manual-automation findings retain the full reference location.
 
@@ -58,8 +58,8 @@ whether diagnostics exist. Reports contain no test outcomes or hosted approval.
 cfg)` attach [local Rust predicate results](../../SCANNING/design/rust-cfg.md)
 to tests and bindings. Scope includes the normalized caller context, its own
 input identity, resolution descriptions and explicit limitations. The parser
-contract is `bloomery-static-syntax-v5`; specification schema 1 is unchanged.
-Default calls retain syntactic behavior and null condition annotations.
+contract is `bloomery-static-syntax-v6`; specification schema 1 is unchanged.
+Default calls retain syntactic cfg behavior and null cfg annotations.
 
 Cfg completeness describes only the requested local predicate analysis. Disabled,
 unmatched, failed and unresolved analysis remains explicit. Cargo feature
@@ -76,3 +76,13 @@ independent completeness states. Rust coverage requires both conditions when
 target selection is requested. Direct module projection has independent
 completeness, declaration spans and inherited target conditions; other Rust
 files remain unresolved.
+
+## Rust harness eligibility
+
+Default and cfg-scoped reports retain independent
+[ignored-test eligibility](../../SCANNING/design/rust-harness.md) on Rust tests
+and bindings. `completeness.rust_harness` describes that projection. Ignored or
+unresolved eligibility never credits coverage; literals remain available for
+relational findings. Harness uncertainty makes relations partial without
+changing syntactic discovery or compilation/target completeness. New fields,
+eligibility and completeness participate in report identity under contract 6.

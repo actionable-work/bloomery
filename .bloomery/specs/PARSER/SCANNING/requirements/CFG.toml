@@ -20,3 +20,10 @@ title = "Unsupported conditional discovery remains explicit"
 manual = false
 design = "design/rust-cfg.md"
 ears = { type = "ubiquitous", system = "static analysis", action = "retain unsupported or malformed predicates and conditional test attributes as unresolved local conditions" }
+
+[[requirements]]
+id = "PARSER-SCANNING-CFG-004"
+title = "Rust facts retain function-local ignore syntax"
+manual = false
+design = "design/rust-harness.md"
+ears = { type = "ubiquitous", system = "Rust condition discovery", action = "retain function-local ignore and conditional-ignore syntax independently of inherited compilation gates without discarding test sites or literal references" }

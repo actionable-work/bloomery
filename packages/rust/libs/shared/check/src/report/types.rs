@@ -20,6 +20,7 @@ pub struct Completeness {
     pub discovery: StageState,
     pub relations: StageState,
     pub rust_cfg: StageState,
+    pub rust_harness: StageState,
     pub rust_target: StageState,
     pub rust_modules: StageState,
 }
@@ -136,6 +137,7 @@ pub struct TestRecord {
     pub location: Location,
     pub references: Vec<String>,
     pub rust_cfg: Option<super::ConditionRecord>,
+    pub rust_harness: Option<super::ConditionRecord>,
     pub rust_target: Option<super::ConditionRecord>,
 }
 
@@ -155,6 +157,7 @@ pub struct Binding {
     pub location: Location,
     pub resolution: BindingResolution,
     pub rust_cfg: Option<super::ConditionRecord>,
+    pub rust_harness: Option<super::ConditionRecord>,
     pub rust_target: Option<super::ConditionRecord>,
 }
 

@@ -54,8 +54,8 @@ testPaths = ["checks/**/*.test.nix"]
         before = {str(p.relative_to(root)): p.read_bytes() for p in root.rglob("*") if p.is_file()}
         context_args = [] if cfg is None else [json.dumps(cfg)]
         library = json.loads(subprocess.check_output([consumer, directory, "--report", *context_args], text=True))
-        assert library["version"] == 5
-        assert library["inputs"]["parser_contract"] == "bloomery-static-syntax-v5"
+        assert library["version"] == 6
+        assert library["inputs"]["parser_contract"] == "bloomery-static-syntax-v6"
         assert library["inputs"]["specification_schema"] == "bloomery-grouped-specifications-v1"
         document = run("trace", "--report", *([] if cfg is None else ["--rust-cfg", json.dumps(cfg)]))
         assert document["operation"] == "trace_report", document
@@ -279,6 +279,57 @@ testPaths = ["checks/**/*.test.nix"]
     conditional_test = report(on)
     assert conditional_test["tests"][0]["rust_cfg"]["state"] == "unresolved"
     assert conditional_test["requirements"][0]["coverage"] == "unresolved"
+    # Harness eligibility applies even to default reports, independently of cfg.
+    harness_source = '//! harness fixture\n#[cfg_attr(any(), bloomery("DEMO-TESTS-BIND-001"))]\n#[test] fn ignored() {}'
+    for attribute, context, expected in [
+        ('#[ignore]', None, 'unresolved'),
+        ('#[ignore="pending"]', on, 'unresolved'),
+        ('#[cfg_attr(test, ignore)]', on, 'unresolved'),
+        ('#[cfg_attr(test, ignore)]', None, 'unresolved'),
+        ('#[cfg_attr(any(), ignore)]', None, 'satisfied'),
+        ('#[cfg_attr(feature="fast", ignore)]', {**on, "features": []}, 'satisfied'),
+        ('#[cfg_attr(test, cfg_attr(feature="fast", ignore))]', on, 'unresolved'),
+        ('#[cfg_attr(unknown, cfg_attr(any(), ignore))]', None, 'satisfied'),
+        ('#[ignore=123]', None, 'unresolved'),
+        ('#[ignore(123)]', None, 'unresolved'),
+        ('#[cfg_attr(test)]', None, 'unresolved'),
+        ('#[cfg_attr(unsupported(test), ignore)]', on, 'unresolved'),
+    ]:
+        source = '/* café 🦀 */\n' + harness_source.replace('#[test]', attribute + '\n#[test]')
+        (root / "tests/a.rs").write_bytes(source.replace('\n', '\r\n').encode())
+        eligibility = report(context)
+        binding = eligibility["bindings"][0]
+        assert binding["rust_harness"]["state"] == expected
+        assert eligibility["tests"][0]["rust_harness"] == binding["rust_harness"]
+        assert span_text(binding["location"]) == '"DEMO-TESTS-BIND-001"'
+        assert eligibility["requirements"][0]["coverage"] == ('bound' if expected == 'satisfied' else 'unresolved')
+        assert eligibility["completeness"]["rust_harness"] == ('complete' if expected == 'satisfied' else 'partial')
+        if context is None:
+            assert binding["rust_cfg"] is None
+        elif attribute not in ['#[ignore=123]', '#[ignore(123)]', '#[cfg_attr(test)]', '#[cfg_attr(unsupported(test), ignore)]']:
+            assert binding["rust_cfg"]["state"] == 'satisfied'
+    (root / "tests/a.rs").write_text(harness_source.replace('#[test]', '#[ignore] #[test]'))
+    ignored = report()
+    for document, code in [(record.replace('BIND-001', 'BIND-002'), 'OrphanTestReference'), (record.replace('manual = false', 'manual = true'), 'IllegalManualAutomation')]:
+        group.write_text('group = "BIND"\n' + document)
+        literal = report()
+        finding = next(d for d in literal["diagnostics"] if d["code"] == code)
+        assert finding["location"] == literal["bindings"][0]["location"]
+    group.write_text('group = "BIND"\n' + record)
+    (root / "tests/a.rs").write_text(harness_source)
+    eligible = report()
+    assert ignored["inputs"]["scope"] == eligible["inputs"]["scope"]
+    assert ignored["inputs"]["tree"] != eligible["inputs"]["tree"]
+    assert ignored["identity"] != eligible["identity"]
+    conditional = harness_source.replace('#[test]', '#[cfg_attr(feature="fast", ignore)] #[test]')
+    (root / "tests/a.rs").write_text(conditional)
+    active, inactive = report(on), report({**on, "features": []})
+    assert active["inputs"]["tree"] == inactive["inputs"]["tree"]
+    assert active["inputs"]["scope"] != inactive["inputs"]["scope"]
+    assert active["identity"] != inactive["identity"]
+    assert active == report({**on, "features": ["fast", "fast"]})
+    (root / "tests/a.rs").write_text(harness_source.replace('#[test]', '#[ignore] #[test]') + '\n' + harness_source.replace('//! harness fixture\n', '').replace('ignored', 'eligible'))
+    assert report()["requirements"][0]["coverage"] == 'bound'
     (root / "tests/a.rs").write_text(rust_source)
     cfg_config = config_path.read_text()
     for changed, state in [
@@ -288,6 +339,7 @@ testPaths = ["checks/**/*.test.nix"]
         config_path.write_text(changed)
         absent = report(on)
         assert absent["completeness"]["rust_cfg"] == state
+        assert absent["completeness"]["rust_harness"] == state
         assert absent["requirements"][0]["coverage"] == "unresolved"
         assert not absent["tests"] and not absent["bindings"]
     # Explicit integration-test entrypoints add required-feature eligibility.
@@ -358,6 +410,10 @@ testPaths = ["checks/**/*.test.nix"]
     assert module["condition"]["state"] == "satisfied"
     assert modules["completeness"]["rust_modules"] == "complete"
     assert modules["requirements"][0]["coverage"] == "bound"
+    child_source = (root / "tests/café.rs").read_text()
+    (root / "tests/café.rs").write_text(child_source.replace("#[test]", "#[ignore] #[test]"))
+    assert report(selection)["requirements"][0]["coverage"] == "unresolved"
+    (root / "tests/café.rs").write_text(child_source)
     assert next(b for b in modules["bindings"] if b["location"]["path"] == "tests/café.rs")["rust_target"]["state"] == "satisfied"
     no_root = report({**selection, "flags": {"test": False}})
     assert next(b for b in no_root["bindings"] if b["location"]["path"] == "tests/café.rs")["rust_target"]["state"] == "rejected"

@@ -1,4 +1,5 @@
 use super::*;
+use bloomery_scanning::scan_tree;
 use bloomery_workspace::source::MemoryTree;
 use std::cell::RefCell;
 use std::collections::BTreeMap;

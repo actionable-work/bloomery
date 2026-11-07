@@ -9,6 +9,33 @@ use std::sync::atomic::{AtomicU64, Ordering};
 static COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[test]
+#[cfg_attr(any(), bloomery("PARSER-SCANNING-CFG-004"))]
+fn harness_facts_preserve_sites_references_and_shared_ingestion() {
+    let source = "#![cfg(parent)]\r\n/* café 🦀 */ #[ignore=\"pending\"] #[cfg_attr(any(), bloomery(\"DEMO-TESTS-BIND-001\"))] #[test] fn café() {}";
+    let tree = MemoryTree::new([("tests/a.rs", source)]).unwrap();
+    let fixture = Fixture::new(&[("tests/a.rs", source)]);
+    let session = crate::AnalysisSession::new();
+    let first =
+        crate::tree_scan::scan_with_session(&tree, &config(), &session, None, true).unwrap();
+    let again =
+        crate::tree_scan::scan_with_session(&tree, &config(), &session, None, true).unwrap();
+    assert_eq!(session.parse_count(), 1);
+    assert_eq!(first, again);
+    assert_eq!(
+        first,
+        crate::scan_tree_with_conditions(&FilesystemTree::new(&fixture.0), &config()).unwrap()
+    );
+    assert_eq!(first.output, scan_tree(&tree, &config()).unwrap().output);
+    let condition = &first.rust_conditions[0];
+    assert_eq!(span_text(source, &condition.test), "café");
+    assert_eq!(
+        span_text(source, &condition.references[0]),
+        "\"DEMO-TESTS-BIND-001\""
+    );
+    assert_ne!(condition.expression, condition.harness);
+}
+
+#[test]
 #[cfg_attr(any(), bloomery("PARSER-SCANNING-MODULE-001"))]
 fn rooted_module_facts_share_cache_spans_and_adapters() {
     let source = "/* café 🦀 */\t#[cfg(test)]\r\nmod café;\r\n#[test] fn root_test() {}";

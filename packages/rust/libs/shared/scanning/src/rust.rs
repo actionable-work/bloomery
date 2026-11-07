@@ -85,7 +85,7 @@ impl<'ast> Visit<'ast> for Visitor<'_> {
         let attributes = conditions::attributes(&item.attrs);
         let conditional_test =
             self.collect_conditions && conditions::conditional_attribute(&attributes, "test");
-        self.inherited = CfgExpression::All(vec![inherited.clone(), attributes]);
+        self.inherited = CfgExpression::All(vec![inherited.clone(), attributes.clone()]);
         let is_test = item.attrs.iter().any(|attribute| {
             attribute
                 .path()
@@ -101,20 +101,19 @@ impl<'ast> Visit<'ast> for Visitor<'_> {
                 .positions
                 .location(self.path, item.sig.ident.span().byte_range());
             if self.collect_conditions {
+                let test_kind = if is_test {
+                    CfgExpression::All(Vec::new())
+                } else {
+                    CfgExpression::Unsupported("conditional_test_attribute".into())
+                };
                 self.conditions.push(RustCondition {
                     test: location.clone(),
                     references: self.output.evidence[evidence_start..]
                         .iter()
                         .map(|evidence| evidence.location.clone())
                         .collect(),
-                    expression: CfgExpression::All(vec![
-                        self.inherited.clone(),
-                        if is_test {
-                            CfgExpression::All(Vec::new())
-                        } else {
-                            CfgExpression::Unsupported("conditional_test_attribute".into())
-                        },
-                    ]),
+                    expression: CfgExpression::All(vec![self.inherited.clone(), test_kind.clone()]),
+                    harness: CfgExpression::All(vec![attributes, test_kind]),
                 });
             }
             self.output.tests.push(TestSite {

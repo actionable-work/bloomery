@@ -7,7 +7,7 @@
 //!
 //! let tree = MemoryTree::new([("tests/example.rs", "#[test] fn example() {}")]).unwrap();
 //! let report = analyze_tree(&tree, Config::default());
-//! assert_eq!(report.version, 5);
+//! assert_eq!(report.version, 6);
 //! assert_eq!(report.completeness.tree, StageState::Complete);
 //! assert_eq!(report.scope.kind, "syntactic");
 //! ```
@@ -16,6 +16,8 @@ mod cfg;
 #[cfg(test)]
 mod cfg_tests;
 mod facts;
+#[cfg(test)]
+mod harness_tests;
 pub use cfg::{ConditionRecord, ConditionState, RustCfg};
 mod identity;
 mod modules;
@@ -31,16 +33,14 @@ mod tests;
 mod types;
 
 use bloomery_model::{Config, Diagnostic};
-use bloomery_scanning::{
-    DiscoveryState, scan_tree, scan_tree_with_conditions, scan_tree_with_rust_root,
-};
+use bloomery_scanning::{DiscoveryState, scan_tree_with_conditions, scan_tree_with_rust_root};
 use bloomery_workspace::source::{FilesystemTree, SourceTree};
 use identity::{Manifest, identity, snapshot};
 use std::path::Path;
 pub use types::*;
 
-pub const REPORT_VERSION: u32 = 5;
-pub const PARSER_CONTRACT: &str = "bloomery-static-syntax-v5";
+pub const REPORT_VERSION: u32 = 6;
+pub const PARSER_CONTRACT: &str = "bloomery-static-syntax-v6";
 pub const SPECIFICATION_SCHEMA: &str = "bloomery-grouped-specifications-v1";
 
 /// Analyze a local repository with explicit configuration. Paths remain relative.
@@ -149,10 +149,8 @@ fn analyze_input(tree: &dyn SourceTree, config: Config, cfg: Option<RustCfg>) ->
     let root = report.cargo_test.as_ref().map(|target| target.path.clone());
     let analysis = if let Some(root) = &root {
         scan_tree_with_rust_root(&tree, &config.scanners, root)
-    } else if cfg.is_some() {
-        scan_tree_with_conditions(&tree, &config.scanners)
     } else {
-        scan_tree(&tree, &config.scanners)
+        scan_tree_with_conditions(&tree, &config.scanners)
     };
     match analysis {
         Ok(analysis) => {
@@ -169,19 +167,12 @@ fn analyze_input(tree: &dyn SourceTree, config: Config, cfg: Option<RustCfg>) ->
                 .as_ref()
                 .map(|context| cfg::annotations(context, &analysis.rust_conditions))
                 .unwrap_or_default();
+            let harness = cfg::harness_annotations(cfg.as_ref(), &analysis.rust_conditions);
+            report.completeness.rust_harness =
+                condition_completeness(analysis.scanners[0].state, &harness);
             if cfg.is_some() {
-                report.completeness.rust_cfg = match analysis.scanners[0].state {
-                    DiscoveryState::Disabled => StageState::Disabled,
-                    DiscoveryState::NoMatchingFiles => StageState::Partial,
-                    DiscoveryState::Complete
-                        if annotations
-                            .values()
-                            .any(|condition| condition.state == ConditionState::Unresolved) =>
-                    {
-                        StageState::Partial
-                    }
-                    DiscoveryState::Complete => StageState::Complete,
-                };
+                report.completeness.rust_cfg =
+                    condition_completeness(analysis.scanners[0].state, &annotations);
             }
             report.completeness.discovery = if complete {
                 StageState::Complete
@@ -206,6 +197,7 @@ fn analyze_input(tree: &dyn SourceTree, config: Config, cfg: Option<RustCfg>) ->
                 context.as_ref(),
                 complete && cfg.is_none(),
                 &annotations,
+                &harness,
             );
         }
         Err(errors) => {
@@ -213,6 +205,11 @@ fn analyze_input(tree: &dyn SourceTree, config: Config, cfg: Option<RustCfg>) ->
                 report.completeness.rust_modules = StageState::Failed;
             }
             report.completeness.discovery = StageState::Failed;
+            report.completeness.rust_harness = if config.scanners.rust.enabled {
+                StageState::Failed
+            } else {
+                StageState::Disabled
+            };
             if cfg.is_some() {
                 report.completeness.rust_cfg = StageState::Failed;
             }
@@ -225,6 +222,21 @@ fn analyze_input(tree: &dyn SourceTree, config: Config, cfg: Option<RustCfg>) ->
         }
     }
     finish(report)
+}
+
+fn condition_completeness(state: DiscoveryState, annotations: &cfg::Annotations) -> StageState {
+    match state {
+        DiscoveryState::Disabled => StageState::Disabled,
+        DiscoveryState::NoMatchingFiles => StageState::Partial,
+        DiscoveryState::Complete
+            if annotations
+                .values()
+                .any(|condition| condition.state == ConditionState::Unresolved) =>
+        {
+            StageState::Partial
+        }
+        DiscoveryState::Complete => StageState::Complete,
+    }
 }
 
 fn empty_report(config: &Config) -> StaticReport {
@@ -261,6 +273,7 @@ fn empty_report(config: &Config) -> StaticReport {
             discovery: StageState::NotAttempted,
             relations: StageState::NotAttempted,
             rust_cfg: StageState::NotAttempted,
+            rust_harness: StageState::NotAttempted,
             rust_target: StageState::NotAttempted,
             rust_modules: StageState::NotAttempted,
         },

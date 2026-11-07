@@ -20,6 +20,10 @@ predicate names. Unsupported or malformed predicates remain unresolved.
 Conditional test attributes are retained as unresolved candidate sites when
 cfg analysis is requested. Normal syntactic discovery is unchanged.
 
+Function-local attributes also feed independent
+[ignored-test eligibility](rust-harness.md); ignore never means a compilation
+predicate is false.
+
 The report separately projects an optional
 [declared Cargo test entrypoint](../../WORKSPACE/design/cargo-test-target.md);
 its target condition does not change local cfg semantics.

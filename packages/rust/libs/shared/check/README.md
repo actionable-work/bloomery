@@ -13,7 +13,7 @@ let tree = MemoryTree::new([("tests/example.rs", "#[test] fn example() {}")])?;
 let mut config = Config::default();
 config.scanners.rust.paths = vec!["tests/**/*.rs".into()];
 let report = analyze_tree(&tree, config);
-assert_eq!(report.version, 5);
+assert_eq!(report.version, 6);
 assert_eq!(report.completeness.tree, StageState::Complete);
 assert_eq!(report.tests[0].name.as_deref(), Some("example"));
 ```
@@ -26,12 +26,12 @@ analysis errors are report findings. The CLI adapter is
 operation `trace_report`. CLI flake/configuration preflights still apply.
 Exit zero means the report was produced, even when it contains findings.
 
-Report format 5 retains optional `end_line` and `end_column` on each location.
+Report format 6 retains optional `end_line` and `end_column` on each location.
 Coordinates use one-based Unicode scalar positions and exclusive ends; tabs count
 as one scalar and LF advances the line, including in CRLF input. Unknown columns
 and ends remain null. References cover quoted literals, Rust test sites cover
 function names, Playwright sites cover calls, and Nix sites cover whole files.
-The parser contract is `bloomery-static-syntax-v5`; specification schema 1 is
+The parser contract is `bloomery-static-syntax-v6`; specification schema 1 is
 unchanged. Rust ingestion errors without retained spans remain line-only.
 
 Reports bind the complete typed configuration, tree snapshot, active specification
@@ -86,7 +86,7 @@ Without cfg scope, these annotations are null and discovery stays syntactic.
 The scanner also exposes owned `CfgExpression` / `RustCondition` facts through
 `scan_tree_with_conditions`, using the existing source ingestion cache.
 
-Report/parser version 5 includes this scope, annotations and `completeness.rust_cfg`;
+Report/parser version 6 includes this scope, annotations and `completeness.rust_cfg`;
 specification schema 1 is unchanged. Only satisfied Rust conditions contribute
 scoped coverage. All literal references and orphan/manual findings remain
 visible. Relations stay partial and absent bindings unresolved. Local cfg
@@ -134,4 +134,19 @@ canonical candidate paths, resolved paths and conditions. Direct projection has
 its own partial/failed/disabled/not-attempted states. Transitive membership,
 out-of-line children below inline modules and conditional paths remain outside
 scope. Relations stay partial; static results cannot establish compilation or
-execution success. Report/parser contract 5 retains specification schema 1.
+execution success. Report/parser contract 6 retains specification schema 1.
+
+Rust tests and bindings always have a separate `rust_harness` eligibility record,
+including in default syntactic reports. Plain `#[ignore]`, reasoned ignore and
+potentially active conditional ignore remain unresolved with
+`ignored_test_attribute`. A provably inactive conditional ignore permits
+eligibility. Conditional predicates use only supplied cfg facts; absent facts
+remain unknown. Malformed syntax and conditional test candidates stay unresolved.
+File/module ignore attributes never transfer to child tests.
+
+Only satisfied harness eligibility can credit Rust coverage, alongside any
+requested cfg and target conditions. Uncertain eligibility makes relations
+partial and absent coverage unresolved; literal orphan/manual findings remain.
+`completeness.rust_harness` records this stage independently. No harness options
+or execution outcomes are inferred. Report/parser 6 adds these fields; raw
+scanner discovery and specification schema 1 remain syntactic and unchanged.

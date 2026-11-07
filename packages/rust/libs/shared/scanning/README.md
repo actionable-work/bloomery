@@ -83,3 +83,9 @@ discovery. It never expands scanner globs or follows modules recursively. Root
 reads respect Rust enablement. Candidate construction is shared with health;
 virtual inputs never probe the filesystem. Consumers resolve authored candidates
 against their tree and evaluate inherited cfg expressions explicitly.
+
+`RustCondition.harness` retains function-local cfg/ignore syntax and unresolved
+conditional-test status separately from inherited compilation gates. Static
+report consumers evaluate these owned facts without another source read or parse.
+Raw `scan_tree`/`scan_all` facts still include ignored sites and literal bindings;
+they do not establish harness eligibility or executed coverage.
