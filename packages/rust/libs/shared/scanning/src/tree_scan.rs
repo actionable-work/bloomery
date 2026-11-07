@@ -29,6 +29,7 @@ pub struct ScanAnalysis {
     pub scanners: Vec<ScannerDiscovery>,
     pub output: ScanOutput,
     pub rust_conditions: Vec<crate::RustCondition>,
+    pub rust_modules: Option<Vec<crate::RustModule>>,
 }
 
 impl ScanAnalysis {
@@ -55,6 +56,20 @@ pub fn scan_tree_with_conditions(
     config: &ScannersConfig,
 ) -> Result<ScanAnalysis, Vec<Diagnostic>> {
     scan_with_session(tree, config, &AnalysisSession::new(), None, true)
+}
+
+/// Add direct root module context without expanding configured discovery globs.
+pub fn scan_tree_with_rust_root(
+    tree: &dyn SourceTree,
+    config: &ScannersConfig,
+    root: &str,
+) -> Result<ScanAnalysis, Vec<Diagnostic>> {
+    let session = AnalysisSession::new();
+    let mut analysis = scan_with_session(tree, config, &session, None, true)?;
+    if config.rust.enabled {
+        analysis.rust_modules = Some(crate::modules::root_modules(tree, root, &session)?);
+    }
+    Ok(analysis)
 }
 
 pub(crate) fn scan_with_session(
@@ -142,6 +157,7 @@ pub(crate) fn scan_with_session(
         scanners,
         output,
         rust_conditions,
+        rust_modules: None,
     })
 }
 

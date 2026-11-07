@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 const MANIFEST: &str = "[[test]]\nname='sample'\npath='tests/a.rs'\nrequired-features=['slow', 'fast', 'fast']\n[[test]]\nname='other'\npath='tests/b.rs'\n";
 
-fn context(features: Option<&[&str]>) -> RustCfg {
+pub(super) fn context(features: Option<&[&str]>) -> RustCfg {
     RustCfg {
         features: features.map(|items| items.iter().map(|item| (*item).into()).collect()),
         flags: [("test".into(), true)].into(),
@@ -16,7 +16,7 @@ fn context(features: Option<&[&str]>) -> RustCfg {
     }
 }
 
-fn files() -> BTreeMap<String, String> {
+pub(super) fn files() -> BTreeMap<String, String> {
     let mut files = tests::files();
     files.insert("Cargo.toml".into(), MANIFEST.into());
     files.insert(
@@ -35,7 +35,7 @@ fn files() -> BTreeMap<String, String> {
     files
 }
 
-fn config() -> Config {
+pub(super) fn config() -> Config {
     let mut config = tests::config();
     config.scanners.playwright.enabled = false;
     config.scanners.nix.enabled = false;
@@ -157,6 +157,7 @@ fn coverage_requires_local_cfg_and_entrypoint_eligibility() {
     disabled.scanners.rust.enabled = false;
     let report = analyze_tree_with_cfg(&tree, disabled, context(None));
     assert_eq!(report.completeness.rust_target, StageState::Disabled);
+    assert_eq!(report.completeness.rust_modules, StageState::Disabled);
     assert!(report.cargo_test.is_none());
     assert!(report.diagnostics.is_empty());
     assert_eq!(

@@ -8,6 +8,54 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
 
+#[test]
+#[cfg_attr(any(), bloomery("PARSER-SCANNING-MODULE-001"))]
+fn rooted_module_facts_share_cache_spans_and_adapters() {
+    let source = "/* café 🦀 */\t#[cfg(test)]\r\nmod café;\r\n#[test] fn root_test() {}";
+    let tree = MemoryTree::new([("tests/a.rs", source)]).unwrap();
+    let fixture = Fixture::new(&[("tests/a.rs", source)]);
+    let mut config = config();
+    config.playwright.enabled = false;
+    config.nix.enabled = false;
+    let session = crate::AnalysisSession::new();
+    crate::tree_scan::scan_with_session(&tree, &config, &session, None, true).unwrap();
+    let modules = crate::modules::root_modules(&tree, "tests/a.rs", &session).unwrap();
+    assert_eq!(session.parse_count(), 1);
+    assert_eq!(span_text(source, &modules[0].location), "café");
+    assert_eq!(
+        modules,
+        crate::modules::root_modules(&tree, "tests/a.rs", &session).unwrap()
+    );
+    assert_eq!(session.parse_count(), 1);
+    let analysis = crate::scan_tree_with_rust_root(&tree, &config, "tests/a.rs").unwrap();
+    assert_eq!(analysis.rust_modules.as_ref().unwrap(), &modules);
+    assert_eq!(
+        analysis,
+        crate::scan_tree_with_rust_root(&FilesystemTree::new(&fixture.0), &config, "tests/a.rs")
+            .unwrap()
+    );
+    for root in ["tests/./a.rs", "../tests/a.rs", "/tests/a.rs", "missing.rs"] {
+        assert_eq!(
+            crate::scan_tree_with_rust_root(&tree, &config, root).unwrap_err()[0].code,
+            "RustModuleRootError"
+        );
+    }
+    let external = MemoryTree::new([
+        ("outside/main.rs", "mod child; #[test] fn unselected() {}"),
+        ("tests/a.rs", "#[test] fn selected() {}"),
+    ])
+    .unwrap();
+    let analysis = crate::scan_tree_with_rust_root(&external, &config, "outside/main.rs").unwrap();
+    assert_eq!(analysis.output.tests.len(), 1);
+    assert_eq!(analysis.output.tests[0].name.as_deref(), Some("selected"));
+    assert_eq!(analysis.rust_modules.unwrap().len(), 1);
+    config.rust.enabled = false;
+    let disabled =
+        crate::scan_tree_with_rust_root(&UnreadableTree, &config, "invalid/root").unwrap();
+    assert!(disabled.rust_modules.is_none());
+    assert!(disabled.output.tests.is_empty());
+}
+
 struct Fixture(PathBuf);
 
 impl Fixture {

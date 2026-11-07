@@ -160,3 +160,30 @@ pub(crate) fn path_key(path: &Path) -> String {
         .collect::<Vec<_>>()
         .join("/")
 }
+
+/// Resolve a portable relative path inside an authorized repository directory.
+pub fn resolve_relative_path(directory: &str, path: &str) -> Result<String, String> {
+    if path.is_empty() || path.starts_with('/') || path.contains(['\\', ':', '\0']) {
+        return Err("entrypoint must be a relative portable path".into());
+    }
+    if !directory.is_empty() {
+        validate_path(directory)?;
+    }
+    let mut parts: Vec<_> = if directory.is_empty() {
+        Vec::new()
+    } else {
+        directory.split('/').collect()
+    };
+    for part in path.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.pop().ok_or("entrypoint escapes the repository")?;
+            }
+            part => parts.push(part),
+        }
+    }
+    let path = parts.join("/");
+    validate_path(&path)?;
+    Ok(path)
+}

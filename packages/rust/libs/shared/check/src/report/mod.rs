@@ -7,7 +7,7 @@
 //!
 //! let tree = MemoryTree::new([("tests/example.rs", "#[test] fn example() {}")]).unwrap();
 //! let report = analyze_tree(&tree, Config::default());
-//! assert_eq!(report.version, 4);
+//! assert_eq!(report.version, 5);
 //! assert_eq!(report.completeness.tree, StageState::Complete);
 //! assert_eq!(report.scope.kind, "syntactic");
 //! ```
@@ -18,6 +18,10 @@ mod cfg_tests;
 mod facts;
 pub use cfg::{ConditionRecord, ConditionState, RustCfg};
 mod identity;
+mod modules;
+pub use modules::RustModuleRecord;
+#[cfg(test)]
+mod module_tests;
 mod target;
 pub use target::{CargoTestRecord, CargoTestSelection};
 #[cfg(test)]
@@ -27,14 +31,16 @@ mod tests;
 mod types;
 
 use bloomery_model::{Config, Diagnostic};
-use bloomery_scanning::{DiscoveryState, scan_tree, scan_tree_with_conditions};
+use bloomery_scanning::{
+    DiscoveryState, scan_tree, scan_tree_with_conditions, scan_tree_with_rust_root,
+};
 use bloomery_workspace::source::{FilesystemTree, SourceTree};
 use identity::{Manifest, identity, snapshot};
 use std::path::Path;
 pub use types::*;
 
-pub const REPORT_VERSION: u32 = 4;
-pub const PARSER_CONTRACT: &str = "bloomery-static-syntax-v4";
+pub const REPORT_VERSION: u32 = 5;
+pub const PARSER_CONTRACT: &str = "bloomery-static-syntax-v5";
 pub const SPECIFICATION_SCHEMA: &str = "bloomery-grouped-specifications-v1";
 
 /// Analyze a local repository with explicit configuration. Paths remain relative.
@@ -56,9 +62,8 @@ pub fn analyze_tree_with_cfg(tree: &dyn SourceTree, config: Config, cfg: RustCfg
     analyze_input(tree, config, Some(cfg))
 }
 
-fn analyze_input(tree: &dyn SourceTree, config: Config, cfg: Option<RustCfg>) -> StaticReport {
-    let mut report = empty_report(&config);
-    if let Some(context) = &cfg {
+fn configure_scope(report: &mut StaticReport, cfg: Option<&RustCfg>) {
+    if let Some(context) = cfg {
         report.scope.kind = "syntactic_with_rust_cfg".into();
         report.scope.target_resolution = "caller_supplied_facts".into();
         report.scope.feature_resolution = if context.features.is_some() {
@@ -70,19 +75,27 @@ fn analyze_input(tree: &dyn SourceTree, config: Config, cfg: Option<RustCfg>) ->
         report.scope.conditional_compilation = "local_rust_predicates".into();
         report.scope.rust_cfg = Some(context.clone());
         if context.cargo_test.is_some() {
-            report.scope.target_resolution = "declared_integration_test_entrypoint".into();
+            report.scope.target_resolution = "declared_integration_test_direct_modules".into();
             report
                 .scope
                 .limitations
-                .retain(|limit| limit != "required_features_targets");
+                .retain(|limit| limit != "required_features_targets" && limit != "module_graph");
             report.scope.limitations.extend([
                 "cargo_target_auto_discovery".into(),
                 "other_cargo_targets".into(),
+                "transitive_module_membership".into(),
+                "inline_external_modules".into(),
+                "conditional_module_paths".into(),
             ]);
             report.scope.limitations.sort();
         }
     }
     report.inputs.scope = identity(&report.scope);
+}
+
+fn analyze_input(tree: &dyn SourceTree, config: Config, cfg: Option<RustCfg>) -> StaticReport {
+    let mut report = empty_report(&config);
+    configure_scope(&mut report, cfg.as_ref());
     if let Some(context) = &cfg
         && let Err(error) = context.validate()
     {
@@ -133,13 +146,24 @@ fn analyze_input(tree: &dyn SourceTree, config: Config, cfg: Option<RustCfg>) ->
             None
         }
     };
-    let analysis = if cfg.is_some() {
+    let root = report.cargo_test.as_ref().map(|target| target.path.clone());
+    let analysis = if let Some(root) = &root {
+        scan_tree_with_rust_root(&tree, &config.scanners, root)
+    } else if cfg.is_some() {
         scan_tree_with_conditions(&tree, &config.scanners)
     } else {
         scan_tree(&tree, &config.scanners)
     };
     match analysis {
         Ok(analysis) => {
+            if let Some(declarations) = &analysis.rust_modules {
+                modules::project(
+                    &mut report,
+                    &tree,
+                    cfg.as_ref().expect("explicit target context"),
+                    declarations,
+                );
+            }
             let complete = analysis.is_complete();
             let annotations = cfg
                 .as_ref()
@@ -185,6 +209,9 @@ fn analyze_input(tree: &dyn SourceTree, config: Config, cfg: Option<RustCfg>) ->
             );
         }
         Err(errors) => {
+            if root.is_some() {
+                report.completeness.rust_modules = StageState::Failed;
+            }
             report.completeness.discovery = StageState::Failed;
             if cfg.is_some() {
                 report.completeness.rust_cfg = StageState::Failed;
@@ -235,6 +262,7 @@ fn empty_report(config: &Config) -> StaticReport {
             relations: StageState::NotAttempted,
             rust_cfg: StageState::NotAttempted,
             rust_target: StageState::NotAttempted,
+            rust_modules: StageState::NotAttempted,
         },
         scanners: [
             ("rust", config.scanners.rust.enabled),

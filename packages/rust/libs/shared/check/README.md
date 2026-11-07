@@ -13,7 +13,7 @@ let tree = MemoryTree::new([("tests/example.rs", "#[test] fn example() {}")])?;
 let mut config = Config::default();
 config.scanners.rust.paths = vec!["tests/**/*.rs".into()];
 let report = analyze_tree(&tree, config);
-assert_eq!(report.version, 4);
+assert_eq!(report.version, 5);
 assert_eq!(report.completeness.tree, StageState::Complete);
 assert_eq!(report.tests[0].name.as_deref(), Some("example"));
 ```
@@ -26,12 +26,12 @@ analysis errors are report findings. The CLI adapter is
 operation `trace_report`. CLI flake/configuration preflights still apply.
 Exit zero means the report was produced, even when it contains findings.
 
-Report format 4 retains optional `end_line` and `end_column` on each location.
+Report format 5 retains optional `end_line` and `end_column` on each location.
 Coordinates use one-based Unicode scalar positions and exclusive ends; tabs count
 as one scalar and LF advances the line, including in CRLF input. Unknown columns
 and ends remain null. References cover quoted literals, Rust test sites cover
 function names, Playwright sites cover calls, and Nix sites cover whole files.
-The parser contract is `bloomery-static-syntax-v4`; specification schema 1 is
+The parser contract is `bloomery-static-syntax-v5`; specification schema 1 is
 unchanged. Rust ingestion errors without retained spans remain line-only.
 
 Reports bind the complete typed configuration, tree snapshot, active specification
@@ -86,7 +86,7 @@ Without cfg scope, these annotations are null and discovery stays syntactic.
 The scanner also exposes owned `CfgExpression` / `RustCondition` facts through
 `scan_tree_with_conditions`, using the existing source ingestion cache.
 
-Report/parser version 4 includes this scope, annotations and `completeness.rust_cfg`;
+Report/parser version 5 includes this scope, annotations and `completeness.rust_cfg`;
 specification schema 1 is unchanged. Only satisfied Rust conditions contribute
 scoped coverage. All literal references and orphan/manual findings remain
 visible. Relations stay partial and absent bindings unresolved. Local cfg
@@ -106,15 +106,32 @@ features, harness mode and eligibility. `completeness.rust_target` tracks this
 projection independently. An absent effective feature set leaves nonempty
 requirements unresolved; custom harnesses are also unresolved.
 
-Each Rust test/binding receives a separate `rust_target` condition. Only tests
-in the selected entrypoint may credit Rust coverage, and both cfg and target
-conditions must be satisfied. Other files have unresolved module membership;
-failed target projection likewise blocks Rust coverage while discovery and
-literal findings continue. Disabled Rust scanning disables projection.
+Each Rust test/binding receives a separate `rust_target` condition. Tests in the
+entrypoint and known direct out-of-line children may credit Rust
+coverage when both cfg and target conditions are satisfied. Other files have
+unresolved module membership; failed target projection likewise blocks Rust
+coverage while discovery and literal findings continue. Disabled Rust scanning
+disables projection.
 
 Manifest paths are canonical repository-relative Cargo.toml paths. Entrypoint
 paths resolve relative to that manifest, allowing dot segments within the tree.
 Missing, escaping, malformed, duplicate or inferred entrypoints are findings.
 This is a declared-entrypoint projection, not Cargo manifest validation, target
-auto-discovery or module resolution. No Cargo process runs. Specification schema
-1 and the repository-only specification discovery contract remain unchanged.
+auto-discovery or complete module resolution. No Cargo process runs.
+Specification schema 1 and repository-only specification discovery are unchanged.
+
+Selected Cargo tests also expose `cargo_test.modules` and
+`completeness.rust_modules`. Direct `mod child;` and literal `#[path]`
+declarations resolve against the supplied tree. Child target conditions include
+entrypoint and declaration cfg gates; local cfg stays separate. Alternative
+routes to one file combine by any satisfied route. Scanner globs still determine
+which tests are discovered; a root outside those globs supplies context only.
+
+Missing/ambiguous, escaping/self-referential or unsupported paths produce located
+`RustModuleResolutionError` findings and unresolved membership. Rejected gates
+suppress irrelevant path findings. Module records retain declaration spans,
+canonical candidate paths, resolved paths and conditions. Direct projection has
+its own partial/failed/disabled/not-attempted states. Transitive membership,
+out-of-line children below inline modules and conditional paths remain outside
+scope. Relations stay partial; static results cannot establish compilation or
+execution success. Report/parser contract 5 retains specification schema 1.

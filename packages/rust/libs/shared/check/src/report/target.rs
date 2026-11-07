@@ -19,6 +19,7 @@ pub struct CargoTestRecord {
     pub required_features: BTreeSet<String>,
     pub harness: bool,
     pub condition: ConditionRecord,
+    pub modules: Vec<super::RustModuleRecord>,
 }
 
 pub(super) fn project(
@@ -32,6 +33,7 @@ pub(super) fn project(
     };
     if !enabled {
         report.completeness.rust_target = StageState::Disabled;
+        report.completeness.rust_modules = StageState::Disabled;
         return;
     }
     match cargo::load_test_target(tree, &selection.manifest, &selection.name) {
@@ -59,6 +61,7 @@ pub(super) fn project(
                 required_features: target.required_features,
                 harness: target.harness,
                 condition,
+                modules: Vec::new(),
             });
         }
         Err(error) => {
@@ -71,7 +74,7 @@ pub(super) fn project(
 pub(super) fn condition(target: Option<&CargoTestRecord>, path: &Path) -> ConditionRecord {
     match target {
         Some(target) if Path::new(&target.path) == path => target.condition.clone(),
-        Some(_) => cfg::unknown("rust_module_membership"),
+        Some(target) => super::modules::membership(target, path),
         None => cfg::unknown("cargo_test_target_unavailable"),
     }
 }

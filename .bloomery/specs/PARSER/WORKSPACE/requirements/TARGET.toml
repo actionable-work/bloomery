@@ -23,7 +23,21 @@ ears = { type = "ubiquitous", system = "static target analysis", action = "evalu
 
 [[requirements]]
 id = "PARSER-WORKSPACE-TARGET-004"
-title = "Target scope limits Rust coverage to the entrypoint"
+title = "Target scope limits Rust coverage to known members"
 manual = false
 design = "design/cargo-test-target.md"
-ears = { type = "ubiquitous", system = "static target analysis", action = "credit Rust coverage only when both local cfg and selected entrypoint conditions are satisfied while retaining other files and failed projection as unresolved" }
+ears = { type = "ubiquitous", system = "static target analysis", action = "credit Rust coverage only when local cfg and selected entrypoint or known direct module conditions are satisfied while retaining other files and failed projection as unresolved" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-TARGET-005"
+title = "Direct children inherit target gates"
+manual = false
+design = "design/cargo-test-target.md"
+ears = { type = "ubiquitous", system = "static target analysis", action = "propagate entrypoint and direct declaration gates to configured child bindings and combine alternative routes conservatively" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-TARGET-006"
+title = "Unresolved direct module paths remain explicit"
+manual = false
+design = "design/cargo-test-target.md"
+ears = { type = "ubiquitous", system = "static module analysis", action = "retain missing, ambiguous, escaping and unsupported direct module paths as unresolved findings while suppressing path findings behind rejected gates" }

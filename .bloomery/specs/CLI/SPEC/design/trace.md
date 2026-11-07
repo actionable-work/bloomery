@@ -49,6 +49,8 @@ Its optional `cargo_test` object requires `manifest` and `name` strings and
 selects one explicitly declared integration-test entrypoint. Invalid selector
 shape or noncanonical manifest paths are usage errors; manifest/target failures
 are static report findings. No additional command or discovery source is used.
+Selected targets include direct out-of-line module membership and inherited
+gates, with explicit module completeness and unresolved nested membership.
 
 ## Candidates
 

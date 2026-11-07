@@ -99,8 +99,11 @@ pub fn load_test_target(
                 "selected test target needs an explicit string path",
             )
         })?;
-    let path = entrypoint_path(manifest, raw_path)
-        .map_err(|error| finding(manifest, "CargoTargetPathError", error))?;
+    let path = crate::source::resolve_relative_path(
+        manifest.rsplit_once('/').map(|(dir, _)| dir).unwrap_or(""),
+        raw_path,
+    )
+    .map_err(|error| finding(manifest, "CargoTargetPathError", error))?;
     if !index.is_file(std::path::Path::new(&path)) {
         return Err(finding(
             manifest,
@@ -153,26 +156,6 @@ fn required_features(declaration: &toml::Value) -> Result<BTreeSet<String>, Stri
                 .ok_or_else(|| "required-features entries must be nonempty strings".into())
         })
         .collect()
-}
-
-fn entrypoint_path(manifest: &str, path: &str) -> Result<String, String> {
-    if path.is_empty() || path.starts_with('/') || path.contains(['\\', ':', '\0']) {
-        return Err("entrypoint must be a relative portable path".into());
-    }
-    let mut parts: Vec<_> = manifest.split('/').collect();
-    parts.pop();
-    for part in path.split('/') {
-        match part {
-            "" | "." => {}
-            ".." => {
-                parts.pop().ok_or("entrypoint escapes the repository")?;
-            }
-            part => parts.push(part),
-        }
-    }
-    let path = parts.join("/");
-    validate_path(&path)?;
-    Ok(path)
 }
 
 fn finding(manifest: &str, code: &str, message: impl Into<String>) -> Diagnostic {

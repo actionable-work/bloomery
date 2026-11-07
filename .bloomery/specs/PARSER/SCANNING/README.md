@@ -26,6 +26,7 @@ candidate projection over untagged tests belongs to
 - [Source span coordinates](design/source-spans.md)
 - [Rust scanning](design/rust.md)
 - [Caller-supplied Rust cfg facts](design/rust-cfg.md)
+- [Direct test-entrypoint modules](design/rust-modules.md)
 - [Shared Rust health analysis](design/health-analysis.md)
 - [Playwright scanning](design/playwright.md)
 - [Nix scanning](design/nix.md)

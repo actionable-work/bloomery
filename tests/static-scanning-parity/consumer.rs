@@ -158,6 +158,35 @@ fn compare_reports(root: &std::path::Path) {
     let config = bloomery_model::config::load(root).expect("configuration");
     if let Some(json) = std::env::args().nth(3) {
         let cfg = bloomery_check::report::RustCfg::parse_json(&json).expect("cfg context");
+        if let Some(selection) = &cfg.cargo_test {
+            let target = bloomery_workspace::cargo::load_test_target(
+                &memory,
+                &selection.manifest,
+                &selection.name,
+            );
+            assert_eq!(
+                target,
+                bloomery_workspace::cargo::load_test_target(
+                    &disk,
+                    &selection.manifest,
+                    &selection.name
+                )
+            );
+            if let Ok(target) = target {
+                assert_eq!(
+                    bloomery_scanning::scan_tree_with_rust_root(
+                        &memory,
+                        &config.scanners,
+                        &target.path
+                    ),
+                    bloomery_scanning::scan_tree_with_rust_root(
+                        &disk,
+                        &config.scanners,
+                        &target.path
+                    )
+                );
+            }
+        }
         assert_eq!(
             bloomery_scanning::scan_tree_with_conditions(&memory, &config.scanners),
             bloomery_scanning::scan_tree_with_conditions(&disk, &config.scanners)

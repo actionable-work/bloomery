@@ -170,7 +170,10 @@ fn negate(mut result: ConditionRecord) -> ConditionRecord {
     result
 }
 
-fn combine(results: impl Iterator<Item = ConditionRecord>, any: bool) -> ConditionRecord {
+pub(super) fn combine(
+    results: impl Iterator<Item = ConditionRecord>,
+    any: bool,
+) -> ConditionRecord {
     let mut unresolved = BTreeSet::new();
     for result in results {
         if result.state

@@ -1,6 +1,7 @@
 //! Source-only Rust metrics used by the static code-health check.
 
 use crate::AnalysisSession;
+use crate::modules::module_paths;
 use bloomery_model::Diagnostic;
 use proc_macro2::{Delimiter, Group, TokenStream, TokenTree};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -303,7 +304,7 @@ impl FileWalker<'_> {
                         self.walk_items(items);
                         self.module_dir = previous;
                     } else {
-                        for path in module_paths(item, &self.module_dir) {
+                        for path in module_paths(item, &self.module_dir, Path::is_file) {
                             let child_dir = module_child_dir(&path);
                             let mut inputs = WalkInputs {
                                 root: self.root,
@@ -766,36 +767,6 @@ fn is_test_fn(attrs: &[syn::Attribute]) -> bool {
                 .last()
                 .is_some_and(|segment| segment.ident == "test")
     })
-}
-
-fn module_paths(module: &syn::ItemMod, module_dir: &Path) -> Vec<PathBuf> {
-    let explicit = module
-        .attrs
-        .iter()
-        .filter(|attr| attr.path().is_ident("path"))
-        .filter_map(|attr| match &attr.meta {
-            syn::Meta::NameValue(value) => match &value.value {
-                syn::Expr::Lit(expression) => match &expression.lit {
-                    syn::Lit::Str(path) => Some(path.value()),
-                    _ => None,
-                },
-                _ => None,
-            },
-            _ => None,
-        })
-        .map(|path| module_dir.join(path))
-        .collect::<Vec<_>>();
-    if !explicit.is_empty() {
-        return explicit;
-    }
-    let name = module.ident.to_string();
-    let first = module_dir.join(format!("{name}.rs"));
-    let second = module_dir.join(name).join("mod.rs");
-    let paths = [first.clone(), second]
-        .into_iter()
-        .filter(|path| path.is_file())
-        .collect::<Vec<_>>();
-    if paths.is_empty() { vec![first] } else { paths }
 }
 
 fn module_child_dir(path: &Path) -> PathBuf {

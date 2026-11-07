@@ -54,3 +54,7 @@ entrypoints within the repository and rejects missing files or duplicate names.
 `cargo::validate_selector` checks selector paths/names without reading content.
 This helper performs no Cargo invocation, automatic target discovery, feature
 resolution or hosted specification discovery.
+
+`source::resolve_relative_path(directory, path)` performs shared lexical path
+normalization inside the repository. Cargo entrypoints and module projection use
+this policy; it does not read content or follow symlinks.

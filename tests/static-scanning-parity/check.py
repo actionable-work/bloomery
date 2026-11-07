@@ -54,8 +54,8 @@ testPaths = ["checks/**/*.test.nix"]
         before = {str(p.relative_to(root)): p.read_bytes() for p in root.rglob("*") if p.is_file()}
         context_args = [] if cfg is None else [json.dumps(cfg)]
         library = json.loads(subprocess.check_output([consumer, directory, "--report", *context_args], text=True))
-        assert library["version"] == 4
-        assert library["inputs"]["parser_contract"] == "bloomery-static-syntax-v4"
+        assert library["version"] == 5
+        assert library["inputs"]["parser_contract"] == "bloomery-static-syntax-v5"
         assert library["inputs"]["specification_schema"] == "bloomery-grouped-specifications-v1"
         document = run("trace", "--report", *([] if cfg is None else ["--rust-cfg", json.dumps(cfg)]))
         assert document["operation"] == "trace_report", document
@@ -70,7 +70,10 @@ testPaths = ["checks/**/*.test.nix"]
             assert all(library["scope"][key] == "unsupported" for key in ["target_resolution", "feature_resolution", "conditional_compilation"])
         else:
             assert library["scope"]["kind"] == "syntactic_with_rust_cfg"
-        assert "module_graph" in library["scope"]["limitations"]
+        if cfg and cfg.get("cargo_test"):
+            assert "transitive_module_membership" in library["scope"]["limitations"]
+        else:
+            assert "module_graph" in library["scope"]["limitations"]
         scope = json.dumps(library["scope"], sort_keys=True, separators=(",", ":"), ensure_ascii=False)
         assert library["inputs"]["scope"] == "sha256:" + hashlib.sha256(scope.encode()).hexdigest()
         for key in ["passed", "approval", "execution"]:
@@ -341,6 +344,66 @@ testPaths = ["checks/**/*.test.nix"]
     assert disabled["cargo_test"] is None
     assert not disabled["diagnostics"]
     config_path.write_text(cfg_config)
+    # Direct root modules inherit root and declaration gates; nested files do not.
+    manifest.write_text(cargo_manifest)
+    original_root = (root / "tests/a.rs").read_text()
+    original_other = (root / "tests/b.rs").read_text()
+    module_root = '/* café 🦀 */\t#![cfg(test)]\n#[cfg(feature="fast")] mod café;\n'
+    (root / "tests/a.rs").write_bytes(module_root.replace("\n", "\r\n").encode())
+    (root / "tests/café.rs").write_text(original_root.replace("conditional", "child"))
+    modules = report(selection)
+    module = modules["cargo_test"]["modules"][0]
+    assert module["name"] == "café" and module["path"] == "tests/café.rs"
+    assert span_text(module["location"]) == "café"
+    assert module["condition"]["state"] == "satisfied"
+    assert modules["completeness"]["rust_modules"] == "complete"
+    assert modules["requirements"][0]["coverage"] == "bound"
+    assert next(b for b in modules["bindings"] if b["location"]["path"] == "tests/café.rs")["rust_target"]["state"] == "satisfied"
+    no_root = report({**selection, "flags": {"test": False}})
+    assert next(b for b in no_root["bindings"] if b["location"]["path"] == "tests/café.rs")["rust_target"]["state"] == "rejected"
+    assert no_root["requirements"][0]["coverage"] == "unresolved"
+    (root / "tests/a.rs").write_text('mod café;')
+    (root / "tests/café").mkdir()
+    (root / "tests/café/mod.rs").write_text("")
+    ambiguous = report(selection)
+    assert ambiguous["completeness"]["rust_modules"] == "partial"
+    finding = next(d for d in ambiguous["diagnostics"] if d["code"] == "RustModuleResolutionError")
+    assert span_text(finding["location"]) == "café"
+    assert "ambiguous_module_path" in ambiguous["cargo_test"]["modules"][0]["condition"]["unresolved"]
+    (root / "tests/café/mod.rs").unlink()
+    (root / "tests/café").rmdir()
+    for declaration, reason in [
+        ('mod absent;', 'missing_module_path'),
+        ('#[path="../../escape.rs"] mod café;', 'entrypoint escapes the repository'),
+        ('#[path="a.rs"] mod café;', 'self_referential_module_path'),
+        ('#[path=123] mod café;', 'unsupported_module_path'),
+        ('#[path="café.rs"] #[path="café.rs"] mod café;', 'unsupported_module_path'),
+        ('#[cfg_attr(test, path="café.rs")] mod café;', 'unsupported_module_path'),
+    ]:
+        (root / "tests/a.rs").write_text(declaration)
+        unresolved = report(selection)
+        assert reason in unresolved["cargo_test"]["modules"][0]["condition"]["unresolved"]
+        assert unresolved["requirements"][0]["coverage"] == "unresolved"
+        assert any(d["code"] == "RustModuleResolutionError" for d in unresolved["diagnostics"])
+    (root / "tests/a.rs").write_text('#[cfg(any())] #[path="../../escape.rs"] mod café;')
+    rejected_module = report(selection)
+    assert not rejected_module["diagnostics"]
+    assert rejected_module["cargo_test"]["modules"][0]["condition"]["state"] == "rejected"
+    (root / "tests/a.rs").write_text('#[cfg(feature="absent")] #[path="café.rs"] mod first; #[cfg(test)] #[path="café.rs"] mod second;')
+    assert report(selection)["requirements"][0]["coverage"] == "bound"
+    (root / "tests/a.rs").write_text('mod café;')
+    (root / "tests/café.rs").unlink()
+    (root / "tests/café").mkdir()
+    (root / "tests/café/mod.rs").write_text(original_other.replace("other", "direct") + '\nmod nested;\n')
+    (root / "tests/café/nested.rs").write_text(original_other.replace("other", "nested"))
+    nested = report(selection)
+    assert nested["cargo_test"]["modules"][0]["path"] == "tests/café/mod.rs"
+    assert next(b for b in nested["bindings"] if b["location"]["path"].endswith("nested.rs"))["rust_target"]["state"] == "unresolved"
+    assert nested["completeness"]["relations"] == "partial"
+    (root / "tests/café/nested.rs").unlink()
+    (root / "tests/café/mod.rs").unlink()
+    (root / "tests/café").rmdir()
+    (root / "tests/a.rs").write_text(original_root)
     manifest.unlink()
     assert report(selection)["completeness"]["rust_target"] == "failed"
     (root / "tests/b.rs").unlink()

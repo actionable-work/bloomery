@@ -60,12 +60,17 @@ pub(crate) fn attributes(attrs: &[Attribute]) -> CfgExpression {
     )
 }
 
-pub(crate) fn conditional_test(expression: &CfgExpression) -> bool {
+pub(crate) fn conditional_attribute(expression: &CfgExpression, name: &str) -> bool {
     use CfgExpression::*;
     match expression {
-        Attributes(items) => items.iter().any(conditional_test),
-        List(name, items) if name == "cfg_attr" => items.iter().skip(1).any(conditional_test),
-        Flag(name) | List(name, _) => name.split("::").last() == Some("test"),
+        Attributes(items) => items.iter().any(|item| conditional_attribute(item, name)),
+        List(attribute, items) if attribute == "cfg_attr" => items
+            .iter()
+            .skip(1)
+            .any(|item| conditional_attribute(item, name)),
+        Flag(attribute) | Value(attribute, _) | List(attribute, _) => {
+            attribute.split("::").last() == Some(name)
+        }
         _ => false,
     }
 }

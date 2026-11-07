@@ -19,7 +19,8 @@ unresolved when requirements exist; an empty requirement set is satisfied.
 Custom harnesses remain unresolved. No default test flags are inferred.
 
 Rust tests and bindings in the selected entrypoint receive its eligibility.
-Other Rust files remain unresolved because module membership is unsupported.
+[Direct out-of-line children](../../SCANNING/design/rust-modules.md) additionally
+inherit entrypoint and declaration cfg gates. Other Rust files remain unresolved.
 Failed target projection leaves Rust target conditions unresolved while local
 cfg discovery continues independently. Disabled Rust scanning leaves target
 projection disabled. Rust coverage requires both satisfied local cfg and target
@@ -27,10 +28,10 @@ conditions. All literal bindings and orphan/manual findings remain visible;
 other scanners remain syntactic. Relations stay partial and absent coverage
 unresolved. No execution outcome or approval is implied.
 
-Report/parser contracts are version 4; specification schema 1 is unchanged.
+Report/parser contracts are version 5; specification schema 1 is unchanged.
 The normalized selector participates in scope identity. Manifest and entrypoint
 bytes participate in tree identity; the resolved projection and conditions
 participate in report identity. `completeness.rust_target` describes entrypoint
 projection, independently of local cfg and whole-target/module completeness.
-Automatic Cargo target discovery, other target kinds, module ancestry, feature
-unification and macro expansion remain explicit limitations.
+Automatic Cargo target discovery, other target kinds, transitive/inline module
+membership, feature unification and macro expansion remain explicit limitations.

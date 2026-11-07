@@ -83,7 +83,8 @@ impl<'ast> Visit<'ast> for Visitor<'_> {
     fn visit_item_fn(&mut self, item: &'ast syn::ItemFn) {
         let inherited = self.inherited.clone();
         let attributes = conditions::attributes(&item.attrs);
-        let conditional_test = self.collect_conditions && conditions::conditional_test(&attributes);
+        let conditional_test =
+            self.collect_conditions && conditions::conditional_attribute(&attributes, "test");
         self.inherited = CfgExpression::All(vec![inherited.clone(), attributes]);
         let is_test = item.attrs.iter().any(|attribute| {
             attribute

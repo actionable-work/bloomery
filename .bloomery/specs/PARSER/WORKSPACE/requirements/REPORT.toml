@@ -82,4 +82,11 @@ id = "PARSER-WORKSPACE-REPORT-012"
 title = "Reports bind selected Cargo test entrypoints"
 manual = false
 design = "design/cargo-test-target.md"
-ears = { type = "ubiquitous", system = "static reporting", action = "bind target selectors, resolved entrypoints, required features and explicit projection completeness in version 4 reports with identical adapter results" }
+ears = { type = "ubiquitous", system = "static reporting", action = "bind target selectors, resolved entrypoints, required features and explicit projection completeness under the current report contract with identical adapter results" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-REPORT-013"
+title = "Reports bind direct module projection"
+manual = false
+design = "design/static-report.md"
+ears = { type = "ubiquitous", system = "static reporting", action = "bind direct module paths, spans, gate conditions and explicit completeness under version 5 with identical tree and CLI adapter results" }

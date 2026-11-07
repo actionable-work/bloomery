@@ -14,7 +14,7 @@ analysis, without a tree identity or downstream findings.
 
 ## Identity
 
-Report format version 4 binds SHA-256 identities for the snapshot, the complete
+Report format version 5 binds SHA-256 identities for the snapshot, the complete
 typed configuration with defaults, the active specification subtree, and the
 report payload. Hash inputs are compact canonical JSON with sorted object keys;
 file bytes are represented by their SHA-256 digest. Directory identity includes
@@ -34,7 +34,7 @@ references, binding resolution, stable diagnostic codes, notes and repository-
 relative locations. Locations preserve available one-based Unicode scalar start
 and exclusive end line/column positions under the shared
 [source span contract](../../SCANNING/design/source-spans.md). Unknown positions
-remain null. The parser contract is `bloomery-static-syntax-v4`; the specification
+remain null. The parser contract is `bloomery-static-syntax-v5`; the specification
 schema remains `bloomery-grouped-specifications-v1`.
 Orphan and manual-automation findings retain the full reference location.
 
@@ -58,7 +58,7 @@ whether diagnostics exist. Reports contain no test outcomes or hosted approval.
 cfg)` attach [local Rust predicate results](../../SCANNING/design/rust-cfg.md)
 to tests and bindings. Scope includes the normalized caller context, its own
 input identity, resolution descriptions and explicit limitations. The parser
-contract is `bloomery-static-syntax-v4`; specification schema 1 is unchanged.
+contract is `bloomery-static-syntax-v5`; specification schema 1 is unchanged.
 Default calls retain syntactic behavior and null condition annotations.
 
 Cfg completeness describes only the requested local predicate analysis. Disabled,
@@ -73,4 +73,6 @@ An optional `cargo_test` selector in the cfg context attaches a
 [declared integration-test entrypoint](cargo-test-target.md) projection and
 per-test/binding target conditions. Local cfg and target projection have
 independent completeness states. Rust coverage requires both conditions when
-target selection is requested. Other Rust files remain unresolved.
+target selection is requested. Direct module projection has independent
+completeness, declaration spans and inherited target conditions; other Rust
+files remain unresolved.

@@ -19,6 +19,7 @@ mod analysis;
 mod clippy;
 mod conditions;
 mod health;
+mod modules;
 mod nix;
 mod positions;
 mod rust;
@@ -27,7 +28,9 @@ mod typescript;
 
 pub use bloomery_workspace::source::{FilesystemTree, MemoryTree, SourceTree};
 pub use conditions::{CfgExpression, RustCondition};
+pub use modules::RustModule;
 pub use tree_scan::scan_tree_with_conditions;
+pub use tree_scan::scan_tree_with_rust_root;
 pub use tree_scan::{DiscoveryState, ScanAnalysis, ScanScope, ScannerDiscovery, scan_tree};
 
 #[cfg(test)]

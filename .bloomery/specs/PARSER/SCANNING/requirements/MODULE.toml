@@ -1,0 +1,8 @@
+group = "MODULE"
+
+[[requirements]]
+id = "PARSER-SCANNING-MODULE-001"
+title = "Direct module facts reuse Rust ingestion"
+manual = false
+design = "design/rust-modules.md"
+ears = { type = "ubiquitous", system = "Rust module projection", action = "project owned direct root module declarations and spans through the shared parser cache without expanding configured test discovery or reading disabled Rust roots" }

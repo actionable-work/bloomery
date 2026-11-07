@@ -76,3 +76,10 @@ attributes become unresolved candidate syntax in this mode. The default
 `scan_tree` path is unchanged and has an empty condition collection.
 `bloomery_check::report::RustCfg` evaluates these facts without host inference;
 Cargo feature resolution, module graph and macro expansion remain outside scope.
+
+`scan_tree_with_rust_root(tree, config, root)` adds owned direct `RustModule`
+declarations in `ScanAnalysis.rust_modules`, using the same parser cache as cfg
+discovery. It never expands scanner globs or follows modules recursively. Root
+reads respect Rust enablement. Candidate construction is shared with health;
+virtual inputs never probe the filesystem. Consumers resolve authored candidates
+against their tree and evaluate inherited cfg expressions explicitly.

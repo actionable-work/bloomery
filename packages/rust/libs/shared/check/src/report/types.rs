@@ -21,6 +21,7 @@ pub struct Completeness {
     pub relations: StageState,
     pub rust_cfg: StageState,
     pub rust_target: StageState,
+    pub rust_modules: StageState,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
