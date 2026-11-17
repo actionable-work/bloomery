@@ -7,8 +7,9 @@
     lib = pkgs.lib;
     workspace = perSystemWorkspace.${system};
     lock = builtins.fromTOML (builtins.readFile ./bloomery.lock);
+    md5 = import ../../lib/test-package.nix workspace.lock "md-5";
   in {
-    validate-object-store-aws = assert lock.packages."md-5-0.11.0".lib-name == "md5";
+    validate-object-store-aws = assert lock.packages.${md5.id}.lib-name == "md5";
       pkgs.runCommand "validate-object-store-aws" {
         passthru.bloomery = ["NIXLIB-GRAPH-NAMING-025"];
       } ''

@@ -277,14 +277,14 @@
     {
       "manifest_path": "packages/rust/libs/cli/sync/Cargo.toml",
       "name": "bloomery-sync",
-      "overall_score": 98.56,
-      "sloc": 1484,
+      "overall_score": 96.61,
+      "sloc": 1601,
       "subscores": {
-        "complexity": 0.67,
-        "crateSize": 0.0,
+        "complexity": 0.66,
+        "crateSize": 2.02,
         "duplication": 0.0,
         "nesting": 0.02,
-        "size": 0.75
+        "size": 0.69
       }
     },
     {
@@ -418,7 +418,7 @@
       }
     }
   ],
-  "input_digest": "8a2d71e4af43105c2ff0f5bff7288db8edf2370ce2f03e746825bd3c29b6ebf8",
+  "input_digest": "0dfd50b556e5062d017220284e44f08e5666b3ffa5fa48ce311f79d9cf5bfff9",
   "policy": {
     "scoring": {
       "crateSlocLimit": 1500,
@@ -443,14 +443,14 @@
   "schema_version": 4,
   "workspace": {
     "crate_count": 32,
-    "overall_score": 94.16,
-    "sloc": 27861,
+    "overall_score": 94.07,
+    "sloc": 27978,
     "subscores": {
       "complexity": 0.49,
-      "crateSize": 4.22,
+      "crateSize": 4.32,
       "duplication": 0.28,
-      "nesting": 0.01,
-      "size": 0.85
+      "nesting": 0.0,
+      "size": 0.84
     }
   }
 }

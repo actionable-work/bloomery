@@ -4,6 +4,6 @@ clap = { workspace = true }
 
 [package]
 edition = "2024"
+license.workspace = true
 name = "bloomery-cli-parser"
 version = "0.1.0"
-license.workspace = true

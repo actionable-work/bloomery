@@ -4,6 +4,6 @@ bloomery-model = { workspace = true }
 
 [package]
 edition = "2024"
+license.workspace = true
 name = "bloomery-docs-check"
 version = "0.1.0"
-license.workspace = true

@@ -31,6 +31,7 @@
     checks.workspaceDependencies = true;
     checks.noDefaultFeatures = true;
   };
+  itoa = import ./test-package.nix metadataWorkspace.lock "itoa";
   defaultPackageChecksWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
   };
@@ -182,7 +183,7 @@
           packages =
             base.packages
             // {
-              "itoa-1.0.18" = builtins.removeAttrs base.packages."itoa-1.0.18" ["license" "license-file"];
+              ${itoa.id} = builtins.removeAttrs base.packages.${itoa.id} ["license" "license-file"];
             };
         });
     rustsecAdvisoryDb = ./workspace/fixtures/rustsec-db;
@@ -302,9 +303,9 @@ in {
     command = allPolicyWorkspace.checks."bin-calc:licenses".passthru.policyBuildCommand;
   in {
     expr = {
-      identifiesMemberAndPackage = lib.hasInfix "bin-calc-0.1.0 policy finding: itoa-1.0.18" command;
+      identifiesMemberAndPackage = lib.hasInfix "bin-calc-0.1.0 policy finding: ${itoa.id}" command;
       reportsMissingLicense = lib.hasInfix "has no SPDX license expression" command;
-      reportsDependencyPath = lib.hasInfix "path: bin-calc (0.1.0) -> lib-core (0.1.0) -> itoa (1.0.18)" command;
+      reportsDependencyPath = lib.hasInfix "path: bin-calc (0.1.0) -> lib-core (0.1.0) -> itoa (${itoa.version})" command;
       failsTheCheck = lib.hasInfix "exit 1" command;
     };
     expected = {

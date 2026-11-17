@@ -68,3 +68,11 @@ by the benchmark harness, so they add no root flake outputs or inputs. The
 records the derivation expectations used to verify each benchmark. The root
 flake exposes the same `bench` runner app. The benchmark contract is specified by
 [BENCHMARKS](../../BENCHMARKS/README.md).
+
+## Fixture dependency versions
+
+Resolve registry package IDs and source expectations from `Cargo.lock` in
+fixtures maintained by `bloomery sync --update`. Tests comparing derivation
+identity hold the dependency resolution fixed while varying local sources.
+Offline index fallback tests pair a fixed Cargo resolution with the matching
+index snapshot.

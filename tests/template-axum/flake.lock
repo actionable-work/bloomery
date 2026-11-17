@@ -7,11 +7,11 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1793727469,
-        "narHash": "sha256-/e61lkHU+p+eWu6acpgnXFJl6a5Fbw/zYUM8u2pCGUc=",
+        "lastModified": 1794946264,
+        "narHash": "sha256-5Y1YVDYkioE3+k6G/V3XHkMOkq2rIqReGF3q8p+GKZw=",
         "owner": "actionable-work",
         "repo": "bloomery",
-        "rev": "34c8f235f4da8bd10319f938b796ffbdddab2de3",
+        "rev": "7ca5bbe2177796310d8bad5d3c72f0a1591643f4",
         "type": "github"
       },
       "original": {

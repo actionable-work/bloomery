@@ -11,6 +11,7 @@
     in
       workspace.checks
       // {
+        validate-registry-source = import ./registry-source-check.nix {inherit pkgs workspace;};
         validate-basic-workspace = assert !(builtins.hasAttr "bloomery:check" workspace.checks);
         assert builtins.isAttrs workspace.formatter;
         assert builtins.hasAttr "workspace:lock" workspace.checks;
@@ -43,8 +44,6 @@
         assert workspace.config ? root;
         assert workspace.checks."bin-calc:bin".drvPath == workspace.packages."bin-calc".drvPath;
         assert workspace.checks."lib-calc:lib".drvPath == workspace.packages."lib-calc:lib".drvPath;
-        assert workspace.crates."itoa-1.0.18".src.name == "itoa-1.0.18.crate";
-        assert workspace.crates."itoa-1.0.18".src.url == "https://static.crates.io/crates/itoa/itoa-1.0.18.crate";
         assert lib.any (p: (p.pname or "") == "bloomery") workspace.devShell.nativeBuildInputs;
           pkgs.runCommand "validate-basic-workspace" {
             passthru.bloomery = [
@@ -60,7 +59,6 @@
               "NIXLIB-FLAKE-OUTPUTS-010"
               "NIXLIB-FLAKE-OUTPUTS-012"
               "NIXLIB-FLAKE-OUTPUTS-017"
-              "NIXLIB-GRAPH-RESOLUTION-013"
               "NIXLIB-GRAPH-DERIVATIONS-013"
               "NIXLIB-GRAPH-DERIVATIONS-016"
               "NIXLIB-GRAPH-DERIVATIONS-017"

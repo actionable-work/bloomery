@@ -20,6 +20,6 @@ tracing-subscriber = { workspace = true }
 
 [package]
 edition = "2024"
+license.workspace = true
 name = "bloomery-cli-app"
 version = "0.1.0"
-license.workspace = true

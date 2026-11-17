@@ -25,6 +25,15 @@
   metadataWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
   };
+  lockedPackage = import ./test-package.nix;
+  itoa = lockedPackage metadataWorkspace.lock "itoa";
+  indexItoa = lockedPackage indexWorkspace.lock "itoa";
+  sha256Sri = hash:
+    builtins.convertHash {
+      inherit hash;
+      hashAlgo = "sha256";
+      toHashFormat = "sri";
+    };
   devWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
     createDevPackages = true;
@@ -55,6 +64,7 @@
   };
   indexWorkspace = mkWorkspace {
     root = ../tests/basic-workspace;
+    source.cargoLock = ../tests/crates-index/basic-workspace.Cargo.lock;
     source.bloomeryLock = null;
     features.cratesIoIndex = ../tests/crates-index;
   };
@@ -294,9 +304,9 @@ in {
   testIndexFallbackBuildsGraph = {
     expr = {
       hasExternalCrate =
-        builtins.isString indexWorkspace.crates."itoa-1.0.18".drvPath;
+        builtins.isString indexWorkspace.crates.${indexItoa.id}.drvPath;
       hasLocalBinary = builtins.isString indexWorkspace.packages."bin-calc".drvPath;
-      resolvedIndexDemand = lib.hasInfix "default" indexWorkspace.crates."itoa-1.0.18".configurePhase;
+      resolvedIndexDemand = lib.hasInfix "default" indexWorkspace.crates.${indexItoa.id}.configurePhase;
     };
     expected = {
       hasExternalCrate = true;
@@ -314,8 +324,8 @@ in {
     expr = {
       hasWorkspaceDev = builtins.hasAttr "lib-calc-0.1.0" devWorkspace.cratesDev;
       sharesExternalRelease =
-        devWorkspace.cratesDev."itoa-1.0.18".drvPath
-        == devWorkspace.crates."itoa-1.0.18".drvPath;
+        devWorkspace.cratesDev.${itoa.id}.drvPath
+        == devWorkspace.crates.${itoa.id}.drvPath;
       omitsWithoutDevPackages = metadataWorkspace.cratesDev == {};
     };
     expected = {
@@ -331,8 +341,8 @@ in {
         metadataWorkspace.globalMetadataCrates."lib-core-0.1.0".drvPath
         != metadataWorkspace.crates."lib-core-0.1.0".drvPath;
       registryVariant =
-        metadataWorkspace.globalMetadataCrates."itoa-1.0.18".drvPath
-        != metadataWorkspace.crates."itoa-1.0.18".drvPath;
+        metadataWorkspace.globalMetadataCrates.${itoa.id}.drvPath
+        != metadataWorkspace.crates.${itoa.id}.drvPath;
     };
     expected = {
       workspaceVariant = true;
@@ -414,7 +424,7 @@ in {
   testIndexFallbackBuildsContexts = {
     expr = {
       hasContexts = indexWorkspace.lockContexts != {};
-      hasGlobalCrate = builtins.isString indexWorkspace.crates."itoa-1.0.18".drvPath;
+      hasGlobalCrate = builtins.isString indexWorkspace.crates.${indexItoa.id}.drvPath;
     };
     expected = {
       hasContexts = true;
@@ -477,17 +487,16 @@ in {
 
   testRegistrySourceUsesLockedMetadata = {
     expr = let
-      src = metadataWorkspace.crates."itoa-1.0.18".src;
-      pkg = metadataWorkspace.lock.byId."itoa-1.0.18";
+      src = metadataWorkspace.crates.${itoa.id}.src;
     in {
       fetchName = src.name;
       fetchUrl = src.url or null;
-      lockedChecksum = pkg.checksum;
+      fetchChecksum = sha256Sri src.outputHash;
     };
     expected = {
-      fetchName = "itoa-1.0.18.crate";
-      fetchUrl = "https://static.crates.io/crates/itoa/itoa-1.0.18.crate";
-      lockedChecksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682";
+      fetchName = "${itoa.id}.crate";
+      fetchUrl = "https://static.crates.io/crates/itoa/${itoa.id}.crate";
+      fetchChecksum = sha256Sri itoa.checksum;
     };
   };
 
@@ -516,7 +525,7 @@ in {
 
   testPureEvaluationBoundary = {
     expr = {
-      externalResolvesWithoutBuild = builtins.isString metadataWorkspace.crates."itoa-1.0.18".drvPath;
+      externalResolvesWithoutBuild = builtins.isString metadataWorkspace.crates.${itoa.id}.drvPath;
       localResolvesWithoutBuild = builtins.isString metadataWorkspace.crates."bin-calc-0.1.0".drvPath;
     };
     expected = {

@@ -3,6 +3,7 @@
   workspace,
 }: let
   dependencies = import ../../lib/builders/dependencies.nix {lib = pkgs.lib;} {};
+  serdeJson = import ../../lib/test-package.nix workspace.lock "serde_json";
 in
   pkgs.runCommand "bloomery-static-scanning-parity" {
     nativeBuildInputs = [pkgs.rustc pkgs.stdenv.cc pkgs.zstd pkgs.python3];
@@ -15,7 +16,7 @@ in
       ${workspace.crates."bloomery-model-0.1.0"} \
       ${workspace.crates."bloomery-workspace-0.1.0"} \
       ${workspace.crates."bloomery-check-0.1.0"} \
-      ${workspace.crates."serde_json-1.0.151"}
+      ${workspace.crates.${serdeJson.id}}
     rustc --edition=2024 ${../../tests/static-scanning-parity/consumer.rs} \
       -L dependency="$PWD/deps" "''${EXTERN_FLAGS[@]}" "''${LINK_FLAGS[@]}" -o consumer
     mkdir "$out"

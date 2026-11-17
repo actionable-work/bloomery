@@ -9,6 +9,6 @@ bloomery-cli-types = { workspace = true }
 
 [package]
 edition = "2024"
+license.workspace = true
 name = "bloomery-check-retrieval"
 version = "0.1.0"
-license.workspace = true

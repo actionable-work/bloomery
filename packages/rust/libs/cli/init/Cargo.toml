@@ -3,6 +3,6 @@ bloomery-sync = { workspace = true }
 
 [package]
 edition = "2024"
+license.workspace = true
 name = "bloomery-init"
 version = "0.1.0"
-license.workspace = true

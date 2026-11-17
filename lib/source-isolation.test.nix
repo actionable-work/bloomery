@@ -168,11 +168,16 @@
       ];
     }).config.perSystem.bloomery.outputs;
 
-  itoaDrvPath = workspace: workspace.crates."itoa-1.0.18".drvPath;
+  itoaDrvPath = workspace: let
+    itoa = import ./test-package.nix workspace.lock "itoa";
+  in
+    workspace.crates.${itoa.id}.drvPath;
   registryWorkspaces = map (
     name:
       mkWorkspace {
         root = ../tests + "/${name}";
+        source.cargoLock = ../tests/basic-workspace/Cargo.lock;
+        source.bloomeryLock = ../tests/basic-workspace/bloomery.lock;
       }
   ) ["basic-workspace" "overrides-workspace" "flake-parts-workspace"];
 

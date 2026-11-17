@@ -131,3 +131,10 @@ design = "design/repository-layout.md"
 type = "ubiquitous"
 system = "the Bloomery repository"
 action = "keep the documentation coverage manifest under .bloomery"
+
+[[requirements]]
+id = "REPOSITORY-LAYOUT-STRUCTURE-013"
+title = "Fixture source checks follow locked dependency versions"
+manual = false
+design = "design/repository-layout.md#fixture-dependency-versions"
+ears = { type = "ubiquitous", system = "upgradable repository fixtures", action = "derive registry source expectations from Cargo.lock" }
