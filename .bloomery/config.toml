@@ -584,8 +584,10 @@ testPaths = [
 ] # Repository-relative globs for Nix test files discovered as candidates.
 
 [scanners.playwright]
-enabled = false           # Enable the Playwright evidence scanner.
-paths = []                # Repository-relative globs for Playwright test files.
+enabled = true # Enable the Playwright evidence scanner.
+paths = [
+  "packages/playwright/**/*.spec.ts",
+] # Repository-relative globs for Playwright test files.
 tag_prefix = "@bloomery:" # Tag prefix that marks Bloomery metadata in Playwright tests.
 
 [scanners.rust]

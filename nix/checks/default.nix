@@ -8,7 +8,9 @@
   docsPackage,
   system,
   root ? ../..,
-}: {
+}:
+(import ./playwright.test.nix {inherit pkgs workspace;})
+// {
   "core:check-command-catalog" = import ./check-command-catalog.test.nix {inherit pkgs lib system;};
   "core:library-name-reader" = import ./library-name-reader.nix {inherit pkgs lib;};
   "core:unit-tests" = import ./unit-tests.nix {inherit bloomery;};
@@ -19,6 +21,14 @@
   };
   "core:validate-docs-assets" = import ./validate-docs-assets.nix {
     inherit pkgs docsPackage;
+  };
+  "playwright:reports" = import ./playwright-reports.nix {inherit pkgs workspace;};
+  "playwright:reproducibility" = import ./playwright-reproducibility.nix {inherit pkgs;};
+  "playwright:laziness" = import ./playwright-laziness.nix {inherit pkgs lib;};
+  "docs:playwright" = workspace.playwrightTest {
+    name = "bloomery-docs-playwright";
+    src = ../../packages/playwright/docs;
+    serverCommand = "${docsPackage}/bin/bloomery-docs";
   };
   "core:validate-docs-consistency" = import ./validate-docs-consistency.nix {
     inherit pkgs workspace root;

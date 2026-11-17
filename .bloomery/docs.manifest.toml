@@ -5,7 +5,7 @@ features = ["CLI/INTERFACE", "NIX/SOURCES", "NIXLIB/FLAKE", "NIXLIB/GRAPH"]
 path = "README.md"
 
 [[surfaces]]
-features = ["CLI/CONFIG", "NIXLIB/FLAKE"]
+features = ["CLI/CONFIG", "NIXLIB/FLAKE", "NIXLIB/PLAYWRIGHT"]
 path = "packages/rust/libs/docs/content/src/docs/api.md"
 
 [[surfaces]]

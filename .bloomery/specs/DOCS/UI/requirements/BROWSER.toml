@@ -1,0 +1,30 @@
+schema_version = 1
+group = "BROWSER"
+
+[[requirements]]
+id = "DOCS-UI-BROWSER-001"
+title = "Navigate guides through the sidebar"
+manual = false
+design = "design/routes-and-rendering.md#browser-behavior"
+ears = { type = "ubiquitous", system = "the documentation UI", action = "open the selected guide and mark its sidebar link active" }
+
+[[requirements]]
+id = "DOCS-UI-BROWSER-002"
+title = "Search and open a guide"
+manual = false
+design = "design/routes-and-rendering.md#browser-behavior"
+ears = { type = "ubiquitous", system = "the documentation UI", action = "filter guide results by search input and open the selected guide" }
+
+[[requirements]]
+id = "DOCS-UI-BROWSER-003"
+title = "Dismiss search with Escape"
+manual = false
+design = "design/routes-and-rendering.md#browser-behavior"
+ears = { type = "ubiquitous", system = "the documentation UI", action = "dismiss keyboard-opened search when Escape is pressed" }
+
+[[requirements]]
+id = "DOCS-UI-BROWSER-004"
+title = "Load native browser assets"
+manual = false
+design = "design/routes-and-rendering.md#browser-behavior"
+ears = { type = "ubiquitous", system = "the documentation UI", action = "load its native stylesheet and brand logo in the browser" }

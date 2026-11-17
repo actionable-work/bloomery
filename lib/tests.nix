@@ -19,6 +19,7 @@
   optimizeTests = builtins.removeAttrs optimizeTestSuite ["optimizedBinarySmoke"];
   graphTests = import ./graph.test.nix {inherit pkgs lib;};
   namingTests = import ./naming.test.nix {inherit pkgs lib;};
+  playwrightLazinessTests = import ./playwright/laziness.test.nix {inherit pkgs lib;};
 
   # Aggregate all colocated unit tests
   testCases =
@@ -35,7 +36,8 @@
     // sourceIsolationTests
     // optimizeTests
     // graphTests
-    // namingTests;
+    // namingTests
+    // playwrightLazinessTests;
 
   failedTests = lib.runTests testCases;
 in {

@@ -181,6 +181,45 @@ The evaluated workspace attribute set returned by `mkFlake` for each system expo
 - `devShell`: Preconfigured `mkShell` environment with the Rust toolchain, build utilities, and the Bloomery CLI (null when disabled).
 - `crates`: Map of all individual `.rlib` derivations in the dependency DAG.
 - `config`: Fully evaluated options configuration set.
+- `playwrightTest`: Constructor for Nix browser-test derivations, registered through `extraOutputs`.
+
+## Playwright Checks
+
+Register a suite against a packaged server with the per-system workspace helper:
+
+```nix
+extraOutputs = { eachSystem, perSystemWorkspace }: {
+  checks = eachSystem (system: let
+    workspace = perSystemWorkspace.${system};
+  in {
+    "web:playwright" = workspace.playwrightTest {
+      name = "web-playwright";
+      src = ./packages/playwright/web;
+      serverCommand = "${workspace.packages.web}/bin/web";
+      # url = "http://127.0.0.1:4173";
+      # env = { APP_MODE = "test"; };
+      # serverTimeout = 30000;
+      # testTimeout = 30000;
+    };
+  });
+};
+```
+
+Tests import `test` and `expect` from `@playwright/test`. No project npm manifest
+is required. Node, Playwright and Chromium use the pinned nixpkgs input and are
+loaded only by test derivations. The CLI, application and default development
+shell do not depend on browser tooling. The server receives `PORT` from `url`,
+which must use HTTP on `127.0.0.1`. The runner waits for that URL and stops the
+server after testing. Stub or block external requests for offline builds.
+
+`bloomery check` executes the registered check. Assertion failures, `test.only`
+and empty suites fail it. Successful outputs contain stable `results.json` and
+`html/index.html` summaries of test declarations and outcomes. They omit timings,
+timestamps and execution metadata, so unchanged test declarations and outcomes
+produce byte-identical Nix outputs. Native Playwright reports, traces and
+screenshots stay under `artifacts/` in the build directory. Use Nix's
+`--keep-failed` to preserve a failed build's artifacts. Chromium runs headless
+with one worker and no retries, using the outer Nix sandbox for isolation.
 
 `bloomery config document` annotates configured keys with their schema
 catalog documentation, writing a trailing comment when the value has none and

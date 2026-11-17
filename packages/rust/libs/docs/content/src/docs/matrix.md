@@ -1,5 +1,12 @@
 Bloomery verifies its own correctness against dedicated test workspaces, running automated checks in CI:
 
+The `docs:playwright` check runs the packaged docs server and Chromium inside a
+Nix test derivation. Browser examples in `packages/playwright/docs` cover sidebar
+navigation, search, keyboard dismissal and native assets. Runner integration
+checks exercise readiness, reports, assertion failures, focused tests, empty
+suites and server failures. Run them with `bloomery check`; select just the docs
+suite with `bloomery check --check '*docs:playwright'`.
+
 ---
 
 ## Workspace Integration Matrix

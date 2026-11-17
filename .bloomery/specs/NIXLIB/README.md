@@ -25,6 +25,9 @@ a user-provided training script.
 
 ## Boundaries
 
+The [Browser tests](PLAYWRIGHT/README.md) feature defines sandboxed Playwright
+check derivations and their local server lifecycle.
+
 Source selection and rebuild isolation for those derivations are owned by
 [NIX/SOURCES](../NIX/SOURCES/README.md). CLI check orchestration is owned by
 [CLI/CHECK](../CLI/CHECK/README.md). Repository path organization is owned by

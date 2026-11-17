@@ -1,0 +1,71 @@
+group = "RUNNER"
+
+[[requirements]]
+id = "NIXLIB-PLAYWRIGHT-RUNNER-001"
+title = "Wait for the configured application server"
+manual = false
+design = "design/runner.md#server-lifecycle"
+ears = { type = "ubiquitous", system = "the Playwright runner", action = "launch the server with its configured environment and PORT and wait for the readiness URL before testing" }
+
+[[requirements]]
+id = "NIXLIB-PLAYWRIGHT-RUNNER-002"
+title = "Run pinned headless Chromium offline"
+manual = false
+design = "design/runner.md#execution"
+ears = { type = "ubiquitous", system = "the Playwright runner", action = "execute suites with headless Chromium and Playwright from pinned nixpkgs without installing npm packages or downloading browsers" }
+
+[[requirements]]
+id = "NIXLIB-PLAYWRIGHT-RUNNER-003"
+title = "Publish browser check reports"
+manual = false
+design = "design/runner.md#results"
+ears = { type = "ubiquitous", system = "the Playwright runner", action = "publish JSON results and an HTML report in the successful derivation output" }
+
+[[requirements]]
+id = "NIXLIB-PLAYWRIGHT-RUNNER-004"
+title = "Fail on browser assertions"
+manual = false
+design = "design/runner.md#results"
+ears = { type = "ubiquitous", system = "the Playwright runner", action = "fail the derivation when a browser test assertion fails" }
+
+[[requirements]]
+id = "NIXLIB-PLAYWRIGHT-RUNNER-005"
+title = "Reject focused tests"
+manual = false
+design = "design/runner.md#results"
+ears = { type = "ubiquitous", system = "the Playwright runner", action = "fail the derivation when a suite contains a focused test" }
+
+[[requirements]]
+id = "NIXLIB-PLAYWRIGHT-RUNNER-006"
+title = "Reject empty suites"
+manual = false
+design = "design/runner.md#results"
+ears = { type = "ubiquitous", system = "the Playwright runner", action = "fail the derivation when no test is discovered" }
+
+[[requirements]]
+id = "NIXLIB-PLAYWRIGHT-RUNNER-007"
+title = "Report server startup failure"
+manual = false
+design = "design/runner.md#server-lifecycle"
+ears = { type = "ubiquitous", system = "the Playwright runner", action = "fail the derivation when the server exits before readiness" }
+
+[[requirements]]
+id = "NIXLIB-PLAYWRIGHT-RUNNER-008"
+title = "Bound server readiness waiting"
+manual = false
+design = "design/runner.md#server-lifecycle"
+ears = { type = "ubiquitous", system = "the Playwright runner", action = "fail the derivation when the readiness timeout expires" }
+
+[[requirements]]
+id = "NIXLIB-PLAYWRIGHT-RUNNER-009"
+title = "Keep browser tools confined to test derivations"
+manual = false
+design = "design/runner.md#execution"
+ears = { type = "ubiquitous", system = "the Playwright runner", action = "leave CLI packages, application packages and the default development shell evaluable without loading Playwright or Chromium" }
+
+[[requirements]]
+id = "NIXLIB-PLAYWRIGHT-RUNNER-010"
+title = "Publish reproducible browser summaries"
+manual = false
+design = "design/runner.md#reproducibility"
+ears = { type = "ubiquitous", system = "the Playwright runner", action = "publish byte-identical successful JSON and HTML summaries for unchanged test declarations and outcomes independently of runtime timestamps, timings, paths and worker metadata" }

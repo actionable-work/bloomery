@@ -342,11 +342,11 @@
     {
       "manifest_path": "packages/rust/libs/shared/check/Cargo.toml",
       "name": "bloomery-check",
-      "overall_score": 88.1,
-      "sloc": 2041,
+      "overall_score": 88.11,
+      "sloc": 2040,
       "subscores": {
         "complexity": 0.41,
-        "crateSize": 10.82,
+        "crateSize": 10.8,
         "duplication": 0.0,
         "nesting": 0.0,
         "size": 0.68
@@ -418,7 +418,7 @@
       }
     }
   ],
-  "input_digest": "de2ce1d5f82d8c5ea4df2e0a18e6ce281790789efce90ce37f506bac6483b9d9",
+  "input_digest": "8a2d71e4af43105c2ff0f5bff7288db8edf2370ce2f03e746825bd3c29b6ebf8",
   "policy": {
     "scoring": {
       "crateSlocLimit": 1500,
@@ -444,7 +444,7 @@
   "workspace": {
     "crate_count": 32,
     "overall_score": 94.16,
-    "sloc": 27862,
+    "sloc": 27861,
     "subscores": {
       "complexity": 0.49,
       "crateSize": 4.22,

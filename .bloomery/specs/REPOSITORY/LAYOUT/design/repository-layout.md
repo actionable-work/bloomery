@@ -11,6 +11,7 @@ workspaces, and repository-local Bloomery metadata.
 | `packages/rust/libs/shared/` | Library crates shared across application layers. |
 | `packages/rust/libs/cli/` | CLI parsing, application, command, and presentation libraries. |
 | `packages/rust/libs/docs/` | Documentation content, UI, and server libraries. |
+| `packages/playwright/` | Browser suites for the docs site and runner integration tests. |
 | `lib/` | Reusable Nix library: builders, workspace discovery, profiles, overrides, locks, docs, and modules. |
 | `templates/` | Bundled scaffolding templates copied by `bloomery init`; each immediate child is a template named by its directory. |
 | `nix/checks/` | Flake checks, including documentation asset validation and workspace checks. |

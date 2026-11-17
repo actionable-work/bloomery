@@ -53,6 +53,9 @@ member's resolved dependency context. Bloomery never generates a recursive
 
 ## Derivation and metadata outputs
 
+`playwrightTest` constructs explicit browser-test derivations for registration
+through `extraOutputs`, as defined by [the runner](../../PLAYWRIGHT/design/runner.md).
+
 `crates` maps package IDs to release crate derivations and `cratesDev` maps
 workspace package IDs to dev-profile derivations. `lock` exposes the parsed
 lock model and `config` exposes the evaluated options.

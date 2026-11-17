@@ -1637,6 +1637,9 @@ in
     inherit checks;
     inherit healthSources;
 
+    # Explicit browser-test constructor; tools are loaded only by its results.
+    playwrightTest = import ./playwright {inherit pkgs lib;};
+
     # Preconfigured development shell (direnv / nix develop)
     inherit devShell;
 
