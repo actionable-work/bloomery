@@ -101,7 +101,7 @@ impl KeySpec {
 }
 
 /// Increment when the catalog changes.
-pub const CATALOG_VERSION: u32 = 14;
+pub const CATALOG_VERSION: u32 = 15;
 
 fn is_check_control(path: &[&str]) -> bool {
     matches!(
@@ -623,6 +623,12 @@ pub const CATALOG: &[CatalogEntry] = &[
         documentation: "Maximum distinct authored validating sites per automated requirement.",
     },
     CatalogEntry {
+        path: &["checks", "specifications", "maxRequirementsPerTest"],
+        value_type: ValueType::PositiveInteger,
+        recommended: Some(DefaultValue::Integer(5)),
+        documentation: "Maximum distinct automated requirement IDs per authored validating site.",
+    },
+    CatalogEntry {
         path: &["checks", "specifications", "untiedTests"],
         value_type: ValueType::StringEnum(&["off", "report", "deny"]),
         recommended: Some(DefaultValue::String("report")),
@@ -1001,13 +1007,25 @@ fn specification_key(path: &[&str]) -> Option<KeySpec> {
             ValueType::PositiveInteger,
             "Validating-site limit for this requirement.",
         ),
-        ("requirementExceptions" | "untiedExceptions" | "crates", "reason") => (
+        ("requirementExceptions" | "untiedExceptions" | "testExceptions" | "crates", "reason") => (
             ValueType::String,
             "Reason for this specification policy exception or ownership.",
         ),
         ("untiedExceptions", "name") => (
             ValueType::String,
             "Exact test name restricted by this untied exception.",
+        ),
+        ("testExceptions", "path") => (
+            ValueType::Path,
+            "Repository-relative path glob for this test breadth exception.",
+        ),
+        ("testExceptions", "name") => (
+            ValueType::String,
+            "Exact test name restricted by this breadth exception.",
+        ),
+        ("testExceptions", "maxRequirements") => (
+            ValueType::PositiveInteger,
+            "Requirement ID limit for matching validating sites.",
         ),
         ("crates", "features") => (
             ValueType::StringList,
@@ -1204,7 +1222,7 @@ fn is_known_table(path: &[&str]) -> bool {
         && path[..2] == ["checks", "specifications"]
         && matches!(
             path[2],
-            "requirementExceptions" | "untiedExceptions" | "crates"
+            "requirementExceptions" | "untiedExceptions" | "testExceptions" | "crates"
         )
     {
         return true;

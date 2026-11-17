@@ -160,14 +160,14 @@
     {
       "manifest_path": "packages/rust/libs/cli/cli-app/Cargo.toml",
       "name": "bloomery-cli-app",
-      "overall_score": 95.22,
-      "sloc": 1154,
+      "overall_score": 95.12,
+      "sloc": 1182,
       "subscores": {
-        "complexity": 1.89,
+        "complexity": 1.74,
         "crateSize": 0.0,
         "duplication": 0.0,
         "nesting": 0.0,
-        "size": 2.89
+        "size": 3.15
       }
     },
     {
@@ -265,7 +265,7 @@
       "manifest_path": "packages/rust/libs/cli/spec/Cargo.toml",
       "name": "bloomery-spec",
       "overall_score": 98.64,
-      "sloc": 700,
+      "sloc": 701,
       "subscores": {
         "complexity": 0.59,
         "crateSize": 0.0,
@@ -342,14 +342,14 @@
     {
       "manifest_path": "packages/rust/libs/shared/check/Cargo.toml",
       "name": "bloomery-check",
-      "overall_score": 90.51,
-      "sloc": 1917,
+      "overall_score": 88.1,
+      "sloc": 2041,
       "subscores": {
-        "complexity": 0.44,
-        "crateSize": 8.34,
+        "complexity": 0.41,
+        "crateSize": 10.82,
         "duplication": 0.0,
         "nesting": 0.0,
-        "size": 0.71
+        "size": 0.68
       }
     },
     {
@@ -381,11 +381,11 @@
     {
       "manifest_path": "packages/rust/libs/shared/schema/Cargo.toml",
       "name": "bloomery-schema",
-      "overall_score": 95.48,
-      "sloc": 1664,
+      "overall_score": 94.46,
+      "sloc": 1716,
       "subscores": {
-        "complexity": 0.8,
-        "crateSize": 3.28,
+        "complexity": 0.79,
+        "crateSize": 4.32,
         "duplication": 0.0,
         "nesting": 0.0,
         "size": 0.44
@@ -418,7 +418,7 @@
       }
     }
   ],
-  "input_digest": "447232b1254ae4450fceb72c0a4bdd53e182232291a81a5f493714a51b0933cb",
+  "input_digest": "de2ce1d5f82d8c5ea4df2e0a18e6ce281790789efce90ce37f506bac6483b9d9",
   "policy": {
     "scoring": {
       "crateSlocLimit": 1500,
@@ -443,14 +443,14 @@
   "schema_version": 4,
   "workspace": {
     "crate_count": 32,
-    "overall_score": 94.42,
-    "sloc": 27657,
+    "overall_score": 94.16,
+    "sloc": 27862,
     "subscores": {
-      "complexity": 0.5,
-      "crateSize": 3.96,
+      "complexity": 0.49,
+      "crateSize": 4.22,
       "duplication": 0.28,
       "nesting": 0.01,
-      "size": 0.84
+      "size": 0.85
     }
   }
 }

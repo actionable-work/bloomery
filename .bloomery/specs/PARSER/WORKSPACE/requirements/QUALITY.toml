@@ -6,7 +6,7 @@ id = "PARSER-WORKSPACE-QUALITY-001"
 title = "Quality reports retain completeness and stable ordering"
 manual = false
 design = "design/static-report.md#facts-and-completeness"
-ears = { type = "ubiquitous", system = "static repository analysis", action = "retain deterministic untied-test and crate ownership assessments with explicit discovery completeness in report contract 9" }
+ears = { type = "ubiquitous", system = "static repository analysis", action = "retain deterministic untied-test and crate ownership assessments with explicit discovery completeness in report contract 10" }
 
 [[requirements]]
 id = "PARSER-WORKSPACE-QUALITY-002"

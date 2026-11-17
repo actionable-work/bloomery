@@ -22,6 +22,7 @@ repository-relative. This validation does not execute checks or grant approval.
 | `IllegalManualAutomation` | Evidence references a manual requirement. |
 | `MissingAutomatedTest` | Automated requirement has no evidence. |
 | `TooManyTestsForRequirement` | Automated requirement exceeds its configured distinct validating-site limit. |
+| `TooManyRequirementsForTest` | A validating site exceeds its configured distinct requirement-ID limit. |
 | `UntiedTestsLimitExceeded` | Nonexempt untied sites exceed the configured deny-mode budget. |
 | `MissingCrateOwnership` | A selected crate requires an ownership mapping or exclusion. |
 | `InsufficientCrateRequirements` | A mapped crate owns fewer automated requirements than its minimum. |

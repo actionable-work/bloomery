@@ -45,4 +45,4 @@ active map never masquerades as successful evidence.
 
 CLI, filesystem and virtual-tree reports expose identical manifests. Static
 revisions, bindings and completeness certify neither execution nor hosted
-approval. Report/parser contracts are 9; source schema remains 1.
+approval. Report/parser contracts are 10; source schema remains 1.

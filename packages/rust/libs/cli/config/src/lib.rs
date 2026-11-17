@@ -1124,6 +1124,55 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-BREADTH-003"))]
+    fn test_breadth_limits_and_named_exceptions_survive_config_commands() {
+        let root = temp_root();
+        seed(
+            &root,
+            "[checks.specifications]\nmaxRequirementsPerTest = 8\n[checks.specifications.testExceptions.protocol]\npath = 'tests/protocol.rs'\nname = 'roundtrip'\nmaxRequirements = 9\nreason = 'Integrated protocol contract'\n",
+        );
+        run(
+            &root,
+            &ConfigOperation::Upgrade {
+                dry_run: false,
+                diff: false,
+            },
+        )
+        .expect("upgrade");
+        run(
+            &root,
+            &ConfigOperation::Set {
+                key: "checks.specifications.testExceptions.protocol.maxRequirements".into(),
+                value: "10".into(),
+            },
+        )
+        .expect("edit limit");
+        run(&root, &ConfigOperation::Document).expect("document exception");
+        let parsed: toml::Value = toml::from_str(&contents(&root)).unwrap();
+        assert_eq!(
+            parsed["checks"]["specifications"]["maxRequirementsPerTest"].as_integer(),
+            Some(8)
+        );
+        let exception = &parsed["checks"]["specifications"]["testExceptions"]["protocol"];
+        assert_eq!(exception["maxRequirements"].as_integer(), Some(10));
+        assert_eq!(exception["name"].as_str(), Some("roundtrip"));
+        assert!(contents(&root).contains("Requirement ID limit for matching validating sites."));
+        run(
+            &root,
+            &ConfigOperation::Unset {
+                key: "checks.specifications.maxRequirementsPerTest".into(),
+            },
+        )
+        .expect("restore default");
+        let policy = bloomery_model::specifications::from_config(
+            &bloomery_model::config::load(&root).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(policy.max_requirements_per_test, 5);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-006"))]
     fn upgrade_is_idempotent() {
         let root = temp_root();

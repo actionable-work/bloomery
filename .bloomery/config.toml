@@ -94,12 +94,19 @@ enable = false # Include binary and library build checks.
 
 # Authored-link policies run in static:traceability.
 # A validating site is a Rust test function, Playwright call, or Nix evidence file.
+# Limit both tests per requirement and requirement IDs per test to five.
+# testExceptions overrides a per-test limit for a repository-relative path glob
+# and optional exact test name. Named matches take precedence over path-only matches;
+# overlapping matches in either category use alphabetical exception-label order.
+# Keep exceptions narrowly scoped and explain each one with a reason.
 # Each mapped crate defaults to at least one automated requirement and one linked site.
 # Untied sites are advisory in report mode; deny mode enforces maxUntiedTests.
 # Inspect associations and exception reasons with bloomery spec trace --report.
 # Policy details and examples: specs/CLI/CHECK/design/spec-quality.md.
+# Test breadth and exception examples: specs/CLI/CHECK/design/test-breadth.md.
 [checks.specifications]
 enable = true                # Enable static specification validation checks.
+maxRequirementsPerTest = 5   # Maximum distinct automated requirement IDs per authored validating site.
 maxTestsPerRequirement = 5   # Maximum distinct authored validating sites per automated requirement.
 maxUntiedTests = 0           # Maximum nonexempt untied sites in deny mode.
 requireCrateOwnership = true # Require an ownership mapping or exclusion for every selected workspace crate.
@@ -221,6 +228,229 @@ reason = "Exactly-once completion is exercised across scheduling and terminal ou
 [checks.specifications.requirementExceptions.CLI-INTERFACE-PRESENTATION-014]
 maxTests = 12                                                                                # Validating-site limit for this requirement.
 reason = "The same metadata omission rule is verified across independent command renderers." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.add_creates_a_group_and_rejects_duplicates]
+maxRequirements = 8                                                                                                        # Requirement ID limit for matching validating sites.
+name = "add_creates_a_group_and_rejects_duplicates"                                                                        # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/spec/src/lib.rs"                                                                            # Repository-relative path glob for this test breadth exception.
+reason = "The record creation workflow verifies derived placement, persisted schema and rejection of a repeated addition." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.aliased_check_build_requests_rely_on_native_store_deduplication]
+maxRequirements = 6                                                                                                  # Requirement ID limit for matching validating sites.
+name = "aliased_check_build_requests_rely_on_native_store_deduplication"                                             # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/check-command/src/check_command/tests/execution.rs"                                   # Repository-relative path glob for this test breadth exception.
+reason = "One aliased derivation graph verifies naming, batching and store deduplication at the scheduler boundary." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.basic_workspace]
+maxRequirements = 20                                                                                                                   # Requirement ID limit for matching validating sites.
+path = "tests/basic-workspace/checks.nix"                                                                                              # Repository-relative path glob for this test breadth exception.
+reason = "This fixture file declares multiple evaluated package, source and build graph checks; metadata is aggregated at file scope." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.benchmark_matrix]
+maxRequirements = 52                                                                                                           # Requirement ID limit for matching validating sites.
+path = "nix/checks/benchmarks.nix"                                                                                             # Repository-relative path glob for this test breadth exception.
+reason = "One benchmark harness runs the fixture and builder scenario matrix; its metadata aggregates those evaluated checks." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.benchmark_report]
+maxRequirements = 15                                                                                                      # Requirement ID limit for matching validating sites.
+path = "nix/checks/benchmarks-report.nix"                                                                                 # Repository-relative path glob for this test breadth exception.
+reason = "One benchmark report artifact validates the complete scenario matrix and its serialized presentation contract." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.built_in_catalog_covers_each_recommended_scanner_with_guidance]
+maxRequirements = 6                                                                                           # Requirement ID limit for matching validating sites.
+name = "built_in_catalog_covers_each_recommended_scanner_with_guidance"                                       # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/sync/src/recommendations.rs"                                                   # Repository-relative path glob for this test breadth exception.
+reason = "One recommendation catalog inventory checks version, scanner completeness and actionable guidance." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.candidates_list_only_untied_tests]
+maxRequirements = 6                                                                                                   # Requirement ID limit for matching validating sites.
+name = "candidates_list_only_untied_tests"                                                                            # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/spec/src/lib.rs"                                                                       # Repository-relative path glob for this test breadth exception.
+reason = "One candidate projection verifies graduation eligibility and its complete source location and naming data." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.config_json_contracts]
+maxRequirements = 8                                                                                                      # Requirement ID limit for matching validating sites.
+name = "config_json_contracts"                                                                                           # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/cli-app/src/lib.rs"                                                                       # Repository-relative path glob for this test breadth exception.
+reason = "The common JSON envelope and configuration-specific payload are verified across the configuration operations." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.detail_pages_are_bounded_seekable_and_make_progress_in_both_formats]
+maxRequirements = 6                                                                                                         # Requirement ID limit for matching validating sites.
+name = "detail_pages_are_bounded_seekable_and_make_progress_in_both_formats"                                                # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/check-output/src/check_command/output.rs"                                                    # Repository-relative path glob for this test breadth exception.
+reason = "The same retained detail stream verifies byte bounds, continuation and equivalent paging in both output formats." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.every_template_carries_the_common_scaffolding]
+maxRequirements = 17                                                                                                           # Requirement ID limit for matching validating sites.
+name = "every_template_carries_the_common_scaffolding"                                                                         # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/init/src/lib.rs"                                                                                # Repository-relative path glob for this test breadth exception.
+reason = "The scaffold matrix verifies common workspace files and project-specific substitution across all shipped templates." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.exact_resolved_names_preserve_versions_features_and_member_contexts]
+maxRequirements = 6                                                                                               # Requirement ID limit for matching validating sites.
+name = "exact_resolved_names_preserve_versions_features_and_member_contexts"                                      # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/sync/src/naming_tests.rs"                                                          # Repository-relative path glob for this test breadth exception.
+reason = "One resolution fixture verifies aliases, versions, features and consumer contexts as a coherent graph." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.executes_default_selection_for_the_host_system]
+maxRequirements = 9                                                                                                                  # Requirement ID limit for matching validating sites.
+name = "executes_default_selection_for_the_host_system"                                                                              # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/build-command/src/tests.rs"                                                                           # Repository-relative path glob for this test breadth exception.
+reason = "One default build invocation verifies discovery, host selection, realization and the resulting command response together." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.extracts_static_references_with_locations_without_running_tests]
+maxRequirements = 6                                                                                                              # Requirement ID limit for matching validating sites.
+name = "extracts_static_references_with_locations_without_running_tests"                                                         # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/shared/scanning/src/lib.rs"                                                                           # Repository-relative path glob for this test breadth exception.
+reason = "One cross-language fixture verifies literal extraction and source locations while proving that no source is executed." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.first_write_health_run_initializes_a_missing_baseline_without_failure]
+maxRequirements = 15                                                                                                                     # Requirement ID limit for matching validating sites.
+name = "first_write_health_run_initializes_a_missing_baseline_without_failure"                                                           # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/check-command/src/check_command/tests/health.rs"                                                          # Repository-relative path glob for this test breadth exception.
+reason = "One first health measurement validates scoring, report retrieval, baseline initialization and its portable artifact together." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.flake_interfaces]
+maxRequirements = 13                                                                                           # Requirement ID limit for matching validating sites.
+path = "nix/interface-checks.nix"                                                                              # Repository-relative path glob for this test breadth exception.
+reason = "This file exports several independent public flake interface checks under one static metadata site." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.health_update_exports_current_snapshot_and_rejects_stale_sources]
+maxRequirements = 9                                                                                                     # Requirement ID limit for matching validating sites.
+name = "health_update_exports_current_snapshot_and_rejects_stale_sources"                                               # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/check-command/src/check_command/tests/health.rs"                                         # Repository-relative path glob for this test breadth exception.
+reason = "The export workflow verifies snapshot contents and rejects stale inputs using the same retained measurement." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.library_names_workspace]
+maxRequirements = 20                                                                                    # Requirement ID limit for matching validating sites.
+path = "tests/library-names-workspace/checks.nix"                                                       # Repository-relative path glob for this test breadth exception.
+reason = "This fixture file aggregates independent Cargo library naming and dependency binding checks." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.nix_check_catalog]
+maxRequirements = 11                                                                                                            # Requirement ID limit for matching validating sites.
+path = "nix/checks/check-command-catalog.test.nix"                                                                              # Repository-relative path glob for this test breadth exception.
+reason = "The source scanner treats this file as one site although its colocated tests exercise independent Nix catalog cases." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.nix_unit_check]
+maxRequirements = 6                                                                                       # Requirement ID limit for matching validating sites.
+path = "nix/checks/unit-tests.nix"                                                                        # Repository-relative path glob for this test breadth exception.
+reason = "One check derivation exports the aggregated colocated Nix unit suite and its workspace wiring." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.nix_unit_suite]
+maxRequirements = 324                                                                                                                 # Requirement ID limit for matching validating sites.
+path = "lib/tests.nix"                                                                                                                # Repository-relative path glob for this test breadth exception.
+reason = "File metadata enumerates the colocated Nix unit suite; static discovery cannot attribute its evaluated cases individually." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.nixlib_workspace]
+maxRequirements = 13                                                                           # Requirement ID limit for matching validating sites.
+path = "tests/nixlib-workspace/checks.nix"                                                     # Repository-relative path glob for this test breadth exception.
+reason = "This fixture file aggregates independent workspace target and package graph checks." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.no_write_rejects_writers_before_workspace_preflights]
+maxRequirements = 8                                                                                                  # Requirement ID limit for matching validating sites.
+name = "no_write_rejects_writers_before_workspace_preflights"                                                        # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/cli-app/src/lib.rs"                                                                   # Repository-relative path glob for this test breadth exception.
+reason = "The shared no-write guard is exercised across writer entry points before any workspace setup or mutation." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.no_write_selects_and_deduplicates_the_native_formatter_per_system]
+maxRequirements = 7                                                                                                   # Requirement ID limit for matching validating sites.
+name = "no_write_selects_and_deduplicates_the_native_formatter_per_system"                                            # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/check-command/src/check_command/tests/execution.rs"                                    # Repository-relative path glob for this test breadth exception.
+reason = "One no-write multi-system run checks the formatter selection, deduplication and shared completion metrics." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.normal_sync_creates_missing_locks_without_specs_directory]
+maxRequirements = 13                                                                                                                     # Requirement ID limit for matching validating sites.
+name = "normal_sync_creates_missing_locks_without_specs_directory"                                                                       # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/sync/src/lib.rs"                                                                                          # Repository-relative path glob for this test breadth exception.
+reason = "One Cargo reconciliation workflow verifies lock creation, metadata identity and recommendations without a specification tree." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.production_adapter_preserves_names_and_builds_shared_derivations_once]
+maxRequirements = 11                                                                                                                      # Requirement ID limit for matching validating sites.
+name = "production_adapter_preserves_names_and_builds_shared_derivations_once"                                                            # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/check-command/src/check_command/tests/nix_cli.rs"                                                          # Repository-relative path glob for this test breadth exception.
+reason = "One real subprocess adapter scenario verifies Nix catalog names, batching, deduplication and their retained boundary evidence." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.production_batch_retains_sibling_success_causal_failure_and_log]
+maxRequirements = 6                                                                                            # Requirement ID limit for matching validating sites.
+name = "production_batch_retains_sibling_success_causal_failure_and_log"                                       # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/check-command/src/check_command/tests/nix_cli.rs"                               # Repository-relative path glob for this test breadth exception.
+reason = "One failing batch verifies sibling outcomes, causal attribution and retained log evidence together." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.production_formatter_edits_logs_and_gate_are_observed]
+maxRequirements = 6                                                                                                  # Requirement ID limit for matching validating sites.
+name = "production_formatter_edits_logs_and_gate_are_observed"                                                       # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/check-command/src/check_command/tests/nix_cli.rs"                                     # Repository-relative path glob for this test breadth exception.
+reason = "One real formatter preflight verifies its workspace edits, retained output and downstream execution gate." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.production_no_write_realizes_the_native_treefmt_check_without_formatting]
+maxRequirements = 6                                                                                                      # Requirement ID limit for matching validating sites.
+name = "production_no_write_realizes_the_native_treefmt_check_without_formatting"                                        # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/check-command/src/check_command/tests/nix_cli.rs"                                         # Repository-relative path glob for this test breadth exception.
+reason = "One real no-write adapter run verifies native formatter selection and the corresponding realization boundary." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.real_cargo_preserves_target_names_and_resolved_edge_bindings]
+maxRequirements = 8                                                                                 # Requirement ID limit for matching validating sites.
+name = "real_cargo_preserves_target_names_and_resolved_edge_bindings"                               # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/sync/src/naming_tests.rs"                                            # Repository-relative path glob for this test breadth exception.
+reason = "One real Cargo fixture verifies target naming and resolved dependency bindings together." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.retrieval_pages_failures_and_details_without_reexecuting_work]
+maxRequirements = 7                                                                                                           # Requirement ID limit for matching validating sites.
+name = "retrieval_pages_failures_and_details_without_reexecuting_work"                                                        # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/check-command/src/check_command/tests/retrieval.rs"                                            # Repository-relative path glob for this test breadth exception.
+reason = "One retained run is paged through both retrieval APIs to verify consistency and the absence of repeated execution." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.run_summary_is_compact_counts_only_and_omits_logs_and_success_records]
+maxRequirements = 6                                                                                                         # Requirement ID limit for matching validating sites.
+name = "run_summary_is_compact_counts_only_and_omits_logs_and_success_records"                                              # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/check-output/src/check_command/output.rs"                                                    # Repository-relative path glob for this test breadth exception.
+reason = "The summary contract checks bounds, aggregate counts and progressive disclosure against the same result fixture." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.scaffolds_the_basic_template_into_a_missing_target]
+maxRequirements = 12                                                                                     # Requirement ID limit for matching validating sites.
+name = "scaffolds_the_basic_template_into_a_missing_target"                                              # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/init/src/lib.rs"                                                          # Repository-relative path glob for this test breadth exception.
+reason = "One scaffold verifies the complete basic template and its generated locks and command result." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.scaffolds_the_topcoat_template]
+maxRequirements = 6                                                                                                  # Requirement ID limit for matching validating sites.
+name = "scaffolds_the_topcoat_template"                                                                              # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/init/src/lib.rs"                                                                      # Repository-relative path glob for this test breadth exception.
+reason = "One scaffold verifies the server, UI, assets and project substitution of the integrated Topcoat template." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.source_health_resolves_modules_and_measures_callable_bodies]
+maxRequirements = 12                                                                                          # Requirement ID limit for matching validating sites.
+name = "source_health_resolves_modules_and_measures_callable_bodies"                                          # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/shared/scanning/src/health.rs"                                                     # Repository-relative path glob for this test breadth exception.
+reason = "One cross-module AST fixture validates source selection and the correlated callable metric report." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.source_isolation_workspace]
+maxRequirements = 13                                                                                                        # Requirement ID limit for matching validating sites.
+path = "tests/source-isolation-workspace/checks.nix"                                                                        # Repository-relative path glob for this test breadth exception.
+reason = "This fixture file aggregates source isolation and consumer invalidation checks across several evaluated targets." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.static_scanning_parity]
+maxRequirements = 14                                                                                                 # Requirement ID limit for matching validating sites.
+path = "nix/checks/static-scanning-parity.nix"                                                                       # Repository-relative path glob for this test breadth exception.
+reason = "The compiled consumer checks the filesystem and virtual library boundary together with CLI report parity." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.summaries_agree_between_human_and_json_and_do_not_stream_logs]
+maxRequirements = 13                                                                                                            # Requirement ID limit for matching validating sites.
+name = "summaries_agree_between_human_and_json_and_do_not_stream_logs"                                                          # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/check-command/src/check_command/tests/execution.rs"                                              # Repository-relative path glob for this test breadth exception.
+reason = "The same failed run is rendered through both output modes to verify equivalent bounded summaries and log separation." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.trace_reports_tied_tests]
+maxRequirements = 8                                                                                                                       # Requirement ID limit for matching validating sites.
+name = "trace_reports_tied_tests"                                                                                                         # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/spec/src/lib.rs"                                                                                           # Repository-relative path glob for this test breadth exception.
+reason = "One multi-scanner projection verifies declared record metadata, tied references and their deterministic presentation together." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.testExceptions.upgrade_adds_absent_recommended_keys_in_sorted_order]
+maxRequirements = 7                                                                                                 # Requirement ID limit for matching validating sites.
+name = "upgrade_adds_absent_recommended_keys_in_sorted_order"                                                       # Exact test name restricted by this breadth exception.
+path = "packages/rust/libs/cli/config/src/lib.rs"                                                                   # Repository-relative path glob for this test breadth exception.
+reason = "One complete upgrade verifies recommended defaults, opt-in controls and stable insertion order together." # Reason for this specification policy exception or ownership.
 
 [checks.vulnerabilities]
 ignoreAdvisories = [] # RustSec advisory IDs suppressed by vulnerability checks.

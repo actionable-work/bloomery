@@ -427,6 +427,13 @@ in {
         config.checks.specifications = {
           enable = true;
           maxTestsPerRequirement = 7;
+          maxRequirementsPerTest = 5;
+          testExceptions.roundtrip = {
+            path = "tests/*.rs";
+            name = "roundtrip";
+            maxRequirements = 6;
+            reason = "Protocol integration";
+          };
           requirementExceptions."_DEMO-2D-RULE-0001" = {
             maxTests = 9;
             reason = "Valid identifier grammar";
@@ -473,6 +480,43 @@ in {
         })) [
         {untiedTests = "warn";}
         {maxUntiedTests = -1;}
+        {maxRequirementsPerTest = 0;}
+        {maxRequirementsPerTest = "5";}
+        {
+          testExceptions.bad = {
+            path = "tests/a.rs";
+            maxRequirements = 6;
+          };
+        }
+        {
+          testExceptions.bad = {
+            path = "../a.rs";
+            maxRequirements = 6;
+            reason = "Invalid";
+          };
+        }
+        {
+          testExceptions.bad = {
+            path = "tests/a.rs";
+            maxRequirements = 0;
+            reason = "Invalid";
+          };
+        }
+        {
+          testExceptions.bad = {
+            path = "tests/a.rs";
+            name = "";
+            maxRequirements = 6;
+            reason = "Invalid";
+          };
+        }
+        {
+          testExceptions." " = {
+            path = "tests/a.rs";
+            maxRequirements = 6;
+            reason = "Invalid";
+          };
+        }
         {requirementExceptions."DEMO-TESTS-RULE-001" = {maxTests = 9;};}
         {untiedExceptions."../tests/*" = {reason = "Invalid path";};}
         {crates."crates/demo/Cargo.toml" = {exclude = true;};}

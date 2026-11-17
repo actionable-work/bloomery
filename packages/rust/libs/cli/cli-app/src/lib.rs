@@ -1057,80 +1057,7 @@ fn render_spec_success(report: &SpecReport, color: output::ColorMode, stdout: &m
                 }
             }
         }
-        SpecOutcome::TraceReport { report } => {
-            let _ = writeln!(
-                stdout,
-                "static report v{} ({})",
-                report.version, report.scope.kind
-            );
-            let _ = writeln!(
-                stdout,
-                "tree: {:?}; specifications: {:?}; discovery: {:?}; relations: {:?}",
-                report.completeness.tree,
-                report.completeness.specifications,
-                report.completeness.discovery,
-                report.completeness.relations
-            );
-            if let Some(quality) = &report.quality {
-                let active = quality
-                    .untied
-                    .iter()
-                    .filter(|site| site.exception_reason.is_none())
-                    .count();
-                let _ = writeln!(
-                    stdout,
-                    "untied tests: {active} nonexempt, {} exempt; mode {:?}; limit {}",
-                    quality.untied.len() - active,
-                    quality.untied_mode,
-                    quality.max_untied_tests
-                );
-                for untied in &quality.untied {
-                    let _ = writeln!(
-                        stdout,
-                        "    {} {}:{} {}{}",
-                        untied.site.scanner,
-                        untied.site.path,
-                        untied.site.line.unwrap_or(1),
-                        untied.name.as_deref().unwrap_or("<unnamed>"),
-                        untied
-                            .exception_reason
-                            .as_ref()
-                            .map(|reason| format!(" (exception: {reason})"))
-                            .unwrap_or_default()
-                    );
-                }
-                for package in &quality.crates {
-                    let _ = writeln!(
-                        stdout,
-                        "crate {}: {} requirements; {} feature-linked sites; {}",
-                        package.manifest,
-                        package.requirements,
-                        package.linked_tests,
-                        if package.excluded {
-                            "excluded"
-                        } else if package.mapped {
-                            "mapped"
-                        } else {
-                            "unowned"
-                        }
-                    );
-                    if let Some(reason) = &package.reason {
-                        let _ = writeln!(stdout, "    {reason}");
-                    }
-                }
-            }
-            for finding in &report.diagnostics {
-                let _ = writeln!(stdout, "[{}] {}", finding.code, finding.message);
-                if let Some(location) = &finding.location {
-                    let _ = writeln!(
-                        stdout,
-                        "    {}:{}",
-                        location.path,
-                        location.line.unwrap_or(1)
-                    );
-                }
-            }
-        }
+        SpecOutcome::TraceReport { report } => render_spec_trace_report(report, stdout),
         SpecOutcome::Candidates { candidates } => {
             if candidates.is_empty() {
                 let _ = writeln!(stdout, "no untied tests");
@@ -1150,6 +1077,108 @@ fn render_spec_success(report: &SpecReport, color: output::ColorMode, stdout: &m
                     }
                 }
             }
+        }
+    }
+}
+
+fn render_spec_trace_report(report: &bloomery_spec::StaticReport, stdout: &mut impl Write) {
+    let _ = writeln!(
+        stdout,
+        "static report v{} ({})",
+        report.version, report.scope.kind
+    );
+    let _ = writeln!(
+        stdout,
+        "tree: {:?}; specifications: {:?}; discovery: {:?}; relations: {:?}",
+        report.completeness.tree,
+        report.completeness.specifications,
+        report.completeness.discovery,
+        report.completeness.relations
+    );
+    if let Some(quality) = &report.quality {
+        let overrides = quality
+            .tests
+            .iter()
+            .filter(|test| test.exception_reason.is_some())
+            .count();
+        let _ = writeln!(
+            stdout,
+            "test breadth: {} tied sites; {overrides} limit exceptions",
+            quality.tests.len()
+        );
+        for test in quality
+            .tests
+            .iter()
+            .filter(|test| test.exception_reason.is_some())
+        {
+            let _ = writeln!(
+                stdout,
+                "    {} {}:{} {}: {} requirements; limit {}; exception: {}",
+                test.site.scanner,
+                test.site.path,
+                test.site.line.unwrap_or(1),
+                test.name.as_deref().unwrap_or("<unnamed>"),
+                test.requirement_ids.len(),
+                test.limit,
+                test.exception_reason.as_deref().unwrap_or_default()
+            );
+        }
+        let active = quality
+            .untied
+            .iter()
+            .filter(|site| site.exception_reason.is_none())
+            .count();
+        let _ = writeln!(
+            stdout,
+            "untied tests: {active} nonexempt, {} exempt; mode {:?}; limit {}",
+            quality.untied.len() - active,
+            quality.untied_mode,
+            quality.max_untied_tests
+        );
+        for untied in &quality.untied {
+            let _ = writeln!(
+                stdout,
+                "    {} {}:{} {}{}",
+                untied.site.scanner,
+                untied.site.path,
+                untied.site.line.unwrap_or(1),
+                untied.name.as_deref().unwrap_or("<unnamed>"),
+                untied
+                    .exception_reason
+                    .as_ref()
+                    .map(|reason| format!(" (exception: {reason})"))
+                    .unwrap_or_default()
+            );
+        }
+        for package in &quality.crates {
+            let _ = writeln!(
+                stdout,
+                "crate {}: {} requirements; {} feature-linked sites; {}",
+                package.manifest,
+                package.requirements,
+                package.linked_tests,
+                if package.excluded {
+                    "excluded"
+                } else if package.mapped {
+                    "mapped"
+                } else {
+                    "unowned"
+                }
+            );
+            if let Some(reason) = &package.reason {
+                let _ = writeln!(stdout, "    {reason}");
+            }
+        }
+    }
+    for finding in &report.diagnostics {
+        let _ = writeln!(stdout, "[{}] {}", finding.code, finding.message);
+        if let Some(location) = &finding.location {
+            let _ = writeln!(
+                stdout,
+                "    {}:{}",
+                location.path,
+                location.line.unwrap_or(1)
+            );
         }
     }
 }
@@ -1492,50 +1521,85 @@ mod tests {
         ));
     }
 
-    #[test]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-031"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-025"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-026"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-027"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-015"))]
-    #[cfg_attr(any(), bloomery("CLI-BUILD-COMMAND-001"))]
-    fn the_cli_exposes_build_with_package_system_and_check_options() {
-        let parse = |args: &[&str]| match Cli::try_parse_from(args).expect("build command").command
-        {
+    use bloomery_cli_types::{ConfigOperation, SpecOperation};
+
+    fn parsed_build(arguments: &[&str]) -> bloomery_cli_types::BuildArgs {
+        match Cli::try_parse_from(arguments).expect("build parse").command {
             Command::Build(args) => args,
             other => panic!("expected build, got {other:?}"),
-        };
+        }
+    }
 
-        let default = parse(&["bloomery", "build"]);
-        assert!(default.packages.is_empty());
-        assert!(default.systems.is_empty());
-        assert!(!default.check);
+    fn parsed_disk(arguments: &[&str]) -> bloomery_cli_types::DiskArgs {
+        match Cli::try_parse_from(arguments).expect("disk parse").command {
+            Command::Disk(args) => args,
+            other => panic!("expected disk, got {other:?}"),
+        }
+    }
 
-        let configured = parse(&[
-            "bloomery",
-            "build",
-            "--package",
-            "app",
-            "--package",
-            "lib*",
-            "--system",
-            "x86_64-linux",
-            "--system",
-            "aarch64-linux",
-            "--check",
-        ]);
+    fn parsed_spec(arguments: &[&str]) -> SpecOperation {
+        match Cli::try_parse_from(arguments).expect("spec parse").command {
+            Command::Spec(args) => args.operation,
+            other => panic!("expected spec, got {other:?}"),
+        }
+    }
+
+    fn parsed_config(arguments: &[&str]) -> ConfigOperation {
+        match Cli::try_parse_from(arguments)
+            .expect("config parse")
+            .command
+        {
+            Command::Config(args) => args.operation,
+            other => panic!("expected config, got {other:?}"),
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-031"))]
+    #[cfg_attr(any(), bloomery("CLI-BUILD-COMMAND-001"))]
+    fn build_defaults_select_all_packages_and_the_host() {
+        let args = parsed_build(&["bloomery", "build"]);
+        assert!(args.packages.is_empty());
+        assert!(args.systems.is_empty());
+        assert!(!args.check);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-025"))]
+    fn build_parses_repeated_package_selectors() {
         assert_eq!(
-            configured.packages,
-            vec!["app".to_owned(), "lib*".to_owned()]
+            parsed_build(&["bloomery", "build", "--package", "app", "--package", "lib*"]).packages,
+            ["app", "lib*"]
         );
-        assert_eq!(
-            configured.systems,
-            vec!["x86_64-linux".to_owned(), "aarch64-linux".to_owned()]
-        );
-        assert!(configured.check);
+    }
 
-        let json = parse(&["bloomery", "build", "--json"]);
-        assert!(json.packages.is_empty());
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-026"))]
+    fn build_parses_repeated_system_selectors() {
+        assert_eq!(
+            parsed_build(&[
+                "bloomery",
+                "build",
+                "--system",
+                "x86_64-linux",
+                "--system",
+                "aarch64-linux"
+            ])
+            .systems,
+            ["x86_64-linux", "aarch64-linux"]
+        );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-027"))]
+    fn build_parses_the_optional_check_gate() {
+        assert!(parsed_build(&["bloomery", "build", "--check"]).check);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-015"))]
+    fn build_accepts_json_selection() {
+        assert!(parse_json(&["bloomery", "build", "--json"]).unwrap());
     }
 
     #[test]
@@ -2041,11 +2105,8 @@ mod tests {
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-006"))]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-007"))]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-008"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-007"))]
     #[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-010"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-008"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-009"))]
-    fn check_exposes_nested_retrieval_options_and_rejects_execution_flags_there() {
+    fn check_parses_selection_and_retrieval_commands() {
         for args in [
             &["bloomery", "check", "--check", "static:*", "--jobs", "2"][..],
             &["bloomery", "check", "--system", "x86_64-linux"][..],
@@ -2063,132 +2124,147 @@ mod tests {
             ][..],
             &["bloomery", "check", "failures", "--offset", "1"][..],
             &["bloomery", "check", "details", "f1", "--run", "r1"][..],
+        ] {
+            assert!(Cli::try_parse_from(args).is_ok(), "{args:?}");
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-007"))]
+    fn check_retrieval_parses_global_json() {
+        for args in [
             &["bloomery", "--json", "check", "list"][..],
             &["bloomery", "check", "list", "--json"][..],
         ] {
-            assert!(
-                Cli::try_parse_from(args).is_ok(),
-                "failed to parse {args:?}"
-            );
+            assert!(parse_json(args).unwrap());
         }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-008"))]
+    fn check_retrieval_rejects_execution_flags() {
         for args in [
             &["bloomery", "check", "list", "--jobs", "2"][..],
             &["bloomery", "check", "failures", "--fail-fast"][..],
             &["bloomery", "check", "details", "f1", "--check", "static:* "][..],
+        ] {
+            assert!(Cli::try_parse_from(args).is_err(), "{args:?}");
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-009"))]
+    fn check_rejects_invalid_numeric_options() {
+        for args in [
             &["bloomery", "check", "--jobs", "not-a-number"][..],
             &["bloomery", "check", "list", "--offset", "-1"][..],
         ] {
-            assert!(
-                Cli::try_parse_from(args).is_err(),
-                "unexpectedly parsed {args:?}"
-            );
+            assert!(Cli::try_parse_from(args).is_err(), "{args:?}");
         }
     }
 
     #[test]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-029"))]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-030"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-021"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-022"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-023"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-024"))]
     #[cfg_attr(any(), bloomery("CLI-DISK-COMMAND-008"))]
     #[cfg_attr(any(), bloomery("CLI-DISK-COMMAND-011"))]
-    fn the_cli_exposes_disk_with_derivation_and_system_options() {
-        let parse = |args: &[&str]| match Cli::try_parse_from(args).expect("disk command").command {
-            Command::Disk(args) => args,
-            other => panic!("expected disk, got {other:?}"),
-        };
-
-        let default = parse(&["bloomery", "disk"]);
+    fn disk_parses_tree_and_addressed_forms() {
+        let default = parsed_disk(&["bloomery", "disk"]);
         assert!(!default.tree);
         assert_eq!(default.derivation, None);
         assert!(default.systems.is_empty());
-
-        let addressed = parse(&["bloomery", "disk", "packages.x86_64-linux.default"]);
+        assert_eq!(default.scope, bloomery_cli_types::DiskScope::All);
+        let addressed = parsed_disk(&["bloomery", "disk", "packages.x86_64-linux.default"]);
         assert!(!addressed.tree);
         assert_eq!(
             addressed.derivation.as_deref(),
             Some("packages.x86_64-linux.default")
         );
         assert!(addressed.systems.is_empty());
-
-        let tree = parse(&["bloomery", "disk", "tree"]);
+        let tree = parsed_disk(&["bloomery", "disk", "tree"]);
         assert!(tree.tree);
         assert_eq!(tree.derivation, None);
-
-        let tree_addressed = parse(&["bloomery", "disk", "tree", "packages.x86_64-linux.default"]);
-        assert!(tree_addressed.tree);
+        assert_eq!(tree.scope, bloomery_cli_types::DiskScope::All);
+        let addressed_tree =
+            parsed_disk(&["bloomery", "disk", "tree", "packages.x86_64-linux.default"]);
+        assert!(addressed_tree.tree);
         assert_eq!(
-            tree_addressed.derivation.as_deref(),
+            addressed_tree.derivation.as_deref(),
             Some("packages.x86_64-linux.default")
         );
+    }
 
-        let tree_systems = parse(&[
-            "bloomery",
-            "disk",
-            "tree",
-            "--system",
-            "x86_64-linux",
-            "--system",
-            "aarch64-linux",
-        ]);
-        assert!(tree_systems.tree);
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-021"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-022"))]
+    fn disk_parses_systems_and_rejects_addressed_system_scope() {
         assert_eq!(
-            tree_systems.systems,
-            vec!["x86_64-linux".to_owned(), "aarch64-linux".to_owned()]
+            parsed_disk(&[
+                "bloomery",
+                "disk",
+                "--system",
+                "x86_64-linux",
+                "--system",
+                "aarch64-linux",
+                "--system",
+                "x86_64-linux"
+            ])
+            .systems,
+            ["x86_64-linux", "aarch64-linux"]
         );
-
-        let systems = parse(&[
-            "bloomery",
-            "disk",
-            "--system",
-            "x86_64-linux",
-            "--system",
-            "aarch64-linux",
-            "--system",
-            "x86_64-linux",
-        ]);
         assert_eq!(
-            systems.systems,
-            vec!["x86_64-linux".to_owned(), "aarch64-linux".to_owned()]
+            parsed_disk(&[
+                "bloomery",
+                "disk",
+                "tree",
+                "--system",
+                "x86_64-linux",
+                "--system",
+                "aarch64-linux"
+            ])
+            .systems,
+            ["x86_64-linux", "aarch64-linux"]
         );
-
-        assert!(
-            Cli::try_parse_from([
+        for args in [
+            &[
                 "bloomery",
                 "disk",
                 "--system",
                 "x86_64-linux",
                 "packages.x86_64-linux.default",
-            ])
-            .is_err()
-        );
-        assert!(
-            Cli::try_parse_from([
+            ][..],
+            &[
                 "bloomery",
                 "disk",
                 "tree",
                 "--system",
                 "x86_64-linux",
                 "packages.x86_64-linux.default",
-            ])
-            .is_err()
-        );
+            ][..],
+        ] {
+            assert!(Cli::try_parse_from(args).is_err());
+        }
+    }
 
-        assert_eq!(default.scope, bloomery_cli_types::DiskScope::All);
-        assert_eq!(tree.scope, bloomery_cli_types::DiskScope::All);
-        let runtime = parse(&["bloomery", "disk", "--scope", "runtime"]);
-        assert_eq!(runtime.scope, bloomery_cli_types::DiskScope::Runtime);
-        let build_tree = parse(&["bloomery", "disk", "tree", "--scope", "build"]);
-        assert_eq!(build_tree.scope, bloomery_cli_types::DiskScope::Build);
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-023"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-024"))]
+    fn disk_parses_measurement_scope_and_rejects_addressed_scope() {
+        assert_eq!(
+            parsed_disk(&["bloomery", "disk", "--scope", "runtime"]).scope,
+            bloomery_cli_types::DiskScope::Runtime
+        );
+        assert_eq!(
+            parsed_disk(&["bloomery", "disk", "tree", "--scope", "build"]).scope,
+            bloomery_cli_types::DiskScope::Build
+        );
         assert!(
             Cli::try_parse_from([
                 "bloomery",
                 "disk",
                 "--scope",
                 "runtime",
-                "packages.x86_64-linux.default",
+                "packages.x86_64-linux.default"
             ])
             .is_err()
         );
@@ -2322,37 +2398,20 @@ mod tests {
     #[test]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-020"))]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-021"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-022"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-023"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-024"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-025"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-026"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-027"))]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-015"))]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-016"))]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-017"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-018"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-019"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-020"))]
-    fn clap_parses_every_spec_subcommand() {
-        use bloomery_cli_types::SpecOperation;
-
-        let operation =
-            |args: &[&str]| match Cli::try_parse_from(args).expect("spec command").command {
-                Command::Spec(args) => args.operation,
-                other => panic!("expected spec, got {other:?}"),
-            };
-
+    fn spec_list_parses_its_filters() {
         assert_eq!(
-            operation(&["bloomery", "spec", "list"]),
+            parsed_spec(&["bloomery", "spec", "list"]),
             SpecOperation::List {
                 area: None,
                 feature: None,
-                group: None,
+                group: None
             }
         );
         assert_eq!(
-            operation(&[
+            parsed_spec(&[
                 "bloomery",
                 "spec",
                 "list",
@@ -2361,22 +2420,34 @@ mod tests {
                 "--feature",
                 "F",
                 "--group",
-                "G",
+                "G"
             ]),
             SpecOperation::List {
                 area: Some("A".into()),
                 feature: Some("F".into()),
-                group: Some("G".into()),
+                group: Some("G".into())
             }
         );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-022"))]
+    fn spec_show_parses_the_requirement_id() {
         assert_eq!(
-            operation(&["bloomery", "spec", "show", "A-F-G-001"]),
+            parsed_spec(&["bloomery", "spec", "show", "A-F-G-001"]),
             SpecOperation::Show {
-                id: "A-F-G-001".into(),
+                id: "A-F-G-001".into()
             }
         );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-023"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-019"))]
+    fn spec_add_parses_required_and_optional_fields() {
+        let ears = "{ type = \"ubiquitous\", system = \"s\", action = \"a\" }";
         assert_eq!(
-            operation(&[
+            parsed_spec(&[
                 "bloomery",
                 "spec",
                 "add",
@@ -2384,60 +2455,86 @@ mod tests {
                 "--title",
                 "Title",
                 "--ears",
-                "{ type = \"ubiquitous\", system = \"s\", action = \"a\" }",
+                ears,
                 "--design",
                 "design/x.md",
-                "--manual",
+                "--manual"
             ]),
             SpecOperation::Add {
                 id: "A-F-G-001".into(),
                 title: "Title".into(),
-                ears: "{ type = \"ubiquitous\", system = \"s\", action = \"a\" }".into(),
+                ears: ears.into(),
                 design: Some("design/x.md".into()),
-                manual: true,
+                manual: true
             }
         );
+        assert!(Cli::try_parse_from(["bloomery", "spec", "add", "ID", "--ears", "{}"]).is_err());
+        assert!(Cli::try_parse_from(["bloomery", "spec", "add", "ID", "--title", "T"]).is_err());
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-024"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-020"))]
+    fn spec_set_parses_the_addressed_field_and_value() {
         assert_eq!(
-            operation(&["bloomery", "spec", "set", "A-F-G-001", "title", "New"]),
+            parsed_spec(&["bloomery", "spec", "set", "A-F-G-001", "title", "New"]),
             SpecOperation::Set {
                 id: "A-F-G-001".into(),
                 field: "title".into(),
-                value: "New".into(),
+                value: "New".into()
             }
         );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-025"))]
+    fn spec_remove_parses_the_requirement_id() {
         assert_eq!(
-            operation(&["bloomery", "spec", "remove", "A-F-G-001"]),
+            parsed_spec(&["bloomery", "spec", "remove", "A-F-G-001"]),
             SpecOperation::Remove {
-                id: "A-F-G-001".into(),
+                id: "A-F-G-001".into()
             }
         );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-026"))]
+    fn spec_trace_parses_ids_and_report_scope() {
         assert_eq!(
-            operation(&["bloomery", "spec", "trace", "A-F-G-001", "A-F-G-002"]),
+            parsed_spec(&["bloomery", "spec", "trace", "A-F-G-001", "A-F-G-002"]),
             SpecOperation::Trace {
-                ids: vec!["A-F-G-001".into(), "A-F-G-002".into()],
+                ids: vec!["A-F-G-001".into(), "A-F-G-002".into()]
             }
         );
         assert_eq!(
-            operation(&["bloomery", "spec", "candidates"]),
-            SpecOperation::Candidates
-        );
-        assert_eq!(
-            operation(&["bloomery", "spec", "trace", "--report"]),
+            parsed_spec(&["bloomery", "spec", "trace", "--report"]),
             SpecOperation::TraceReport { rust_cfg: None }
         );
-        assert!(Cli::try_parse_from(["bloomery", "spec", "trace"]).is_err());
-        assert!(
-            Cli::try_parse_from(["bloomery", "spec", "trace", "--report", "A-F-G-001"]).is_err()
-        );
-        assert!(
-            Cli::try_parse_from(["bloomery", "spec", "trace", "A-F-G-001", "--rust-cfg", "{}"])
-                .is_err()
-        );
-        assert!(Cli::try_parse_from(["bloomery", "spec", "trace", "--rust-cfg", "{}"]).is_err());
+        for arguments in [
+            &["bloomery", "spec", "trace"][..],
+            &["bloomery", "spec", "trace", "--report", "A-F-G-001"][..],
+            &["bloomery", "spec", "trace", "A-F-G-001", "--rust-cfg", "{}"][..],
+            &["bloomery", "spec", "trace", "--rust-cfg", "{}"][..],
+        ] {
+            assert!(Cli::try_parse_from(arguments).is_err());
+        }
+    }
 
-        assert!(Cli::try_parse_from(["bloomery", "spec", "show", "ID", "--area", "A"]).is_err());
-        assert!(Cli::try_parse_from(["bloomery", "spec", "add", "ID", "--ears", "{}"]).is_err());
-        assert!(Cli::try_parse_from(["bloomery", "spec", "add", "ID", "--title", "T"]).is_err());
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-027"))]
+    fn spec_candidates_parses_without_arguments() {
+        assert_eq!(
+            parsed_spec(&["bloomery", "spec", "candidates"]),
+            SpecOperation::Candidates
+        );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-018"))]
+    fn spec_filter_flags_are_rejected_outside_list() {
+        for flag in ["--area", "--feature", "--group"] {
+            assert!(Cli::try_parse_from(["bloomery", "spec", "show", "ID", flag, "A"]).is_err());
+        }
     }
 
     #[test]
@@ -2716,68 +2813,82 @@ mod tests {
     #[test]
     #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-001"))]
     #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-002"))]
-    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-003"))]
-    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-004"))]
-    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-005"))]
-    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-006"))]
-    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-014"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-019"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-010"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-011"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-013"))]
-    fn config_commands_expose_typed_operations() {
-        fn operation(arguments: &[&str]) -> bloomery_cli_types::ConfigOperation {
-            match Cli::try_parse_from(arguments)
-                .expect("config parse")
-                .command
-            {
-                Command::Config(args) => args.operation,
-                other => panic!("expected config, got {other:?}"),
+    fn config_get_parses_a_key() {
+        assert_eq!(
+            parsed_config(&["bloomery", "config", "get", "checks.enable"]),
+            ConfigOperation::Get {
+                key: "checks.enable".into()
             }
-        }
+        );
+    }
 
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-003"))]
+    fn config_set_parses_a_key_and_value() {
         assert_eq!(
-            operation(&["bloomery", "config", "get", "checks.enable"]),
-            bloomery_cli_types::ConfigOperation::Get {
-                key: "checks.enable".to_owned()
+            parsed_config(&["bloomery", "config", "set", "checks.enable", "false"]),
+            ConfigOperation::Set {
+                key: "checks.enable".into(),
+                value: "false".into()
             }
         );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-004"))]
+    fn config_unset_parses_a_key() {
         assert_eq!(
-            operation(&["bloomery", "config", "set", "checks.enable", "false"]),
-            bloomery_cli_types::ConfigOperation::Set {
-                key: "checks.enable".to_owned(),
-                value: "false".to_owned()
+            parsed_config(&["bloomery", "config", "unset", "checks.enable"]),
+            ConfigOperation::Unset {
+                key: "checks.enable".into()
             }
         );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-005"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-010"))]
+    fn config_list_parses_a_prefix() {
         assert_eq!(
-            operation(&["bloomery", "config", "unset", "checks.enable"]),
-            bloomery_cli_types::ConfigOperation::Unset {
-                key: "checks.enable".to_owned()
+            parsed_config(&["bloomery", "config", "list", "--prefix", "checks"]),
+            ConfigOperation::List {
+                prefix: Some("checks".into())
             }
         );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-006"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-011"))]
+    fn config_upgrade_parses_dry_run() {
         assert_eq!(
-            operation(&["bloomery", "config", "list", "--prefix", "checks"]),
-            bloomery_cli_types::ConfigOperation::List {
-                prefix: Some("checks".to_owned())
-            }
-        );
-        assert_eq!(
-            operation(&["bloomery", "config", "upgrade", "--dry-run"]),
-            bloomery_cli_types::ConfigOperation::Upgrade {
+            parsed_config(&["bloomery", "config", "upgrade", "--dry-run"]),
+            ConfigOperation::Upgrade {
                 dry_run: true,
                 diff: false
             }
         );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-FLAGS-013"))]
+    fn config_upgrade_parses_recommendation_diff() {
         assert_eq!(
-            operation(&["bloomery", "config", "upgrade", "--diff"]),
-            bloomery_cli_types::ConfigOperation::Upgrade {
+            parsed_config(&["bloomery", "config", "upgrade", "--diff"]),
+            ConfigOperation::Upgrade {
                 dry_run: false,
                 diff: true
             }
         );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-COMMANDS-014"))]
+    #[cfg_attr(any(), bloomery("CLI-INTERFACE-COMMANDS-019"))]
+    fn config_document_parses_without_arguments() {
         assert_eq!(
-            operation(&["bloomery", "config", "document"]),
-            bloomery_cli_types::ConfigOperation::Document
+            parsed_config(&["bloomery", "config", "document"]),
+            ConfigOperation::Document
         );
     }
 

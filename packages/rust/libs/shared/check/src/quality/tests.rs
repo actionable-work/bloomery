@@ -7,7 +7,7 @@ const ID: &str = "DEMO-TESTS-RULE-001";
 const OTHER: &str = "DEMO-TESTS-RULE-002";
 const MANUAL: &str = "DEMO-TESTS-RULE-003";
 
-fn files(rust: &str) -> BTreeMap<String, String> {
+pub(super) fn files(rust: &str) -> BTreeMap<String, String> {
     let mut files = BTreeMap::new();
     files.insert(
         ".bloomery/specs/DEMO/TESTS/design/main.md".into(),
@@ -28,11 +28,11 @@ fn files(rust: &str) -> BTreeMap<String, String> {
     files
 }
 
-fn config(policy: &str) -> Config {
+pub(super) fn config(policy: &str) -> Config {
     parse_contents(&format!("version = 2\n[scanners.rust]\npaths = ['tests/**/*.rs']\n[scanners.playwright]\npaths = ['e2e/**/*.ts']\n[scanners.nix]\npaths = ['checks/**/*.nix']\ntestPaths = ['checks/**/*.test.nix']\n[checks.specifications]\n{policy}"), Path::new(".bloomery/config.toml")).expect("configuration").config
 }
 
-fn tagged(name: &str, ids: &[&str]) -> String {
+pub(super) fn tagged(name: &str, ids: &[&str]) -> String {
     let tags = ids
         .iter()
         .map(|id| format!("#[cfg_attr(any(), bloomery(\"{id}\"))]\n"))
@@ -40,7 +40,7 @@ fn tagged(name: &str, ids: &[&str]) -> String {
     format!("{tags}#[test] fn {name}() {{ for _ in 0..20 {{}} }}\n")
 }
 
-fn analyze(
+pub(super) fn analyze(
     files: BTreeMap<String, String>,
     policy: &str,
     complete: bool,
@@ -189,7 +189,7 @@ fn partial_discovery_proves_excess_without_certifying_absence() {
     assert!(!assessment.report.discovery_complete);
     assert_eq!(assessment.diagnostics[0].code, "TooManyTestsForRequirement");
     let report = crate::report::analyze_tree(&tree, context.config);
-    assert_eq!(report.version, 9);
+    assert_eq!(report.version, 10);
     assert_eq!(
         report.completeness.relations,
         crate::report::StageState::Partial
@@ -332,6 +332,7 @@ fn ownership_checks_minima_and_rejects_stale_targets() {
 #[test]
 #[cfg_attr(any(), bloomery("PARSER-WORKSPACE-GRANULARITY-001"))]
 #[cfg_attr(any(), bloomery("PARSER-WORKSPACE-GRANULARITY-004"))]
+#[cfg_attr(any(), bloomery("PARSER-WORKSPACE-BREADTH-002"))]
 fn caller_discovery_and_filesystem_reports_share_site_counts() {
     use std::sync::atomic::{AtomicU64, Ordering};
     static NEXT: AtomicU64 = AtomicU64::new(0);

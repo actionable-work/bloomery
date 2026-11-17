@@ -1,0 +1,16 @@
+schema_version = 1
+group = "BREADTH"
+
+[[requirements]]
+id = "PARSER-WORKSPACE-BREADTH-001"
+title = "Static reports expose deterministic test breadth facts"
+manual = false
+design = "design/static-report.md#facts-and-completeness"
+ears = { type = "ubiquitous", system = "static repository analysis", action = "include tied sites, sorted distinct requirement IDs, effective limits, and exception reasons in report identity under contract 10" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-BREADTH-002"
+title = "Repository adapters share breadth findings"
+manual = false
+design = "design/static-report.md#facts-and-completeness"
+ears = { type = "ubiquitous", system = "static repository analysis", action = "produce equivalent test breadth facts and findings from identical filesystem, virtual, and caller-supplied discovery inputs" }

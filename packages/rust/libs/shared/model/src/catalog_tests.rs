@@ -422,7 +422,7 @@ fn nix_test_paths_are_catalogued() {
 #[test]
 #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-005"))]
 fn catalog_version_tracks_the_binary() {
-    assert_eq!(CATALOG_VERSION, 14);
+    assert_eq!(CATALOG_VERSION, 15);
     assert!(!CATALOG.is_empty());
 }
 

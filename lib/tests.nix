@@ -49,6 +49,7 @@ in {
         inherit failedTests;
         bloomery = [
           "PARSER-CONFIGURATION-GRANULARITY-006"
+          "PARSER-CONFIGURATION-BREADTH-004"
           "REPOSITORY-LAYOUT-STRUCTURE-001"
           "REPOSITORY-LAYOUT-STRUCTURE-002"
           "REPOSITORY-LAYOUT-STRUCTURE-003"

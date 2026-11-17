@@ -1,0 +1,58 @@
+schema_version = 1
+group = "BREADTH"
+
+[[requirements]]
+id = "CLI-CHECK-BREADTH-001"
+title = "Tests fail above the requirement ID limit"
+manual = false
+design = "design/test-breadth.md"
+ears = { type = "event", system = "bloomery check", action = "fail static:traceability with TooManyRequirementsForTest", trigger = "one authored validating site references more distinct automated requirements than its effective limit" }
+
+[[requirements]]
+id = "CLI-CHECK-BREADTH-002"
+title = "Equality with the requirement ID limit passes"
+manual = false
+design = "design/test-breadth.md"
+ears = { type = "event", system = "the test breadth policy", action = "produce no TooManyRequirementsForTest finding", trigger = "a validating site references exactly its effective requirement ID limit" }
+
+[[requirements]]
+id = "CLI-CHECK-BREADTH-003"
+title = "Duplicate and invalid IDs do not inflate breadth"
+manual = false
+design = "design/test-breadth.md#counting"
+ears = { type = "ubiquitous", system = "the test breadth policy", action = "count distinct declared automated requirement IDs once per site while retaining independent orphan and manual reference findings" }
+
+[[requirements]]
+id = "CLI-CHECK-BREADTH-004"
+title = "Test breadth follows shared physical site identities"
+manual = false
+design = "design/test-breadth.md#counting"
+ears = { type = "ubiquitous", system = "the test breadth policy", action = "assess Rust declarations, directly tagged Playwright calls, and Nix evidence files separately using canonical site identities" }
+
+[[requirements]]
+id = "CLI-CHECK-BREADTH-005"
+title = "Scoped test exceptions retain their reasons"
+manual = false
+design = "design/test-breadth.md#configuration-and-exceptions"
+ears = { type = "event", system = "the test breadth policy", action = "apply the first name-specific exception in label order or the first path-only match when no named match exists while retaining its reason", trigger = "a site matches configured test exceptions" }
+
+[[requirements]]
+id = "CLI-CHECK-BREADTH-006"
+title = "Breadth findings retain contributing requirement declarations"
+manual = false
+design = "design/test-breadth.md#findings-and-reports"
+ears = { type = "event", system = "the test breadth policy", action = "retain its source location, name, count, limit, and every contributing ID with declaration location in the ordinary failure detail stream", trigger = "a site exceeds its effective requirement ID limit" }
+
+[[requirements]]
+id = "CLI-CHECK-BREADTH-007"
+title = "Authored breadth is independent of execution eligibility"
+manual = false
+design = "design/test-breadth.md#counting"
+ears = { type = "ubiquitous", system = "the test breadth policy", action = "preserve authored associations regardless of cfg, target, ignored-test eligibility, runtime iteration, or selected systems" }
+
+[[requirements]]
+id = "CLI-CHECK-BREADTH-008"
+title = "Observed breadth violations survive partial discovery"
+manual = false
+design = "design/test-breadth.md#counting"
+ears = { type = "event", system = "static repository analysis", action = "retain TooManyRequirementsForTest without certifying absent violations in unavailable sources", trigger = "discovery is partial and an observed site exceeds the requirement ID limit" }

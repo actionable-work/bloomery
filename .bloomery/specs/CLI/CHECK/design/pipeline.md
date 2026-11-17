@@ -32,6 +32,8 @@ scanning is disabled, without producing specification references.
 5. **Relational verification** — compare declared requirements and discovered
    references, including the per-requirement validating-site limit in
    [specification granularity](spec-granularity.md).
+   [Test breadth](test-breadth.md) independently bounds the number of requirement
+   IDs associated with each validating site.
 6. **Diagnostic retention** — retain all deterministic diagnostics, then produce
    the bounded [failure summary](diagnostics.md) and overall runner exit code.
 

@@ -1,5 +1,6 @@
 //! Authored traceability metrics. These associations do not establish execution coverage.
 
+mod breadth;
 mod ownership;
 #[cfg(test)]
 mod tests;
@@ -53,6 +54,15 @@ pub struct RequirementLinks {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct TestLinks {
+    pub site: Site,
+    pub name: Option<String>,
+    pub requirement_ids: Vec<String>,
+    pub limit: usize,
+    pub exception_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct UntiedSite {
     pub site: Site,
     pub name: Option<String>,
@@ -80,6 +90,7 @@ pub struct QualityReport {
     pub untied_mode: UntiedMode,
     pub max_untied_tests: usize,
     pub requirements: Vec<RequirementLinks>,
+    pub tests: Vec<TestLinks>,
     pub untied: Vec<UntiedSite>,
     pub crates: Vec<CrateLinks>,
 }
@@ -103,6 +114,7 @@ pub fn assess_links(
             untied_mode: policy.untied_tests,
             max_untied_tests: policy.max_untied_tests,
             requirements: Vec::new(),
+            tests: Vec::new(),
             untied: Vec::new(),
             crates: Vec::new(),
         },
@@ -110,6 +122,7 @@ pub fn assess_links(
     };
     let sites = validating_sites(context, output);
     granularity(context, &policy, &sites, &mut assessment);
+    breadth::assess(context, output, &policy, &mut assessment);
     untied(context, output, &policy, &mut assessment);
     Ok(assessment)
 }

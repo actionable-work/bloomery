@@ -191,11 +191,13 @@ generating a corresponding Nix check.
 | Key | Type | Effective default | Upgrade recommendation |
 | --- | --- | --- | --- |
 | `checks.specifications.maxTestsPerRequirement` | positive integer | `5` | `5` |
+| `checks.specifications.maxRequirementsPerTest` | positive integer | `5` | `5` |
 
-The limit is consumed by the
-[specification granularity policy](../../../CLI/CHECK/design/spec-granularity.md).
-It participates in config get/set/unset/list/upgrade/document. Explicit values
-override the default and survive upgrade; unset restores the effective default.
+These limits are consumed by the
+[specification granularity](../../../CLI/CHECK/design/spec-granularity.md) and
+[test breadth](../../../CLI/CHECK/design/test-breadth.md) policies.
+They participate in config get/set/unset/list/upgrade/document. Explicit values
+override the defaults and survive upgrade; unset restores the effective default.
 Reject zero, negative integers, floats, booleans, strings, and unknown policy
 keys as `ConfigurationError` before formatting or analysis, including when
 specification checks or management are disabled. Nix configuration validation
@@ -214,6 +216,14 @@ Reasons are nonempty; paths are canonical repository-relative paths; crate
 keys end in `Cargo.toml`. Crate feature identifiers have exactly two valid ID
 segments. Unknown fields are errors. Config editing and documentation support
 all parameterized leaves through the shared schema catalog.
+
+The [test breadth policy](../../../CLI/CHECK/design/test-breadth.md) consumes
+`maxRequirementsPerTest`. `testExceptions.<label>` accepts required `path`,
+`maxRequirements`, `reason`, and optional `name`, with no recommendations for
+parameterized leaves. Limits are positive integers; paths use repository globs;
+labels, reasons and optional names are nonempty. Unknown keys and invalid values
+fail CLI and Nix validation even when checks are disabled. Upgrade preserves
+configured values; unset of the global limit restores `5`.
 
 ### `[checks.codeHealth]`
 

@@ -25,6 +25,16 @@
     && entry ? reason
     && nonempty entry.reason
     && optional entry "name" nonempty;
+  test = label: entry:
+    nonempty label
+    && known ["path" "name" "maxRequirements" "reason"] entry
+    && entry ? path
+    && path entry.path
+    && entry ? maxRequirements
+    && positive entry.maxRequirements
+    && entry ? reason
+    && nonempty entry.reason
+    && optional entry "name" nonempty;
   feature = value: builtins.isString value && builtins.match "[A-Z0-9_]+/[A-Z0-9_]+" value != null;
   crate = manifest: entry:
     path manifest
@@ -47,13 +57,15 @@
         && builtins.length entry.features == builtins.length (lib.unique entry.features)
     );
   valid =
-    known ["enable" "maxTestsPerRequirement" "untiedTests" "maxUntiedTests" "requireCrateOwnership" "requirementExceptions" "untiedExceptions" "crates"] value
+    known ["enable" "maxTestsPerRequirement" "maxRequirementsPerTest" "untiedTests" "maxUntiedTests" "requireCrateOwnership" "requirementExceptions" "testExceptions" "untiedExceptions" "crates"] value
     && optional value "enable" builtins.isBool
     && optional value "maxTestsPerRequirement" positive
+    && optional value "maxRequirementsPerTest" positive
     && optional value "untiedTests" (mode: builtins.elem mode ["off" "report" "deny"])
     && optional value "maxUntiedTests" natural
     && optional value "requireCrateOwnership" builtins.isBool
     && optional value "requirementExceptions" (table: family table requirement)
+    && optional value "testExceptions" (table: family table test)
     && optional value "untiedExceptions" (table: family table untied)
     && optional value "crates" (table: family table crate);
 in

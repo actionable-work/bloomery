@@ -59,7 +59,7 @@ limit, every untied site and exception reason, crate associations, and discovery
 completeness. Null means specifications or discovery were unavailable. Crate
 rows are ordered by manifest; untied sites by scanner/path/line/column.
 Configuration and findings participate in report identity under parser/report
-contract 9; grouped requirement schema remains 1.
+contract 10; grouped requirement schema remains 1.
 
 Observed excess counts can fail partial discovery. Below-minimum linked-test
 findings require complete discovery; incomplete scope remains explicit. Crate

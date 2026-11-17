@@ -13,7 +13,7 @@ let tree = MemoryTree::new([("tests/example.rs", "#[test] fn example() {}")])?;
 let mut config = Config::default();
 config.scanners.rust.paths = vec!["tests/**/*.rs".into()];
 let report = analyze_tree(&tree, config);
-assert_eq!(report.version, 9);
+assert_eq!(report.version, 10);
 assert_eq!(report.completeness.tree, StageState::Complete);
 assert_eq!(report.tests[0].name.as_deref(), Some("example"));
 ```
@@ -31,7 +31,7 @@ Coordinates use one-based Unicode scalar positions and exclusive ends; tabs coun
 as one scalar and LF advances the line, including in CRLF input. Unknown columns
 and ends remain null. References cover quoted literals, Rust test sites cover
 function names, Playwright sites cover calls, and Nix sites cover whole files.
-The parser contract is `bloomery-static-syntax-v9`; specification schema 1 is
+The parser contract is `bloomery-static-syntax-v10`; specification schema 1 is
 unchanged. Rust ingestion errors without retained spans remain line-only.
 
 Reports bind the complete typed configuration, tree snapshot, active specification
@@ -46,7 +46,7 @@ successful input identity. Contract constants are exported from `report`.
 Report 8 adds `RequirementRecord.revision` and `StaticReport.spec_set` containing
 `report::SpecSetManifest`. Source schema 1 and existing analysis entry points are
 unchanged. Consumers accepting only earlier report contracts must explicitly
-adopt version 9.
+adopt version 10.
 
 ```rust
 // Existing CLI: bloomery --json spec trace --report
@@ -124,7 +124,7 @@ Without cfg scope, these annotations are null and discovery stays syntactic.
 The scanner also exposes owned `CfgExpression` / `RustCondition` facts through
 `scan_tree_with_conditions`, using the existing source ingestion cache.
 
-Report/parser version 9 includes this scope, annotations and `completeness.rust_cfg`;
+Report/parser version 10 includes this scope, annotations and `completeness.rust_cfg`;
 specification schema 1 is unchanged. Only satisfied Rust conditions contribute
 scoped coverage. All literal references and orphan/manual findings remain
 visible. Relations stay partial and absent bindings unresolved. Local cfg
@@ -172,7 +172,7 @@ canonical candidate paths, resolved paths and conditions. Direct projection has
 its own partial/failed/disabled/not-attempted states. Transitive membership,
 out-of-line children below inline modules and conditional paths remain outside
 scope. Relations stay partial; static results cannot establish compilation or
-execution success. Report/parser contract 9 retains specification schema 1.
+execution success. Report/parser contract 10 retains specification schema 1.
 
 Rust tests and bindings always have a separate `rust_harness` eligibility record,
 including in default syntactic reports. Plain `#[ignore]`, reasoned ignore and

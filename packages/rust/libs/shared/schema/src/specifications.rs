@@ -18,10 +18,12 @@ pub enum UntiedMode {
 pub struct SpecificationPolicy {
     pub enable: bool,
     pub max_tests_per_requirement: usize,
+    pub max_requirements_per_test: usize,
     pub untied_tests: UntiedMode,
     pub max_untied_tests: usize,
     pub require_crate_ownership: bool,
     pub requirement_exceptions: BTreeMap<String, RequirementException>,
+    pub test_exceptions: BTreeMap<String, TestException>,
     pub untied_exceptions: BTreeMap<String, UntiedException>,
     pub crates: BTreeMap<String, CrateOwnership>,
 }
@@ -31,10 +33,12 @@ impl Default for SpecificationPolicy {
         Self {
             enable: false,
             max_tests_per_requirement: 5,
+            max_requirements_per_test: 5,
             untied_tests: UntiedMode::Report,
             max_untied_tests: 0,
             require_crate_ownership: false,
             requirement_exceptions: BTreeMap::new(),
+            test_exceptions: BTreeMap::new(),
             untied_exceptions: BTreeMap::new(),
             crates: BTreeMap::new(),
         }
@@ -45,6 +49,15 @@ impl Default for SpecificationPolicy {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RequirementException {
     pub max_tests: usize,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TestException {
+    pub path: String,
+    pub name: Option<String>,
+    pub max_requirements: usize,
     pub reason: String,
 }
 
@@ -79,6 +92,7 @@ impl SpecificationPolicy {
     }
 
     fn validate(&self) -> Result<(), Diagnostic> {
+        self.validate_test_breadth()?;
         if self.max_tests_per_requirement == 0 {
             return Err(invalid("maxTestsPerRequirement must be positive"));
         }
@@ -136,6 +150,28 @@ impl SpecificationPolicy {
             {
                 return Err(invalid(format!(
                     "invalid crate ownership '{manifest}': expected a Cargo.toml path with distinct features, or an exclusion with a reason"
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_test_breadth(&self) -> Result<(), Diagnostic> {
+        if self.max_requirements_per_test == 0 {
+            return Err(invalid("maxRequirementsPerTest must be positive"));
+        }
+        for (label, exception) in &self.test_exceptions {
+            if label.trim().is_empty()
+                || !valid_path(&exception.path)
+                || exception.max_requirements == 0
+                || exception.reason.trim().is_empty()
+                || exception
+                    .name
+                    .as_ref()
+                    .is_some_and(|name| name.trim().is_empty())
+            {
+                return Err(invalid(format!(
+                    "invalid test exception '{label}': expected a relative path glob, positive maxRequirements, nonempty reason, and optional nonempty name"
                 )));
             }
         }

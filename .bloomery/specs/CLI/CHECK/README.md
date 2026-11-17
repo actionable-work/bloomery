@@ -44,6 +44,7 @@ without specification passes.
 
 - [Static validation pipeline](design/pipeline.md)
 - [Specification granularity](design/spec-granularity.md)
+- [Test requirement breadth](design/test-breadth.md)
 - [Untied tests and crate ownership](design/spec-quality.md)
 - [Selection and parallel execution](design/execution.md)
 - [Terminal progress and work metrics](design/progress.md)

@@ -1,0 +1,30 @@
+schema_version = 1
+group = "BREADTH"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-BREADTH-001"
+title = "Test breadth limits have catalogued defaults"
+manual = false
+design = "design/schema-catalog.md#checks-specifications"
+ears = { type = "ubiquitous", system = "configuration loading", action = "catalogue maxRequirementsPerTest with a positive integer type and effective default and upgrade recommendation of 5" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-BREADTH-002"
+title = "Invalid test breadth policy fails before analysis"
+manual = false
+design = "design/schema-catalog.md#checks-specifications"
+ears = { type = "ubiquitous", system = "configuration loading", action = "reject invalid breadth limits, exception fields, labels, paths, names, and reasons before analysis even when checks are disabled" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-BREADTH-003"
+title = "Test breadth configuration supports editing and documentation"
+manual = false
+design = "design/schema-catalog.md#checks-specifications"
+ears = { type = "ubiquitous", system = "bloomery config", action = "preserve explicit breadth limits and exceptions during upgrade and expose their configured leaves for editing and documentation" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-BREADTH-004"
+title = "Nix accepts valid test breadth policy"
+manual = false
+design = "design/schema-catalog.md#checks-specifications"
+ears = { type = "ubiquitous", system = "the Nix configuration loader", action = "validate test breadth limits and exception tables without generating an additional derivation" }

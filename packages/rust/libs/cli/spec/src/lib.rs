@@ -1,6 +1,7 @@
 mod editing;
 mod trace;
 
+pub use bloomery_check::report::StaticReport;
 use bloomery_cli_types::SpecOperation;
 use bloomery_model::{Context, Diagnostic, Requirement};
 use serde::Serialize;
@@ -148,7 +149,7 @@ pub enum SpecOutcome {
         requirements: Vec<TraceRecord>,
     },
     TraceReport {
-        report: Box<bloomery_check::report::StaticReport>,
+        report: Box<StaticReport>,
     },
     Candidates {
         candidates: Vec<CandidateRecord>,
@@ -247,6 +248,7 @@ pub(crate) fn display_path(root: &Path, path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    pub use bloomery_check::report::StaticReport;
     use bloomery_cli_types::SpecOperation;
     use std::fs;
     use std::path::{Path, PathBuf};

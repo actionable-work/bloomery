@@ -8,6 +8,64 @@ use std::sync::Mutex;
 use std::sync::atomic::Ordering;
 
 #[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-BREADTH-006"))]
+fn test_breadth_failures_retain_all_requirement_declarations() {
+    let (root, cache) = fixture(true);
+    let path = root.join(".bloomery/specs/CLI/CHECK/requirements/CONTRACT.toml");
+    let mut source = fs::read_to_string(&path)
+        .unwrap()
+        .replace("manual = true", "manual = false");
+    source.push_str("\n[[requirements]]\nid = 'CLI-CHECK-CONTRACT-002'\ntitle = 'Second behavior'\nmanual = false\nears = {type = 'ubiquitous', system = 'fixture', action = 'exercise second behavior'}\n");
+    fs::write(path, source).unwrap();
+    let config = root.join(".bloomery/config.toml");
+    fs::write(
+        &config,
+        fs::read_to_string(&config).unwrap().replace(
+            "[checks.specifications]",
+            "[checks.specifications]\nmaxRequirementsPerTest = 1",
+        ),
+    )
+    .unwrap();
+    fs::create_dir_all(root.join("packages/rust")).unwrap();
+    fs::write(root.join("packages/rust/a.rs"), "#[cfg_attr(any(), bloomery(\"CLI-CHECK-CONTRACT-001\"), bloomery(\"CLI-CHECK-CONTRACT-002\"))]\n#[test] fn broad() {}\n").unwrap();
+    let backend = FakeNix::default();
+    let (status, summary, _) = invoke(request(), &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::FAILURE);
+    let summary: Value = serde_json::from_slice(&summary).unwrap();
+    assert_eq!(
+        summary["result"]["failures"][0]["code"],
+        "TooManyRequirementsForTest"
+    );
+    let mut args = request();
+    args.operation = Some(CheckOperation::Details(DetailsArgs {
+        failure: summary["result"]["failures"][0]["id"]
+            .as_str()
+            .unwrap()
+            .into(),
+        run: Some(summary["result"]["run"].as_str().unwrap().into()),
+        offset: None,
+        limit: 40,
+    }));
+    let (status, details, _) = invoke(args, &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::SUCCESS);
+    let details: Value = serde_json::from_slice(&details).unwrap();
+    assert_eq!(details["result"]["location"]["path"], "packages/rust/a.rs");
+    assert_eq!(
+        details["result"]["records"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|record| record
+                .as_str()
+                .is_some_and(|text| text.contains("declared at")))
+            .count(),
+        2
+    );
+    fs::remove_dir_all(root).unwrap();
+    fs::remove_dir_all(cache).unwrap();
+}
+
+#[test]
 #[cfg_attr(any(), bloomery("CLI-CHECK-GRANULARITY-013"))]
 fn granularity_failures_retain_every_contributing_site_for_details() {
     let (root, cache) = fixture(true);

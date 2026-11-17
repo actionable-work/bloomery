@@ -80,6 +80,7 @@ enable = true
 
 [checks.specifications]
 enable = true
+maxRequirementsPerTest = 5
 maxTestsPerRequirement = 5
 maxUntiedTests = 0
 requireCrateOwnership = false
