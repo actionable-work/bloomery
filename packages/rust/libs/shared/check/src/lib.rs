@@ -3,6 +3,7 @@ use bloomery_scanning::scan_all_with_session;
 use std::collections::BTreeMap;
 
 pub mod health;
+pub mod quality;
 pub mod report;
 
 pub use bloomery_scanning::AnalysisSession;
@@ -28,12 +29,41 @@ pub fn run_with_session(
     context: &Context,
     session: &AnalysisSession,
 ) -> Result<(), Vec<Diagnostic>> {
-    let evidence = scan_all_with_session(context, session)?.evidence;
-    validate_evidence(context, &evidence)
+    let discovery = scan_all_with_session(context, session)?;
+    let mut diagnostics = validate_references(context, &discovery.evidence)
+        .err()
+        .unwrap_or_default();
+    match quality::assess(
+        context,
+        &discovery,
+        &bloomery_workspace::source::FilesystemTree::new(&context.root),
+        true,
+    ) {
+        Ok(assessment) => diagnostics.extend(assessment.diagnostics),
+        Err(error) => diagnostics.push(error),
+    }
+    validation_result(diagnostics)
 }
 
 /// Validate static references against repository specifications. Does not run tests.
-pub fn validate_evidence(context: &Context, evidence: &[Evidence]) -> Result<(), Vec<Diagnostic>> {
+pub fn validate_evidence(
+    context: &Context,
+    discovery: &bloomery_scanning::ScanOutput,
+) -> Result<(), Vec<Diagnostic>> {
+    let mut diagnostics = validate_references(context, &discovery.evidence)
+        .err()
+        .unwrap_or_default();
+    match quality::assess_links(context, discovery, true) {
+        Ok(assessment) => diagnostics.extend(assessment.diagnostics),
+        Err(error) => diagnostics.push(error),
+    }
+    validation_result(diagnostics)
+}
+
+pub(crate) fn validate_references(
+    context: &Context,
+    evidence: &[Evidence],
+) -> Result<(), Vec<Diagnostic>> {
     let mut diagnostics = Vec::new();
     let mut declared = BTreeMap::new();
     for (area, feature, requirement) in context.requirements() {
@@ -98,6 +128,10 @@ pub fn validate_evidence(context: &Context, evidence: &[Evidence]) -> Result<(),
             );
         }
     }
+    validation_result(diagnostics)
+}
+
+fn validation_result(mut diagnostics: Vec<Diagnostic>) -> Result<(), Vec<Diagnostic>> {
     sort_diagnostics(&mut diagnostics);
     if diagnostics.is_empty() {
         Ok(())

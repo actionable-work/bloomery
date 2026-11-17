@@ -4,8 +4,9 @@
 
 Preserve the existing diagnostic semantics and repository-relative locations:
 
-`bloomery_check::validate_evidence(context, evidence)` applies the static
-relational rules to caller-supplied discovery facts. Filesystem checks delegate
+`bloomery_check::validate_evidence(context, discovery)` applies the static
+relational rules to caller-supplied references and their owning validating
+sites. Filesystem checks delegate
 to it. Both return the same sorted diagnostics; declaration paths in notes are
 repository-relative. This validation does not execute checks or grant approval.
 
@@ -20,6 +21,12 @@ repository-relative. This validation does not execute checks or grant approval.
 | `OrphanTestReference` | Evidence names no declared requirement. |
 | `IllegalManualAutomation` | Evidence references a manual requirement. |
 | `MissingAutomatedTest` | Automated requirement has no evidence. |
+| `TooManyTestsForRequirement` | Automated requirement exceeds its configured distinct validating-site limit. |
+| `UntiedTestsLimitExceeded` | Nonexempt untied sites exceed the configured deny-mode budget. |
+| `MissingCrateOwnership` | A selected crate requires an ownership mapping or exclusion. |
+| `InsufficientCrateRequirements` | A mapped crate owns fewer automated requirements than its minimum. |
+| `InsufficientCrateTests` | Complete discovery establishes fewer feature-linked sites than a crate's minimum. |
+| `SpecificationPolicyError` | A policy target or required workspace manifest is invalid or unavailable. |
 | `ParseError` | Configuration, Markdown, TOML, source, or Nix input is invalid. |
 | `HealthScoreBelowMinimum` | A crate or workspace score is below its configured floor. |
 | `HealthCrateSizeLimitExceeded` | A crate exceeds its configured production-SLOC hard limit. |

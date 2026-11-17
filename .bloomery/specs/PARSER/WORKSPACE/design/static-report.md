@@ -14,7 +14,7 @@ analysis, without a tree identity or downstream findings.
 
 ## Identity
 
-Report format version 8 binds SHA-256 identities for the snapshot, the complete
+Report format version 9 binds SHA-256 identities for the snapshot, the complete
 typed configuration with defaults, the active specification subtree, and the
 report payload. Hash inputs are compact canonical JSON with sorted object keys;
 file bytes are represented by their SHA-256 digest. Directory identity includes
@@ -34,7 +34,7 @@ references, binding resolution, stable diagnostic codes, notes and repository-
 relative locations. Locations preserve available one-based Unicode scalar start
 and exclusive end line/column positions under the shared
 [source span contract](../../SCANNING/design/source-spans.md). Unknown positions
-remain null. The parser contract is `bloomery-static-syntax-v8`; the specification
+remain null. The parser contract is `bloomery-static-syntax-v9`; the specification
 schema remains `bloomery-grouped-specifications-v1`.
 Orphan and manual-automation findings retain the full reference location.
 
@@ -52,13 +52,22 @@ Scope defaults to syntactic over the configured source patterns.
 Static completeness describes completion of these stages, independent of
 whether diagnostics exist. Reports contain no test outcomes or hosted approval.
 
+Relational findings include the
+[specification granularity policy](../../../CLI/CHECK/design/spec-granularity.md).
+Counts use authored site associations regardless of Rust eligibility, while
+coverage retains its eligibility rules. Partial discovery can establish an
+over-limit lower bound without establishing an under-limit result. Filesystem
+and virtual reports apply identical counting and diagnostic rules.
+The nullable `quality` projection carries
+[untied-test and crate-ownership assessments](../../../CLI/CHECK/design/spec-quality.md).
+
 ## Explicit Rust cfg scope
 
 `analyze_tree_with_cfg(tree, config, cfg)` and `analyze_with_cfg(root, config,
 cfg)` attach [local Rust predicate results](../../SCANNING/design/rust-cfg.md)
 to tests and bindings. Scope includes the normalized caller context, its own
 input identity, resolution descriptions and explicit limitations. The parser
-contract is `bloomery-static-syntax-v8`; specification schema 1 is unchanged.
+contract is `bloomery-static-syntax-v9`; specification schema 1 is unchanged.
 Default calls retain syntactic cfg behavior and null cfg annotations.
 
 Cfg completeness describes only the requested local predicate analysis. Disabled,
@@ -85,13 +94,13 @@ and bindings. `completeness.rust_harness` describes that projection. Ignored or
 unresolved eligibility never credits coverage; literals remain available for
 relational findings. Harness uncertainty makes relations partial without
 changing syntactic discovery or compilation/target completeness. New fields,
-eligibility and completeness participate in report identity under contract 8.
+eligibility and completeness participate in report identity under contract 9.
 
 The shared loader enforces the grouped-file
 [source version](../../REQUIREMENTS/design/format.md#source-schema-version).
 Unsupported or malformed declarations fail specifications without a successful
 specification identity or fabricated relational coverage. Discovery remains
-independent. Contract 8 binds the validation rules; source format 1 is unchanged.
+independent. Contract 9 binds the validation rules; source format 1 is unchanged.
 
 Reports also expose per-record content revisions and a versioned
 [derived specification-set manifest](spec-set.md). The existing

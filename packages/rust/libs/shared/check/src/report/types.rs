@@ -179,5 +179,6 @@ pub struct StaticReport {
     pub requirements: Vec<RequirementRecord>,
     pub tests: Vec<TestRecord>,
     pub bindings: Vec<Binding>,
+    pub quality: Option<crate::quality::QualityReport>,
     pub diagnostics: Vec<Finding>,
 }

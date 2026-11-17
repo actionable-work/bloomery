@@ -4,6 +4,8 @@ use crate::source::{SourceTree, TreeIndex, validate_path};
 use bloomery_model::Diagnostic;
 use std::collections::BTreeSet;
 
+pub mod ownership;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestTarget {
     pub manifest: String,

@@ -1,0 +1,44 @@
+schema_version = 1
+group = "GRANULARITY"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-GRANULARITY-001"
+title = "The validating-site limit is catalogued"
+manual = false
+design = "design/schema-catalog.md#checks-specifications"
+ears = { type = "ubiquitous", system = "the configuration schema", action = "catalogue checks.specifications.maxTestsPerRequirement as a positive integer with documentation and an upgrade recommendation of 5" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-GRANULARITY-002"
+title = "The omitted validating-site limit defaults to five"
+manual = false
+design = "design/schema-catalog.md#checks-specifications"
+ears = { type = "event", system = "configuration loading", action = "resolve its effective value to 5", trigger = "checks.specifications.maxTestsPerRequirement is omitted" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-GRANULARITY-003"
+title = "Invalid validating-site limits are rejected"
+manual = false
+design = "design/schema-catalog.md#checks-specifications"
+ears = { type = "event", system = "configuration loading", action = "report ConfigurationError before formatting or analysis", trigger = "checks.specifications.maxTestsPerRequirement is not a positive integer" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-GRANULARITY-004"
+title = "Disabled checks still validate the site limit"
+manual = false
+design = "design/schema-catalog.md#checks-specifications"
+ears = { type = "event", system = "configuration loading", action = "validate any configured checks.specifications.maxTestsPerRequirement value", trigger = "specification checks or specification management are disabled" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-GRANULARITY-005"
+title = "Explicit site limits survive configuration upgrade"
+manual = false
+design = "design/schema-catalog.md#checks-specifications"
+ears = { type = "event", system = "bloomery config upgrade", action = "preserve that value", trigger = "checks.specifications.maxTestsPerRequirement has an explicit valid value" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-GRANULARITY-006"
+title = "Nix accepts the CLI validating-site policy"
+manual = false
+design = "design/schema-catalog.md#checks-specifications"
+ears = { type = "event", system = "the Nix configuration loader", action = "accept the value without generating an additional check derivation", trigger = "checks.specifications.maxTestsPerRequirement is configured as a positive integer" }

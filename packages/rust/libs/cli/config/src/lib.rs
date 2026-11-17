@@ -164,7 +164,7 @@ fn resolve(operation: &ConfigOperation) -> Result<Resolved, ConfigError> {
 fn record(entry: &KeySpec, raw: Option<&toml::Value>) -> KeyRecord {
     let path = path_refs(&entry.path);
     KeyRecord {
-        key: entry.path.join("."),
+        key: document::display_key(&entry.path),
         value: catalog::effective_value(raw, &path),
         configured: raw.and_then(|raw| catalog::raw_at(raw, &path)).is_some(),
         recommended: entry.recommended.is_some(),
@@ -293,14 +293,14 @@ pub fn run(root: &Path, operation: &ConfigOperation) -> Result<ConfigReport, Con
             key: record(entry, raw.as_ref()),
         },
         Resolved::List(prefix) => {
-            let mut keys = catalog::CATALOG
+            let mut keys = document::entries(raw.as_ref())
                 .iter()
                 .filter(|entry| {
                     prefix
                         .as_deref()
-                        .is_none_or(|prefix| entry.path.join(".").starts_with(prefix))
+                        .is_none_or(|prefix| document::display_key(&entry.path).starts_with(prefix))
                 })
-                .map(|entry| record(&KeySpec::from_entry(entry), raw.as_ref()))
+                .map(|entry| record(entry, raw.as_ref()))
                 .collect::<Vec<_>>();
             keys.sort_by(|left, right| left.key.cmp(&right.key));
             ConfigOutcome::List { keys }
@@ -313,7 +313,7 @@ pub fn run(root: &Path, operation: &ConfigOperation) -> Result<ConfigReport, Con
                 publish_checked(&config_path, &document)?;
             }
             ConfigOutcome::Set {
-                key: entry.path.join("."),
+                key: document::display_key(&entry.path),
                 value: value.clone(),
                 changed: changed || created,
             }
@@ -326,7 +326,7 @@ pub fn run(root: &Path, operation: &ConfigOperation) -> Result<ConfigReport, Con
                 publish_checked(&config_path, &document)?;
             }
             ConfigOutcome::Unset {
-                key: entry.path.join("."),
+                key: document::display_key(&entry.path),
                 removed,
                 changed: removed || created,
             }
@@ -1057,6 +1057,69 @@ mod tests {
             other => panic!("unexpected outcome: {other:?}"),
         }
         assert_eq!(contents(&root), before_second);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-GRANULARITY-005"))]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-QUALITY-003"))]
+    fn upgrade_preserves_specification_thresholds_and_exception_tables() {
+        let root = temp_root();
+        seed(
+            &root,
+            "[checks.specifications]\nmaxTestsPerRequirement = 8\nuntiedTests = 'deny'\nmaxUntiedTests = 2\n[checks.specifications.requirementExceptions.'DEMO-TESTS-RULE-001']\nmaxTests = 12\nreason = 'Boundary cases'\n",
+        );
+        run(
+            &root,
+            &ConfigOperation::Upgrade {
+                dry_run: false,
+                diff: false,
+            },
+        )
+        .expect("upgrade");
+        run(
+            &root,
+            &ConfigOperation::Set {
+                key: "checks.specifications.requirementExceptions.\"DEMO-TESTS-RULE-001\".maxTests"
+                    .into(),
+                value: "13".into(),
+            },
+        )
+        .expect("edit existing exception");
+        run(&root, &ConfigOperation::Document).expect("document policy");
+        let listed = run(
+            &root,
+            &ConfigOperation::List {
+                prefix: Some("checks.specifications.requirementExceptions".into()),
+            },
+        )
+        .expect("list exception leaves");
+        match listed.outcome {
+            ConfigOutcome::List { keys } => {
+                assert_eq!(keys.len(), 2);
+                assert!(keys.iter().all(|key| key.configured));
+                for key in keys {
+                    run(&root, &ConfigOperation::Get { key: key.key })
+                        .expect("listed paths are addressable");
+                }
+            }
+            other => panic!("unexpected outcome {other:?}"),
+        }
+        assert!(
+            contents(&root)
+                .contains("Reason for this specification policy exception or ownership.")
+        );
+        let document: toml::Value = toml::from_str(&contents(&root)).unwrap();
+        assert_eq!(
+            document["checks"]["specifications"]["maxTestsPerRequirement"].as_integer(),
+            Some(8)
+        );
+        assert_eq!(
+            document["checks"]["specifications"]["untiedTests"].as_str(),
+            Some("deny")
+        );
+        assert_eq!(document["checks"]["specifications"]["requirementExceptions"]["DEMO-TESTS-RULE-001"]["maxTests"].as_integer(), Some(13));
+        assert_eq!(document["checks"]["specifications"]["requirementExceptions"]["DEMO-TESTS-RULE-001"]["reason"].as_str(), Some("Boundary cases"));
         let _ = fs::remove_dir_all(root);
     }
 

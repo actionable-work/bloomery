@@ -48,7 +48,7 @@ pub(crate) fn ignored_name(name: &str) -> bool {
     )
 }
 
-pub(crate) fn glob_matches(pattern: &str, path: &Path) -> bool {
+pub fn glob_matches(pattern: &str, path: &Path) -> bool {
     let pattern_parts: Vec<&str> = pattern.trim_matches('/').split('/').collect();
     let path_string = path
         .to_string_lossy()

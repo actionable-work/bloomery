@@ -424,7 +424,29 @@ in {
     expr = let
       args = loader.toWorkspaceArgs {
         root = ./.;
-        config.checks.specifications.enable = true;
+        config.checks.specifications = {
+          enable = true;
+          maxTestsPerRequirement = 7;
+          requirementExceptions."_DEMO-2D-RULE-0001" = {
+            maxTests = 9;
+            reason = "Valid identifier grammar";
+          };
+          untiedTests = "report";
+          maxUntiedTests = 2;
+          requireCrateOwnership = false;
+          requirementExceptions."DEMO-TESTS-RULE-001" = {
+            maxTests = 9;
+            reason = "Boundary cases";
+          };
+          untiedExceptions."tests/**/*.rs" = {
+            reason = "Infrastructure";
+            name = "helper";
+          };
+          crates."crates/demo/Cargo.toml" = {
+            features = ["DEMO/TESTS"];
+            minLinkedTests = 0;
+          };
+        };
         config.checks.clippySuppressions = {
           enable = true;
           allow = ["clippy::unwrap_used"];
@@ -436,6 +458,26 @@ in {
         root = ./.;
         config.checks.specifications.enable = "true";
       });
+      badSpecLimit = builtins.all (value:
+        fails (loader.toWorkspaceArgs {
+          root = ./.;
+          config.checks.specifications = {
+            enable = false;
+            maxTestsPerRequirement = value;
+          };
+        })) [0 (-1) 1.5 true "5"];
+      badSpecExceptions = builtins.all (policy:
+        fails (loader.toWorkspaceArgs {
+          root = ./.;
+          config.checks.specifications = policy;
+        })) [
+        {untiedTests = "warn";}
+        {maxUntiedTests = -1;}
+        {requirementExceptions."DEMO-TESTS-RULE-001" = {maxTests = 9;};}
+        {untiedExceptions."../tests/*" = {reason = "Invalid path";};}
+        {crates."crates/demo/Cargo.toml" = {exclude = true;};}
+        {crates."crates/demo/Cargo.toml" = {features = ["DEMO/TESTS" "DEMO/TESTS"];};}
+      ];
       badLintName = fails (loader.toWorkspaceArgs {
         root = ./.;
         config.checks.clippySuppressions.allow = ["unwrap_used"];
@@ -448,6 +490,8 @@ in {
     expected = {
       policiesRemoved = true;
       badSpecType = true;
+      badSpecLimit = true;
+      badSpecExceptions = true;
       badLintName = true;
       duplicateLint = true;
     };

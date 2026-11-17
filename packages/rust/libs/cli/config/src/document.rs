@@ -7,27 +7,60 @@ use toml_edit::{Array, DocumentMut, Item, RawString, Table, Value as EditValue};
 
 /// Split a dotted key path, rejecting empty or malformed segments.
 pub(crate) fn parse_key(key: &str) -> Result<Vec<String>, ConfigError> {
-    let segments = key.split('.').map(str::to_owned).collect::<Vec<String>>();
-    let valid = !segments.is_empty()
-        && segments.iter().all(|segment| {
-            !segment.is_empty()
-                && segment.chars().all(|character| {
-                    character.is_ascii_alphanumeric() || character == '_' || character == '-'
-                })
-        });
-    if !valid {
-        return Err(ConfigError::usage(format!(
-            "invalid configuration key: {key}"
-        )));
+    let invalid = || ConfigError::usage(format!("invalid configuration key: {key}"));
+    let keys = toml_edit::Key::parse(key).map_err(|_| invalid())?;
+    if keys.is_empty() || keys.iter().any(|key| key.get().is_empty()) {
+        return Err(invalid());
     }
-    Ok(segments)
+    Ok(keys.into_iter().map(|key| key.get().to_owned()).collect())
+}
+
+pub(crate) fn display_key(path: &[String]) -> String {
+    path.iter()
+        .map(|part| toml_edit::Key::new(part).to_string())
+        .collect::<Vec<_>>()
+        .join(".")
+}
+
+/// Include configured parameterized leaves beside the fixed schema entries.
+pub(crate) fn entries(raw: Option<&toml::Value>) -> Vec<KeySpec> {
+    let mut entries = catalog::CATALOG
+        .iter()
+        .map(|entry| {
+            let entry = KeySpec::from_entry(entry);
+            (entry.path.clone(), entry)
+        })
+        .collect::<std::collections::BTreeMap<_, _>>();
+    if let Some(raw) = raw {
+        configured_entries(raw, &mut Vec::new(), &mut entries);
+    }
+    entries.into_values().collect()
+}
+
+fn configured_entries(
+    value: &toml::Value,
+    path: &mut Vec<String>,
+    entries: &mut std::collections::BTreeMap<Vec<String>, KeySpec>,
+) {
+    if let Some(table) = value.as_table() {
+        for (key, child) in table {
+            path.push(key.clone());
+            configured_entries(child, path, entries);
+            path.pop();
+        }
+    } else {
+        let parts = path.iter().map(String::as_str).collect::<Vec<_>>();
+        if let Some(entry) = catalog::resolve(&parts) {
+            entries.insert(path.clone(), entry);
+        }
+    }
 }
 
 /// Resolve a parsed key path to a catalog entry or parameterized key.
 pub(crate) fn lookup_entry(parts: &[String]) -> Result<KeySpec, ConfigError> {
     let reference = parts.iter().map(String::as_str).collect::<Vec<_>>();
     catalog::resolve(&reference).ok_or_else(|| {
-        ConfigError::usage(format!("unknown configuration key: {}", parts.join(".")))
+        ConfigError::usage(format!("unknown configuration key: {}", display_key(parts)))
     })
 }
 
@@ -86,7 +119,7 @@ pub(crate) fn parse_value(entry: &KeySpec, raw: &str) -> Result<toml::Value, Con
     parse_typed(&entry.value_type, raw).ok_or_else(|| {
         ConfigError::usage(format!(
             "{} must be a {}",
-            entry.path.join("."),
+            display_key(&entry.path),
             catalog::describe_value_type(&entry.value_type)
         ))
     })
@@ -286,49 +319,17 @@ fn document_leaf(document: &mut DocumentMut, path: &[String], documentation: &st
     document_key(table, last, documentation)
 }
 
-fn formatter_extra_documentation(
-    document: &mut DocumentMut,
-    raw: &toml::Value,
-    documented: &mut Vec<String>,
-) {
-    let Some(formatters) = raw.get("formatters").and_then(toml::Value::as_table) else {
-        return;
-    };
-    for name in formatters.keys() {
-        if catalog::BUILTIN_FORMATTERS.contains(&name.as_str()) {
-            continue;
-        }
-        for field in ["enable", "before", "after"] {
-            let path = vec!["formatters".to_owned(), name.clone(), field.to_owned()];
-            let reference = path.iter().map(String::as_str).collect::<Vec<_>>();
-            let Some(spec) = catalog::resolve(&reference) else {
-                continue;
-            };
-            if document_leaf(document, &path, spec.documentation) {
-                documented.push(path.join("."));
-            }
-        }
-    }
-}
-
-/// Annotate every catalogued key present in `raw` with its documentation.
-/// Returns the sorted paths that gained a documentation comment.
+/// Annotate every fixed and configured parameterized schema leaf.
 pub(crate) fn document_values(
     document: &mut DocumentMut,
     raw: &toml::Value,
 ) -> Result<Vec<String>, ConfigError> {
     let mut documented = Vec::new();
-    for entry in catalog::CATALOG {
-        let path = entry
-            .path
-            .iter()
-            .map(|segment| (*segment).to_owned())
-            .collect::<Vec<_>>();
-        if document_leaf(document, &path, entry.documentation) {
-            documented.push(entry.path.join("."));
+    for entry in entries(Some(raw)) {
+        if document_leaf(document, &entry.path, entry.documentation) {
+            documented.push(display_key(&entry.path));
         }
     }
-    formatter_extra_documentation(document, raw, &mut documented);
     documented.sort();
     Ok(documented)
 }

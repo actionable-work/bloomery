@@ -8,6 +8,53 @@ use std::sync::Mutex;
 use std::sync::atomic::Ordering;
 
 #[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-GRANULARITY-013"))]
+fn granularity_failures_retain_every_contributing_site_for_details() {
+    let (root, cache) = fixture(true);
+    let path = root.join(".bloomery/specs/CLI/CHECK/requirements/CONTRACT.toml");
+    let requirement = fs::read_to_string(&path)
+        .unwrap()
+        .replace("manual = true", "manual = false");
+    fs::write(path, requirement).unwrap();
+    fs::create_dir_all(root.join("packages/rust")).unwrap();
+    let source = (0..6).map(|index| format!("#[cfg_attr(any(), bloomery(\"CLI-CHECK-CONTRACT-001\"))]\n#[test] fn case{index}() {{}}\n")).collect::<String>();
+    fs::write(root.join("packages/rust/a.rs"), source).unwrap();
+    let backend = FakeNix::default();
+    let (status, summary, _) = invoke(request(), &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::FAILURE);
+    let summary: Value = serde_json::from_slice(&summary).unwrap();
+    assert_eq!(
+        summary["result"]["failures"][0]["code"],
+        "TooManyTestsForRequirement"
+    );
+    let mut args = request();
+    args.operation = Some(CheckOperation::Details(DetailsArgs {
+        failure: summary["result"]["failures"][0]["id"]
+            .as_str()
+            .unwrap()
+            .into(),
+        run: Some(summary["result"]["run"].as_str().unwrap().into()),
+        offset: None,
+        limit: 40,
+    }));
+    let (status, details, _) = invoke(args, &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::SUCCESS);
+    let details: Value = serde_json::from_slice(&details).unwrap();
+    let records = details["result"]["records"].as_array().unwrap();
+    assert_eq!(
+        records
+            .iter()
+            .filter(|record| record
+                .as_str()
+                .is_some_and(|text| text.contains("rust packages/rust/a.rs:")))
+            .count(),
+        6
+    );
+    fs::remove_dir_all(root).unwrap();
+    fs::remove_dir_all(cache).unwrap();
+}
+
+#[test]
 #[cfg_attr(any(), bloomery("CLI-CHECK-SELECT-021"))]
 fn oversized_catalog_ids_return_an_error_instead_of_a_stalled_page() {
     let (root, cache) = fixture(true);

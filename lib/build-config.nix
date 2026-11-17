@@ -202,12 +202,7 @@
     then throw "bloomery: checks.codeHealth.crateExceptions must map workspace-relative Cargo.toml paths to recognized positive hard limits at least as large as their corresponding soft limits"
     else config;
 
-  checkSpecifications = value: let
-    config = checkTable "checks.specifications" ["enable"] value;
-  in
-    if (config ? enable && !builtins.isBool config.enable)
-    then throw "bloomery: checks.specifications.enable must be a boolean"
-    else config;
+  checkSpecifications = import ./specification-policy.nix {inherit lib;};
 
   checkClippySuppressions = value: let
     config = checkTable "checks.clippySuppressions" ["enable" "allow"] value;

@@ -37,6 +37,10 @@ format and retain its version.
 
 ## Key addressing and type safety
 
+Dotted paths accept TOML quoted segments, including manifest paths and path
+globs in parameterized policy tables. Quoted dots remain inside one segment.
+Malformed paths and empty segments are usage errors before any write.
+
 `KEY` is a dotted TOML path whose segments are bare TOML keys, for example
 `checks.enable` or `scanners.rust.paths`. The path resolves against the
 [schema catalog](../../PARSER/CONFIGURATION/design/schema-catalog.md), which

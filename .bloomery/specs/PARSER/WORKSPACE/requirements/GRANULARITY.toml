@@ -1,0 +1,30 @@
+schema_version = 1
+group = "GRANULARITY"
+
+[[requirements]]
+id = "PARSER-WORKSPACE-GRANULARITY-001"
+title = "Repository adapters share granularity findings"
+manual = false
+design = "design/static-report.md#facts-and-completeness"
+ears = { type = "ubiquitous", system = "static repository analysis", action = "produce identical granularity findings for identical filesystem and virtual tree content and configuration" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-GRANULARITY-002"
+title = "Partial discovery can prove an exceeded limit"
+manual = false
+design = "design/static-report.md#facts-and-completeness"
+ears = { type = "event", system = "static repository analysis", action = "report TooManyTestsForRequirement while retaining partial completeness", trigger = "discovery is partial and observed authored validating sites exceed the configured limit" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-GRANULARITY-003"
+title = "Unavailable discovery cannot certify granularity"
+manual = false
+design = "design/static-report.md#facts-and-completeness"
+ears = { type = "event", system = "static repository analysis", action = "retain the unavailable or partial assessment rather than certify compliance with the validating-site limit", trigger = "discovery is partial or failed and no over-limit finding is established" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-GRANULARITY-004"
+title = "Caller-supplied discovery preserves validating-site counts"
+manual = false
+design = "design/static-report.md#facts-and-completeness"
+ears = { type = "ubiquitous", system = "shared relational validation", action = "apply the same validating-site limit to caller-supplied references and site ownership as to filesystem scanner discovery" }

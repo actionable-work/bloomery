@@ -1,0 +1,23 @@
+schema_version = 1
+group = "QUALITY"
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-QUALITY-001"
+title = "Quality policy defaults are catalogued"
+manual = false
+design = "design/schema-catalog.md#checks-specifications"
+ears = { type = "ubiquitous", system = "the configuration schema", action = "expose untiedTests, maxUntiedTests, and requireCrateOwnership with their documented defaults and types" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-QUALITY-002"
+title = "Policy exceptions require valid shapes and reasons"
+manual = false
+design = "design/schema-catalog.md#checks-specifications"
+ears = { type = "ubiquitous", system = "configuration validation", action = "reject invalid exception paths, IDs, values, unknown keys, and missing or empty required reasons even when specification checks are disabled" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-QUALITY-003"
+title = "Parameterized policy keys support config editing"
+manual = false
+design = "design/schema-catalog.md#checks-specifications"
+ears = { type = "ubiquitous", system = "the configuration schema", action = "resolve requirement exception, untied exception, and crate ownership leaves for config editing and documentation without materializing recommendations" }

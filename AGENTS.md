@@ -3,7 +3,7 @@
 - `bloomery check` is intended to be the main testing entry point.  If that is green, you can consider the workspace ready to merge.
 - We use jujutsu for git management with conventional commits.
 - Do not create commits or push to git remotes, let me do that manually.
-- For code, focus on readability and maintainability over clever code.  Prefer writing our own code over pulling in a small dependency. When adding a dependency, make sure to confirm with the user.
+- For code, focus on readability and maintainability over clever code.  Prefer writing our own code over pulling in a small dependency. Confirm with the user before adding a third-party dependency. Splitting internal crates is always allowed without confirmation.
 - When changing dependencies or crate layout, make sure to run `bloomery sync` to update lockfiles
 - For design documents, prefer terse prose.
 - For requirements, each requirement should focus on only one story.  Prefer creating multiple requirements if they are validating different things, even if they are very similar.

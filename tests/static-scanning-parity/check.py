@@ -54,8 +54,8 @@ testPaths = ["checks/**/*.test.nix"]
         before = {str(p.relative_to(root)): p.read_bytes() for p in root.rglob("*") if p.is_file()}
         context_args = [] if cfg is None else [json.dumps(cfg)]
         library = json.loads(subprocess.check_output([consumer, directory, "--report", *context_args], text=True))
-        assert library["version"] == 8
-        assert library["inputs"]["parser_contract"] == "bloomery-static-syntax-v8"
+        assert library["version"] == 9
+        assert library["inputs"]["parser_contract"] == "bloomery-static-syntax-v9"
         assert library["inputs"]["specification_schema"] == "bloomery-grouped-specifications-v1"
         document = run("trace", "--report", *([] if cfg is None else ["--rust-cfg", json.dumps(cfg)]))
         assert document["operation"] == "trace_report", document

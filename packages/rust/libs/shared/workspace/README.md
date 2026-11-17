@@ -34,7 +34,7 @@ ignored directories; it is an adapter for stable local content, not a sandbox.
 Tree adapters now live in `bloomery_workspace::source`; their existing
 `bloomery_scanning` re-exports remain available. Call `scan_tree(&tree,
 &context.config.scanners)` and pass its evidence to
-`bloomery_check::validate_evidence(&context, &analysis.output.evidence)` for
+`bloomery_check::validate_evidence(&context, &analysis.output)` for
 static traceability validation. Scanner completeness describes syntactic
 discovery, while relational diagnostics describe references and coverage.
 Neither API runs tests or grants hosted approval.

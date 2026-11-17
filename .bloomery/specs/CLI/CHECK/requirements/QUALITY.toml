@@ -1,0 +1,72 @@
+schema_version = 1
+group = "QUALITY"
+
+[[requirements]]
+id = "CLI-CHECK-QUALITY-001"
+title = "Untied tests are advisory by default"
+manual = false
+design = "design/spec-quality.md#untied-tests"
+ears = { type = "event", system = "static specification validation", action = "retain untied test sites without failing the check", trigger = "untied-test policy is report" }
+
+[[requirements]]
+id = "CLI-CHECK-QUALITY-002"
+title = "Deny mode enforces the untied-test budget"
+manual = false
+design = "design/spec-quality.md#untied-tests"
+ears = { type = "event", system = "static specification validation", action = "fail with UntiedTestsLimitExceeded", trigger = "nonexempt distinct untied sites exceed maxUntiedTests in deny mode" }
+
+[[requirements]]
+id = "CLI-CHECK-QUALITY-003"
+title = "Untied-test exceptions remain visible"
+manual = false
+design = "design/spec-quality.md#untied-tests"
+ears = { type = "ubiquitous", system = "the quality report", action = "retain matching untied sites and their configured reason while excluding them from the policy budget" }
+
+[[requirements]]
+id = "CLI-CHECK-QUALITY-004"
+title = "Crates expose explicit feature ownership"
+manual = false
+design = "design/spec-quality.md#crate-ownership"
+ears = { type = "ubiquitous", system = "the quality report", action = "attribute distinct automated requirements and authored validating sites to each configured crate through its feature identifiers" }
+
+[[requirements]]
+id = "CLI-CHECK-QUALITY-005"
+title = "Required crate ownership rejects unmapped crates"
+manual = false
+design = "design/spec-quality.md#crate-ownership"
+ears = { type = "event", system = "static specification validation", action = "fail with MissingCrateOwnership", trigger = "requireCrateOwnership is true and a selected crate is neither mapped nor excluded" }
+
+[[requirements]]
+id = "CLI-CHECK-QUALITY-006"
+title = "Crate requirement minima are enforced"
+manual = false
+design = "design/spec-quality.md#crate-ownership"
+ears = { type = "event", system = "static specification validation", action = "fail with InsufficientCrateRequirements", trigger = "a mapped crate owns fewer automated requirements than minRequirements" }
+
+[[requirements]]
+id = "CLI-CHECK-QUALITY-007"
+title = "Crate linked-test minima are enforced"
+manual = false
+design = "design/spec-quality.md#crate-ownership"
+ears = { type = "event", system = "static specification validation", action = "fail with InsufficientCrateTests", trigger = "complete discovery establishes fewer owned validating sites than minLinkedTests" }
+
+[[requirements]]
+id = "CLI-CHECK-QUALITY-008"
+title = "Excluded crates remain visible"
+manual = false
+design = "design/spec-quality.md#crate-ownership"
+ears = { type = "event", system = "the quality report", action = "retain the exclusion reason and skip ownership gates for that crate", trigger = "a crate is explicitly excluded with a reason" }
+
+[[requirements]]
+id = "CLI-CHECK-QUALITY-009"
+title = "Invalid policy targets fail explicitly"
+manual = false
+design = "design/spec-quality.md#crate-ownership"
+ears = { type = "event", system = "static specification validation", action = "fail with SpecificationPolicyError", trigger = "a configured requirement exception, crate, or feature target is unknown" }
+
+[[requirements]]
+id = "CLI-CHECK-QUALITY-010"
+title = "Requirement exceptions override the global site limit"
+manual = false
+design = "design/spec-granularity.md#diagnostics"
+ears = { type = "event", system = "the granularity policy", action = "use that requirement's maxTests override while retaining its reason", trigger = "an automated requirement has an exact configured requirement exception" }

@@ -48,6 +48,7 @@ in {
       passthru = {
         inherit failedTests;
         bloomery = [
+          "PARSER-CONFIGURATION-GRANULARITY-006"
           "REPOSITORY-LAYOUT-STRUCTURE-001"
           "REPOSITORY-LAYOUT-STRUCTURE-002"
           "REPOSITORY-LAYOUT-STRUCTURE-003"

@@ -24,6 +24,11 @@ static references ───────┘
 ```
 
 Discovered test sites feed the [spec candidate projection](../../../CLI/SPEC/design/trace.md).
+Site ownership also feeds the
+[specification granularity policy](../../../CLI/CHECK/design/spec-granularity.md):
+retain the owning Rust function or Playwright call for each literal reference
+so repeated annotations cannot be mistaken for distinct tests. Nix counts use
+the metadata-bearing evidence file, independently of candidate discovery globs.
 
 ## Common rules
 

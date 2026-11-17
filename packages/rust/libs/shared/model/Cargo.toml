@@ -1,4 +1,5 @@
 [dependencies]
+bloomery-schema = { workspace = true }
 serde = { workspace = true }
 toml = { workspace = true }
 

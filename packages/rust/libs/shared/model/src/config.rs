@@ -300,6 +300,7 @@ impl Config {
             ));
         }
         self.validate_specs_dir()?;
+        crate::specifications::from_config(self)?;
         self.scanners.validate()
     }
 

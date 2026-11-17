@@ -430,6 +430,7 @@ dependencies = [
 name = "bloomery-model"
 version = "0.1.0"
 dependencies = [
+ "bloomery-schema",
  "serde",
  "toml",
 ]
@@ -455,6 +456,14 @@ dependencies = [
  "proc-macro2",
  "serde_json",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "bloomery-schema"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "toml",
 ]
 
 [[package]]

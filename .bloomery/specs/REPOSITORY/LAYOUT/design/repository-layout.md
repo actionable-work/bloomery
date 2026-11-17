@@ -35,6 +35,7 @@ The Rust workspace contains these binaries and libraries:
 | `packages/rust/libs/cli/review` | `bloomery-review` | `CLI/REVIEW` |
 | `packages/rust/libs/cli/sync` | `bloomery-sync` | `CLI/SYNC` |
 | `packages/rust/libs/shared/model` | `bloomery-model` | `PARSER/CONFIGURATION`, `PARSER/REQUIREMENTS` |
+| `packages/rust/libs/shared/schema` | `bloomery-schema` | `PARSER/CONFIGURATION`, `PARSER/REQUIREMENTS` |
 | `packages/rust/libs/shared/workspace` | `bloomery-workspace` | `PARSER/WORKSPACE` |
 | `packages/rust/libs/shared/scanning` | `bloomery-scanning` | `PARSER/SCANNING` |
 | `packages/rust/libs/shared/test-macros` | `bloomery-test-macros` | Proc-macro build-graph fixture in `NIXLIB/GRAPH` |

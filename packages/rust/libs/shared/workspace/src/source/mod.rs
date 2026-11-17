@@ -2,6 +2,7 @@
 
 mod files;
 mod index;
+pub use files::glob_matches;
 use files::{filesystem_entries, ignored_name};
 pub use index::TreeIndex;
 use std::collections::BTreeMap;

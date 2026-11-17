@@ -1,0 +1,16 @@
+schema_version = 1
+group = "QUALITY"
+
+[[requirements]]
+id = "PARSER-WORKSPACE-QUALITY-001"
+title = "Quality reports retain completeness and stable ordering"
+manual = false
+design = "design/static-report.md#facts-and-completeness"
+ears = { type = "ubiquitous", system = "static repository analysis", action = "retain deterministic untied-test and crate ownership assessments with explicit discovery completeness in report contract 9" }
+
+[[requirements]]
+id = "PARSER-WORKSPACE-QUALITY-002"
+title = "Ownership honors selected workspace manifests"
+manual = false
+design = "design/static-report.md#facts-and-completeness"
+ears = { type = "ubiquitous", system = "crate ownership analysis", action = "select Cargo workspace members and exclusions under build.cargoToml and build.members without invoking Cargo or reading unrelated workspace manifests" }

@@ -7,7 +7,7 @@
 //!
 //! let tree = MemoryTree::new([("tests/example.rs", "#[test] fn example() {}")]).unwrap();
 //! let report = analyze_tree(&tree, Config::default());
-//! assert_eq!(report.version, 8);
+//! assert_eq!(report.version, 9);
 //! assert_eq!(report.completeness.tree, StageState::Complete);
 //! assert_eq!(report.scope.kind, "syntactic");
 //! ```
@@ -45,8 +45,8 @@ use identity::{Manifest, identity, snapshot};
 use std::path::Path;
 pub use types::*;
 
-pub const REPORT_VERSION: u32 = 8;
-pub const PARSER_CONTRACT: &str = "bloomery-static-syntax-v8";
+pub const REPORT_VERSION: u32 = 9;
+pub const PARSER_CONTRACT: &str = "bloomery-static-syntax-v9";
 pub const SPECIFICATION_SCHEMA: &str = "bloomery-grouped-specifications-v1";
 
 /// Analyze a local repository with explicit configuration. Paths remain relative.
@@ -200,6 +200,7 @@ fn analyze_input(tree: &dyn SourceTree, config: Config, cfg: Option<RustCfg>) ->
             facts::add_discovery(
                 &mut report,
                 &analysis.output,
+                &tree,
                 context.as_ref(),
                 complete && cfg.is_none(),
                 &annotations,
@@ -302,6 +303,7 @@ fn empty_report(config: &Config) -> StaticReport {
         requirements: Vec::new(),
         tests: Vec::new(),
         bindings: Vec::new(),
+        quality: None,
         diagnostics: Vec::new(),
     }
 }

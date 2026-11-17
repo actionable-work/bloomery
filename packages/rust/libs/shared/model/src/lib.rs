@@ -1,9 +1,10 @@
 pub mod catalog;
 pub mod clippy;
 pub mod config;
-pub mod diagnostics;
+pub use bloomery_schema::diagnostics;
 mod domain;
 pub mod health;
+pub mod specifications;
 
 pub use config::Config;
 pub use diagnostics::{Diagnostic, SourceLocation, render_diagnostics, sort_diagnostics};

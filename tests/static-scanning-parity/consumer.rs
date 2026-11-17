@@ -262,21 +262,31 @@ fn check_specification_parity(root: &std::path::Path, scanners: &ScannersConfig)
     let virtual_scan = scan_tree(&memory, scanners).expect("virtual discovery");
     let filesystem_scan = scan_tree(&disk, scanners).expect("filesystem discovery");
     assert_eq!(virtual_scan, filesystem_scan);
-    bloomery_check::validate_evidence(&virtual_context, &virtual_scan.output.evidence)
+    bloomery_check::validate_evidence(&virtual_context, &virtual_scan.output)
         .expect("virtual static relations");
     bloomery_check::run(&filesystem_context).expect("filesystem static relations");
     assert_eq!(
-        bloomery_check::validate_evidence(&virtual_context, &[]).expect_err("missing bindings"),
+        bloomery_check::validate_evidence(
+            &virtual_context,
+            &bloomery_scanning::ScanOutput::default()
+        )
+        .expect_err("missing bindings"),
         relative_diagnostics(
             root,
-            bloomery_check::validate_evidence(&filesystem_context, &[])
-                .expect_err("missing bindings")
+            bloomery_check::validate_evidence(
+                &filesystem_context,
+                &bloomery_scanning::ScanOutput::default()
+            )
+            .expect_err("missing bindings")
         ),
     );
-    let mut unknown = virtual_scan.output.evidence.clone();
-    let mut reference = unknown[0].clone();
+    let mut unknown = bloomery_scanning::ScanOutput {
+        evidence: virtual_scan.output.evidence.clone(),
+        tests: virtual_scan.output.tests.clone(),
+    };
+    let mut reference = unknown.evidence[0].clone();
     reference.id = "DEMO-TESTS-BIND-999".into();
-    unknown.push(reference);
+    unknown.evidence.push(reference);
     assert_eq!(
         bloomery_check::validate_evidence(&virtual_context, &unknown).expect_err("orphan")[0].code,
         "OrphanTestReference"
@@ -291,9 +301,8 @@ fn check_specification_parity(root: &std::path::Path, scanners: &ScannersConfig)
         bloomery_workspace::load_tree(&edited_memory, config).expect("edited virtual specs");
     let edited_filesystem = bloomery_workspace::load(root).expect("edited filesystem specs");
     assert_ne!(virtual_context.areas, edited_virtual.areas);
-    let virtual_errors =
-        bloomery_check::validate_evidence(&edited_virtual, &virtual_scan.output.evidence)
-            .expect_err("manual automation");
+    let virtual_errors = bloomery_check::validate_evidence(&edited_virtual, &virtual_scan.output)
+        .expect_err("manual automation");
     assert!(
         virtual_errors
             .iter()

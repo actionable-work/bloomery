@@ -1,0 +1,93 @@
+schema_version = 1
+group = "GRANULARITY"
+
+[[requirements]]
+id = "CLI-CHECK-GRANULARITY-001"
+title = "Automated requirements fail above the site limit"
+manual = false
+design = "design/spec-granularity.md"
+ears = { type = "event", system = "bloomery check", action = "fail static:traceability with TooManyTestsForRequirement", trigger = "an automated requirement has more distinct authored validating sites than checks.specifications.maxTestsPerRequirement" }
+
+[[requirements]]
+id = "CLI-CHECK-GRANULARITY-002"
+title = "Equality with the site limit passes"
+manual = false
+design = "design/spec-granularity.md"
+ears = { type = "event", system = "the granularity policy", action = "produce no TooManyTestsForRequirement finding", trigger = "an automated requirement has exactly checks.specifications.maxTestsPerRequirement distinct authored validating sites" }
+
+[[requirements]]
+id = "CLI-CHECK-GRANULARITY-003"
+title = "Counts aggregate across scanners"
+manual = false
+design = "design/spec-granularity.md#counting"
+ears = { type = "ubiquitous", system = "the granularity policy", action = "count validating sites per requirement ID across all enabled scanners in their configured evidence scope" }
+
+[[requirements]]
+id = "CLI-CHECK-GRANULARITY-004"
+title = "Repeated associations count once per site"
+manual = false
+design = "design/spec-granularity.md#counting"
+ears = { type = "ubiquitous", system = "the granularity policy", action = "deduplicate repeated requirement annotations and repeated discovery by scanner and canonical site location before counting" }
+
+[[requirements]]
+id = "CLI-CHECK-GRANULARITY-005"
+title = "Distinct declarations count independently of names"
+manual = false
+design = "design/spec-granularity.md#counting"
+ears = { type = "ubiquitous", system = "the granularity policy", action = "count distinct Rust function and Playwright call declarations separately even when they share a test name" }
+
+[[requirements]]
+id = "CLI-CHECK-GRANULARITY-006"
+title = "Runtime multiplicity does not inflate counts"
+manual = false
+design = "design/spec-granularity.md#counting"
+ears = { type = "ubiquitous", system = "the granularity policy", action = "count each authored site once regardless of parameter rows, macro expansion, retries, runtime iteration, target matrices, or selected systems" }
+
+[[requirements]]
+id = "CLI-CHECK-GRANULARITY-007"
+title = "Nix validation sites use file identity"
+manual = false
+design = "design/spec-granularity.md#counting"
+ears = { type = "ubiquitous", system = "the granularity policy", action = "count each metadata-bearing Nix evidence file once per requirement regardless of metadata repetitions and candidate testPaths selection" }
+
+[[requirements]]
+id = "CLI-CHECK-GRANULARITY-008"
+title = "Playwright suite tags remain direct associations"
+manual = false
+design = "design/spec-granularity.md#counting"
+ears = { type = "ubiquitous", system = "the granularity policy", action = "count a requirement tag on a recognized Playwright suite call once without projecting it onto descendant calls" }
+
+[[requirements]]
+id = "CLI-CHECK-GRANULARITY-009"
+title = "Each linked requirement receives its own count"
+manual = false
+design = "design/spec-granularity.md#counting"
+ears = { type = "ubiquitous", system = "the granularity policy", action = "count a site referencing several requirement IDs once toward each referenced automated requirement" }
+
+[[requirements]]
+id = "CLI-CHECK-GRANULARITY-010"
+title = "Granularity excludes unknown and manual requirements"
+manual = false
+design = "design/spec-granularity.md#validation"
+ears = { type = "ubiquitous", system = "the granularity policy", action = "produce no TooManyTestsForRequirement finding for unknown or manual requirement IDs" }
+
+[[requirements]]
+id = "CLI-CHECK-GRANULARITY-011"
+title = "Eligibility does not erase authored associations"
+manual = false
+design = "design/spec-granularity.md#counting"
+ears = { type = "ubiquitous", system = "the granularity policy", action = "count authored Rust associations regardless of cfg, target, and ignored-test eligibility" }
+
+[[requirements]]
+id = "CLI-CHECK-GRANULARITY-012"
+title = "Violations retain actionable contributing locations"
+manual = false
+design = "design/spec-granularity.md#diagnostics"
+ears = { type = "event", system = "the granularity policy", action = "emit one declaration-located finding naming the requirement, observed count, effective limit, and all contributing sites in deterministic scanner and location order", trigger = "a requirement exceeds the validating-site limit" }
+
+[[requirements]]
+id = "CLI-CHECK-GRANULARITY-013"
+title = "Contributing sites are available through retained details"
+manual = false
+design = "design/spec-granularity.md#diagnostics"
+ears = { type = "event", system = "bloomery check details", action = "expose every contributing site through the ordinary bounded detail stream", trigger = "a granularity violation is retained" }

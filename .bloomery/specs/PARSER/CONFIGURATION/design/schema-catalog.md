@@ -1,5 +1,9 @@
 # Configuration schema catalog
 
+`bloomery-schema` owns the shared catalog, specification policy types, and
+portable diagnostics. `bloomery-model` re-exports these interfaces and adds
+model-owned health validation and repository configuration loading.
+
 The schema catalog is the single enumerated description of every configurable
 `.bloomery/config.toml` option. The top-level `version` field is format metadata
 and is described by the
@@ -183,6 +187,33 @@ CLI. Its `enable` key defaults to `false` and has an upgrade recommendation of
 `true`. It gates specification structure and traceability checks when
 specification management is active. The Nix loader accepts the table without
 generating a corresponding Nix check.
+
+| Key | Type | Effective default | Upgrade recommendation |
+| --- | --- | --- | --- |
+| `checks.specifications.maxTestsPerRequirement` | positive integer | `5` | `5` |
+
+The limit is consumed by the
+[specification granularity policy](../../../CLI/CHECK/design/spec-granularity.md).
+It participates in config get/set/unset/list/upgrade/document. Explicit values
+override the default and survive upgrade; unset restores the effective default.
+Reject zero, negative integers, floats, booleans, strings, and unknown policy
+keys as `ConfigurationError` before formatting or analysis, including when
+specification checks or management are disabled. Nix configuration validation
+accepts the positive integer without generating an additional derivation.
+
+The [quality policy](../../../CLI/CHECK/design/spec-quality.md) also catalogs
+`untiedTests` (`off`, `report`, `deny`; default and recommendation `report`),
+`maxUntiedTests` (nonnegative integer; default and recommendation `0`), and
+`requireCrateOwnership` (boolean; default and recommendation `false`).
+Parameterized tables `requirementExceptions.<ID>` (`maxTests`, `reason`),
+`untiedExceptions.<path-glob>` (`reason`, optional `name`), and
+`crates.<manifest>` (`features`, `minRequirements`, `minLinkedTests`, `exclude`,
+`reason`) carry no upgrade recommendations. Types and cross-field constraints
+apply in both CLI and Nix validation, including when checks are disabled.
+Reasons are nonempty; paths are canonical repository-relative paths; crate
+keys end in `Cargo.toml`. Crate feature identifiers have exactly two valid ID
+segments. Unknown fields are errors. Config editing and documentation support
+all parameterized leaves through the shared schema catalog.
 
 ### `[checks.codeHealth]`
 

@@ -1071,6 +1071,54 @@ fn render_spec_success(report: &SpecReport, color: output::ColorMode, stdout: &m
                 report.completeness.discovery,
                 report.completeness.relations
             );
+            if let Some(quality) = &report.quality {
+                let active = quality
+                    .untied
+                    .iter()
+                    .filter(|site| site.exception_reason.is_none())
+                    .count();
+                let _ = writeln!(
+                    stdout,
+                    "untied tests: {active} nonexempt, {} exempt; mode {:?}; limit {}",
+                    quality.untied.len() - active,
+                    quality.untied_mode,
+                    quality.max_untied_tests
+                );
+                for untied in &quality.untied {
+                    let _ = writeln!(
+                        stdout,
+                        "    {} {}:{} {}{}",
+                        untied.site.scanner,
+                        untied.site.path,
+                        untied.site.line.unwrap_or(1),
+                        untied.name.as_deref().unwrap_or("<unnamed>"),
+                        untied
+                            .exception_reason
+                            .as_ref()
+                            .map(|reason| format!(" (exception: {reason})"))
+                            .unwrap_or_default()
+                    );
+                }
+                for package in &quality.crates {
+                    let _ = writeln!(
+                        stdout,
+                        "crate {}: {} requirements; {} feature-linked sites; {}",
+                        package.manifest,
+                        package.requirements,
+                        package.linked_tests,
+                        if package.excluded {
+                            "excluded"
+                        } else if package.mapped {
+                            "mapped"
+                        } else {
+                            "unowned"
+                        }
+                    );
+                    if let Some(reason) = &package.reason {
+                        let _ = writeln!(stdout, "    {reason}");
+                    }
+                }
+            }
             for finding in &report.diagnostics {
                 let _ = writeln!(stdout, "[{}] {}", finding.code, finding.message);
                 if let Some(location) = &finding.location {

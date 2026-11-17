@@ -77,7 +77,7 @@ The Bloomery repository is itself a Rust workspace, a reusable Nix library, and 
 | `CLI/SPEC` | `packages/rust/libs/cli/spec` |
 | `CLI/CONFIG` | `packages/rust/libs/cli/config` |
 | `CLI/SYNC` | `packages/rust/libs/cli/sync` |
-| `PARSER/CONFIGURATION` | `packages/rust/libs/shared/model` configuration and schema catalog |
+| `PARSER/CONFIGURATION` | `packages/rust/libs/shared/model` configuration loading and `packages/rust/libs/shared/schema` catalog and policy types |
 | `PARSER/REQUIREMENTS` | `packages/rust/libs/shared/model` requirement records and identifiers |
 | `PARSER/SCANNING` | `packages/rust/libs/shared/scanning` |
 | `PARSER/WORKSPACE` | `packages/rust/libs/shared/workspace` |

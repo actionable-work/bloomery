@@ -92,8 +92,135 @@ enable = true # Require default features to be disabled on workspace dependencie
 [checks.packages]
 enable = false # Include binary and library build checks.
 
+# Authored-link policies run in static:traceability.
+# A validating site is a Rust test function, Playwright call, or Nix evidence file.
+# Each mapped crate defaults to at least one automated requirement and one linked site.
+# Untied sites are advisory in report mode; deny mode enforces maxUntiedTests.
+# Inspect associations and exception reasons with bloomery spec trace --report.
+# Policy details and examples: specs/CLI/CHECK/design/spec-quality.md.
 [checks.specifications]
-enable = true # Enable static specification validation checks.
+enable = true                # Enable static specification validation checks.
+maxTestsPerRequirement = 5   # Maximum distinct authored validating sites per automated requirement.
+maxUntiedTests = 0           # Maximum nonexempt untied sites in deny mode.
+requireCrateOwnership = true # Require an ownership mapping or exclusion for every selected workspace crate.
+untiedTests = "report"       # Untied-test policy: off, advisory reporting, or a failing budget.
+
+[checks.specifications.crates."packages/rust/bins/cli/Cargo.toml"]
+features = ["CLI/INTERFACE"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/bins/docs-check/Cargo.toml"]
+features = ["DOCS/CONSISTENCY"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/bins/docs/Cargo.toml"]
+features = ["DOCS/SERVER"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/cli/build-command/Cargo.toml"]
+features = ["CLI/BUILD"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/cli/check-catalog/Cargo.toml"]
+features = ["CLI/CHECK"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/cli/check-command/Cargo.toml"]
+features = ["CLI/CHECK"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/cli/check-health/Cargo.toml"]
+features = ["CLI/CHECK"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/cli/check-output/Cargo.toml"]
+features = ["CLI/CHECK"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/cli/check-retrieval/Cargo.toml"]
+features = ["CLI/CHECK"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/cli/check-selection/Cargo.toml"]
+features = ["CLI/CHECK"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/cli/check-storage/Cargo.toml"]
+features = ["CLI/CHECK"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/cli/check-support/Cargo.toml"]
+features = ["CLI/CHECK"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/cli/cli-app/Cargo.toml"]
+features = ["CLI/INTERFACE"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/cli/cli-output/Cargo.toml"]
+features = ["CLI/INTERFACE"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/cli/cli-parser/Cargo.toml"]
+features = ["CLI/INTERFACE"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/cli/cli-types/Cargo.toml"]
+features = ["CLI/INTERFACE"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/cli/config/Cargo.toml"]
+features = ["CLI/CONFIG"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/cli/disk/Cargo.toml"]
+features = ["CLI/DISK"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/cli/init/Cargo.toml"]
+features = ["CLI/INIT"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/cli/review/Cargo.toml"]
+features = ["CLI/REVIEW"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/cli/spec/Cargo.toml"]
+features = ["CLI/SPEC"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/cli/sync/Cargo.toml"]
+features = ["CLI/SYNC"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/docs/consistency/Cargo.toml"]
+features = ["DOCS/CONSISTENCY"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/docs/content/Cargo.toml"]
+features = ["DOCS/CONTENT"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/docs/docs-server/Cargo.toml"]
+features = ["DOCS/SERVER"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/docs/ui/Cargo.toml"]
+features = ["DOCS/UI"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/shared/check/Cargo.toml"]
+features = [
+  "CLI/CHECK",
+  "PARSER/WORKSPACE",
+] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/shared/model/Cargo.toml"]
+features = [
+  "PARSER/CONFIGURATION",
+  "PARSER/REQUIREMENTS",
+] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/shared/scanning/Cargo.toml"]
+features = ["PARSER/SCANNING"] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/shared/schema/Cargo.toml"]
+features = [
+  "PARSER/CONFIGURATION",
+  "PARSER/REQUIREMENTS",
+] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/shared/test-macros/Cargo.toml"]
+exclude = true                                                                 # Exclude this crate from ownership gates with a reason.
+reason = "Test attribute support; this crate provides no production behavior." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.crates."packages/rust/libs/shared/workspace/Cargo.toml"]
+features = [
+  "PARSER/REQUIREMENTS",
+  "PARSER/WORKSPACE",
+] # Feature identifiers owned by this crate.
+
+[checks.specifications.requirementExceptions.CLI-CHECK-PROGRESS-009]
+maxTests = 7                                                                                  # Validating-site limit for this requirement.
+reason = "Exactly-once completion is exercised across scheduling and terminal outcome paths." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.requirementExceptions.CLI-INTERFACE-PRESENTATION-014]
+maxTests = 12                                                                                # Validating-site limit for this requirement.
+reason = "The same metadata omission rule is verified across independent command renderers." # Reason for this specification policy exception or ownership.
 
 [checks.vulnerabilities]
 ignoreAdvisories = [] # RustSec advisory IDs suppressed by vulnerability checks.
@@ -113,64 +240,64 @@ packages = []  # Additional nixpkgs packages in the development shell.
 shellHook = "" # Shell hook run when entering the development shell.
 
 [flakes.axum-workspace]
-checks = "aggregate"
-path = "tests/axum-workspace"
+checks = "aggregate"          # Sub-flake check elevation: none, individual, or aggregate.
+path = "tests/axum-workspace" # Repository-relative path to a sub-flake directory.
 
 [flakes.basic-workspace]
-checks = "aggregate"
-path = "tests/basic-workspace"
+checks = "aggregate"           # Sub-flake check elevation: none, individual, or aggregate.
+path = "tests/basic-workspace" # Repository-relative path to a sub-flake directory.
 
 [flakes.edge-cases-workspace]
-checks = "aggregate"
-path = "tests/edge-cases-workspace"
+checks = "aggregate"                # Sub-flake check elevation: none, individual, or aggregate.
+path = "tests/edge-cases-workspace" # Repository-relative path to a sub-flake directory.
 
 [flakes.flake-parts-workspace]
-checks = "aggregate"
-path = "tests/flake-parts-workspace"
+checks = "aggregate"                 # Sub-flake check elevation: none, individual, or aggregate.
+path = "tests/flake-parts-workspace" # Repository-relative path to a sub-flake directory.
 
 [flakes.library-names-workspace]
-checks = "aggregate"
-path = "tests/library-names-workspace"
+checks = "aggregate"                   # Sub-flake check elevation: none, individual, or aggregate.
+path = "tests/library-names-workspace" # Repository-relative path to a sub-flake directory.
 
 [flakes.library-only-workspace]
-checks = "aggregate"
-path = "tests/library-only-workspace"
+checks = "aggregate"                  # Sub-flake check elevation: none, individual, or aggregate.
+path = "tests/library-only-workspace" # Repository-relative path to a sub-flake directory.
 
 [flakes.manifest-policy-workspace]
-checks = "aggregate"
-path = "tests/manifest-policy-workspace"
+checks = "aggregate"                     # Sub-flake check elevation: none, individual, or aggregate.
+path = "tests/manifest-policy-workspace" # Repository-relative path to a sub-flake directory.
 
 [flakes.nixlib-workspace]
-checks = "aggregate"
-path = "tests/nixlib-workspace"
+checks = "aggregate"            # Sub-flake check elevation: none, individual, or aggregate.
+path = "tests/nixlib-workspace" # Repository-relative path to a sub-flake directory.
 
 [flakes.object-store-aws-workspace]
-checks = "aggregate"
-path = "tests/object-store-aws-workspace"
+checks = "aggregate"                      # Sub-flake check elevation: none, individual, or aggregate.
+path = "tests/object-store-aws-workspace" # Repository-relative path to a sub-flake directory.
 
 [flakes.overrides-workspace]
-checks = "aggregate"
-path = "tests/overrides-workspace"
+checks = "aggregate"               # Sub-flake check elevation: none, individual, or aggregate.
+path = "tests/overrides-workspace" # Repository-relative path to a sub-flake directory.
 
 [flakes.single-crate-workspace]
-checks = "aggregate"
-path = "tests/single-crate-workspace"
+checks = "aggregate"                  # Sub-flake check elevation: none, individual, or aggregate.
+path = "tests/single-crate-workspace" # Repository-relative path to a sub-flake directory.
 
 [flakes.source-isolation-workspace]
-checks = "aggregate"
-path = "tests/source-isolation-workspace"
+checks = "aggregate"                      # Sub-flake check elevation: none, individual, or aggregate.
+path = "tests/source-isolation-workspace" # Repository-relative path to a sub-flake directory.
 
 [flakes.template-axum]
-checks = "aggregate"
-path = "tests/template-axum"
+checks = "aggregate"         # Sub-flake check elevation: none, individual, or aggregate.
+path = "tests/template-axum" # Repository-relative path to a sub-flake directory.
 
 [flakes.template-basic]
-checks = "aggregate"
-path = "tests/template-basic"
+checks = "aggregate"          # Sub-flake check elevation: none, individual, or aggregate.
+path = "tests/template-basic" # Repository-relative path to a sub-flake directory.
 
 [flakes.template-topcoat]
-checks = "aggregate"
-path = "tests/template-topcoat"
+checks = "aggregate"            # Sub-flake check elevation: none, individual, or aggregate.
+path = "tests/template-topcoat" # Repository-relative path to a sub-flake directory.
 
 [formatters]
 

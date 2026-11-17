@@ -30,7 +30,8 @@ scanning is disabled, without producing specification references.
 4. **Static evidence extraction** — run enabled Rust, Playwright, and Nix
    scanners and merge their references.
 5. **Relational verification** — compare declared requirements and discovered
-   references.
+   references, including the per-requirement validating-site limit in
+   [specification granularity](spec-granularity.md).
 6. **Diagnostic retention** — retain all deterministic diagnostics, then produce
    the bounded [failure summary](diagnostics.md) and overall runner exit code.
 
@@ -50,6 +51,11 @@ T ∖ S         = ∅   no test references an unknown requirement
 T ∩ S_manual  = ∅   manual requirements have no automated references
 S_auto ∖ T    = ∅   every automated requirement has evidence
 ```
+
+Each automated requirement also has at most
+`checks.specifications.maxTestsPerRequirement` distinct authored validating
+sites. Unlike ID set validation, this rule retains test-site ownership before
+deduplication.
 
 The workspace pass requires every feature to provide architecture documents and
 at least one grouped requirement file before the requirement and relational

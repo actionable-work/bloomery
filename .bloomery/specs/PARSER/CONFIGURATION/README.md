@@ -60,7 +60,8 @@ is rejected before configuration validation.
   `bloomery config` and sync recommendations.
 - Resolve and validate CLI-owned `checks.codeHealth` scoring and baseline policy.
 - Resolve and validate CLI-owned `checks.clippySuppressions` enablement and exception names.
-- Resolve and validate CLI-owned `checks.specifications` check enablement.
+- Resolve and validate CLI-owned `checks.specifications` check enablement and
+  per-requirement validating-site limit.
 - Reject malformed or ambiguous configuration before scanning begins.
 
 ## Dependencies

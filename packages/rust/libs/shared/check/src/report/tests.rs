@@ -317,10 +317,9 @@ fn same_line_relational_ranges_are_sorted_independent_of_evidence_order() {
     let context = bloomery_workspace::load_tree(&tree, config()).expect("specifications");
     let mut evidence = scan_tree(&tree, &context.config.scanners)
         .expect("scan")
-        .output
-        .evidence;
+        .output;
     let first = crate::validate_evidence(&context, &evidence).expect_err("unknown IDs");
-    evidence.reverse();
+    evidence.evidence.reverse();
     assert_eq!(
         first,
         crate::validate_evidence(&context, &evidence).expect_err("reversed IDs")

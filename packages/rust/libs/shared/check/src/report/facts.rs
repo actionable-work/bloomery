@@ -38,6 +38,7 @@ pub(super) fn requirements(context: &Context) -> Vec<RequirementRecord> {
 pub(super) fn add_discovery(
     report: &mut StaticReport,
     output: &ScanOutput,
+    tree: &dyn bloomery_workspace::source::SourceTree,
     context: Option<&Context>,
     complete: bool,
     annotations: &super::cfg::Annotations,
@@ -115,9 +116,16 @@ pub(super) fn add_discovery(
                 };
             }
         }
-        let errors = crate::validate_evidence(context, &output.evidence)
+        let mut errors = crate::validate_references(context, &output.evidence)
             .err()
             .unwrap_or_default();
+        match crate::quality::assess(context, output, tree, complete) {
+            Ok(assessment) => {
+                report.quality = Some(assessment.report);
+                errors.extend(assessment.diagnostics);
+            }
+            Err(error) => errors.push(error),
+        }
         add_findings(
             report,
             errors

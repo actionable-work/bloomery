@@ -43,6 +43,8 @@ without specification passes.
 ## Design documents
 
 - [Static validation pipeline](design/pipeline.md)
+- [Specification granularity](design/spec-granularity.md)
+- [Untied tests and crate ownership](design/spec-quality.md)
 - [Selection and parallel execution](design/execution.md)
 - [Terminal progress and work metrics](design/progress.md)
 - [Failure summaries and diagnostics](design/diagnostics.md)
@@ -82,6 +84,7 @@ without specification passes.
   lockfiles unchanged.
 - Share Rust ingestion between health and traceability without coupling outcomes.
 - Check inline Clippy lint suppressions against configured exceptions.
+- Reject automated requirements with too many distinct authored validating sites.
 - Warn through tracing when a supported check-control key is absent.
 - Score production SLOC per crate to reward smaller crates and preserve a
   SLOC-weighted workspace score.
