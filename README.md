@@ -85,9 +85,11 @@ built-in formatters (including `toml-sort`) and any formatters supplied through
 
 Synchronize locks from a workspace with the Bloomery CLI package, for example
 `nix run github:actionable-work/bloomery#bloomery-wrapped -- sync`. `bloomery sync`
-reconciles `Cargo.lock` and writes `bloomery.lock`; use `--update=rust`,
-`--update=nix`, or bare `--update` to request ecosystem updates. Sync requires
-`.bloomery/config.toml` and does not create or edit it. The `check`, `review`,
+reconciles `Cargo.lock` and writes `bloomery.lock` in the root and each Cargo
+workspace reached recursively through `[flakes.<name>].path`. Use
+`bloomery sync --update` to upgrade Nix inputs and Rust dependencies across
+the same tree. `--update=nix` and `--update=rust` select one ecosystem. Sync
+requires `.bloomery/config.toml` in the invocation root. The `check`, `review`,
 and `sync` commands share `--json` for machine-readable output; human terminal
 output is colorized automatically and honors `NO_COLOR`. `bloomery config
 document` annotates configured keys with the schema catalog documentation

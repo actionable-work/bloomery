@@ -6,6 +6,7 @@ mod nix_migration;
 mod recommendations;
 mod runner;
 mod selection;
+mod traversal;
 
 pub use recommendations::RECOMMENDATION_CATALOG_VERSION;
 pub use runner::{CommandOutput, CommandRunner, SystemCommandRunner};
@@ -21,7 +22,7 @@ use serde::Serialize;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Shared message for the root-flake preflight required by every command. Kept
 /// in sync with the CLI output layer so direct library callers see the same
@@ -43,19 +44,6 @@ impl SyncError {
             message: message.into(),
             completed_stages: Vec::new(),
             may_be_partially_synchronized: false,
-        }
-    }
-
-    fn after_progress(
-        stage: impl Into<String>,
-        message: impl Into<String>,
-        state: &RunState,
-    ) -> Self {
-        Self {
-            stage: stage.into(),
-            message: message.into(),
-            completed_stages: state.completed.clone(),
-            may_be_partially_synchronized: state.may_be_partially_synchronized,
         }
     }
 
@@ -108,6 +96,7 @@ impl std::error::Error for SyncError {}
 
 #[derive(Debug, Default)]
 struct RunState {
+    flake: PathBuf,
     completed: Vec<String>,
     may_be_partially_synchronized: bool,
     tool_stderr: Vec<String>,
@@ -131,25 +120,31 @@ pub struct SyncReport {
     pub tool_stderr: Vec<String>,
 }
 
-#[derive(Debug, Default)]
-struct Advisories {
-    warnings: Vec<String>,
-    recommendations: Vec<SyncRecommendation>,
-}
-
 impl RunState {
     fn completed(&mut self, stage: &str) {
-        self.completed.push(stage.to_owned());
+        self.completed.push(self.stage_name(stage));
     }
 
     fn failure(&self, stage: &str, message: impl Into<String>) -> SyncError {
-        SyncError::after_progress(stage, message, self)
+        SyncError {
+            stage: self.stage_name(stage),
+            message: message.into(),
+            completed_stages: self.completed.clone(),
+            may_be_partially_synchronized: self.may_be_partially_synchronized,
+        }
+    }
+
+    fn stage_name(&self, stage: &str) -> String {
+        if self.flake.as_os_str().is_empty() {
+            stage.to_owned()
+        } else {
+            format!("{}: {stage}", self.flake.display())
+        }
     }
 }
 
-/// Reconcile Cargo and Bloomery locks in `root`, optionally updating selected
-/// ecosystems. The caller is responsible for parsing CLI syntax before calling
-/// this function so usage errors cannot reach a mutating stage.
+/// Reconcile locks across `root` and its configured sub-flakes, optionally
+/// upgrading dependencies in the selected ecosystems.
 pub fn run(
     root: &Path,
     selection: &UpdateSelection,
@@ -158,17 +153,61 @@ pub fn run(
     stderr: &mut impl Write,
 ) -> Result<SyncReport, SyncError> {
     let (plan, loaded_config) = preflight(root, selection, runner)?;
-    let advisories = collect_advisories(&loaded_config);
-    emit_advisories(&advisories, stderr)?;
+    let flakes = traversal::discover(root, &loaded_config)?;
+    let recommendations = collect_recommendations(&loaded_config);
+    emit_recommendations(&recommendations, stderr)?;
 
     let mut state = RunState::default();
+    let mut reconciled_locks = Vec::new();
+    let mut reconciled_nix_lock = false;
+    for flake in &flakes {
+        if !flake.has_cargo && !plan.update_nix {
+            continue;
+        }
+        state.flake.clone_from(&flake.relative);
+        if !state.flake.as_os_str().is_empty() {
+            let path = state.flake.display();
+            write_progress(stdout, format_args!("Synchronizing flake {path}"), &state)?;
+        }
+        sync_flake(flake, &plan, runner, stdout, stderr, &mut state)?;
+        if flake.has_cargo {
+            reconciled_locks
+                .extend(["Cargo.lock", "bloomery.lock"].map(|lock| flake.lock_path(lock)));
+        }
+        if plan.update_nix && flake.root.join("flake.lock").is_file() {
+            reconciled_locks.push(flake.lock_path("flake.lock"));
+            reconciled_nix_lock = true;
+        }
+    }
+
+    state.flake.clear();
+    write_completion(stdout, &plan, reconciled_nix_lock, &state)?;
+    Ok(SyncReport {
+        reconciled_locks,
+        updated_ecosystems: plan
+            .selected_names()
+            .into_iter()
+            .map(str::to_owned)
+            .collect(),
+        skipped_updates: Vec::new(),
+        completed_stages: state.completed,
+        warnings: Vec::new(),
+        recommendations,
+        tool_stderr: state.tool_stderr,
+    })
+}
+
+fn sync_flake(
+    flake: &traversal::Flake,
+    plan: &UpdatePlan,
+    runner: &mut impl CommandRunner,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+    state: &mut RunState,
+) -> Result<(), SyncError> {
+    let root = &flake.root;
     if plan.update_nix {
-        write_progress(
-            stdout,
-            "==> Updating Nix flake inputs...",
-            "progress output",
-            &state,
-        )?;
+        write_progress(stdout, "Updating Nix flake inputs", state)?;
         state.may_be_partially_synchronized = true;
         let output = execute(
             runner,
@@ -176,68 +215,50 @@ pub fn run(
             &[OsString::from("flake"), OsString::from("update")],
             root,
             "Nix input update",
-            &state,
+            stderr,
+            state,
         )?;
-        state.completed("Nix input update");
-        record_tool_stderr(&mut state, &output.stderr);
-        forward_stream(&output.stderr, stderr, "Nix input update stderr", &state)?;
-        forward_stream(&output.stdout, stdout, "Nix input update output", &state)?;
+        forward_stream(&output.stdout, stdout, "Nix input update output", state)?;
+    }
+
+    if !flake.has_cargo {
+        return Ok(());
     }
 
     let cargo_manifest = root.join("Cargo.toml");
-    if plan.update_rust {
-        write_progress(
-            stdout,
-            "==> Updating Rust dependencies...",
-            "progress output",
-            &state,
-        )?;
-        state.may_be_partially_synchronized = true;
-        let arguments = [
-            OsString::from("update"),
-            OsString::from("--manifest-path"),
-            cargo_manifest.as_os_str().to_owned(),
-        ];
-        let output = execute(
-            runner,
-            OsStr::new("cargo"),
-            &arguments,
-            root,
+    let (progress, stage, arguments) = if plan.update_rust {
+        (
+            "Updating Rust dependencies",
             "Rust dependency update",
-            &state,
-        )?;
-        state.completed("Rust dependency update");
-        record_tool_stderr(&mut state, &output.stderr);
-        forward_stream(&output.stderr, stderr, "Cargo update stderr", &state)?;
-        forward_stream(&output.stdout, stdout, "Cargo update output", &state)?;
+            vec![
+                "update".into(),
+                "--manifest-path".into(),
+                cargo_manifest.as_os_str().into(),
+            ],
+        )
     } else {
-        write_progress(
-            stdout,
-            "==> Reconciling Cargo.lock with workspace manifests...",
-            "progress output",
-            &state,
-        )?;
-        state.may_be_partially_synchronized = true;
-        let arguments = cargo_metadata_arguments(&cargo_manifest, false);
-        let output = execute(
-            runner,
-            OsStr::new("cargo"),
-            &arguments,
-            root,
+        (
+            "Reconciling Cargo.lock with workspace manifests",
             "Cargo lock reconciliation",
-            &state,
-        )?;
-        state.completed("Cargo lock reconciliation");
-        record_tool_stderr(&mut state, &output.stderr);
-        forward_stream(&output.stderr, stderr, "Cargo metadata stderr", &state)?;
+            cargo_metadata_arguments(&cargo_manifest, false),
+        )
+    };
+    write_progress(stdout, progress, state)?;
+    state.may_be_partially_synchronized = true;
+    let output = execute(
+        runner,
+        OsStr::new("cargo"),
+        &arguments,
+        root,
+        stage,
+        stderr,
+        state,
+    )?;
+    if plan.update_rust {
+        forward_stream(&output.stdout, stdout, "Cargo update output", state)?;
     }
 
-    write_progress(
-        stdout,
-        "==> Reading final locked Cargo metadata...",
-        "progress output",
-        &state,
-    )?;
+    write_progress(stdout, "Reading final locked Cargo metadata", state)?;
     let final_metadata_arguments = cargo_metadata_arguments(&cargo_manifest, true);
     let final_metadata = execute(
         runner,
@@ -245,23 +266,11 @@ pub fn run(
         &final_metadata_arguments,
         root,
         "final Cargo metadata",
-        &state,
-    )?;
-    state.completed("final locked Cargo metadata");
-    record_tool_stderr(&mut state, &final_metadata.stderr);
-    forward_stream(
-        &final_metadata.stderr,
         stderr,
-        "final Cargo metadata stderr",
-        &state,
+        state,
     )?;
 
-    write_progress(
-        stdout,
-        "==> Generating and validating bloomery.lock...",
-        "progress output",
-        &state,
-    )?;
+    write_progress(stdout, "Generating and validating bloomery.lock", state)?;
     let cargo_lock_path = root.join("Cargo.lock");
     let cargo_lock = std::fs::read(&cargo_lock_path).map_err(|error| {
         state.failure(
@@ -283,28 +292,7 @@ pub fn run(
         PublicationOutcome::Unchanged => state.completed("Bloomery lock already current"),
     }
 
-    let report = SyncReport {
-        reconciled_locks: if plan.update_nix {
-            vec!["Cargo.lock", "bloomery.lock", "flake.lock"]
-        } else {
-            vec!["Cargo.lock", "bloomery.lock"]
-        }
-        .into_iter()
-        .map(str::to_owned)
-        .collect(),
-        updated_ecosystems: plan
-            .selected_names()
-            .into_iter()
-            .map(str::to_owned)
-            .collect(),
-        skipped_updates: Vec::new(),
-        completed_stages: state.completed.clone(),
-        warnings: advisories.warnings,
-        recommendations: advisories.recommendations,
-        tool_stderr: state.tool_stderr.clone(),
-    };
-    write_completion(stdout, &plan, &state)?;
-    Ok(report)
+    Ok(())
 }
 
 fn preflight(
@@ -334,17 +322,18 @@ fn preflight(
     })?;
     let plan = UpdatePlan::new(selection);
 
-    if !runner.is_available("cargo") {
-        return Err(SyncError::new(
-            "tool preflight",
-            "required executable 'cargo' was not found on PATH",
-        ));
-    }
-    if plan.update_nix && !runner.is_available("nix") {
-        return Err(SyncError::new(
-            "tool preflight",
-            "Nix updates were selected but required executable 'nix' was not found on PATH",
-        ));
+    let tools: &[_] = if plan.update_nix {
+        &["cargo", "nix"]
+    } else {
+        &["cargo"]
+    };
+    for tool in tools {
+        if !runner.is_available(tool) {
+            return Err(SyncError::new(
+                "tool preflight",
+                format!("required executable '{tool}' was not found on PATH"),
+            ));
+        }
     }
 
     Ok((plan, loaded_config))
@@ -365,33 +354,24 @@ fn format_diagnostic(root: &Path, diagnostic: &bloomery_model::Diagnostic) -> St
     message
 }
 
-fn collect_advisories(loaded: &LoadedConfig) -> Advisories {
-    let recommendations = loaded
+fn collect_recommendations(loaded: &LoadedConfig) -> Vec<SyncRecommendation> {
+    loaded
         .raw
-        .as_ref()
-        .map(|raw| {
-            missing_recommendations(raw)
-                .into_iter()
-                .map(|recommendation| SyncRecommendation {
-                    key: recommendation_key(recommendation),
-                    benefit: recommendation.benefit.to_owned(),
-                    guidance: recommendation.guidance.to_owned(),
-                })
-                .collect()
+        .iter()
+        .flat_map(missing_recommendations)
+        .map(|recommendation| SyncRecommendation {
+            key: recommendation_key(recommendation),
+            benefit: recommendation.benefit.to_owned(),
+            guidance: recommendation.guidance.to_owned(),
         })
-        .unwrap_or_default();
-    Advisories {
-        warnings: Vec::new(),
-        recommendations,
-    }
+        .collect()
 }
 
-fn emit_advisories(advisories: &Advisories, stderr: &mut impl Write) -> Result<(), SyncError> {
-    for warning in &advisories.warnings {
-        writeln!(stderr, "warning: {warning}")
-            .map_err(|error| SyncError::new("configuration warning", error.to_string()))?;
-    }
-    for recommendation in &advisories.recommendations {
+fn emit_recommendations(
+    recommendations: &[SyncRecommendation],
+    stderr: &mut impl Write,
+) -> Result<(), SyncError> {
+    for recommendation in recommendations {
         let message = format!(
             "recommended feature not yet configured: `{}` — {} {}",
             recommendation.key, recommendation.benefit, recommendation.guidance
@@ -400,14 +380,6 @@ fn emit_advisories(advisories: &Advisories, stderr: &mut impl Write) -> Result<(
             .map_err(|error| SyncError::new("recommendations", error.to_string()))?;
     }
     Ok(())
-}
-
-fn record_tool_stderr(state: &mut RunState, contents: &[u8]) {
-    if !contents.is_empty() {
-        state
-            .tool_stderr
-            .push(String::from_utf8_lossy(contents).trim_end().to_owned());
-    }
 }
 
 fn cargo_metadata_arguments(manifest: &Path, locked: bool) -> Vec<OsString> {
@@ -430,19 +402,29 @@ fn execute(
     arguments: &[OsString],
     root: &Path,
     stage: &str,
-    state: &RunState,
+    stderr: &mut impl Write,
+    state: &mut RunState,
 ) -> Result<CommandOutput, SyncError> {
     let output = runner
         .run(executable, arguments, root)
         .map_err(|error| state.failure(stage, format!("unable to invoke tool: {error}")))?;
+    let tool_stderr = String::from_utf8_lossy(&output.stderr);
     if !output.succeeded() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let details = if stderr.trim().is_empty() {
+        let details = if tool_stderr.trim().is_empty() {
             output.status_description()
         } else {
-            format!("{}:\n{}", output.status_description(), stderr.trim_end())
+            format!(
+                "{}:\n{}",
+                output.status_description(),
+                tool_stderr.trim_end()
+            )
         };
         return Err(state.failure(stage, details));
+    }
+    state.completed(stage);
+    if !output.stderr.is_empty() {
+        state.tool_stderr.push(tool_stderr.trim_end().to_owned());
+        forward_stream(&output.stderr, stderr, stage, state)?;
     }
     Ok(output)
 }
@@ -467,19 +449,20 @@ fn forward_stream(
 
 fn write_progress(
     stdout: &mut impl Write,
-    message: &str,
-    stage: &str,
+    message: impl fmt::Display,
     state: &RunState,
 ) -> Result<(), SyncError> {
-    writeln!(stdout, "{message}").map_err(|error| state.failure(stage, error.to_string()))
+    writeln!(stdout, "==> {message}...")
+        .map_err(|error| state.failure("progress output", error.to_string()))
 }
 
 fn write_completion(
     stdout: &mut impl Write,
     plan: &UpdatePlan,
+    reconciled_nix_lock: bool,
     state: &RunState,
 ) -> Result<(), SyncError> {
-    let lock_summary = if plan.update_nix {
+    let lock_summary = if reconciled_nix_lock {
         "Cargo.lock, bloomery.lock, and flake.lock"
     } else {
         "Cargo.lock and bloomery.lock"
@@ -494,8 +477,7 @@ fn write_completion(
         stdout,
         "Successfully synchronized {lock_summary}; updated ecosystems: {updates}."
     )
-    .map_err(|error| state.failure("completion output", error.to_string()))?;
-    Ok(())
+    .map_err(|error| state.failure("completion output", error.to_string()))
 }
 
 #[cfg(test)]
@@ -520,16 +502,27 @@ mod tests {
     impl Fixture {
         fn new() -> Self {
             let suffix = FIXTURE_COUNTER.fetch_add(1, Ordering::Relaxed);
-            let root = std::env::temp_dir().join(format!(
+            let temp_dir = std::env::temp_dir().canonicalize().expect("temp directory");
+            let root = temp_dir.join(format!(
                 "bloomery-sync-pipeline-{}-{suffix}",
                 std::process::id()
             ));
+            Self::create(root, true)
+        }
+
+        fn child(&self, relative: &str, has_cargo: bool) -> Self {
+            Self::create(self.root.join(relative), has_cargo)
+        }
+
+        fn create(root: PathBuf, has_cargo: bool) -> Self {
             fs::create_dir_all(&root).expect("fixture directory");
-            fs::write(
-                root.join("Cargo.toml"),
-                "[package]\nname = \"sync-fixture\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
-            )
-            .expect("manifest");
+            if has_cargo {
+                fs::write(
+                    root.join("Cargo.toml"),
+                    "[package]\nname = \"sync-fixture\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+                )
+                .expect("manifest");
+            }
             fs::write(root.join("flake.nix"), "{ }\n").expect("flake");
             Self { root }
         }
@@ -716,6 +709,160 @@ mod tests {
                     && call.arguments.first().is_some_and(|arg| arg == first_arg)
             })
             .expect("expected command")
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECURSION-001"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECURSION-002"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECURSION-006"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECURSION-010"))]
+    fn normal_sync_reconciles_nested_workspaces_and_reports_their_locks() {
+        let fixture = Fixture::new();
+        let child = fixture.child("children/first", true);
+        let nested = child.child("more/second", true);
+        let unrelated = fixture.child("unconfigured", true);
+        fixture.write_config("[flakes.first]\npath = 'children/first'\n");
+        child.write_config("[flakes.second]\npath = 'more/second'\n");
+        let mut runner = FakeRunner::default();
+        runner.available.remove("nix");
+
+        let (report, stdout, _) = run_fixture(&fixture, &UpdateSelection::None, &mut runner);
+        let report = report.expect("recursive sync succeeds");
+        for workspace in [&fixture, &child, &nested] {
+            assert!(workspace.root.join("Cargo.lock").is_file());
+            assert!(workspace.root.join("bloomery.lock").is_file());
+        }
+        assert!(!nested.root.join(".bloomery/config.toml").exists());
+        assert!(!unrelated.root.join("Cargo.lock").exists());
+        assert_eq!(
+            report.reconciled_locks,
+            [
+                "Cargo.lock",
+                "bloomery.lock",
+                "children/first/Cargo.lock",
+                "children/first/bloomery.lock",
+                "children/first/more/second/Cargo.lock",
+                "children/first/more/second/bloomery.lock",
+            ]
+        );
+        assert!(stdout.contains("Synchronizing flake children/first/more/second"));
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECURSION-003"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECURSION-004"))]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECURSION-005"))]
+    fn updates_reach_nested_flakes_and_workspaces_once() {
+        let fixture = Fixture::new();
+        let child = fixture.child("first", true);
+        let nested = child.child("second", true);
+        let nix_only = child.child("nix-only", false);
+        fixture.write_config("[flakes.a]\npath = 'first'\n[flakes.b]\npath = './first'\n");
+        child.write_config("[flakes.a]\npath = 'second'\n[flakes.b]\npath = 'nix-only'\n");
+
+        for (selection, nix, rust) in [
+            ("nix,rust", true, true),
+            ("nix", true, false),
+            ("rust", false, true),
+        ] {
+            let mut runner = FakeRunner::default();
+            let selection = parse_update_list(selection).expect("update selection");
+            run_fixture(&fixture, &selection, &mut runner)
+                .0
+                .expect("recursive updates succeed");
+            let calls = |executable: &str, first_arg: &str| {
+                runner
+                    .calls
+                    .iter()
+                    .filter(|call| call.executable == executable && call.arguments[0] == first_arg)
+                    .map(|call| call.working_directory.as_path())
+                    .collect::<Vec<_>>()
+            };
+            let nix_roots =
+                [&fixture, &child, &nested, &nix_only].map(|flake| flake.root.as_path());
+            let rust_roots = [&fixture, &child, &nested].map(|flake| flake.root.as_path());
+            assert_eq!(
+                calls("nix", "flake"),
+                if nix { &nix_roots[..] } else { &[] }
+            );
+            assert_eq!(
+                calls("cargo", "update"),
+                if rust { &rust_roots[..] } else { &[] }
+            );
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECURSION-007"))]
+    fn invalid_nested_flake_config_fails_before_running_tools() {
+        let fixture = Fixture::new();
+        let child = fixture.child("first", true);
+        let nested = child.child("second", true);
+        fixture.write_config("[flakes.a]\npath = 'first'\n");
+        child.write_config("[flakes.b]\npath = 'second'\n");
+        nested.write_config("invalid=\n");
+        let mut runner = FakeRunner::default();
+
+        let error = run_fixture(&fixture, &UpdateSelection::All, &mut runner)
+            .0
+            .expect_err("invalid config");
+        assert!(error.message().contains("first/second"));
+        assert!(error.message().contains("config.toml"));
+        assert!(runner.calls.is_empty());
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECURSION-008"))]
+    fn invalid_sub_flake_paths_fail_before_running_tools() {
+        let fixture = Fixture::new();
+        let not_a_flake = fixture.child("not-a-flake", true);
+        fs::remove_file(not_a_flake.root.join("flake.nix")).expect("remove flake file");
+        let invalid_paths = ["", "missing", "not-a-flake", "../outside", "."];
+        #[cfg(unix)]
+        let outside = Fixture::new();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&outside.root, fixture.root.join("escaped"))
+            .expect("symlink to another flake");
+        #[cfg(unix)]
+        let invalid_paths = invalid_paths.into_iter().chain(["escaped"]);
+        for path in invalid_paths {
+            fixture.write_config(&format!("[flakes.invalid]\npath = '{path}'\n"));
+            let mut runner = FakeRunner::default();
+            let error = run_fixture(&fixture, &UpdateSelection::All, &mut runner)
+                .0
+                .expect_err("invalid path");
+            assert!(error.message().contains("[flakes.invalid].path"));
+            assert!(runner.calls.is_empty());
+        }
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-SYNC-RECURSION-009"))]
+    fn descendant_tool_failure_labels_the_stage_and_stops_traversal() {
+        let fixture = Fixture::new();
+        let child = fixture.child("first", true);
+        let nested = child.child("second", true);
+        let sibling = fixture.child("third", true);
+        fixture.write_config("[flakes.a]\npath = 'first'\n[flakes.b]\npath = 'third'\n");
+        child.write_config("[flakes.a]\npath = 'second'\n");
+        let mut runner = FakeRunner {
+            fail_at: Some(5),
+            ..FakeRunner::default()
+        };
+
+        let (result, stdout, _) = run_fixture(&fixture, &UpdateSelection::None, &mut runner);
+        let error = result.expect_err("nested Cargo reconciliation fails");
+        assert_eq!(error.stage(), "first/second: Cargo lock reconciliation");
+        assert!(
+            error
+                .completed_stages()
+                .iter()
+                .any(|stage| stage == "first: Bloomery lock publication")
+        );
+        assert!(error.may_be_partially_synchronized());
+        assert!(!nested.root.join("bloomery.lock").exists());
+        assert!(!sibling.root.join("Cargo.lock").exists());
+        assert!(!stdout.contains("Successfully synchronized"));
     }
 
     #[test]

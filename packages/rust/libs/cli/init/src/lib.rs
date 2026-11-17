@@ -1032,7 +1032,10 @@ mod tests {
                 flake_url,
             ]
         );
-        assert_eq!(nix_update.working_directory, root);
+        assert_eq!(
+            nix_update.working_directory,
+            root.canonicalize().expect("workspace directory")
+        );
         let _ = std::fs::remove_dir_all(root.parent().expect("temporary parent"));
     }
 

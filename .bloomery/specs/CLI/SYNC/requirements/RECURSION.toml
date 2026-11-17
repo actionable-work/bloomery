@@ -1,0 +1,72 @@
+schema_version = 1
+group = "RECURSION"
+
+[[requirements]]
+id = "CLI-SYNC-RECURSION-001"
+title = "Sync reconciles nested Cargo locks"
+manual = false
+design = "design/sync.md#sub-flake-traversal"
+ears = { type = "ubiquitous", system = "bloomery sync", action = "reconcile Cargo.lock in each configured descendant Cargo workspace" }
+
+[[requirements]]
+id = "CLI-SYNC-RECURSION-002"
+title = "Sync generates nested Bloomery locks"
+manual = false
+design = "design/sync.md#sub-flake-traversal"
+ears = { type = "ubiquitous", system = "bloomery sync", action = "generate bloomery.lock in each configured descendant Cargo workspace" }
+
+[[requirements]]
+id = "CLI-SYNC-RECURSION-003"
+title = "Nix updates reach every configured flake"
+manual = false
+design = "design/sync.md#sub-flake-traversal"
+ears = { type = "ubiquitous", system = "bloomery sync", action = "run nix flake update in each configured descendant when Nix is selected" }
+
+[[requirements]]
+id = "CLI-SYNC-RECURSION-004"
+title = "Rust updates reach every configured workspace"
+manual = false
+design = "design/sync.md#sub-flake-traversal"
+ears = { type = "ubiquitous", system = "bloomery sync", action = "run cargo update in each configured descendant Cargo workspace when Rust is selected" }
+
+[[requirements]]
+id = "CLI-SYNC-RECURSION-005"
+title = "Duplicate paths are processed once"
+manual = false
+design = "design/sync.md#sub-flake-traversal"
+ears = { type = "ubiquitous", system = "bloomery sync", action = "process each canonical flake directory only once per invocation" }
+
+[[requirements]]
+id = "CLI-SYNC-RECURSION-006"
+title = "Config-less children participate in sync"
+manual = false
+design = "design/sync.md#sub-flake-traversal"
+ears = { type = "ubiquitous", system = "bloomery sync", action = "process a configured child even when its Bloomery configuration is absent" }
+
+[[requirements]]
+id = "CLI-SYNC-RECURSION-007"
+title = "Invalid child configuration blocks mutation"
+manual = false
+design = "design/sync.md#sub-flake-traversal"
+ears = { type = "ubiquitous", system = "bloomery sync", action = "validate every present child configuration before invoking mutating tools" }
+
+[[requirements]]
+id = "CLI-SYNC-RECURSION-008"
+title = "Child paths are validated before mutation"
+manual = false
+design = "design/sync.md#sub-flake-traversal"
+ears = { type = "ubiquitous", system = "bloomery sync", action = "reject configured child paths that do not resolve to a flake inside their declaring flake before invoking mutating tools" }
+
+[[requirements]]
+id = "CLI-SYNC-RECURSION-009"
+title = "Failure reports identify the affected child"
+manual = false
+design = "design/sync.md#failures-and-output"
+ears = { type = "ubiquitous", system = "bloomery sync", action = "identify the child flake path when a child lock operation fails" }
+
+[[requirements]]
+id = "CLI-SYNC-RECURSION-010"
+title = "Structured results list descendant locks"
+manual = false
+design = "design/sync.md#failures-and-output"
+ears = { type = "ubiquitous", system = "bloomery sync", action = "report reconciled descendant locks by path relative to the invocation root" }

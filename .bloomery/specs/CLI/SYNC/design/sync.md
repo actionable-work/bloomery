@@ -2,12 +2,10 @@
 
 ## Intent
 
-`bloomery sync` is the single maintenance entry point for `Cargo.lock`,
-`bloomery.lock`, and optional `flake.lock` updates. Every sync invocation also
-requires the shared CLI `flake.nix` preflight. It replaces the existing Nix lock
-generator while leaving Nix's pure lock parsing and validation intact.
-The Rust CLI orchestrates tools and owns Bloomery lock generation; running sync
-must not depend on evaluating or building the workspace's Nix outputs.
+`bloomery sync` maintains `Cargo.lock`, `bloomery.lock`, and optional
+`flake.lock` updates across the root and its configured sub-flakes. The Rust CLI
+orchestrates tools and owns Bloomery lock generation without evaluating or
+building Nix outputs.
 
 The global `--no-write` option is a usage error for sync. Reject it before
 running Cargo or Nix, even when the current lockfiles would remain unchanged.
@@ -15,9 +13,8 @@ running Cargo or Nix, even when the current lockfiles would remain unchanged.
 ## Invocation and update selection
 
 Run from the workspace root (the current working directory). There is no root
-argument or upward workspace search. The root must contain `Cargo.toml` and
-`flake.nix`; `Cargo.lock`, `bloomery.lock`, the configuration, and the spec tree
-may be absent.
+argument or upward workspace search. The root requires `Cargo.toml`,
+`flake.nix`, and `.bloomery/config.toml`. Lockfiles and the spec tree may be absent.
 
 ```text
 bloomery sync
@@ -42,36 +39,45 @@ Repeated `--update` flags are rejected to avoid ambiguous merging.
 | `--update=nix` | Reconcile manifests, preserve locked versions where possible | Update all Nix inputs |
 | `--update=nix,rust` | Update all dependencies within Cargo manifest constraints | Update all Nix inputs |
 
-Bare `--update` selects both Rust and Nix updates. The shared CLI preflight
-rejects every command when the root lacks `flake.nix`. Every successful
-invocation reconciles `Cargo.lock` and regenerates `bloomery.lock`, even when
-only Nix was selected. `bloomery.lock` is a derived resolution artifact, not a
-separately selectable update ecosystem. No package-specific or input-specific update
-selection is included in this design.
+Bare `--update` selects both Rust and Nix upgrades for every applicable flake.
+Each Cargo workspace reconciles `Cargo.lock` and regenerates `bloomery.lock`,
+including when only Nix upgrades are selected. `bloomery.lock` is derived from
+the Cargo resolution.
+
+## Sub-flake traversal
+
+Follow each `[flakes.<name>].path` in the declaring flake's configuration,
+regardless of output elevation settings. Traverse from the root in depth-first
+order, sorting siblings by entry name. Require a relative path without `..`
+components, resolving to a strict descendant with `flake.nix`. Process each
+canonical directory once even when several entries refer to it.
+
+A child with a `Cargo.toml` at its flake root owns a Cargo workspace and receives
+the Cargo and Bloomery lock stages. A Nix-only child participates in Nix input
+updates. A missing child `.bloomery/config.toml` ends descent at that child.
+Validate every present child configuration and all configured paths before
+running mutating tools. Config recommendations apply to the invocation root.
 
 ## Execution pipeline
 
 1. Parse CLI arguments and determine the root.
-2. Preflight: require `Cargo.toml` and `flake.nix`, load/validate configuration
-   if present, and verify required executables. Cargo is always required; Nix is
-   required only when an actual Nix update will run. A present malformed,
-   unreadable, or invalid config remains an error under the shared configuration
-   contract. Preflight failures occur before invoking mutating tools.
-3. Emit the missing-config warning or the recommendation notices described
-   below. These do not gate synchronization.
-4. Perform selected Nix updates first via `nix flake update` in the root. If
-   needed, Nix creates `flake.lock`. Normal sync does not invoke Nix at all.
-5. For a Rust update, run `cargo update --manifest-path <root>/Cargo.toml`.
-   Otherwise resolve via `cargo metadata --manifest-path <root>/Cargo.toml
+2. Preflight the root, the configured sub-flake tree, and required executables.
+   Cargo is required. Nix is required for Nix updates.
+3. Emit the recommendation notices for the root configuration.
+4. In each flake directory, perform selected Nix upgrades first via
+   `nix flake update`. Nix can create a missing `flake.lock`; input-free flakes
+   may have no lock to report. Plain sync leaves Nix locks untouched.
+5. For a Rust upgrade, run `cargo update --manifest-path <flake>/Cargo.toml`.
+   Otherwise resolve via `cargo metadata --manifest-path <flake>/Cargo.toml
    --format-version 1`, without `--locked`, allowing Cargo to repair or create
    `Cargo.lock`. This reconciles manifest changes without deliberately upgrading
    already compatible locked dependencies. Do not delete the lock or run
    `cargo generate-lockfile` as the normal refresh strategy.
 6. Obtain final metadata via `cargo metadata --locked --manifest-path
-   <root>/Cargo.toml --format-version 1`. This must not further mutate the Cargo
+   <flake>/Cargo.toml --format-version 1`. This must not further mutate the Cargo
    resolution. Generate the Bloomery lock from this snapshot and the final
    `Cargo.lock` hash.
-7. Publish the generated lock safely and report completion.
+7. Publish the generated lock safely. Report completion after the last flake.
 
 Cargo remains the feature-resolution authority. Sync derives the dependency-edge
 unit graph from the final locked resolution and adds no target or feature
@@ -211,7 +217,7 @@ new catalog entries naturally appear for absent keys after a CLI upgrade.
 
 ## Missing configuration
 
-`.bloomery/config.toml` is required. When it is absent, sync stops before
+The root `.bloomery/config.toml` is required. When it is absent, sync stops before
 reconciliation and reports a `ConfigurationError` naming the path and
 recommending creation of the file. Sync does not create or edit `.bloomery/` or
 the config automatically. A dangling config symlink or another read failure is
@@ -236,10 +242,12 @@ Use stdout for stage progress and completion, stderr for warnings,
 recommendations, and failures. Human output follows the shared
 [presentation grammar](../../INTERFACE/design/presentation.md): the root heading,
 status vocabulary, semantic color roles, and one closing summary. A successful
-summary identifies reconciled
-locks and selected update ecosystems. `sync --json` carries its structured
-success or failure payload as the `result` of the shared
-[JSON envelope](../../INTERFACE/design/output.md#json-envelope). No
+summary identifies reconciled locks and selected update ecosystems. In a
+multi-flake run, child progress and completed stages identify the child by
+path relative to the invocation root. Failures identify the affected child,
+and the structured result reports reconciled lock paths relative to the root.
+`sync --json` carries its structured success or failure payload as the
+`result` of the shared [JSON envelope](../../INTERFACE/design/output.md#json-envelope). No
 interactive confirmation is introduced. Invoke subprocesses with structured
 arguments rather than interpolated shell commands.
 
@@ -266,10 +274,12 @@ evaluation.
 
 Use temporary workspace fixtures and injectable subprocess runners for the
 shared flake preflight, update selection, tool failures, and partial-success
-reporting. Exercise real Cargo fixtures for missing and stale locks, version
-preservation, explicit updates, and compatible metadata generation. Test
-byte-level lock stability, escaping, collision rejection, CRLF hash agreement
-with the Nix consumer, and safe publication under injected write failures.
+reporting. Cover nested configured flakes, duplicate paths, a config-less Cargo
+child, and a Nix-only child. Exercise real Cargo fixtures for missing and stale
+locks, version preservation, explicit updates, and compatible metadata
+generation. Test byte-level lock stability, escaping, collision rejection, CRLF
+hash agreement with the Nix consumer, and safe publication under injected write
+failures.
 
 Use config fixtures for absent files, empty files, missing parents/leaves,
 explicit false/true, dotted keys, inline tables, malformed files, and future

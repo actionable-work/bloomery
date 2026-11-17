@@ -158,9 +158,9 @@ enum RawCommand {
     Disk(RawDiskArgs),
     /// Print requirements that require human review.
     Review,
-    /// Reconcile Cargo and Bloomery locks, optionally updating dependencies.
+    /// Synchronize locks recursively across configured sub-flakes.
     Sync {
-        /// Update all applicable ecosystems, or a comma-separated list of nix and rust.
+        /// Upgrade Nix and Rust dependencies recursively, or select a comma-separated list of nix and rust.
         #[arg(
             long,
             value_name = "LIST",

@@ -4,9 +4,9 @@ name: Workspace Synchronization
 tagline: Synchronize Cargo and Bloomery locks, optionally update dependencies, and surface unconfigured recommendations.
 description: |
   The sync feature owns the mutating `bloomery sync` command. It reconciles
-  Cargo.lock with the workspace manifests, regenerates bloomery.lock, optionally
-  updates Rust dependencies and Nix flake inputs, and reports recommended
-  configuration keys that the user has not explicitly configured.
+  Cargo.lock and regenerates bloomery.lock across configured sub-flakes,
+  optionally upgrades Rust dependencies and Nix flake inputs, and reports
+  recommended configuration keys for the invocation root.
 ---
 
 # `bloomery sync`
@@ -23,6 +23,7 @@ requirements define the CLI behavior.
 ## Responsibilities
 
 - Preserve existing Cargo dependency versions where possible during normal sync.
+- Traverse configured sub-flakes recursively for both sync and dependency upgrades.
 - Offer explicit dependency updates through `--update[=nix,rust]`.
 - Generate a compatible `bloomery.lock` from the final Cargo resolution.
 - Record Cargo license expressions and license-file paths in `bloomery.lock`.
