@@ -329,6 +329,7 @@ recommendation. Every name has the same sub-table shape:
 | `flakes.<name>.path` | repository-relative path | none |
 | `flakes.<name>.packages` | boolean | none |
 | `flakes.<name>.apps` | boolean | none |
+| `flakes.<name>.billets` | boolean | none |
 | `flakes.<name>.checks` | `"none"`, `"individual"`, or `"aggregate"` | none |
 
 `path` is required when a sub-flake entry is present. No key for any other

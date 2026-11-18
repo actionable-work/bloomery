@@ -21,6 +21,13 @@
         mkdir "$out"
         echo "ok" > "$out/ok"
       '';
+      "billet:worker:validate" = nixpkgs.legacyPackages.${system}.hello;
+    });
+    billets = lib.genAttrs systems (system: {
+      worker = {
+        role = "complete-worker";
+        validationCheck = nixpkgs.legacyPackages.${system}.hello;
+      };
     });
   };
 }

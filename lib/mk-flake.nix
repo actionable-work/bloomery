@@ -16,6 +16,7 @@ in
     overrides ? {},
     extraFormatters ? {},
     extraOutputs ? null,
+    billets ? null,
     self ? null,
     rustsecAdvisoryDb ? null,
   }: let
@@ -89,11 +90,9 @@ in
         acc: name: let
           spec = configuredFlakes.${name};
           enabled =
-            if family == "packages"
-            then spec.packages
-            else if family == "apps"
-            then spec.apps
-            else spec.checks == "individual";
+            if family == "checks"
+            then spec.checks == "individual"
+            else spec.${family};
           sub = subOutputs.${name}.${family}.${system} or {};
         in
           if enabled && sub != {}
@@ -195,5 +194,59 @@ in
           );
         }
       else extra;
+    outputs = baseOutputs // mergedExtra;
+
+    # Billets come from the root callback and from sub-flakes whose
+    # `[flakes.<name>].billets` toggle is on. Only callback Billets gain
+    # generated validation checks; elevated sub-flake checks follow the
+    # sub-flake's `checks` mode.
+    billetsEnabled =
+      billets != null || lib.any (spec: spec.billets) (lib.attrValues configuredFlakes);
+
+    declaredBillets = eachSystem (system:
+      if billets == null
+      then {}
+      else let
+        result = billets {
+          pkgs = nixpkgs.legacyPackages.${system};
+          packages = baseOutputs.packages.${system};
+        };
+      in
+        if builtins.isAttrs result
+        then lib.mapAttrs (validBillet system) result
+        else throw "bloomery: billets callback for ${system} must return a named attribute set");
+
+    validBillet = system: name: billet:
+      if builtins.isAttrs billet && lib.isDerivation (billet.validationCheck or null)
+      then billet
+      else throw "bloomery: billets.${system}.${name}.validationCheck must be a derivation";
+
+    billetOutputs = eachSystem (
+      system: mergeElevated declaredBillets.${system} (elevatedFamily "billets" system)
+    );
+
+    billetChecks = system:
+      lib.mapAttrs' (
+        name: billet: lib.nameValuePair "billet:${name}:validate" billet.validationCheck
+      )
+      declaredBillets.${system};
+
+    checksWithBillets = eachSystem (system: let
+      existing = outputs.checks.${system};
+      generated = billetChecks system;
+      collisions = lib.intersectLists (lib.attrNames existing) (lib.attrNames generated);
+    in
+      if collisions == []
+      then existing // generated
+      else throw "bloomery: Billet check name(s) collide on ${system}: ${lib.concatStringsSep ", " collisions}");
   in
-    baseOutputs // mergedExtra
+    if billets != null && !lib.isFunction billets
+    then throw "bloomery: billets must be a callback taking { pkgs, packages }"
+    else if !billetsEnabled
+    then outputs
+    else if extra ? billets
+    then throw "bloomery: extraOutputs.billets conflicts with the billets callback or [flakes.<name>].billets elevation"
+    else
+      outputs
+      // {billets = billetOutputs;}
+      // lib.optionalAttrs (billets != null) {checks = checksWithBillets;}

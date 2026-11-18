@@ -10,10 +10,11 @@ it does not expose a public `lib` builder surface.
 
 `mkFlake` accepts `nixpkgs`, `root`, an optional `systems` list, an optional
 `overrides` attribute set, an optional `extraFormatters` attribute set, an
-optional `extraOutputs` callback, an optional main-flake `self`, and an
-optional `rustsecAdvisoryDb` source path. The advisory database is a Nix input,
-not a workspace option; every build setting comes from the configuration file
-described in [Build configuration](configuration.md). `mkFlake` evaluates one
+optional `extraOutputs` callback, an optional [`billets` callback](billets.md),
+an optional main-flake `self`, and an optional `rustsecAdvisoryDb` source path.
+The advisory database is a Nix input, not a workspace option; every build
+setting comes from the configuration file described in
+[Build configuration](configuration.md). `mkFlake` evaluates one
 workspace per selected system with that system's `nixpkgs.legacyPackages`.
 
 When `[flakes]` composition is configured, `mkFlake` uses `self` to resolve

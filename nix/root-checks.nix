@@ -26,7 +26,20 @@ in
     inherit lib pkgs system;
     bloomery = self;
   })
+  // (import ../lib/billets.test.nix {
+    inherit lib pkgs;
+    inherit (self) mkFlake;
+  })
   // {
+    "billet:elevation" = import ../lib/billets-elevation.test.nix {
+      inherit lib pkgs;
+      inherit (self) mkFlake;
+    };
+    "billet:invalid-outputs" = import ../lib/billets-errors.test.nix {
+      inherit lib pkgs;
+      inherit (self) mkFlake;
+    };
+    "billet:diagnostics" = import ../lib/billets-diagnostics.test.nix {inherit pkgs;};
     "optimization-smoke" = bloomery.tests.optimizedBinarySmoke;
     "naming-public-compatibility" =
       pkgs.runCommand "bloomery-naming-public-compatibility" {

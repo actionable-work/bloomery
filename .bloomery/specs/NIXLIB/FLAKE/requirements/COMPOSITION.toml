@@ -29,11 +29,7 @@ id = "NIXLIB-FLAKE-COMPOSITION-003"
 title = "Elevation toggles default to off"
 manual = false
 design = "design/composition.md#configuration"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the build configuration"
-action = "default flakes.<name>.packages and flakes.<name>.apps to false and flakes.<name>.checks to none"
+ears = { type = "ubiquitous", system = "the build configuration", action = "default flakes.<name>.packages, flakes.<name>.apps, and flakes.<name>.billets to false and flakes.<name>.checks to none" }
 
 [[requirements]]
 id = "NIXLIB-FLAKE-COMPOSITION-004"
@@ -179,15 +175,10 @@ action = "still expose the elevated sub-flake checks"
 
 [[requirements]]
 id = "NIXLIB-FLAKE-COMPOSITION-016"
-title = "Only packages, apps, and checks are elevatable"
+title = "Only packages, apps, billets, and checks are elevatable"
 manual = false
 design = "design/composition.md#output-restrictions"
-
-[requirements.ears]
-type = "unwanted_behavior"
-trigger = "a flakes entry contains a key other than path, packages, apps, or checks"
-system = "the mkFlake constructor"
-action = "fail evaluation instead of elevating another output family"
+ears = { type = "unwanted_behavior", trigger = "a flakes entry contains a key other than path, packages, apps, billets, or checks", system = "the mkFlake constructor", action = "fail evaluation instead of elevating another output family" }
 
 [[requirements]]
 id = "NIXLIB-FLAKE-COMPOSITION-017"
@@ -235,3 +226,17 @@ type = "event"
 trigger = "a configured sub-flake calls mkFlake without passing self"
 system = "the mkFlake constructor"
 action = "supply the main flake's inputs, including the Bloomery mkFlake binding, to that call by default"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-021"
+title = "Enabled Billets are elevated under the flake name"
+manual = false
+design = "design/composition.md#elevated-billets"
+ears = { type = "event", trigger = "flakes.<name>.billets is enabled", system = "the mkFlake constructor", action = "expose each named sub-flake Billet as billets.<system>.<name>:<billet>" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-COMPOSITION-022"
+title = "Elevated Billets add no generated validation checks"
+manual = false
+design = "design/composition.md#elevated-billets"
+ears = { type = "event", trigger = "flakes.<name>.billets is enabled", system = "the mkFlake constructor", action = "leave the sub-flake Billet validation checks to the flakes.<name>.checks mode" }

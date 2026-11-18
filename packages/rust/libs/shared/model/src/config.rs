@@ -812,6 +812,7 @@ mod tests {
             "[flakes.x]\npath = 5\n",
             "[flakes.x]\npath = \"tests/x\"\npackages = \"yes\"\n",
             "[flakes.x]\npath = \"tests/x\"\napps = [1]\n",
+            "[flakes.x]\npath = \"tests/x\"\nbillets = \"yes\"\n",
             "[flakes.x]\npath = \"tests/x\"\nchecks = \"always\"\n",
         ] {
             let root = write_config(contents);

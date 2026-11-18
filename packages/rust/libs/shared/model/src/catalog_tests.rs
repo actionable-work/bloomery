@@ -595,6 +595,12 @@ fn catalog_covers_the_parameterized_sub_flake_table() {
         ValueType::Bool
     );
     assert_eq!(
+        resolve(&["flakes", "tests-basic", "billets"])
+            .expect("sub-flake billets")
+            .value_type,
+        ValueType::Bool
+    );
+    assert_eq!(
         resolve(&["flakes", "tests-basic", "checks"])
             .expect("sub-flake checks")
             .value_type,

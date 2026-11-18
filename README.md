@@ -38,8 +38,8 @@ setting from a required `.bloomery/config.toml` at the workspace root.
 
 `mkFlake` accepts `nixpkgs`, `root`, an optional `systems` list, an optional
 `overrides` set, an optional `extraFormatters` set, an optional `extraOutputs`
-callback, and an optional `self`. It does not accept workspace options as
-arguments.
+callback, an optional `billets` callback, and an optional `self`. It does not
+accept workspace options as arguments.
 
 ```toml bloomery-config
 # .bloomery/config.toml (required)

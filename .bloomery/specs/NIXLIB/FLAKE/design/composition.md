@@ -2,8 +2,9 @@
 
 `mkFlake` can compose independently evaluated sub-flakes into the main flake.
 Composition is off by default and is enabled per sub-flake through
-`.bloomery/config.toml`. Only a sub-flake's `packages`, `apps`, and `checks`
-outputs can be elevated; every other output family stays with the sub-flake.
+`.bloomery/config.toml`. Only a sub-flake's `packages`, `apps`, `billets`, and
+`checks` outputs can be elevated; every other output family stays with the
+sub-flake.
 
 ## Configuration
 
@@ -15,6 +16,7 @@ The `[flakes]` table is a parameterized family keyed by sub-flake name. Each
 | `path` | repository-relative path | required |
 | `packages` | boolean | `false` |
 | `apps` | boolean | `false` |
+| `billets` | boolean | `false` |
 | `checks` | `"none"`, `"individual"`, or `"aggregate"` | `"none"` |
 
 ```toml
@@ -41,8 +43,8 @@ For each selected system, Bloomery imports `<root>/<path>/flake.nix`, calls its
 sub-flake's `outputs` is evaluated once and read for every selected system.
 Evaluation is pure: it uses no
 `builtins.getFlake`, no network access, no impure mode, and no import-from-
-derivation. A sub-flake that exposes no `packages`, `apps`, or `checks`
-attribute for a selected system contributes nothing to that system.
+derivation. A sub-flake that exposes no `packages`, `apps`, `billets`, or
+`checks` attribute for a selected system contributes nothing to that system.
 
 ## Nesting
 
@@ -68,6 +70,14 @@ under the same prefix, so the main workspace's `packages.default` and
 `apps.default` are never replaced by a sub-flake. Dev-profile derivations and
 all other output families stay out of the main flake.
 
+## Elevated Billets
+
+When `[flakes.<name>].billets` is enabled, each named sub-flake
+`billets.<system>` attribute is elevated as `billets.<system>.<name>:<billet>`
+alongside any [Billets](billets.md) from the main flake's callback. Elevation
+generates no validation checks; the sub-flake's own `billet:<billet>:validate`
+checks reach the main flake through its `checks` mode.
+
 ## Elevated checks
 
 When `[flakes.<name>].checks` is `"individual"`, each sub-flake
@@ -81,7 +91,7 @@ workspace's `[checks]` toggles gate only its own generated checks.
 
 ## Output restrictions
 
-Only `packages`, `apps`, and `checks` are elevated. `devShells`, `formatter`,
+Only `packages`, `apps`, `billets`, and `checks` are elevated. `devShells`, `formatter`,
 `legacyPackages`, `overlays`, `nixosModules`, `lib`, and every other output
 family are never elevated, and no configuration key can request their
 elevation.

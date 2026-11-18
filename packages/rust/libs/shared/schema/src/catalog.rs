@@ -1155,6 +1155,10 @@ fn flake_key(path: &[&str]) -> Option<KeySpec> {
             ValueType::Bool,
             "Elevate the sub-flake's apps into the main flake.",
         ),
+        "billets" => (
+            ValueType::Bool,
+            "Elevate the sub-flake's Billet outputs into the main flake.",
+        ),
         "checks" => (
             ValueType::StringEnum(&["none", "individual", "aggregate"]),
             "Sub-flake check elevation: none, individual, or aggregate.",

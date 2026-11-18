@@ -124,9 +124,9 @@ subtable without generating a health derivation.
 The `[flakes]` table is a parameterized family keyed by sub-flake name and is
 consumed by the [NIXLIB/FLAKE composition design](../../../NIXLIB/FLAKE/design/composition.md).
 Each `[flakes.<name>]` entry carries a required repository-relative `path`, a
-`packages` boolean, an `apps` boolean, and a `checks` mode of `"none"`,
-`"individual"`, or `"aggregate"`. The elevation keys default to off, so an
-entry contributes nothing until a family is enabled.
+`packages` boolean, an `apps` boolean, a `billets` boolean, and a `checks` mode
+of `"none"`, `"individual"`, or `"aggregate"`. The elevation keys default to
+off, so an entry contributes nothing until a family is enabled.
 
 ```toml
 [flakes.tests-basic]

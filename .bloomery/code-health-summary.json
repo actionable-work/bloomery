@@ -420,11 +420,11 @@
     {
       "manifest_path": "packages/rust/libs/shared/schema/Cargo.toml",
       "name": "bloomery-schema",
-      "overall_score": 92.56,
-      "sloc": 1813,
+      "overall_score": 92.48,
+      "sloc": 1817,
       "subscores": {
         "complexity": 0.82,
-        "crateSize": 6.26,
+        "crateSize": 6.34,
         "duplication": 0.0,
         "nesting": 0.0,
         "size": 0.36
@@ -470,7 +470,7 @@
       }
     }
   ],
-  "input_digest": "305fd9a1f917d544760cd62c6366e3df3caf1bb4d45065f3f8d60232a00fa475",
+  "input_digest": "965e5cb73a621eded0081d7eb1cb7094c67b05e4542eee5fbd3ff12992580397",
   "policy": {
     "scoring": {
       "crateSlocLimit": 1500,
@@ -495,8 +495,8 @@
   "schema_version": 4,
   "workspace": {
     "crate_count": 36,
-    "overall_score": 94.83,
-    "sloc": 27988,
+    "overall_score": 94.82,
+    "sloc": 27992,
     "subscores": {
       "complexity": 0.46,
       "crateSize": 3.93,

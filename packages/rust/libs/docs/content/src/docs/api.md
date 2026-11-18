@@ -29,6 +29,35 @@ bloomery.mkFlake {
 
 ---
 
+## Billet outputs
+
+Applications that consume Billet can pass `billets = { pkgs, packages }: ...`
+to `mkFlake`. Return a named set of evaluated services and bundles. For example:
+
+```nix
+billets = { pkgs, packages }: {
+  catalog = billet.lib.mkBillet {
+    inherit pkgs;
+    modules = [
+      ./catalog.nix
+      { process.package = packages.catalog; }
+    ];
+  };
+};
+```
+
+The callback receives the regular workspace and elevated packages for each
+configured system. Entries appear at `billets.<system>.<name>`, and their
+`validationCheck` derivations run as `checks.<system>."billet:<name>:validate"`.
+The application supplies the Billet input. Additional artifact checks can use
+the normal check output.
+
+Set `billets = true` on a `[flakes.<name>]` entry to elevate a sub-flake's
+Billets as `billets.<system>."<name>:<billet>"`. Their validation checks reach
+the main flake through that entry's `checks` mode.
+
+---
+
 ## Configuration Tables
 
 Package-valued settings are written as nixpkgs attribute paths. Path-valued settings are relative to the workspace root.

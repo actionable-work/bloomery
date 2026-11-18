@@ -64,12 +64,7 @@ id = "PARSER-CONFIGURATION-VALIDATION-006"
 title = "Sub-flake elevation keys are type-validated"
 manual = false
 design = "design/schema-catalog.md#validation"
-
-[requirements.ears]
-type = "event"
-trigger = "config.toml contains a flakes entry key"
-system = "the configuration loader"
-action = "validate the packages and apps booleans, the checks enum, and the path string before any consuming command runs"
+ears = { type = "event", trigger = "config.toml contains a flakes entry key", system = "the configuration loader", action = "validate the packages, apps, and billets booleans, the checks enum, and the path string before any consuming command runs" }
 
 [[requirements]]
 id = "PARSER-CONFIGURATION-VALIDATION-007"

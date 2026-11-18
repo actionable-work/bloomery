@@ -321,7 +321,7 @@
     else
       lib.mapAttrs (
         name: sub: let
-          unknown = filter (key: !(elem key ["path" "packages" "apps" "checks"])) (attrNames sub);
+          unknown = filter (key: !(elem key ["path" "packages" "apps" "billets" "checks"])) (attrNames sub);
           path = sub.path or null;
           checks = sub.checks or "none";
         in
@@ -337,12 +337,15 @@
           then throw "bloomery: [flakes.${name}].packages must be a boolean"
           else if sub ? apps && !(builtins.isBool sub.apps)
           then throw "bloomery: [flakes.${name}].apps must be a boolean"
+          else if sub ? billets && !(builtins.isBool sub.billets)
+          then throw "bloomery: [flakes.${name}].billets must be a boolean"
           else if !(elem checks ["none" "individual" "aggregate"])
           then throw "bloomery: [flakes.${name}].checks must be none, individual, or aggregate"
           else {
             inherit path;
             packages = sub.packages or false;
             apps = sub.apps or false;
+            billets = sub.billets or false;
             inherit checks;
           }
       )

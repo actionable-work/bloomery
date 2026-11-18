@@ -12,6 +12,7 @@ path = "children/complete"
 
 [flakes.complete]
 apps = true
+billets = true
 checks = "individual"
 packages = true
 path = "children/complete"

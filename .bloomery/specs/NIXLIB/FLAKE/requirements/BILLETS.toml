@@ -1,0 +1,79 @@
+schema_version = 1
+group = "BILLETS"
+
+[[requirements]]
+id = "NIXLIB-FLAKE-BILLETS-001"
+title = "Supply the selected package set and workspace packages"
+manual = false
+design = "design/billets.md"
+ears = { type = "event", trigger = "a billets callback is configured", system = "mkFlake", action = "call it per system with the selected pkgs and the workspace and elevated packages" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-BILLETS-002"
+title = "Export each system's named Billets"
+manual = false
+design = "design/billets.md"
+ears = { type = "event", trigger = "the billets callback returns a named set", system = "mkFlake", action = "publish that set unchanged under billets.<system>" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-BILLETS-003"
+title = "Register each Billet validation derivation"
+manual = false
+design = "design/billets.md"
+ears = { type = "event", trigger = "the billets callback supplies validation derivations", system = "mkFlake", action = "register each derivation as checks.<system>.billet:<name>:validate" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-BILLETS-004"
+title = "Retain other checks when registering Billets"
+manual = false
+design = "design/billets.md"
+ears = { type = "event", trigger = "Billet validation checks are registered", system = "mkFlake", action = "retain ordinary workspace, elevated subflake, and extraOutputs checks" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-BILLETS-005"
+title = "Reject malformed callback results"
+manual = false
+design = "design/billets.md"
+ears = { type = "unwanted_behavior", trigger = "the billets callback returns a value other than a named set", system = "mkFlake", action = "reject the result with the owning system in the diagnostic" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-BILLETS-006"
+title = "Reject a missing Billet validation derivation"
+manual = false
+design = "design/billets.md"
+ears = { type = "unwanted_behavior", trigger = "a declared Billet does not provide a validationCheck derivation", system = "mkFlake", action = "reject that Billet entry with the owning system and member in the diagnostic" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-BILLETS-007"
+title = "Reject a colliding Billet check name"
+manual = false
+design = "design/billets.md"
+ears = { type = "unwanted_behavior", trigger = "a generated Billet check name is already in use", system = "mkFlake", action = "reject the duplicate check name" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-BILLETS-008"
+title = "Reject competing Billet output declarations"
+manual = false
+design = "design/billets.md"
+ears = { type = "unwanted_behavior", trigger = "the billets callback and extraOutputs.billets are both supplied", system = "mkFlake", action = "reject the competing definitions" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-BILLETS-009"
+title = "Keep native Billet outputs opt-in"
+manual = false
+design = "design/billets.md"
+ears = { type = "event", trigger = "the billets callback is omitted and no sub-flake elevates Billets", system = "mkFlake", action = "leave the billets output and validation checks to the existing extension mechanism" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-BILLETS-010"
+title = "Reject a non-callable billets value"
+manual = false
+design = "design/billets.md"
+ears = { type = "unwanted_behavior", trigger = "billets is supplied as a value that cannot be called", system = "mkFlake", action = "reject it with a bloomery-prefixed error" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-BILLETS-011"
+title = "Reject extraOutputs Billets alongside elevated Billets"
+manual = false
+design = "design/billets.md"
+ears = { type = "unwanted_behavior", trigger = "a sub-flake elevates Billets and extraOutputs.billets is supplied", system = "mkFlake", action = "reject the competing definitions" }

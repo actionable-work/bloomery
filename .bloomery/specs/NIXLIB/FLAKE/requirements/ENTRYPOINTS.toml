@@ -27,7 +27,7 @@ id = "NIXLIB-FLAKE-ENTRYPOINTS-003"
 title = "mkFlake accepts its workspace and Nix data inputs"
 manual = false
 design = "design/entry-points.md#mkflake"
-ears = { type = "ubiquitous", system = "the mkFlake constructor", action = "accept nixpkgs, root, optional systems, overrides, extraFormatters, extraOutputs, main-flake self, and rustsecAdvisoryDb inputs" }
+ears = { type = "ubiquitous", system = "the mkFlake constructor", action = "accept nixpkgs, root, optional systems, overrides, extraFormatters, extraOutputs, billets, main-flake self, and rustsecAdvisoryDb inputs" }
 
 [[requirements]]
 id = "NIXLIB-FLAKE-ENTRYPOINTS-004"

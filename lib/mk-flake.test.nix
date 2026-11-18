@@ -372,7 +372,7 @@ in
 
     testMkFlakeArgumentSurface = {
       expr = builtins.attrNames (builtins.functionArgs mkFlake);
-      expected = ["extraFormatters" "extraOutputs" "nixpkgs" "overrides" "root" "rustsecAdvisoryDb" "self" "systems"];
+      expected = ["billets" "extraFormatters" "extraOutputs" "nixpkgs" "overrides" "root" "rustsecAdvisoryDb" "self" "systems"];
     };
 
     testMkFlakePassesPinnedRustSecDatabaseToWorkspace = {
