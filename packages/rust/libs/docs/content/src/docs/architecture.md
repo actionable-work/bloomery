@@ -70,9 +70,9 @@ The Bloomery repository is itself a Rust workspace, a reusable Nix library, and 
 | --- | --- |
 | `CLI/INTERFACE` | `packages/rust/bins/cli`, `packages/rust/libs/cli/cli-app`, `cli-parser`, `cli-types`, `cli-output` |
 | `CLI/INIT` | `packages/rust/libs/cli/init` |
-| `CLI/BUILD` | `packages/rust/libs/cli/build-command` |
-| `CLI/CHECK` | `packages/rust/libs/cli/check-command`, `packages/rust/libs/shared/check` |
-| `CLI/DISK` | `packages/rust/libs/cli/disk` |
+| `CLI/BUILD` | `packages/rust/libs/cli/build-command`, `nix` |
+| `CLI/CHECK` | `packages/rust/libs/cli/check-command`, `check-*`, `nix`, `packages/rust/libs/shared/check`, `glob` |
+| `CLI/DISK` | `packages/rust/libs/cli/disk`, `nix` |
 | `CLI/REVIEW` | `packages/rust/libs/cli/review` |
 | `CLI/SPEC` | `packages/rust/libs/cli/spec` |
 | `CLI/CONFIG` | `packages/rust/libs/cli/config` |
@@ -80,7 +80,7 @@ The Bloomery repository is itself a Rust workspace, a reusable Nix library, and 
 | `PARSER/CONFIGURATION` | `packages/rust/libs/shared/model` configuration loading and `packages/rust/libs/shared/schema` catalog and policy types |
 | `PARSER/REQUIREMENTS` | `packages/rust/libs/shared/model` requirement records and identifiers |
 | `PARSER/SCANNING` | `packages/rust/libs/shared/scanning` |
-| `PARSER/WORKSPACE` | `packages/rust/libs/shared/workspace` |
+| `PARSER/WORKSPACE` | `packages/rust/libs/shared/workspace`, `glob` |
 | `NIX/SOURCES` | `lib/workspace/sources.nix` and the builder filesets |
 | `NIXLIB/FLAKE` | `lib/mk-flake.nix` and `lib/modules/` |
 | `NIXLIB/GRAPH` | `lib/builders/` and `lib/workspace/` |

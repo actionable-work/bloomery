@@ -1,7 +1,7 @@
 use super::*;
 use crate::backend::{
     NixBackend, NixCli, PackagePlan, Realization, parse_build_result, parse_derivation_show_json,
-    parse_packages_json, parse_path_info_json, plan_args, realize_args,
+    parse_packages_json, plan_args, realize_args, valid_outputs,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -158,7 +158,7 @@ fn executes_default_selection_for_the_host_system() {
         &FakeGate::default(),
     )
     .expect("build report");
-    assert_eq!(report.status, BuildStatus::Passed);
+    assert_eq!(report.status, RunStatus::Passed);
     assert_eq!(report.systems, vec!["x86_64-linux".to_owned()]);
     assert_eq!(report.packages.len(), 2);
     assert!(
@@ -254,7 +254,7 @@ fn empty_package_set_is_valid() {
         ..BuildArgs::default()
     };
     let report = execute(args, Path::new("."), &backend, &FakeGate::default()).expect("report");
-    assert_eq!(report.status, BuildStatus::Passed);
+    assert_eq!(report.status, RunStatus::Passed);
 }
 
 #[test]
@@ -290,7 +290,7 @@ fn failed_package_returns_failure_and_retains_derivation() {
         &FakeGate::default(),
     )
     .expect("report");
-    assert_eq!(report.status, BuildStatus::Failed);
+    assert_eq!(report.status, RunStatus::Failed);
     assert_eq!(report.packages[0].outcome, Outcome::Failed);
     assert_eq!(report.packages[0].derivation.as_deref(), Some(&*drv("app")));
 }
@@ -332,7 +332,7 @@ fn cancellation_distinguishes_canceled_and_not_run() {
         &FakeGate::default(),
     )
     .expect("report");
-    assert_eq!(report.status, BuildStatus::Interrupted);
+    assert_eq!(report.status, RunStatus::Interrupted);
     let outcomes = report
         .packages
         .iter()
@@ -371,7 +371,7 @@ fn evaluation_failures_are_isolated() {
         &FakeGate::default(),
     )
     .expect("report");
-    assert_eq!(report.status, BuildStatus::Failed);
+    assert_eq!(report.status, RunStatus::Failed);
     assert_eq!(backend.realize_calls.lock().unwrap()[0], vec![drv("app")]);
 }
 
@@ -448,10 +448,7 @@ fn gate_uses_selected_systems() {
         gate.calls.lock().unwrap()[0],
         vec!["aarch64-linux".to_owned()]
     );
-    assert_eq!(
-        report.gate.expect("gate report").status,
-        BuildStatus::Passed
-    );
+    assert_eq!(report.gate.expect("gate report").status, RunStatus::Passed);
     assert_eq!(gate.no_write_calls.lock().unwrap().as_slice(), &[false]);
 }
 
@@ -478,7 +475,7 @@ fn no_write_build_forwards_mode_to_the_gate_and_preserves_workspace_files() {
         .collect::<Vec<_>>();
     let gate = FakeGate {
         outcome: GateOutcome {
-            status: BuildStatus::Passed,
+            status: RunStatus::Passed,
             ..GateOutcome::default()
         },
         ..FakeGate::default()
@@ -489,7 +486,7 @@ fn no_write_build_forwards_mode_to_the_gate_and_preserves_workspace_files() {
         ..BuildArgs::default()
     };
     let report = execute_with_mode(args, &root, &backend, &gate, true).expect("build report");
-    assert_eq!(report.status, BuildStatus::Passed);
+    assert_eq!(report.status, RunStatus::Passed);
     assert_eq!(gate.no_write_calls.lock().unwrap().as_slice(), &[true]);
     assert_eq!(backend.realize_calls.lock().unwrap().len(), 1);
     assert_eq!(
@@ -507,7 +504,7 @@ fn no_write_build_forwards_mode_to_the_gate_and_preserves_workspace_files() {
 fn gate_pass_proceeds_to_realization() {
     let gate = FakeGate {
         outcome: GateOutcome {
-            status: BuildStatus::Passed,
+            status: RunStatus::Passed,
             ..GateOutcome::default()
         },
         ..FakeGate::default()
@@ -518,7 +515,7 @@ fn gate_pass_proceeds_to_realization() {
         ..BuildArgs::default()
     };
     let report = execute(args, Path::new("."), &backend, &gate).expect("report");
-    assert_eq!(report.status, BuildStatus::Passed);
+    assert_eq!(report.status, RunStatus::Passed);
     assert_eq!(backend.realize_calls.lock().unwrap().len(), 1);
 }
 
@@ -527,7 +524,7 @@ fn gate_pass_proceeds_to_realization() {
 fn gate_failure_blocks_realization() {
     let gate = FakeGate {
         outcome: GateOutcome {
-            status: BuildStatus::Failed,
+            status: RunStatus::Failed,
             failed_checks: vec!["app:test".to_owned()],
             ..GateOutcome::default()
         },
@@ -539,7 +536,7 @@ fn gate_failure_blocks_realization() {
         ..BuildArgs::default()
     };
     let report = execute(args, Path::new("."), &backend, &gate).expect("report");
-    assert_eq!(report.status, BuildStatus::Failed);
+    assert_eq!(report.status, RunStatus::Failed);
     assert!(backend.realize_calls.lock().unwrap().is_empty());
     assert_eq!(
         report.gate.expect("gate report").failed_checks,
@@ -552,7 +549,7 @@ fn gate_failure_blocks_realization() {
 fn gate_operational_failure_returns_error() {
     let gate = FakeGate {
         outcome: GateOutcome {
-            status: BuildStatus::Error,
+            status: RunStatus::Error,
             ..GateOutcome::default()
         },
         ..FakeGate::default()
@@ -563,7 +560,7 @@ fn gate_operational_failure_returns_error() {
         ..BuildArgs::default()
     };
     let report = execute(args, Path::new("."), &backend, &gate).expect("report");
-    assert_eq!(report.status, BuildStatus::Error);
+    assert_eq!(report.status, RunStatus::Error);
     assert!(backend.realize_calls.lock().unwrap().is_empty());
 }
 
@@ -585,7 +582,7 @@ fn build_executes_without_a_specification_tree() {
     let root = flake_root();
     let backend = passed_backend(&["app"]);
     let report = execute(default_args(), &root, &backend, &FakeGate::default()).expect("report");
-    assert_eq!(report.status, BuildStatus::Passed);
+    assert_eq!(report.status, RunStatus::Passed);
     assert_eq!(backend.realize_calls.lock().unwrap().len(), 1);
     let _ = std::fs::remove_dir_all(root);
 }
@@ -800,7 +797,7 @@ fn raw_logs_are_not_streamed() {
 fn gate_failure_is_reported() {
     let gate = FakeGate {
         outcome: GateOutcome {
-            status: BuildStatus::Failed,
+            status: RunStatus::Failed,
             failed_checks: vec!["app:test".to_owned()],
             ..GateOutcome::default()
         },
@@ -905,10 +902,18 @@ fn derivation_show_and_path_info_parse_outputs() {
     let legacy_paths = parse_derivation_show_json(legacy.as_bytes()).expect("legacy paths");
     assert_eq!(legacy_paths.get(&drv("app")), Some(&vec![out("app")]));
 
-    let path_info = format!(r#"{{ "{}": {{ "narSize": 1 }} }}"#, out("app"));
-    let valid = parse_path_info_json(path_info.as_bytes()).expect("valid");
-    assert!(valid.contains(&out("app")));
-
     assert!(parse_derivation_show_json(b"[]").is_err());
-    assert!(parse_path_info_json(b"[]").is_err());
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-BUILD-EXECUTION-029"))]
+fn outputs_reported_invalid_by_path_info_are_absent() {
+    let response = format!(
+        r#"{{ "{}": {{ "narSize": 1 }}, "{}": null }}"#,
+        out("app"),
+        out("missing")
+    );
+    let valid = valid_outputs(response.as_bytes()).expect("path-info");
+    assert!(valid.contains(&out("app")));
+    assert!(!valid.contains(&out("missing")));
 }

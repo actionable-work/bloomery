@@ -216,7 +216,7 @@ fn metadata_rhs(
         let token = &tokens[index];
         match &token.kind {
             TokenKind::String(value) if list_depth > 0 => {
-                if is_requirement_id(value) {
+                if bloomery_model::is_requirement_id(value) {
                     ids.push((value.clone(), token.range.clone()));
                 } else {
                     diagnostics.push(
@@ -251,21 +251,6 @@ fn metadata_rhs(
         index += 1;
     }
     (ids, diagnostics, index)
-}
-
-fn is_requirement_id(value: &str) -> bool {
-    let segments = value.split('-').collect::<Vec<_>>();
-    segments.len() == 4
-        && segments[..3].iter().all(|segment| {
-            !segment.is_empty()
-                && segment.chars().all(|character| {
-                    character.is_ascii_uppercase() || character.is_ascii_digit() || character == '_'
-                })
-        })
-        && (segments[3].len() == 3 || segments[3].len() == 4)
-        && segments[3]
-            .chars()
-            .all(|character| character.is_ascii_digit())
 }
 
 #[derive(Debug)]

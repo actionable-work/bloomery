@@ -1,5 +1,6 @@
 [dependencies]
 bloomery-cli-types = { workspace = true }
+bloomery-nix = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 

@@ -4,7 +4,7 @@ use super::interrupt::{CancellationToken, InterruptFlag};
 pub(super) use super::model::FailureDraft;
 use super::model::{
     CheckRecord, FailureLocation, FailureRecord, Outcome, RunMode, RunRecord, RunSelection,
-    RunStatus, select_ids,
+    RunStatus,
 };
 use super::output;
 use super::progress::{ProgressEvent, ProgressReducer, ProgressReporter, ProgressSink};
@@ -13,15 +13,13 @@ use super::scheduler::{
 };
 use super::store;
 use bloomery_check::AnalysisSession;
-use bloomery_check_health::check_command::health_report::{self, HealthOutcome};
-use bloomery_model::{
-    Diagnostic, health::HealthConfig, sort_diagnostics as sort_model_diagnostics,
-};
+use bloomery_check_health::health_report::{self, HealthOutcome};
+use bloomery_check_selection::selection::select_ids;
+use bloomery_model::{Diagnostic, sort_diagnostics as sort_model_diagnostics};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::Path;
 use std::process::ExitCode;
 use std::sync::mpsc;
 use std::time::Duration;
@@ -78,7 +76,10 @@ fn prepare_check_run(
             .filter(|system| {
                 !planned
                     .ids
-                    .contains(&format!("nix:{system}:core:treefmt-check"))
+                    .contains(&bloomery_check_catalog::catalog::nix_check_id(
+                        system,
+                        bloomery_check_catalog::catalog::TREEFMT_CHECK_ATTRIBUTE,
+                    ))
             })
             .cloned()
             .collect::<Vec<_>>();
@@ -108,7 +109,10 @@ fn prepare_check_run(
     let (mut selected, mut selection) = prepare_selection(args, &planned)?;
     if context.no_write {
         for system in &planned.systems {
-            selected.insert(format!("nix:{system}:core:treefmt-check"));
+            selected.insert(bloomery_check_catalog::catalog::nix_check_id(
+                system,
+                bloomery_check_catalog::catalog::TREEFMT_CHECK_ATTRIBUTE,
+            ));
         }
         selection.selected_checks = selected.iter().cloned().collect();
     }
@@ -174,20 +178,11 @@ fn prepare_health_sources(
     if !selected.contains("static:code-health") {
         return Ok((None, None));
     }
-    let loaded = bloomery_model::config::load_with_raw(root)
-        .map_err(|diagnostic| CheckError::operational(diagnostic.message))?;
-    let config = HealthConfig::from_raw(loaded.raw.as_ref())
-        .map_err(|diagnostic| CheckError::operational(diagnostic.message))?;
-    let raw_json = loaded
-        .raw
-        .as_ref()
-        .map(serde_json::to_value)
-        .transpose()
-        .map_err(|error| {
-            CheckError::operational(format!(
-                "unable to read health source-selection policy: {error}"
-            ))
-        })?;
+    let health_report::HealthPolicy {
+        config,
+        raw: raw_json,
+    } = health_report::load_health_policy(root)
+        .map_err(|error| CheckError::operational(error.into_message()))?;
     let projection = backend
         .host_system(root)
         .and_then(|system| backend.health_sources(root, &system));
@@ -636,18 +631,17 @@ fn write_run_summary(
     stdout: &mut impl Write,
     stderr: &mut impl Write,
 ) -> ExitCode {
-    let exit_code = match record.status {
-        RunStatus::Passed => ExitCode::SUCCESS,
-        RunStatus::Failed => ExitCode::from(1),
-        RunStatus::Interrupted => ExitCode::from(130),
-        RunStatus::Error => ExitCode::from(2),
-    };
+    let exit_code = ExitCode::from(record.status.exit_code());
     let bytes = if context.json_mode {
         output::run_summary_json(record).bytes
     } else {
-        crate::output::colorize_check(
+        bloomery_cli_output::colorize_check(
             &output::run_summary_text(record, final_metrics),
-            crate::output::color_enabled(crate::output::Stream::Stdout, false, context.color),
+            bloomery_cli_output::color_enabled(
+                bloomery_cli_output::Stream::Stdout,
+                false,
+                context.color,
+            ),
         )
         .into_bytes()
     };
@@ -856,7 +850,9 @@ fn build_initial_tasks<'a>(inputs: InitialTaskInputs<'a>) -> Vec<InitialWork<'a>
                 let result = if cancellation.is_canceled() {
                     InitialTaskResult::ClippyCanceled
                 } else {
-                    InitialTaskResult::Clippy(run_clippy_suppression_check(&root, &allow))
+                    InitialTaskResult::Clippy(
+                        bloomery_check::clippy::check_workspace_clippy_suppressions(&root, &allow),
+                    )
                 };
                 InitialTask { result }
             }) as _,
@@ -1828,100 +1824,6 @@ fn nix_plan_failure(
     }
 }
 
-fn run_clippy_suppression_check(root: &Path, allow: &[String]) -> Result<(), Vec<Diagnostic>> {
-    let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
-    let output = Command::new(cargo)
-        .args([
-            "metadata",
-            "--offline",
-            "--no-deps",
-            "--format-version=1",
-            "--manifest-path",
-        ])
-        .arg(root.join("Cargo.toml"))
-        .current_dir(root)
-        .output()
-        .map_err(|error| {
-            vec![Diagnostic::new(
-                "ClippySourceError",
-                format!("Unable to discover Cargo workspace targets: {error}"),
-            )]
-        })?;
-    if !output.status.success() {
-        return Err(vec![Diagnostic::new(
-            "ClippySourceError",
-            format!(
-                "Cargo target discovery failed: {}",
-                String::from_utf8_lossy(&output.stderr).trim()
-            ),
-        )]);
-    }
-    let metadata: Value = serde_json::from_slice(&output.stdout).map_err(|error| {
-        vec![Diagnostic::new(
-            "ClippySourceError",
-            format!("Cargo returned invalid target metadata: {error}"),
-        )]
-    })?;
-    let workspace_members = metadata
-        .get("workspace_members")
-        .and_then(Value::as_array)
-        .ok_or_else(|| {
-            vec![Diagnostic::new(
-                "ClippySourceError",
-                "Cargo metadata omitted workspace members",
-            )]
-        })?
-        .iter()
-        .filter_map(Value::as_str)
-        .collect::<BTreeSet<_>>();
-    let packages = metadata
-        .get("packages")
-        .and_then(Value::as_array)
-        .ok_or_else(|| {
-            vec![Diagnostic::new(
-                "ClippySourceError",
-                "Cargo metadata omitted packages",
-            )]
-        })?;
-    let target_kinds = [
-        "lib",
-        "bin",
-        "example",
-        "test",
-        "bench",
-        "custom-build",
-        "proc-macro",
-    ];
-    let mut source_paths = Vec::new();
-    for package in packages {
-        if !package
-            .get("id")
-            .and_then(Value::as_str)
-            .is_some_and(|id| workspace_members.contains(id))
-        {
-            continue;
-        }
-        let Some(targets) = package.get("targets").and_then(Value::as_array) else {
-            continue;
-        };
-        for target in targets {
-            let included = target
-                .get("kind")
-                .and_then(Value::as_array)
-                .is_some_and(|kinds| {
-                    kinds
-                        .iter()
-                        .filter_map(Value::as_str)
-                        .any(|kind| target_kinds.contains(&kind))
-                });
-            if included && let Some(path) = target.get("src_path").and_then(Value::as_str) {
-                source_paths.push(PathBuf::from(path));
-            }
-        }
-    }
-    bloomery_check::find_clippy_suppressions(root, &source_paths, allow, &AnalysisSession::new())
-}
-
 fn failure_from_block(
     check: &str,
     block: &super::catalog::FailureBlock,
@@ -1992,7 +1894,7 @@ fn diagnostic_failures(
                 .location
                 .as_ref()
                 .map(|location| FailureLocation {
-                    path: display_path(root, &location.path),
+                    path: location.display_slash_path(root),
                     line: location.line,
                     column: location.column,
                 });
@@ -2016,13 +1918,6 @@ fn diagnostic_failures(
 fn diagnostic_subject(diagnostic: &Diagnostic) -> Option<String> {
     let quoted = diagnostic.message.split('\'').nth(1)?;
     (!quoted.is_empty()).then(|| quoted.to_owned())
-}
-
-fn display_path(root: &Path, path: &Path) -> String {
-    path.strip_prefix(root)
-        .unwrap_or(path)
-        .to_string_lossy()
-        .replace(std::path::MAIN_SEPARATOR, "/")
 }
 
 pub(super) fn assign_failure_ids(mut failures: Vec<FailureDraft>) -> Vec<FailureRecord> {

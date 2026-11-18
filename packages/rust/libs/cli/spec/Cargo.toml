@@ -5,7 +5,6 @@ bloomery-model = { workspace = true }
 bloomery-scanning = { workspace = true }
 bloomery-workspace = { workspace = true }
 serde = { workspace = true }
-toml = { workspace = true }
 toml_edit = { workspace = true }
 
 [package]

@@ -2,6 +2,7 @@ use bloomery_model::{Context, Diagnostic, Evidence, sort_diagnostics};
 use bloomery_scanning::scan_all_with_session;
 use std::collections::BTreeMap;
 
+pub mod clippy;
 pub mod health;
 pub mod quality;
 pub mod report;

@@ -43,7 +43,7 @@ fn walk(root: &Path, current: &Path, segments: &[&str], out: &mut Vec<String>) {
             let name = child
                 .file_name()
                 .map(|name| name.to_string_lossy().to_string());
-            if name.is_some_and(|name| segment_match(segment, &name)) {
+            if name.is_some_and(|name| bloomery_glob::matches(segment, &name)) {
                 walk(root, &child, rest, out);
             }
         }
@@ -73,23 +73,6 @@ fn has_meta(segment: &str) -> bool {
     segment.contains('*') || segment.contains('?')
 }
 
-fn segment_match(pattern: &str, name: &str) -> bool {
-    let pattern: Vec<char> = pattern.chars().collect();
-    let name: Vec<char> = name.chars().collect();
-    matches_from(&pattern, &name)
-}
-
-fn matches_from(pattern: &[char], name: &[char]) -> bool {
-    let Some((head, rest)) = pattern.split_first() else {
-        return name.is_empty();
-    };
-    match head {
-        '*' => matches_from(rest, name) || (!name.is_empty() && matches_from(pattern, &name[1..])),
-        '?' => !name.is_empty() && matches_from(rest, &name[1..]),
-        literal => !name.is_empty() && name[0] == *literal && matches_from(rest, &name[1..]),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -112,12 +95,5 @@ mod tests {
             ],
         );
         assert_eq!(matches, vec!["README.md", "docs/a.md", "docs/nested/b.md"]);
-    }
-
-    #[test]
-    fn question_mark_matches_one_character() {
-        assert!(segment_match("a?c", "abc"));
-        assert!(!segment_match("a?c", "ac"));
-        assert!(segment_match("*", "anything"));
     }
 }

@@ -31,13 +31,27 @@ The Rust workspace contains these binaries and libraries:
 | `packages/rust/libs/cli/cli-parser` | `bloomery-cli-parser` | `CLI/INTERFACE` |
 | `packages/rust/libs/cli/cli-types` | `bloomery-cli-types` | `CLI/INTERFACE` |
 | `packages/rust/libs/cli/cli-output` | `bloomery-cli-output` | `CLI/INTERFACE` |
+| `packages/rust/libs/cli/nix` | `bloomery-nix` | `CLI/BUILD`, `CLI/CHECK`, `CLI/DISK` |
 | `packages/rust/libs/cli/check-command` | `bloomery-check-command` | `CLI/CHECK` |
-| `packages/rust/libs/shared/check` | `bloomery-check` | `CLI/CHECK` |
+| `packages/rust/libs/cli/check-catalog` | `bloomery-check-catalog` | `CLI/CHECK` |
+| `packages/rust/libs/cli/check-health` | `bloomery-check-health` | `CLI/CHECK` |
+| `packages/rust/libs/cli/check-output` | `bloomery-check-output` | `CLI/CHECK` |
+| `packages/rust/libs/cli/check-retrieval` | `bloomery-check-retrieval` | `CLI/CHECK` |
+| `packages/rust/libs/cli/check-selection` | `bloomery-check-selection` | `CLI/CHECK` |
+| `packages/rust/libs/cli/check-storage` | `bloomery-check-storage` | `CLI/CHECK` |
+| `packages/rust/libs/cli/check-support` | `bloomery-check-support` | `CLI/CHECK` |
+| `packages/rust/libs/shared/check` | `bloomery-check` | `CLI/CHECK`, `PARSER/WORKSPACE` |
+| `packages/rust/libs/cli/build-command` | `bloomery-build-command` | `CLI/BUILD` |
+| `packages/rust/libs/cli/config` | `bloomery-config` | `CLI/CONFIG` |
+| `packages/rust/libs/cli/disk` | `bloomery-disk` | `CLI/DISK` |
+| `packages/rust/libs/cli/init` | `bloomery-init` | `CLI/INIT` |
 | `packages/rust/libs/cli/review` | `bloomery-review` | `CLI/REVIEW` |
+| `packages/rust/libs/cli/spec` | `bloomery-spec` | `CLI/SPEC` |
 | `packages/rust/libs/cli/sync` | `bloomery-sync` | `CLI/SYNC` |
 | `packages/rust/libs/shared/model` | `bloomery-model` | `PARSER/CONFIGURATION`, `PARSER/REQUIREMENTS` |
 | `packages/rust/libs/shared/schema` | `bloomery-schema` | `PARSER/CONFIGURATION`, `PARSER/REQUIREMENTS` |
-| `packages/rust/libs/shared/workspace` | `bloomery-workspace` | `PARSER/WORKSPACE` |
+| `packages/rust/libs/shared/glob` | `bloomery-glob` | `CLI/CHECK`, `PARSER/WORKSPACE` |
+| `packages/rust/libs/shared/workspace` | `bloomery-workspace` | `PARSER/REQUIREMENTS`, `PARSER/WORKSPACE` |
 | `packages/rust/libs/shared/scanning` | `bloomery-scanning` | `PARSER/SCANNING` |
 | `packages/rust/libs/shared/test-macros` | `bloomery-test-macros` | Proc-macro build-graph fixture in `NIXLIB/GRAPH` |
 | `packages/rust/bins/docs` | `bloomery-docs` | `DOCS/SERVER` |

@@ -95,3 +95,23 @@ pub(crate) fn module_paths(
         .collect::<Vec<_>>();
     if paths.is_empty() { vec![first] } else { paths }
 }
+
+/// Directory holding child module files of the module loaded from `path`.
+pub(crate) fn module_child_dir(path: &Path) -> PathBuf {
+    let parent = path.parent().unwrap_or(Path::new("."));
+    if path.file_name().is_some_and(|name| name == "mod.rs") {
+        parent.to_path_buf()
+    } else {
+        parent.join(path.file_stem().unwrap_or_default())
+    }
+}
+
+/// Whether the attributes mark a test function (`#[test]` or `#[*::test]`).
+pub(crate) fn is_test_fn(attrs: &[syn::Attribute]) -> bool {
+    attrs.iter().any(|attr| {
+        attr.path()
+            .segments
+            .last()
+            .is_some_and(|segment| segment.ident == "test")
+    })
+}

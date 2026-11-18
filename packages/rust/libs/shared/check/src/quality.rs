@@ -5,10 +5,11 @@ mod ownership;
 #[cfg(test)]
 mod tests;
 
+use bloomery_glob::path_matches;
 use bloomery_model::specifications::{SpecificationPolicy, UntiedMode};
 use bloomery_model::{Context, Diagnostic, SourceLocation};
 use bloomery_scanning::ScanOutput;
-use bloomery_workspace::source::{SourceTree, glob_matches};
+use bloomery_workspace::source::SourceTree;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -25,10 +26,7 @@ impl Site {
     fn new(scanner: &str, location: &SourceLocation, root: &Path) -> Self {
         Self {
             scanner: scanner.into(),
-            path: location
-                .display_path(root)
-                .to_string_lossy()
-                .replace(std::path::MAIN_SEPARATOR, "/"),
+            path: location.display_slash_path(root),
             line: (scanner != "nix").then_some(location.line).flatten(),
             column: (scanner != "nix").then_some(location.column).flatten(),
         }
@@ -239,7 +237,7 @@ fn untied(
             .untied_exceptions
             .iter()
             .find(|(pattern, exception)| {
-                glob_matches(pattern, Path::new(&site.path))
+                path_matches(pattern, Path::new(&site.path))
                     && exception
                         .name
                         .as_ref()

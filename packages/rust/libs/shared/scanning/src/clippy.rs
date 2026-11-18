@@ -1,4 +1,5 @@
 use crate::AnalysisSession;
+use crate::modules::{module_child_dir, module_paths};
 use bloomery_model::{Diagnostic, sort_diagnostics};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -127,50 +128,9 @@ impl<'ast> Visit<'ast> for SuppressionVisitor<'_> {
             self.module_dir = previous;
             return;
         }
-        let name = item.ident.to_string();
-        let custom = item
-            .attrs
-            .iter()
-            .find_map(|attribute| match &attribute.meta {
-                Meta::NameValue(value) if value.path.is_ident("path") => {
-                    if let syn::Expr::Lit(expression) = &value.value
-                        && let syn::Lit::Str(path) = &expression.lit
-                    {
-                        Some(self.module_dir.join(path.value()))
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
-            });
-        let candidates = if let Some(path) = custom {
-            vec![path]
-        } else {
-            let first = self.module_dir.join(format!("{name}.rs"));
-            let second = self.module_dir.join(&name).join("mod.rs");
-            let existing = [first.clone(), second]
-                .into_iter()
-                .filter(|path| path.is_file())
-                .collect::<Vec<_>>();
-            if existing.is_empty() {
-                vec![first]
-            } else {
-                existing
-            }
-        };
-        for module_path in candidates {
+        for module_path in module_paths(item, &self.module_dir, Path::is_file) {
             if module_path.is_file() {
-                let child_dir = if module_path.file_name().is_some_and(|name| name == "mod.rs") {
-                    module_path
-                        .parent()
-                        .unwrap_or(&self.module_dir)
-                        .to_path_buf()
-                } else {
-                    module_path
-                        .parent()
-                        .unwrap_or(&self.module_dir)
-                        .join(module_path.file_stem().unwrap_or_default())
-                };
+                let child_dir = module_child_dir(&module_path);
                 self.modules.push((module_path, child_dir));
             }
         }

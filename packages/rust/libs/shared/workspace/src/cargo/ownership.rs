@@ -1,6 +1,6 @@
 //! Manifest-only workspace selection for specification ownership.
 
-use crate::source::{SourceTree, TreeIndex, glob_matches, resolve_relative_path, validate_path};
+use crate::source::{SourceTree, TreeIndex, resolve_relative_path, validate_path};
 use bloomery_model::{Config, Diagnostic};
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -80,7 +80,7 @@ pub fn selected_crates(
             let directory = path.parent().unwrap_or(Path::new(""));
             if !excludes
                 .iter()
-                .any(|exclude| glob_matches(exclude, directory))
+                .any(|exclude| bloomery_glob::path_matches(exclude, directory))
             {
                 paths.insert(path.to_string_lossy().into_owned());
             }

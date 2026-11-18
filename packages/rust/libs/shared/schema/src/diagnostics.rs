@@ -27,6 +27,13 @@ impl SourceLocation {
             .map(Path::to_path_buf)
             .unwrap_or_else(|_| self.path.clone())
     }
+
+    /// [`Self::display_path`] with `/` separators on every platform.
+    pub fn display_slash_path(&self, root: &Path) -> String {
+        self.display_path(root)
+            .to_string_lossy()
+            .replace(std::path::MAIN_SEPARATOR, "/")
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

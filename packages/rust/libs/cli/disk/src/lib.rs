@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Output};
 
 /// Nix expression that maps a package output set to named measurement targets.
@@ -239,7 +239,7 @@ fn resolve_targets(
             DiskError::operational(format!("unable to determine the host Nix system: {error}"))
         })?]
     } else {
-        deduplicate(&args.systems)
+        bloomery_nix::deduplicate_systems(&args.systems)
     };
     let mut targets = backend
         .resolve_tree(root, &systems, args.scope)
@@ -279,16 +279,6 @@ fn category_rank(category: &str) -> u8 {
         "derivation" => 2,
         _ => 3,
     }
-}
-
-fn deduplicate(values: &[String]) -> Vec<String> {
-    let mut deduplicated = Vec::new();
-    for value in values {
-        if !deduplicated.contains(value) {
-            deduplicated.push(value.clone());
-        }
-    }
-    deduplicated
 }
 
 /// Render a concise size summary for a terminal.
@@ -385,11 +375,6 @@ pub fn format_bytes(bytes: u64) -> String {
     format!("{value:.1} {}", UNITS[unit])
 }
 
-/// Whether an address names a Nix store path rather than a flake output.
-pub fn is_store_path(address: &str) -> bool {
-    address.starts_with("/nix/store/")
-}
-
 /// Real Nix CLI implementation of [`NixQuery`].
 #[derive(Debug, Clone)]
 pub struct NixCli {
@@ -415,7 +400,7 @@ impl NixQuery for NixCli {
     }
 
     fn host_system(&self, _root: &Path) -> Result<String, String> {
-        host_nix_system()
+        bloomery_nix::host_nix_system()
     }
 
     fn resolve_tree(
@@ -445,7 +430,7 @@ impl NixQuery for NixCli {
     }
 
     fn resolve_derivation(&self, root: &Path, address: &str) -> Result<Vec<DiskTarget>, String> {
-        if is_store_path(address) {
+        if bloomery_nix::is_store_path(address) {
             if address.ends_with(DERIVATION_SUFFIX) {
                 return Ok(self
                     .derivation_outputs(root, address)?
@@ -463,15 +448,13 @@ impl NixQuery for NixCli {
                 path: address.to_owned(),
             }]);
         }
-        let arguments = vec![
-            OsString::from("eval"),
+        let mut arguments = bloomery_nix::eval_base_args();
+        arguments.extend([
             OsString::from("--raw"),
-            OsString::from("--no-write-lock-file"),
-            OsString::from("--no-update-lock-file"),
             OsString::from(format!(".#{address}")),
             OsString::from("--apply"),
             OsString::from("value: value.outPath"),
-        ];
+        ]);
         let output = run_tool(&self.executable, &arguments, root)?;
         if !output.status.success() {
             return Err(nix_stderr(&output));
@@ -509,16 +492,8 @@ impl NixQuery for NixCli {
                 });
                 continue;
             }
-            let value: serde_json::Value = serde_json::from_slice(&output.stdout)
-                .map_err(|error| format!("Nix returned invalid store info JSON: {error}"))?;
-            let realized = match &value {
-                serde_json::Value::Object(map) => {
-                    map.get(&target.path).is_some_and(|entry| !entry.is_null())
-                }
-                serde_json::Value::Array(items) => !items.is_empty(),
-                _ => false,
-            };
-            if !realized {
+            let info = bloomery_nix::parse_path_info(&output.stdout)?;
+            if !info.is_valid(&target.path) {
                 closures.push(TargetClosure {
                     target: target.clone(),
                     realized: false,
@@ -529,7 +504,7 @@ impl NixQuery for NixCli {
             closures.push(TargetClosure {
                 target: target.clone(),
                 realized: true,
-                entries: parse_path_info(&value)?,
+                entries: closure_entries(info)?,
             });
         }
         Ok(closures)
@@ -543,15 +518,13 @@ impl NixCli {
         attribute: &str,
         apply: &str,
     ) -> Result<Vec<DiskTarget>, String> {
-        let arguments = vec![
-            OsString::from("eval"),
-            OsString::from("--no-write-lock-file"),
-            OsString::from("--no-update-lock-file"),
+        let mut arguments = bloomery_nix::eval_base_args();
+        arguments.extend([
             OsString::from("--json"),
             OsString::from(format!(".#{attribute}")),
             OsString::from("--apply"),
             OsString::from(apply),
-        ];
+        ]);
         let output = run_tool(&self.executable, &arguments, root)?;
         if !output.status.success() {
             return Err(nix_stderr(&output));
@@ -602,136 +575,26 @@ fn nix_stderr(output: &Output) -> String {
 
 /// Parse `nix path-info --json` output in either its keyed-object or legacy
 /// array shape.
-fn parse_path_info(value: &serde_json::Value) -> Result<Vec<PathSize>, String> {
-    match value {
-        serde_json::Value::Object(map) => map
-            .iter()
-            .filter(|(_, info)| !info.is_null())
-            .map(|(path, info)| {
-                let nar_size = info
-                    .get("narSize")
-                    .and_then(serde_json::Value::as_u64)
-                    .ok_or_else(|| format!("store path '{path}' has no narSize"))?;
-                Ok(PathSize {
-                    path: path.clone(),
-                    nar_size,
-                })
+fn closure_entries(info: bloomery_nix::PathInfo) -> Result<Vec<PathSize>, String> {
+    info.valid
+        .into_iter()
+        .map(|entry| {
+            let nar_size = entry
+                .nar_size
+                .ok_or_else(|| format!("store path '{}' has no narSize", entry.path))?;
+            Ok(PathSize {
+                path: entry.path,
+                nar_size,
             })
-            .collect(),
-        serde_json::Value::Array(items) => items
-            .iter()
-            .map(|item| {
-                let path = item
-                    .get("path")
-                    .and_then(serde_json::Value::as_str)
-                    .ok_or_else(|| "store path entry has no path".to_owned())?;
-                let nar_size = item
-                    .get("narSize")
-                    .and_then(serde_json::Value::as_u64)
-                    .ok_or_else(|| format!("store path '{path}' has no narSize"))?;
-                Ok(PathSize {
-                    path: path.to_owned(),
-                    nar_size,
-                })
-            })
-            .collect(),
-        _ => Err("Nix store info is neither an object nor an array".to_owned()),
-    }
-}
-
-fn host_nix_system() -> Result<String, String> {
-    if let Some(configured) = configured_nix_system() {
-        if valid_system_name(&configured) {
-            return Ok(configured);
-        }
-        return Err(format!("invalid configured Nix system '{configured}'"));
-    }
-    target_nix_system(std::env::consts::ARCH, std::env::consts::OS).ok_or_else(|| {
-        format!(
-            "unable to infer the host Nix system for {}-{}; select one with --system",
-            std::env::consts::ARCH,
-            std::env::consts::OS
-        )
-    })
-}
-
-fn valid_system_name(value: &str) -> bool {
-    !value.is_empty()
-        && value.chars().all(|character| {
-            character.is_ascii_alphanumeric() || character == '-' || character == '_'
         })
-}
-
-fn configured_nix_system() -> Option<String> {
-    let mut configuration = std::collections::BTreeMap::new();
-    for contents in nix_config_contents() {
-        for line in contents.lines() {
-            let line = line.split('#').next().unwrap_or("").trim();
-            if let Some((name, value)) = line.split_once('=') {
-                configuration.insert(name.trim().to_owned(), value.trim().to_owned());
-            }
-        }
-    }
-    let eval_system = configuration
-        .get("eval-system")
-        .filter(|value| !value.is_empty());
-    eval_system
-        .or_else(|| configuration.get("system"))
-        .map(|value| value.trim_matches('"').to_owned())
-}
-
-fn nix_config_contents() -> Vec<String> {
-    let mut paths = Vec::new();
-    if let Some(directory) = std::env::var_os("NIX_CONF_DIR") {
-        paths.push(PathBuf::from(directory).join("nix.conf"));
-    } else {
-        paths.push(PathBuf::from("/etc/nix/nix.conf"));
-    }
-    if let Some(directory) = std::env::var_os("XDG_CONFIG_HOME") {
-        paths.push(PathBuf::from(directory).join("nix/nix.conf"));
-    } else if let Some(home) = std::env::var_os("HOME") {
-        paths.push(PathBuf::from(home).join(".config/nix/nix.conf"));
-    }
-    let mut contents = paths
-        .iter()
-        .filter_map(|path| std::fs::read_to_string(path).ok())
-        .collect::<Vec<_>>();
-    if let Ok(environment) = std::env::var("NIX_CONFIG") {
-        contents.push(environment);
-    }
-    contents
-}
-
-fn target_nix_system(architecture: &str, operating_system: &str) -> Option<String> {
-    let platform = match operating_system {
-        "linux" => "linux",
-        "macos" => "darwin",
-        "freebsd" => "freebsd",
-        _ => return None,
-    };
-    let architecture = match (architecture, platform) {
-        ("x86_64", "linux") => "x86_64",
-        ("aarch64", "linux") => "aarch64",
-        ("i686", "linux") => "i686",
-        ("arm", "linux") => "armv7l",
-        ("riscv64", "linux") | ("riscv64gc", "linux") => "riscv64",
-        ("powerpc64", "linux") => "powerpc64",
-        ("powerpc64le", "linux") => "powerpc64le",
-        ("s390x", "linux") => "s390x",
-        ("x86_64", "darwin") => "x86_64",
-        ("aarch64", "darwin") => "aarch64",
-        ("x86_64", "freebsd") => "x86_64",
-        ("aarch64", "freebsd") => "aarch64",
-        _ => return None,
-    };
-    Some(format!("{architecture}-{platform}"))
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
         CHECKS_APPLY, DiskArgs, DiskErrorKind, DiskReport, DiskScope, DiskTarget, NixQuery,
-        TargetClosure, exit_code, format_bytes, is_store_path, render_summary, render_text, run,
+        TargetClosure, exit_code, format_bytes, render_summary, render_text, run,
     };
     use std::cell::RefCell;
     use std::collections::BTreeMap;
@@ -918,12 +781,16 @@ mod tests {
     #[cfg_attr(any(), bloomery("CLI-DISK-COMMAND-004"))]
     #[cfg_attr(any(), bloomery("CLI-DISK-COMMAND-005"))]
     fn disk_accepts_flake_output_and_store_paths() {
-        assert!(!is_store_path("packages.x86_64-linux.default"));
-        assert!(!is_store_path("checks.x86_64-linux.my-crate:test"));
-        assert!(is_store_path(
+        assert!(!bloomery_nix::is_store_path(
+            "packages.x86_64-linux.default"
+        ));
+        assert!(!bloomery_nix::is_store_path(
+            "checks.x86_64-linux.my-crate:test"
+        ));
+        assert!(bloomery_nix::is_store_path(
             "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-app"
         ));
-        assert!(is_store_path(
+        assert!(bloomery_nix::is_store_path(
             "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-app.drv"
         ));
 

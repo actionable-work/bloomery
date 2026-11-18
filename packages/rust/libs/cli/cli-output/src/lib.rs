@@ -2,14 +2,10 @@ mod terminal;
 
 pub use terminal::{TerminalFacts, TransientLine};
 
-use bloomery_config::ConfigReport;
-use bloomery_disk::DiskReport;
-use bloomery_init::{InitError, InitErrorKind, InitReport};
-use bloomery_model::{Diagnostic, diagnostics::SourceLocation};
-use bloomery_spec::SpecReport;
-use bloomery_sync::SyncReport;
+use bloomery_cli_types::{MISSING_FLAKE_CODE, MISSING_FLAKE_MESSAGE};
+use bloomery_model::Diagnostic;
 use serde_json::{Map, Value, json};
-use std::io::{self, IsTerminal, Write};
+use std::io::{self, IsTerminal};
 use std::path::Path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -220,7 +216,7 @@ fn warning_json(warning: &Warning) -> Value {
     })
 }
 
-fn attach_warnings(mut value: Value, warnings: &[Warning]) -> Value {
+pub fn attach_warnings(mut value: Value, warnings: &[Warning]) -> Value {
     if warnings.is_empty() {
         return value;
     }
@@ -317,7 +313,7 @@ pub fn diagnostics_json(
 fn diagnostic_json(root: &Path, diagnostic: &Diagnostic) -> Value {
     let location = diagnostic.location.as_ref().map(|location| {
         json!({
-            "path": relative_path(root, location),
+            "path": location.display_slash_path(root),
             "line": location.line,
             "column": location.column,
         })
@@ -330,19 +326,22 @@ fn diagnostic_json(root: &Path, diagnostic: &Diagnostic) -> Value {
     })
 }
 
-fn relative_path(root: &Path, location: &SourceLocation) -> String {
-    location
-        .display_path(root)
-        .to_string_lossy()
-        .replace(std::path::MAIN_SEPARATOR, "/")
-}
-
 pub fn colorize_check(text: &str, enabled: bool) -> String {
     colorize_roles(text, enabled, check_line_role)
 }
 
-pub fn colorize_review(text: &str, enabled: bool) -> String {
-    colorize_roles(text, enabled, review_line_role)
+/// Write `error: <message>` as one human-mode stderr line, colored per `mode`.
+pub fn write_error(
+    stderr: &mut impl io::Write,
+    message: impl std::fmt::Display,
+    mode: ColorMode,
+) -> io::Result<()> {
+    let line = format!("error: {message}");
+    writeln!(
+        stderr,
+        "{}",
+        colorize_error(&line, color_enabled(Stream::Stderr, false, mode))
+    )
 }
 
 pub fn colorize_error(text: &str, enabled: bool) -> String {
@@ -370,22 +369,6 @@ fn check_line_role(line: &str) -> Option<Role> {
     }
 }
 
-fn review_line_role(line: &str) -> Option<Role> {
-    if line.starts_with("Total manual requirements") {
-        Some(Role::Success)
-    } else if line.starts_with("            Design:") {
-        Some(Role::Info)
-    } else if line.starts_with("        └── [") {
-        Some(Role::Identifier)
-    } else if line.starts_with("    └──") || line.starts_with("└──") {
-        Some(Role::Accent)
-    } else if !line.trim().is_empty() && !line.starts_with(' ') {
-        Some(Role::Heading)
-    } else {
-        None
-    }
-}
-
 fn error_line_role(line: &str) -> Option<Role> {
     if line.starts_with("error:") || line.starts_with("sync failed") {
         Some(Role::Failure)
@@ -394,173 +377,6 @@ fn error_line_role(line: &str) -> Option<Role> {
     } else {
         None
     }
-}
-
-pub fn sync_success_json(report: &SyncReport) -> Value {
-    success_envelope(
-        "sync",
-        None,
-        Status::Succeeded,
-        serde_json::to_value(report).unwrap_or(Value::Null),
-        Vec::new(),
-    )
-}
-
-pub fn sync_failure_json(
-    stage: &str,
-    message: &str,
-    completed_stages: &[String],
-    partially_synchronized: bool,
-    captured_stderr: &str,
-) -> Value {
-    let (warnings, recommendations, tool_stderr) = categorize_stderr(captured_stderr);
-    let notices = warnings
-        .iter()
-        .map(|warning| Warning::new("warning", warning.clone()))
-        .chain(
-            recommendations
-                .iter()
-                .map(|recommendation| Warning::new("recommendation", recommendation.clone())),
-        )
-        .collect::<Vec<_>>();
-    let details = json!({
-        "stage": stage,
-        "completed_stages": completed_stages,
-        "partially_synchronized": partially_synchronized,
-        "recovery_guidance": if partially_synchronized {
-            Some("Fix the error and rerun `bloomery sync`.")
-        } else {
-            None
-        },
-        "tool_stderr": tool_stderr,
-    });
-    let envelope = error_envelope(
-        Some("sync"),
-        None,
-        Status::Error,
-        "SyncFailed",
-        "sync",
-        message,
-        Some(details),
-    );
-    attach_warnings(envelope, &notices)
-}
-
-pub fn init_success_json(report: &InitReport) -> Value {
-    success_envelope(
-        "init",
-        None,
-        Status::Succeeded,
-        json!({
-            "directory": report.directory,
-            "template": report.template,
-            "created": report.created,
-            "lockfiles": report.lockfiles,
-        }),
-        Vec::new(),
-    )
-}
-
-pub fn init_failure_json(error: &InitError) -> Value {
-    let (code, kind) = match error.kind() {
-        InitErrorKind::Usage => ("UsageError", "usage"),
-        InitErrorKind::Operational => ("InitError", "operational"),
-    };
-    error_envelope(
-        Some("init"),
-        None,
-        Status::Error,
-        code,
-        kind,
-        error.message(),
-        None,
-    )
-}
-
-pub fn config_success_json(report: &ConfigReport) -> Value {
-    let result = serde_json::to_value(&report.outcome).unwrap_or(Value::Null);
-    success_envelope(
-        "config",
-        None,
-        Status::Succeeded,
-        result,
-        config_warnings(&report.warnings),
-    )
-}
-
-pub fn config_failure_json(command: &str, message: &str) -> Value {
-    error_envelope(
-        Some(command),
-        None,
-        Status::Error,
-        "ConfigError",
-        "config",
-        message,
-        None,
-    )
-}
-
-fn config_warnings(warnings: &[bloomery_config::ConfigWarning]) -> Vec<Warning> {
-    warnings
-        .iter()
-        .map(|warning| match warning {
-            bloomery_config::ConfigWarning::MissingFlake => Warning::new(
-                "missing_flake",
-                "no Bloomery flake.nix in the current directory",
-            ),
-            bloomery_config::ConfigWarning::MissingConfig { path } => {
-                Warning::new("missing_config", format!("{path} is missing"))
-            }
-            bloomery_config::ConfigWarning::CreatedConfig { path } => {
-                Warning::new("created_config", format!("created {path}"))
-            }
-        })
-        .collect()
-}
-
-pub fn spec_success_json(report: &SpecReport) -> Value {
-    let result = serde_json::to_value(&report.outcome).unwrap_or(Value::Null);
-    success_envelope("spec", None, Status::Succeeded, result, Vec::new())
-}
-
-pub fn spec_failure_json(command: &str, message: &str) -> Value {
-    error_envelope(
-        Some(command),
-        None,
-        Status::Error,
-        "SpecError",
-        "spec",
-        message,
-        None,
-    )
-}
-
-pub fn disk_success_json(report: &DiskReport) -> Value {
-    success_envelope(
-        "disk",
-        None,
-        Status::Succeeded,
-        json!({
-            "bytes": report.bytes,
-            "systems": report.systems,
-            "derivation": report.derivation,
-            "unmeasured": report.unmeasured,
-            "categories": report.categories,
-        }),
-        Vec::new(),
-    )
-}
-
-pub fn disk_failure_json(message: &str) -> Value {
-    error_envelope(
-        Some("disk"),
-        None,
-        Status::Error,
-        "DiskError",
-        "disk",
-        message,
-        None,
-    )
 }
 
 pub fn usage_error_json(command: Option<&str>, message: &str) -> Value {
@@ -574,13 +390,6 @@ pub fn usage_error_json(command: Option<&str>, message: &str) -> Value {
         None,
     )
 }
-
-/// Shared message for the root `flake.nix` preflight required by every command.
-pub const MISSING_FLAKE_MESSAGE: &str = "A Bloomery flake.nix is required; set up a Bloomery flake.nix in the current directory before running this command.";
-
-/// Stable error code shared by the CLI preflight and each command's own
-/// missing-flake boundary check.
-pub const MISSING_FLAKE_CODE: &str = "MissingFlake";
 
 /// One structured setup error for a missing root flake, reused by every
 /// command so human and JSON modes carry the same guidance.
@@ -596,22 +405,6 @@ pub fn flake_setup_error_json(command: Option<&str>) -> Value {
     )
 }
 
-fn categorize_stderr(contents: &str) -> (Vec<String>, Vec<String>, Vec<String>) {
-    let mut warnings = Vec::new();
-    let mut recommendations = Vec::new();
-    let mut tool_stderr = Vec::new();
-    for line in contents.lines() {
-        if let Some(message) = line.strip_prefix("warning: ") {
-            warnings.push(message.to_owned());
-        } else if let Some(message) = line.strip_prefix("recommendation: ") {
-            recommendations.push(message.to_owned());
-        } else if !line.is_empty() {
-            tool_stderr.push(line.to_owned());
-        }
-    }
-    (warnings, recommendations, tool_stderr)
-}
-
 fn is_failure_id_line(line: &str) -> bool {
     let Some((identifier, _)) = line.split_once(' ') else {
         return false;
@@ -621,7 +414,8 @@ fn is_failure_id_line(line: &str) -> bool {
     })
 }
 
-fn colorize_roles(text: &str, enabled: bool, role: impl Fn(&str) -> Option<Role>) -> String {
+/// Style each line with the role `role` assigns it, when color is enabled.
+pub fn colorize_roles(text: &str, enabled: bool, role: impl Fn(&str) -> Option<Role>) -> String {
     if !enabled {
         return text.to_owned();
     }
@@ -640,105 +434,14 @@ fn colorize_roles(text: &str, enabled: bool, role: impl Fn(&str) -> Option<Role>
     output
 }
 
-#[derive(Debug, Clone, Copy)]
-enum Channel {
-    Stdout,
-    Stderr,
-}
-
-/// Line-buffering adapter that adds ANSI styles to the sync command's progress
-/// and advisory lines without changing subprocess output.
-pub struct ColorWriter<W> {
-    inner: W,
-    enabled: bool,
-    channel: Channel,
-    line: Vec<u8>,
-}
-
-impl<W> ColorWriter<W> {
-    pub fn stdout(inner: W, enabled: bool) -> Self {
-        Self {
-            inner,
-            enabled,
-            channel: Channel::Stdout,
-            line: Vec::new(),
-        }
-    }
-
-    pub fn stderr(inner: W, enabled: bool) -> Self {
-        Self {
-            inner,
-            enabled,
-            channel: Channel::Stderr,
-            line: Vec::new(),
-        }
-    }
-}
-
-impl<W: Write> ColorWriter<W> {
-    fn emit_line(&mut self, newline: bool) -> io::Result<()> {
-        let raw = String::from_utf8_lossy(&self.line);
-        let line = raw.strip_suffix('\r').unwrap_or(&raw);
-        let role = match self.channel {
-            Channel::Stdout if line.starts_with("==>") => Some(Role::Accent),
-            Channel::Stdout if line.starts_with("Successfully synchronized") => Some(Role::Success),
-            Channel::Stdout if line.starts_with("Skipped ") => Some(Role::Warning),
-            Channel::Stderr if line.starts_with("warning:") => Some(Role::Warning),
-            Channel::Stderr if line.starts_with("recommendation:") => Some(Role::Info),
-            _ => None,
-        };
-        if self.enabled {
-            if let Some(role) = role {
-                write!(self.inner, "{}", style(role, line, true))?;
-            } else {
-                self.inner.write_all(line.as_bytes())?;
-            }
-        } else {
-            self.inner.write_all(line.as_bytes())?;
-        }
-        if newline {
-            self.inner.write_all(b"\n")?;
-        }
-        self.line.clear();
-        Ok(())
-    }
-}
-
-impl<W: Write> Write for ColorWriter<W> {
-    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
-        let mut start = 0;
-        for (index, byte) in buffer.iter().enumerate() {
-            if *byte == b'\n' {
-                self.line.extend_from_slice(&buffer[start..index]);
-                self.emit_line(true)?;
-                start = index + 1;
-            }
-        }
-        self.line.extend_from_slice(&buffer[start..]);
-        Ok(buffer.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        if !self.line.is_empty() {
-            self.emit_line(false)?;
-        }
-        self.inner.flush()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{
-        ColorMode, ColorWriter, OutcomeStatus, Role, Status, Stream, Warning, color_enabled,
-        colorize_check, colorize_review, diagnostics_json, disk_success_json, error_envelope,
-        field, heading, join_sections, style, success_envelope, sync_failure_json,
-        sync_success_json, usage_error_json,
+        ColorMode, OutcomeStatus, Role, Status, Stream, Warning, color_enabled, colorize_check,
+        diagnostics_json, error_envelope, field, heading, join_sections, style, success_envelope,
+        usage_error_json,
     };
-    use bloomery_disk::{DiskCategory, DiskEntry, DiskReport};
     use bloomery_model::Diagnostic;
-    use bloomery_review::ReviewItem;
-    use bloomery_sync::SyncReport;
-    use std::io::Write;
     use std::path::Path;
 
     fn assert_no_ansi(value: &serde_json::Value) {
@@ -948,142 +651,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-005"))]
-    fn review_json_retains_the_stable_catalog_fields() {
-        let item = ReviewItem {
-            area: "CLI".to_owned(),
-            feature: "INTERFACE".to_owned(),
-            group: "OUTPUT".to_owned(),
-            id: "CLI-INTERFACE-OUTPUT-001".to_owned(),
-            title: "Colored output".to_owned(),
-            statement: "The CLI shall color terminal output.".to_owned(),
-            design_ref: "design/output.md".to_owned(),
-        };
-        let document = success_envelope(
-            "review",
-            None,
-            Status::Succeeded,
-            serde_json::to_value([item]).expect("review JSON"),
-            Vec::new(),
-        );
-        assert!(document["result"].is_array());
-        assert_eq!(document["result"][0]["id"], "CLI-INTERFACE-OUTPUT-001");
-        assert_eq!(document["result"][0]["design_ref"], "design/output.md");
-        assert_eq!(
-            document["result"][0]
-                .as_object()
-                .expect("review item")
-                .len(),
-            7
-        );
-        assert_no_ansi(&document);
-    }
-
-    #[test]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-013"))]
-    fn disk_json_reports_integer_bytes_and_unmeasured_targets() {
-        let report = DiskReport {
-            bytes: 4096,
-            systems: vec!["x86_64-linux".to_owned()],
-            derivation: None,
-            unmeasured: vec!["/nix/store/aaa-check".to_owned()],
-            categories: Vec::new(),
-        };
-        let document = disk_success_json(&report);
-        assert_eq!(document["command"], "disk");
-        assert_eq!(document["status"], "succeeded");
-        assert_eq!(document["result"]["bytes"], 4096);
-        assert_eq!(document["result"]["systems"][0], "x86_64-linux");
-        assert_eq!(document["result"]["unmeasured"][0], "/nix/store/aaa-check");
-        assert!(document["result"]["bytes"].is_u64());
-        assert_no_ansi(&document);
-    }
-
-    #[test]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-014"))]
-    fn disk_json_reports_the_category_tree() {
-        let report = DiskReport {
-            bytes: 300,
-            systems: vec!["x86_64-linux".to_owned()],
-            derivation: None,
-            unmeasured: Vec::new(),
-            categories: vec![
-                DiskCategory {
-                    name: "packages".to_owned(),
-                    bytes: 100,
-                    entries: vec![DiskEntry {
-                        name: "default".to_owned(),
-                        bytes: 100,
-                        unmeasured: false,
-                    }],
-                },
-                DiskCategory {
-                    name: "checks".to_owned(),
-                    bytes: 200,
-                    entries: vec![DiskEntry {
-                        name: "app:test".to_owned(),
-                        bytes: 200,
-                        unmeasured: false,
-                    }],
-                },
-            ],
-        };
-        let document = disk_success_json(&report);
-        assert_eq!(document["result"]["categories"][0]["name"], "packages");
-        assert_eq!(
-            document["result"]["categories"][0]["entries"][0]["name"],
-            "default"
-        );
-        assert_eq!(
-            document["result"]["categories"][0]["entries"][0]["bytes"],
-            100
-        );
-        assert_eq!(
-            document["result"]["categories"][0]["entries"][0]["unmeasured"],
-            false
-        );
-        assert_eq!(document["result"]["categories"][1]["name"], "checks");
-    }
-
-    #[test]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-006"))]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-007"))]
-    fn sync_json_contains_structured_completion_and_partial_failure_data() {
-        let report = SyncReport {
-            reconciled_locks: vec!["Cargo.lock".to_owned(), "bloomery.lock".to_owned()],
-            updated_ecosystems: vec!["rust".to_owned()],
-            skipped_updates: vec!["nix".to_owned()],
-            completed_stages: vec!["Cargo dependency update".to_owned()],
-            warnings: vec!["config missing".to_owned()],
-            recommendations: Vec::new(),
-            tool_stderr: Vec::new(),
-        };
-        let success = sync_success_json(&report);
-        assert_eq!(success["command"], "sync");
-        assert_eq!(success["status"], "succeeded");
-        assert_eq!(success["result"]["updated_ecosystems"][0], "rust");
-        assert_no_ansi(&success);
-
-        let failure = sync_failure_json(
-            "final Cargo metadata",
-            "exit status 1",
-            &["Cargo lock reconciliation".to_owned()],
-            true,
-            "warning: advisory\nrecommendation: feature\ntool detail\n",
-        );
-        assert_eq!(failure["error"]["details"]["stage"], "final Cargo metadata");
-        assert_eq!(failure["error"]["details"]["partially_synchronized"], true);
-        assert_eq!(
-            failure["error"]["details"]["recovery_guidance"],
-            "Fix the error and rerun `bloomery sync`."
-        );
-        assert_eq!(failure["warnings"][0]["message"], "advisory");
-        assert_eq!(failure["warnings"][1]["message"], "feature");
-        assert_eq!(failure["error"]["details"]["tool_stderr"][0], "tool detail");
-        assert_no_ansi(&failure);
-    }
-
-    #[test]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-007"))]
     fn usage_errors_requested_as_json_are_single_machine_documents() {
         let document = usage_error_json(Some("review"), "unknown option");
@@ -1096,35 +663,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(any(), bloomery("CLI-INTERFACE-OUTPUT-001"))]
-    fn sync_color_writer_styles_only_progress_and_advisories() {
-        let mut output = Vec::new();
-        {
-            let mut writer = ColorWriter::stdout(&mut output, true);
-            writer
-                .write_all(b"==> Stage\nSuccessfully synchronized locks\nplain subprocess output\n")
-                .expect("write");
-            writer.flush().expect("flush");
-        }
-        let output = String::from_utf8(output).expect("UTF-8");
-        assert!(output.contains("\x1b[1;36m==> Stage\x1b[0m\n"));
-        assert!(output.contains("\x1b[1;32mSuccessfully synchronized locks\x1b[0m\n"));
-        assert!(output.contains("plain subprocess output\n"));
-
-        let mut errors = Vec::new();
-        {
-            let mut writer = ColorWriter::stderr(&mut errors, true);
-            writer
-                .write_all(b"warning: config\nrecommendation: scanner\n")
-                .expect("write notices");
-            writer.flush().expect("flush notices");
-        }
-        let errors = String::from_utf8(errors).expect("UTF-8 stderr");
-        assert!(errors.contains("\x1b[1;33mwarning: config\x1b[0m\n"));
-        assert!(errors.contains("\x1b[36mrecommendation: scanner\x1b[0m\n"));
-    }
-
-    #[test]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-005"))]
     #[cfg_attr(any(), bloomery("CLI-INTERFACE-PRESENTATION-009"))]
     fn human_renderers_apply_color_only_when_requested() {
@@ -1133,13 +671,6 @@ mod tests {
         assert!(colored_check.contains("\x1b[1;32m✓ passed"));
         assert!(colored_check.contains("\x1b[1;31m✗ failed"));
         assert_eq!(colorize_check(check, false), check);
-
-        let review = "PARSER\n└── AUTH\n        └── [REQ-001] Review\n";
-        let colored_review = colorize_review(review, true);
-        assert!(colored_review.contains("\x1b[1mPARSER"));
-        assert!(colored_review.contains("\x1b[1;36m└── AUTH"));
-        assert!(colored_review.contains("\x1b[1;35m        └── [REQ-001]"));
-        assert_eq!(colorize_review(review, false), review);
     }
 
     #[test]

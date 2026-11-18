@@ -5,7 +5,7 @@ use super::catalog::{
 use super::command::{CheckArgs, CheckContext, run_at_with};
 use super::interrupt::{CancellationToken, InterruptFlag};
 use super::progress::{DerivationEvent, ProgressSink};
-use crate::output::TerminalFacts;
+use bloomery_cli_output::TerminalFacts;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -603,7 +603,7 @@ pub(super) fn invoke_with_terminal_and_mode(
         CheckContext {
             root,
             json_mode: json,
-            color: crate::output::ColorMode::Auto,
+            color: bloomery_cli_output::ColorMode::Auto,
             no_write,
             backend,
             interrupt,

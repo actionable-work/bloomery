@@ -1,8 +1,8 @@
 use super::{Assessment, Site, TestLinks};
+use bloomery_glob::path_matches;
 use bloomery_model::specifications::{SpecificationPolicy, TestException};
 use bloomery_model::{Context, Diagnostic, Requirement, SourceLocation};
 use bloomery_scanning::ScanOutput;
-use bloomery_workspace::source::glob_matches;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -107,7 +107,7 @@ fn matching_exception<'a>(
     [true, false].into_iter().find_map(|named| {
         policy.test_exceptions.values().find(|exception| {
             exception.name.is_some() == named
-                && glob_matches(&exception.path, Path::new(&site.path))
+                && path_matches(&exception.path, Path::new(&site.path))
                 && exception
                     .name
                     .as_deref()

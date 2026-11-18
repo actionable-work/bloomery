@@ -1440,6 +1440,26 @@ fn valid_clippy_lint_name(name: &str) -> bool {
 }
 
 /// Recommended default for a path, if any.
+/// Catalog default string at `path`; panics when the catalog has none, which
+/// is a catalog definition error.
+pub fn default_string(path: &[&str]) -> String {
+    match lookup(path).and_then(CatalogEntry::effective_default) {
+        Some(DefaultValue::String(value)) => value.to_owned(),
+        _ => panic!("catalog has no string default for {}", path.join(".")),
+    }
+}
+
+/// Catalog default string list at `path`; panics when the catalog has none,
+/// which is a catalog definition error.
+pub fn default_string_list(path: &[&str]) -> Vec<String> {
+    match lookup(path).and_then(CatalogEntry::effective_default) {
+        Some(DefaultValue::StringList(values)) => {
+            values.iter().map(|value| (*value).to_owned()).collect()
+        }
+        _ => panic!("catalog has no string list default for {}", path.join(".")),
+    }
+}
+
 pub fn effective_default(path: &[&str]) -> Option<Value> {
     lookup(path)
         .and_then(CatalogEntry::effective_default)

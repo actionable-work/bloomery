@@ -97,11 +97,7 @@ impl SpecificationPolicy {
             return Err(invalid("maxTestsPerRequirement must be positive"));
         }
         for (id, exception) in &self.requirement_exceptions {
-            let parts: Vec<_> = id.split('-').collect();
-            if parts.len() != 4
-                || !parts[..3].iter().all(|part| valid_segment(part))
-                || !matches!(parts[3].len(), 3 | 4)
-                || !parts[3].bytes().all(|byte| byte.is_ascii_digit())
+            if !crate::is_requirement_id(id)
                 || exception.max_tests == 0
                 || exception.reason.trim().is_empty()
             {
@@ -129,7 +125,10 @@ impl SpecificationPolicy {
                 && distinct.len() == ownership.features.len()
                 && distinct.iter().all(|feature| {
                     let parts: Vec<_> = feature.split('/').collect();
-                    parts.len() == 2 && parts.iter().all(|part| valid_segment(part))
+                    parts.len() == 2
+                        && parts
+                            .iter()
+                            .all(|part| crate::requirement_id::valid_segment(part))
                 });
             let valid_exclusion = ownership
                 .reason
@@ -177,13 +176,6 @@ impl SpecificationPolicy {
         }
         Ok(())
     }
-}
-
-fn valid_segment(value: &str) -> bool {
-    !value.is_empty()
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'_')
 }
 
 fn valid_path(value: &str) -> bool {

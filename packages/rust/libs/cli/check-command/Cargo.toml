@@ -12,11 +12,9 @@ bloomery-cli-types = { workspace = true }
 bloomery-model = { workspace = true }
 bloomery-workspace = { workspace = true }
 serde_json = { workspace = true }
-sha2 = { workspace = true }
-toml = { workspace = true }
-tracing = { workspace = true }
 
 [dev-dependencies]
+toml = { workspace = true }
 
 [package]
 edition = "2024"

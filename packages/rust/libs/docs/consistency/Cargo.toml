@@ -1,6 +1,8 @@
 [dependencies]
 bloomery-cli-types = { workspace = true }
+bloomery-glob = { workspace = true }
 bloomery-model = { workspace = true }
+bloomery-workspace = { workspace = true }
 serde = { workspace = true }
 toml = { workspace = true }
 

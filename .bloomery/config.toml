@@ -169,6 +169,13 @@ features = ["CLI/DISK"] # Feature identifiers owned by this crate.
 [checks.specifications.crates."packages/rust/libs/cli/init/Cargo.toml"]
 features = ["CLI/INIT"] # Feature identifiers owned by this crate.
 
+[checks.specifications.crates."packages/rust/libs/cli/nix/Cargo.toml"]
+features = [
+  "CLI/BUILD",
+  "CLI/CHECK",
+  "CLI/DISK",
+] # Feature identifiers owned by this crate.
+
 [checks.specifications.crates."packages/rust/libs/cli/review/Cargo.toml"]
 features = ["CLI/REVIEW"] # Feature identifiers owned by this crate.
 
@@ -191,6 +198,12 @@ features = ["DOCS/SERVER"] # Feature identifiers owned by this crate.
 features = ["DOCS/UI"] # Feature identifiers owned by this crate.
 
 [checks.specifications.crates."packages/rust/libs/shared/check/Cargo.toml"]
+features = [
+  "CLI/CHECK",
+  "PARSER/WORKSPACE",
+] # Feature identifiers owned by this crate.
+
+[checks.specifications.crates."packages/rust/libs/shared/glob/Cargo.toml"]
 features = [
   "CLI/CHECK",
   "PARSER/WORKSPACE",
@@ -277,7 +290,7 @@ reason = "The common JSON envelope and configuration-specific payload are verifi
 [checks.specifications.testExceptions.detail_pages_are_bounded_seekable_and_make_progress_in_both_formats]
 maxRequirements = 6                                                                                                         # Requirement ID limit for matching validating sites.
 name = "detail_pages_are_bounded_seekable_and_make_progress_in_both_formats"                                                # Exact test name restricted by this breadth exception.
-path = "packages/rust/libs/cli/check-output/src/check_command/output.rs"                                                    # Repository-relative path glob for this test breadth exception.
+path = "packages/rust/libs/cli/check-output/src/output.rs"                                                                  # Repository-relative path glob for this test breadth exception.
 reason = "The same retained detail stream verifies byte bounds, continuation and equivalent paging in both output formats." # Reason for this specification policy exception or ownership.
 
 [checks.specifications.testExceptions.every_template_carries_the_common_scaffolding]
@@ -403,7 +416,7 @@ reason = "One retained run is paged through both retrieval APIs to verify consis
 [checks.specifications.testExceptions.run_summary_is_compact_counts_only_and_omits_logs_and_success_records]
 maxRequirements = 6                                                                                                         # Requirement ID limit for matching validating sites.
 name = "run_summary_is_compact_counts_only_and_omits_logs_and_success_records"                                              # Exact test name restricted by this breadth exception.
-path = "packages/rust/libs/cli/check-output/src/check_command/output.rs"                                                    # Repository-relative path glob for this test breadth exception.
+path = "packages/rust/libs/cli/check-output/src/output.rs"                                                                  # Repository-relative path glob for this test breadth exception.
 reason = "The summary contract checks bounds, aggregate counts and progressive disclosure against the same result fixture." # Reason for this specification policy exception or ownership.
 
 [checks.specifications.testExceptions.scaffolds_the_basic_template_into_a_missing_target]

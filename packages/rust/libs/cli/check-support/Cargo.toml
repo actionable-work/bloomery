@@ -1,6 +1,7 @@
 [dependencies]
 bloomery-cli-output = { workspace = true }
 bloomery-cli-types = { workspace = true }
+bloomery-nix = { workspace = true }
 
 [package]
 edition = "2024"

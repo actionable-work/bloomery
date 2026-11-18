@@ -1,5 +1,8 @@
-use bloomery_model::{Context, Requirement};
+use bloomery_model::{
+    Context, Diagnostic, SPEC_MANAGEMENT_DISABLED_MESSAGE, catalogue_order, sort_diagnostics,
+};
 use serde::Serialize;
+use std::path::Path;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ReviewItem {
@@ -10,6 +13,24 @@ pub struct ReviewItem {
     pub title: String,
     pub statement: String,
     pub design_ref: String,
+}
+
+/// Load the workspace for review, requiring specification management.
+///
+/// Load failures are returned sorted; a workspace with specification
+/// management disabled yields one `SpecManagementDisabled` diagnostic.
+pub fn load(root: &Path) -> Result<Context, Vec<Diagnostic>> {
+    match bloomery_workspace::load(root) {
+        Ok(context) if context.spec_management_enabled() => Ok(context),
+        Ok(_) => Err(vec![Diagnostic::new(
+            "SpecManagementDisabled",
+            SPEC_MANAGEMENT_DISABLED_MESSAGE,
+        )]),
+        Err(mut diagnostics) => {
+            sort_diagnostics(&mut diagnostics);
+            Err(diagnostics)
+        }
+    }
 }
 
 pub fn items(context: &Context) -> Vec<ReviewItem> {
@@ -23,22 +44,16 @@ pub fn items(context: &Context) -> Vec<ReviewItem> {
             id: requirement.entry.id.clone(),
             title: requirement.entry.title.clone(),
             statement: requirement.entry.ears.to_statement(),
-            design_ref: design_display(requirement),
+            design_ref: requirement.design_ref(),
         })
         .collect::<Vec<_>>();
     items.sort_by(|left, right| {
-        (
-            left.area.as_str(),
-            left.feature.as_str(),
-            left.group.as_str(),
-            sequence(&left.id),
-        )
-            .cmp(&(
-                right.area.as_str(),
-                right.feature.as_str(),
-                right.group.as_str(),
-                sequence(&right.id),
-            ))
+        catalogue_order(&left.area, &left.feature, &left.group, &left.id).cmp(&catalogue_order(
+            &right.area,
+            &right.feature,
+            &right.group,
+            &right.id,
+        ))
     });
     items
 }
@@ -77,20 +92,6 @@ pub fn render_text(items: &[ReviewItem]) -> String {
         items.len()
     ));
     output
-}
-
-fn design_display(requirement: &Requirement) -> String {
-    match &requirement.design.anchor {
-        Some(anchor) => format!("{}#{anchor}", requirement.design.display),
-        None => requirement.design.display.clone(),
-    }
-}
-
-fn sequence(id: &str) -> u32 {
-    id.rsplit('-')
-        .next()
-        .and_then(|value| value.parse().ok())
-        .unwrap_or(0)
 }
 
 #[cfg(test)]

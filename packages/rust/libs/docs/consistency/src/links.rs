@@ -121,54 +121,8 @@ fn is_external(target: &str) -> bool {
 }
 
 fn has_anchor(path: &Path, anchor: &str) -> bool {
-    let Ok(contents) = fs::read_to_string(path) else {
-        return false;
-    };
-    let mut occurrences = std::collections::BTreeMap::<String, usize>::new();
-    for line in contents.lines() {
-        let trimmed = line.trim_start();
-        let hash_count = trimmed
-            .chars()
-            .take_while(|character| *character == '#')
-            .count();
-        if (1..=6).contains(&hash_count)
-            && trimmed
-                .chars()
-                .nth(hash_count)
-                .is_some_and(char::is_whitespace)
-        {
-            let heading = trimmed[hash_count..].trim().trim_end_matches('#').trim();
-            let base = slugify(heading);
-            let count = occurrences.entry(base.clone()).or_insert(0);
-            let candidate = if *count == 0 {
-                base
-            } else {
-                format!("{base}-{}", *count)
-            };
-            *count += 1;
-            if candidate == anchor {
-                return true;
-            }
-        }
-    }
-    false
-}
-
-fn slugify(value: &str) -> String {
-    let mut slug = String::new();
-    let mut pending_dash = false;
-    for character in value.chars().flat_map(|character| character.to_lowercase()) {
-        if character.is_alphanumeric() {
-            if pending_dash && !slug.is_empty() {
-                slug.push('-');
-            }
-            pending_dash = false;
-            slug.push(character);
-        } else if !slug.is_empty() {
-            pending_dash = true;
-        }
-    }
-    slug
+    fs::read_to_string(path)
+        .is_ok_and(|contents| bloomery_workspace::markdown::has_anchor(&contents, anchor))
 }
 
 #[cfg(test)]

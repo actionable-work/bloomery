@@ -2,6 +2,8 @@
 bloomery-check-command = { workspace = true }
 bloomery-cli-output = { workspace = true }
 bloomery-cli-types = { workspace = true }
+bloomery-glob = { workspace = true }
+bloomery-nix = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]

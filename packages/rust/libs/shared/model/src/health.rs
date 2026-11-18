@@ -484,6 +484,40 @@ mod tests {
     }
 
     #[test]
+    fn catalog_effective_defaults_match_omitted_key_defaults() {
+        let mut health = toml::Table::new();
+        for entry in crate::catalog::CATALOG {
+            let ["checks", "codeHealth", rest @ ..] = entry.path else {
+                continue;
+            };
+            let Some(default) = entry.effective_default() else {
+                continue;
+            };
+            let mut table = &mut health;
+            let (key, parents) = rest.split_last().expect("non-empty catalog path");
+            for parent in parents {
+                table = table
+                    .entry(parent.to_string())
+                    .or_insert_with(|| toml::Value::Table(toml::Table::new()))
+                    .as_table_mut()
+                    .expect("catalog parent table");
+            }
+            table.insert(key.to_string(), default.to_toml());
+        }
+        let raw = toml::Value::Table(toml::Table::from_iter([(
+            "checks".to_owned(),
+            toml::Value::Table(toml::Table::from_iter([(
+                "codeHealth".to_owned(),
+                toml::Value::Table(health),
+            )])),
+        )]));
+        assert_eq!(
+            HealthConfig::from_raw(Some(&raw)).expect("catalog defaults"),
+            HealthConfig::default()
+        );
+    }
+
+    #[test]
     fn accepts_fractional_scores_and_disabled_valid_policy() {
         let config = parse("enable = false\nminCrateScore = 74.25\nmaxRegression = 1.5")
             .expect("valid thresholds");

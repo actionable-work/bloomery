@@ -116,6 +116,35 @@ pub struct Requirement {
     pub design: DesignReference,
 }
 
+impl Requirement {
+    /// Design reference as displayed to readers: `path` or `path#anchor`.
+    pub fn design_ref(&self) -> String {
+        match &self.design.anchor {
+            Some(anchor) => format!("{}#{anchor}", self.design.display),
+            None => self.design.display.clone(),
+        }
+    }
+}
+
+/// Catalogue ordering key for a requirement: area, feature, group, then the
+/// identifier's [`requirement_sequence`].
+pub fn catalogue_order<'a>(
+    area: &'a str,
+    feature: &'a str,
+    group: &'a str,
+    id: &str,
+) -> (&'a str, &'a str, &'a str, u32) {
+    (area, feature, group, requirement_sequence(id))
+}
+
+/// Numeric sequence suffix of a requirement identifier, or `0` when absent.
+pub fn requirement_sequence(id: &str) -> u32 {
+    id.rsplit('-')
+        .next()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(0)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RequirementGroup {
     pub group: String,
@@ -164,6 +193,10 @@ pub struct Context {
     pub specs_enabled: bool,
     pub areas: Vec<Area>,
 }
+
+/// Guidance shown when a command needs specification management but it is off.
+pub const SPEC_MANAGEMENT_DISABLED_MESSAGE: &str =
+    "specification management is disabled; set specs.enable = true or add .bloomery/specs";
 
 impl Context {
     /// Whether specification management is active for this workspace.

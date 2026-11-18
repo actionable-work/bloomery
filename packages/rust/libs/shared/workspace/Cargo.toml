@@ -1,4 +1,5 @@
 [dependencies]
+bloomery-glob = { workspace = true }
 bloomery-model = { workspace = true }
 serde_yaml = { workspace = true }
 toml = { workspace = true }

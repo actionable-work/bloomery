@@ -30,7 +30,7 @@ pub fn command_paths() -> BTreeSet<String> {
         }),
     ];
     for command in &commands {
-        paths.insert(command_name(command).to_string());
+        paths.insert(command.name().to_string());
     }
     // `disk tree` is a subcommand represented by a boolean flag in the model.
     paths.insert("disk tree".to_string());
@@ -48,7 +48,7 @@ pub fn command_paths() -> BTreeSet<String> {
         CheckOperation::HealthUpdate(HealthUpdateArgs::default()),
     ];
     for operation in &check_operations {
-        paths.insert(check_operation_path(operation).to_string());
+        paths.insert(operation.path().to_string());
     }
 
     let config_operations = [
@@ -66,7 +66,7 @@ pub fn command_paths() -> BTreeSet<String> {
         ConfigOperation::Document,
     ];
     for operation in &config_operations {
-        paths.insert(config_operation_path(operation).to_string());
+        paths.insert(operation.path().to_string());
     }
 
     let spec_operations = [
@@ -93,56 +93,10 @@ pub fn command_paths() -> BTreeSet<String> {
         SpecOperation::Candidates,
     ];
     for operation in &spec_operations {
-        paths.insert(spec_operation_path(operation).to_string());
+        paths.insert(operation.path().to_string());
     }
 
     paths
-}
-
-fn command_name(command: &CliCommand) -> &'static str {
-    match command {
-        CliCommand::Init(_) => "init",
-        CliCommand::Check(_) => "check",
-        CliCommand::Build(_) => "build",
-        CliCommand::Disk(_) => "disk",
-        CliCommand::Review => "review",
-        CliCommand::Sync { .. } => "sync",
-        CliCommand::Config(_) => "config",
-        CliCommand::Spec(_) => "spec",
-    }
-}
-
-fn check_operation_path(operation: &CheckOperation) -> &'static str {
-    match operation {
-        CheckOperation::List(_) => "check list",
-        CheckOperation::Failures(_) => "check failures",
-        CheckOperation::Details(_) => "check details",
-        CheckOperation::Health(_) => "check health",
-        CheckOperation::HealthUpdate(_) => "check health update",
-    }
-}
-
-fn config_operation_path(operation: &ConfigOperation) -> &'static str {
-    match operation {
-        ConfigOperation::Get { .. } => "config get",
-        ConfigOperation::Set { .. } => "config set",
-        ConfigOperation::Unset { .. } => "config unset",
-        ConfigOperation::List { .. } => "config list",
-        ConfigOperation::Upgrade { .. } => "config upgrade",
-        ConfigOperation::Document => "config document",
-    }
-}
-
-fn spec_operation_path(operation: &SpecOperation) -> &'static str {
-    match operation {
-        SpecOperation::List { .. } => "spec list",
-        SpecOperation::Show { .. } => "spec show",
-        SpecOperation::Add { .. } => "spec add",
-        SpecOperation::Set { .. } => "spec set",
-        SpecOperation::Remove { .. } => "spec remove",
-        SpecOperation::Trace { .. } | SpecOperation::TraceReport { .. } => "spec trace",
-        SpecOperation::Candidates => "spec candidates",
-    }
 }
 
 #[cfg(test)]

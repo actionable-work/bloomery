@@ -24,11 +24,6 @@ use std::fmt;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-/// Shared message for the root-flake preflight required by every command. Kept
-/// in sync with the CLI output layer so direct library callers see the same
-/// guidance as the CLI boundary.
-pub const MISSING_FLAKE_MESSAGE: &str = "A Bloomery flake.nix is required; set up a Bloomery flake.nix in the current directory before running this command.";
-
 #[derive(Debug)]
 pub struct SyncError {
     stage: String,
@@ -310,8 +305,11 @@ fn preflight(
             ),
         ));
     }
-    if !root.join("flake.nix").is_file() {
-        return Err(SyncError::new("preflight", MISSING_FLAKE_MESSAGE));
+    if !bloomery_cli_types::flake_present(root) {
+        return Err(SyncError::new(
+            "preflight",
+            bloomery_cli_types::MISSING_FLAKE_MESSAGE,
+        ));
     }
 
     let loaded_config = load_with_raw(root).map_err(|diagnostic| {

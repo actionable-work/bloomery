@@ -11,7 +11,7 @@ use crate::check_command::test_support::{
     FakeNix, TerminalInvocation, fixture, invoke_with_terminal, invoke_with_terminal_and_mode,
     request,
 };
-use crate::output::TerminalFacts;
+use bloomery_cli_output::TerminalFacts;
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
@@ -509,7 +509,7 @@ fn completed_check_outputs_advance_progress_before_the_batch_returns() {
             CheckContext {
                 root: &root_for_run,
                 json_mode: false,
-                color: crate::output::ColorMode::Auto,
+                color: bloomery_cli_output::ColorMode::Auto,
                 no_write: false,
                 backend: backend_for_run.as_ref(),
                 interrupt: InterruptFlag::new(),
@@ -630,7 +630,7 @@ fn blocked_dependents_finalize_before_a_slow_worker_joins() {
             CheckContext {
                 root: &root_for_run,
                 json_mode: false,
-                color: crate::output::ColorMode::Auto,
+                color: bloomery_cli_output::ColorMode::Auto,
                 no_write: false,
                 backend: &backend,
                 interrupt: InterruptFlag::new(),

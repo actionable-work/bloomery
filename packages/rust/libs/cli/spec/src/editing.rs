@@ -1,5 +1,5 @@
 use crate::{RecordDetail, RecordSummary, SpecError, SpecOutcome, display_path, find_requirement};
-use bloomery_model::{Area, Context, Feature, Requirement};
+use bloomery_model::{Area, Context, Feature, Requirement, catalogue_order, requirement_sequence};
 use std::fs;
 use std::path::{Path, PathBuf};
 use toml_edit::{ArrayOfTables, DocumentMut, Item, Table};
@@ -26,18 +26,12 @@ pub(crate) fn list(
         .map(|(area_node, feature_node, requirement)| summary(area_node, feature_node, requirement))
         .collect::<Vec<_>>();
     records.sort_by(|left, right| {
-        (
-            left.area.as_str(),
-            left.feature.as_str(),
-            left.group.as_str(),
-            sequence(&left.id),
-        )
-            .cmp(&(
-                right.area.as_str(),
-                right.feature.as_str(),
-                right.group.as_str(),
-                sequence(&right.id),
-            ))
+        catalogue_order(&left.area, &left.feature, &left.group, &left.id).cmp(&catalogue_order(
+            &right.area,
+            &right.feature,
+            &right.group,
+            &right.id,
+        ))
     });
     records
 }
@@ -213,44 +207,20 @@ fn summary(area: &Area, feature: &Feature, requirement: &Requirement) -> RecordS
         id: requirement.entry.id.clone(),
         title: requirement.entry.title.clone(),
         manual: requirement.entry.manual,
-        design_ref: design_display(requirement),
+        design_ref: requirement.design_ref(),
     }
-}
-
-fn design_display(requirement: &Requirement) -> String {
-    match &requirement.design.anchor {
-        Some(anchor) => format!("{}#{anchor}", requirement.design.display),
-        None => requirement.design.display.clone(),
-    }
-}
-
-fn sequence(id: &str) -> u32 {
-    id.rsplit('-')
-        .next()
-        .and_then(|value| value.parse().ok())
-        .unwrap_or(0)
 }
 
 fn parse_id(id: &str) -> Result<ParsedId<'_>, SpecError> {
-    let parts = id.split('-').collect::<Vec<_>>();
-    let valid = parts.len() == 4
-        && parts[..3].iter().all(|part| {
-            !part.is_empty()
-                && part.chars().all(|character| {
-                    character.is_ascii_uppercase() || character.is_ascii_digit() || character == '_'
-                })
-        })
-        && (parts[3].len() == 3 || parts[3].len() == 4)
-        && parts[3].chars().all(|character| character.is_ascii_digit());
-    if !valid {
+    let Some(parsed) = bloomery_model::parse_requirement_id(id) else {
         return Err(SpecError::usage(format!(
             "requirement ID '{id}' does not match AREA-FEATURE-GROUP-SEQUENCE"
         )));
-    }
+    };
     Ok(ParsedId {
-        area: parts[0],
-        feature: parts[1],
-        group: parts[2],
+        area: parsed.area,
+        feature: parsed.feature,
+        group: parsed.group,
     })
 }
 
@@ -286,7 +256,7 @@ fn insert_record(document: &mut DocumentMut, record: Table) -> Result<(), SpecEr
     let new_sequence = record
         .get("id")
         .and_then(Item::as_str)
-        .map(sequence)
+        .map(requirement_sequence)
         .unwrap_or(0);
     let array = document
         .get_mut("requirements")
@@ -298,7 +268,7 @@ fn insert_record(document: &mut DocumentMut, record: Table) -> Result<(), SpecEr
                 table
                     .get("id")
                     .and_then(Item::as_str)
-                    .map(sequence)
+                    .map(requirement_sequence)
                     .is_some_and(|existing| existing > new_sequence)
             })
             .unwrap_or(array.len());

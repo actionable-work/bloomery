@@ -1,13 +1,25 @@
+mod commands;
+
 use bloomery_build_command as build_command;
 use bloomery_check_command as check_command;
 use bloomery_cli_output as output;
 use bloomery_cli_parser::{ParseError, ParseErrorKind, parse_from};
-use bloomery_cli_types::{CliCommand, CliInvocation, ColorChoice, SpecArgs};
-use bloomery_config::{
-    ConfigError, ConfigErrorKind, ConfigOutcome, ConfigReport, ConfigWarning, DiffStatus,
+use bloomery_cli_types::{
+    CliCommand, CliInvocation, ColorChoice, MISSING_FLAKE_MESSAGE, flake_present,
 };
-use bloomery_model::{render_diagnostics, sort_diagnostics};
-use bloomery_spec::{SpecError, SpecOutcome, SpecReport};
+use bloomery_model::render_diagnostics;
+#[cfg(test)]
+use commands::config::render_config_outcome;
+use commands::config::run_config_at;
+use commands::disk::run_disk_at;
+#[cfg(test)]
+use commands::disk::run_disk_with_backend;
+use commands::init::run_init_at;
+#[cfg(test)]
+use commands::init::run_init_request;
+use commands::review::run_review_at;
+use commands::spec::run_spec_at;
+use commands::sync::run_sync_at;
 use serde_json::Value;
 use std::ffi::OsString;
 use std::io::{self, Write};
@@ -105,40 +117,39 @@ fn run_invocation_at(
     }
 }
 
-fn write_required_operation(command: &CliCommand) -> Option<&'static str> {
-    match command {
-        CliCommand::Init(_) => Some("bloomery init"),
-        CliCommand::Sync { .. } => Some("bloomery sync"),
+fn write_required_operation(command: &CliCommand) -> Option<String> {
+    use bloomery_cli_types::{CheckOperation, ConfigOperation, SpecOperation};
+    let writes = match command {
+        CliCommand::Init(_) | CliCommand::Sync { .. } => Some(command.name()),
         CliCommand::Config(args) => match &args.operation {
-            bloomery_cli_types::ConfigOperation::Set { .. } => Some("bloomery config set"),
-            bloomery_cli_types::ConfigOperation::Unset { .. } => Some("bloomery config unset"),
-            bloomery_cli_types::ConfigOperation::Document => Some("bloomery config document"),
-            bloomery_cli_types::ConfigOperation::Upgrade {
+            ConfigOperation::Set { .. }
+            | ConfigOperation::Unset { .. }
+            | ConfigOperation::Document
+            | ConfigOperation::Upgrade {
                 dry_run: false,
                 diff: false,
-            } => Some("bloomery config upgrade"),
-            bloomery_cli_types::ConfigOperation::Get { .. }
-            | bloomery_cli_types::ConfigOperation::List { .. }
-            | bloomery_cli_types::ConfigOperation::Upgrade { .. } => None,
+            } => Some(args.operation.path()),
+            ConfigOperation::Get { .. }
+            | ConfigOperation::List { .. }
+            | ConfigOperation::Upgrade { .. } => None,
         },
         CliCommand::Spec(args) => match &args.operation {
-            bloomery_cli_types::SpecOperation::Add { .. } => Some("bloomery spec add"),
-            bloomery_cli_types::SpecOperation::Set { .. } => Some("bloomery spec set"),
-            bloomery_cli_types::SpecOperation::Remove { .. } => Some("bloomery spec remove"),
-            bloomery_cli_types::SpecOperation::List { .. }
-            | bloomery_cli_types::SpecOperation::Show { .. }
-            | bloomery_cli_types::SpecOperation::Trace { .. }
-            | bloomery_cli_types::SpecOperation::TraceReport { .. }
-            | bloomery_cli_types::SpecOperation::Candidates => None,
+            SpecOperation::Add { .. }
+            | SpecOperation::Set { .. }
+            | SpecOperation::Remove { .. } => Some(args.operation.path()),
+            SpecOperation::List { .. }
+            | SpecOperation::Show { .. }
+            | SpecOperation::Trace { .. }
+            | SpecOperation::TraceReport { .. }
+            | SpecOperation::Candidates => None,
         },
         CliCommand::Check(args) => match &args.operation {
-            Some(bloomery_cli_types::CheckOperation::HealthUpdate(_)) => {
-                Some("bloomery check health update")
-            }
+            Some(operation @ CheckOperation::HealthUpdate(_)) => Some(operation.path()),
             _ => None,
         },
         CliCommand::Build(_) | CliCommand::Disk(_) | CliCommand::Review => None,
-    }
+    };
+    writes.map(|path| format!("bloomery {path}"))
 }
 
 fn report_usage_error(
@@ -150,23 +161,27 @@ fn report_usage_error(
     stderr: &mut impl Write,
 ) -> ExitCode {
     if json_mode {
-        let document = if command == Some("check") {
-            check_command::check_output::error_document("UsageError", message, None)
-        } else {
-            output::usage_error_json(command, message)
-        };
-        if write_json(stdout, &document).is_err() {
-            let _ = writeln!(stderr, "bloomery: unable to render JSON usage error");
-            return ExitCode::from(1);
+        if let Err(code) = emit_json(
+            stdout,
+            stderr,
+            &usage_error_document(command, message),
+            "usage error",
+        ) {
+            return code;
         }
     } else {
-        let rendered = output::colorize_error(
-            &format!("error: {message}"),
-            output::color_enabled(output::Stream::Stderr, false, color),
-        );
-        let _ = writeln!(stderr, "{rendered}");
+        let _ = output::write_error(stderr, message, color);
     }
     ExitCode::from(2)
+}
+
+/// JSON usage error in the command's own envelope; `check` uses its check document.
+fn usage_error_document(command: Option<&str>, message: &str) -> Value {
+    if command == Some("check") {
+        check_command::check_output::error_document("UsageError", message, None)
+    } else {
+        output::usage_error_json(command, message)
+    }
 }
 
 /// Map the CLI's color selection onto the shared output policy.
@@ -178,10 +193,6 @@ fn color_mode(choice: ColorChoice) -> output::ColorMode {
     }
 }
 
-fn flake_present(root: &Path) -> bool {
-    root.join("flake.nix").is_file()
-}
-
 /// Commands exempt from the required-configuration preflight. `init` is listed
 /// ahead of the command existing so it is exempt as soon as it is implemented.
 pub(crate) const CONFIGURATION_EXEMPT_COMMANDS: &[&str] = &["help", "init"];
@@ -191,16 +202,7 @@ fn configuration_exempt(command: &str) -> bool {
 }
 
 fn command_name(command: &CliCommand) -> Option<&'static str> {
-    match command {
-        CliCommand::Init(_) => Some("init"),
-        CliCommand::Check(_) => Some("check"),
-        CliCommand::Build(_) => Some("build"),
-        CliCommand::Disk(_) => Some("disk"),
-        CliCommand::Review => Some("review"),
-        CliCommand::Sync { .. } => Some("sync"),
-        CliCommand::Config(_) => Some("config"),
-        CliCommand::Spec(_) => Some("spec"),
-    }
+    Some(command.name())
 }
 
 fn report_missing_flake(
@@ -210,19 +212,33 @@ fn report_missing_flake(
     stderr: &mut impl Write,
 ) -> ExitCode {
     if json_mode {
-        if write_json(stdout, &output::flake_setup_error_json(command)).is_err() {
-            let _ = writeln!(stderr, "bloomery: unable to render JSON setup error");
-            return ExitCode::from(1);
+        if let Err(code) = emit_json(
+            stdout,
+            stderr,
+            &output::flake_setup_error_json(command),
+            "setup error",
+        ) {
+            return code;
         }
     } else {
-        let message = format!("error: {}", output::MISSING_FLAKE_MESSAGE);
-        let rendered = output::colorize_error(
-            &message,
-            output::color_enabled(output::Stream::Stderr, false, output::ColorMode::Auto),
-        );
-        let _ = writeln!(stderr, "{rendered}");
+        let _ = output::write_error(stderr, MISSING_FLAKE_MESSAGE, output::ColorMode::Auto);
     }
     ExitCode::from(2)
+}
+
+/// Write diagnostics as human-mode stderr text, colored per `mode`.
+fn write_diagnostics(
+    stderr: &mut impl Write,
+    root: &Path,
+    diagnostics: &[bloomery_model::Diagnostic],
+    mode: output::ColorMode,
+) {
+    let rendered = render_diagnostics(root, diagnostics);
+    let rendered = output::colorize_check(
+        &rendered,
+        output::color_enabled(output::Stream::Stderr, false, mode),
+    );
+    let _ = stderr.write_all(rendered.as_bytes());
 }
 
 fn report_configuration_error(
@@ -240,20 +256,16 @@ fn report_configuration_error(
             root,
             std::slice::from_ref(&diagnostic),
         );
-        if write_json(stdout, &document).is_err() {
-            let _ = writeln!(
-                stderr,
-                "bloomery: unable to render JSON configuration error"
-            );
-            return ExitCode::from(1);
+        if let Err(code) = emit_json(stdout, stderr, &document, "configuration error") {
+            return code;
         }
     } else {
-        let rendered = render_diagnostics(root, std::slice::from_ref(&diagnostic));
-        let rendered = output::colorize_check(
-            &rendered,
-            output::color_enabled(output::Stream::Stderr, false, output::ColorMode::Auto),
+        write_diagnostics(
+            stderr,
+            root,
+            std::slice::from_ref(&diagnostic),
+            output::ColorMode::Auto,
         );
-        let _ = stderr.write_all(rendered.as_bytes());
     }
     ExitCode::from(1)
 }
@@ -296,442 +308,14 @@ fn report_parse_error_at(
     }
 
     if error.json_mode() {
-        if error.command() == Some("check") {
-            let document =
-                check_command::check_output::error_document("UsageError", error.message(), None);
-            if write_json(stdout, &document).is_err() {
-                let _ = writeln!(stderr, "bloomery: unable to render JSON usage error");
-                return ExitCode::from(1);
-            }
-        } else {
-            let document = output::usage_error_json(error.command(), error.message());
-            if write_json(stdout, &document).is_err() {
-                let _ = writeln!(stderr, "bloomery: unable to render JSON usage error");
-                return ExitCode::from(1);
-            }
+        let document = usage_error_document(error.command(), error.message());
+        if let Err(code) = emit_json(stdout, stderr, &document, "usage error") {
+            return code;
         }
     } else {
         let _ = stderr.write_all(error.message().as_bytes());
     }
     ExitCode::from(exit_code)
-}
-
-fn run_sync_at(
-    root: &Path,
-    update: Option<&str>,
-    json_mode: bool,
-    color: output::ColorMode,
-    stdout: &mut impl Write,
-    stderr: &mut impl Write,
-) -> ExitCode {
-    if !flake_present(root) {
-        return report_missing_flake(Some("sync"), json_mode, stdout, stderr);
-    }
-    if let Err(code) = load_configuration_preflight(Some("sync"), root, json_mode, stdout, stderr) {
-        return code;
-    }
-    let selection = match bloomery_sync::parse_cli_update(update) {
-        Ok(selection) => selection,
-        Err(error) => {
-            if json_mode {
-                let document = output::usage_error_json(Some("sync"), &error.to_string());
-                if write_json(stdout, &document).is_err() {
-                    let _ = writeln!(stderr, "bloomery: unable to render JSON usage error");
-                    return ExitCode::from(1);
-                }
-            } else {
-                let rendered = output::colorize_error(
-                    &format!("error: {error}\nUsage: bloomery sync [--update[=nix,rust]]"),
-                    output::color_enabled(output::Stream::Stderr, false, color),
-                );
-                let _ = writeln!(stderr, "{rendered}");
-            }
-            return ExitCode::from(error.exit_code());
-        }
-    };
-
-    let mut runner = bloomery_sync::SystemCommandRunner;
-    if json_mode {
-        let mut progress = Vec::new();
-        let mut diagnostics = Vec::new();
-        return match bloomery_sync::run(
-            root,
-            &selection,
-            &mut runner,
-            &mut progress,
-            &mut diagnostics,
-        ) {
-            Ok(report) => {
-                if write_json(stdout, &output::sync_success_json(&report)).is_err() {
-                    let _ = writeln!(stderr, "bloomery: unable to render JSON sync result");
-                    ExitCode::from(1)
-                } else {
-                    ExitCode::SUCCESS
-                }
-            }
-            Err(error) => {
-                let exit_code = error.exit_code();
-                let document = output::sync_failure_json(
-                    error.stage(),
-                    error.message(),
-                    error.completed_stages(),
-                    error.may_be_partially_synchronized(),
-                    &String::from_utf8_lossy(&diagnostics),
-                );
-                if write_json(stdout, &document).is_err() {
-                    let _ = writeln!(stderr, "bloomery: unable to render JSON sync error");
-                    ExitCode::from(1)
-                } else {
-                    ExitCode::from(exit_code)
-                }
-            }
-        };
-    }
-
-    let result = {
-        let mut stdout_writer = output::ColorWriter::stdout(
-            &mut *stdout,
-            output::color_enabled(output::Stream::Stdout, false, color),
-        );
-        let mut stderr_writer = output::ColorWriter::stderr(
-            &mut *stderr,
-            output::color_enabled(output::Stream::Stderr, false, color),
-        );
-        let result = bloomery_sync::run(
-            root,
-            &selection,
-            &mut runner,
-            &mut stdout_writer,
-            &mut stderr_writer,
-        );
-        let _ = stdout_writer.flush();
-        let _ = stderr_writer.flush();
-        result
-    };
-    match result {
-        Ok(_) => ExitCode::SUCCESS,
-        Err(error) => {
-            let _ = writeln!(
-                stderr,
-                "{}",
-                output::colorize_error(
-                    &format!("error: {error}"),
-                    output::color_enabled(output::Stream::Stderr, false, color)
-                )
-            );
-            ExitCode::from(error.exit_code())
-        }
-    }
-}
-
-fn run_config_at(
-    args: bloomery_cli_types::ConfigArgs,
-    json_mode: bool,
-    color: output::ColorMode,
-    root: &Path,
-    stdout: &mut impl Write,
-    stderr: &mut impl Write,
-) -> ExitCode {
-    let mut boundary = Vec::new();
-    if !flake_present(root) {
-        boundary.push(ConfigWarning::MissingFlake);
-    }
-    match bloomery_config::run(root, &args.operation) {
-        Ok(mut report) => {
-            report.prepend_warnings(boundary);
-            if json_mode {
-                if write_json(stdout, &output::config_success_json(&report)).is_err() {
-                    let _ = writeln!(stderr, "bloomery: unable to render JSON config result");
-                    return ExitCode::from(1);
-                }
-            } else {
-                render_config_warnings(&report.warnings, color, stderr);
-                render_config_outcome(&report, color, stdout);
-                let _ = stdout.flush();
-            }
-            ExitCode::SUCCESS
-        }
-        Err(error) => report_config_error(error, root, json_mode, stdout, stderr),
-    }
-}
-
-fn render_config_warnings(
-    warnings: &[ConfigWarning],
-    color: output::ColorMode,
-    stderr: &mut impl Write,
-) {
-    let styled = output::color_enabled(output::Stream::Stderr, false, color);
-    for warning in warnings {
-        let message = match warning {
-            ConfigWarning::MissingFlake => {
-                "warning: no Bloomery flake.nix in the current directory".to_owned()
-            }
-            ConfigWarning::MissingConfig { path } => {
-                format!("warning: {path} is missing; reporting documented defaults")
-            }
-            ConfigWarning::CreatedConfig { path } => format!("warning: created {path}"),
-        };
-        let _ = writeln!(
-            stderr,
-            "{}",
-            output::style(output::Role::Warning, &message, styled)
-        );
-    }
-}
-
-fn render_config_value(value: Option<&toml::Value>) -> String {
-    value
-        .map(ToString::to_string)
-        .unwrap_or_else(|| "unset".to_owned())
-}
-
-fn render_config_outcome(report: &ConfigReport, color: output::ColorMode, stdout: &mut impl Write) {
-    let styled = output::color_enabled(output::Stream::Stdout, false, color);
-    let _ = writeln!(stdout, "{}", output::heading("bloomery config", styled));
-    match &report.outcome {
-        ConfigOutcome::Get { key } => {
-            let origin = if key.configured {
-                "configured"
-            } else if key.recommended {
-                "default"
-            } else {
-                "unset"
-            };
-            let _ = writeln!(
-                stdout,
-                "{} = {} ({origin})",
-                key.key,
-                render_config_value(key.value.as_ref())
-            );
-        }
-        ConfigOutcome::List { keys } => {
-            for key in keys {
-                let origin = if key.configured {
-                    "configured"
-                } else if key.recommended {
-                    "default"
-                } else {
-                    "unset"
-                };
-                let _ = writeln!(
-                    stdout,
-                    "{} = {} ({origin})",
-                    key.key,
-                    render_config_value(key.value.as_ref())
-                );
-            }
-        }
-        ConfigOutcome::Set {
-            key,
-            value,
-            changed,
-        } => {
-            if *changed {
-                let _ = writeln!(stdout, "set {key} = {value}");
-            } else {
-                let _ = writeln!(stdout, "{key} unchanged");
-            }
-        }
-        ConfigOutcome::Unset {
-            key,
-            removed,
-            changed,
-        } => {
-            if *removed {
-                let _ = writeln!(stdout, "unset {key}");
-            } else if *changed {
-                let _ = writeln!(stdout, "created configuration");
-            } else {
-                let _ = writeln!(stdout, "{key} absent");
-            }
-        }
-        ConfigOutcome::Upgrade {
-            source_version,
-            target_version,
-            added,
-            written,
-            differences,
-        } => {
-            if let (Some(source), Some(target)) = (source_version, target_version) {
-                let _ = writeln!(stdout, "format migration: {source} -> {target}");
-            }
-            if !differences.is_empty() {
-                for record in differences {
-                    let status = match record.status {
-                        DiffStatus::Equal => "equal",
-                        DiffStatus::Differing => "differs",
-                        DiffStatus::Absent => "absent",
-                        DiffStatus::Unset => "unset",
-                    };
-                    let _ = writeln!(
-                        stdout,
-                        "{}: {status} (recommended {}, current {})",
-                        record.key,
-                        render_config_value(record.recommended.as_ref()),
-                        render_config_value(record.current.as_ref())
-                    );
-                }
-            } else if added.is_empty() {
-                let _ = writeln!(stdout, "configuration already current");
-            } else {
-                for key in added {
-                    let _ = writeln!(stdout, "added {key}");
-                }
-                if !written {
-                    let _ = writeln!(stdout, "(dry run; not written)");
-                }
-            }
-        }
-        ConfigOutcome::Document {
-            documented,
-            written,
-        } => {
-            if documented.is_empty() {
-                let _ = writeln!(stdout, "no keys documented");
-            } else {
-                for key in documented {
-                    let _ = writeln!(stdout, "documented {key}");
-                }
-            }
-            if !written {
-                let _ = writeln!(stdout, "(not written)");
-            }
-        }
-    }
-}
-
-fn report_config_error(
-    error: ConfigError,
-    root: &Path,
-    json_mode: bool,
-    stdout: &mut impl Write,
-    stderr: &mut impl Write,
-) -> ExitCode {
-    let exit_code = error.exit_code();
-    if json_mode {
-        let document = match error.diagnostic() {
-            Some(diagnostic) => {
-                output::diagnostics_json("config", "failed", root, std::slice::from_ref(diagnostic))
-            }
-            None if error.kind() == ConfigErrorKind::Usage => {
-                output::usage_error_json(Some("config"), error.message())
-            }
-            None => output::config_failure_json("config", error.message()),
-        };
-        if write_json(stdout, &document).is_err() {
-            let _ = writeln!(stderr, "bloomery: unable to render JSON config error");
-            return ExitCode::from(1);
-        }
-    } else {
-        match error.diagnostic() {
-            Some(diagnostic) => {
-                let rendered = render_diagnostics(root, std::slice::from_ref(diagnostic));
-                let rendered = output::colorize_check(
-                    &rendered,
-                    output::color_enabled(output::Stream::Stderr, false, output::ColorMode::Auto),
-                );
-                let _ = stderr.write_all(rendered.as_bytes());
-            }
-            None => {
-                let _ = writeln!(
-                    stderr,
-                    "{}",
-                    output::colorize_error(
-                        &format!("error: {}", error.message()),
-                        output::color_enabled(
-                            output::Stream::Stderr,
-                            false,
-                            output::ColorMode::Auto
-                        ),
-                    )
-                );
-            }
-        }
-    }
-    ExitCode::from(exit_code)
-}
-
-fn run_init_at(
-    args: bloomery_cli_types::InitArgs,
-    json_mode: bool,
-    color: output::ColorMode,
-    root: &Path,
-    stdout: &mut impl Write,
-    stderr: &mut impl Write,
-) -> ExitCode {
-    let directory = match args.directory {
-        Some(path) if path.is_absolute() => path,
-        Some(path) => root.join(path),
-        None => root.to_path_buf(),
-    };
-    let request = bloomery_init::InitRequest {
-        directory,
-        template: args.template,
-        force: args.force,
-    };
-    let mut stage = bloomery_init::SyncLockStage::system();
-    run_init_request(&request, &mut stage, json_mode, color, stdout, stderr)
-}
-
-fn run_init_request<L: bloomery_init::LockStage>(
-    request: &bloomery_init::InitRequest,
-    stage: &mut L,
-    json_mode: bool,
-    color: output::ColorMode,
-    stdout: &mut impl Write,
-    stderr: &mut impl Write,
-) -> ExitCode {
-    let mut progress = Vec::new();
-    let mut progress_err = Vec::new();
-    match bloomery_init::run(request, stage, &mut progress, &mut progress_err) {
-        Ok(report) => {
-            if json_mode {
-                if write_json(stdout, &output::init_success_json(&report)).is_err() {
-                    let _ = writeln!(stderr, "bloomery: unable to render JSON init result");
-                    return ExitCode::from(1);
-                }
-            } else {
-                let styled = output::color_enabled(output::Stream::Stdout, false, color);
-                let _ = writeln!(stdout, "{}", output::heading("bloomery init", styled));
-                for path in &report.created {
-                    let _ = writeln!(stdout, "created {}", path.display());
-                }
-                let _ = writeln!(
-                    stdout,
-                    "Initialized '{}' from the '{}' template.",
-                    report.directory.display(),
-                    report.template
-                );
-                let _ = writeln!(
-                    stdout,
-                    "Generated lockfiles: {}.",
-                    report.lockfiles.join(", ")
-                );
-                let _ = writeln!(stdout, "Next: run `nix develop` in the project.");
-                let _ = stdout.flush();
-            }
-            ExitCode::SUCCESS
-        }
-        Err(error) => {
-            if json_mode {
-                if write_json(stdout, &output::init_failure_json(&error)).is_err() {
-                    let _ = writeln!(stderr, "bloomery: unable to render JSON init error");
-                    return ExitCode::from(1);
-                }
-            } else {
-                let _ = stderr.write_all(&progress_err);
-                let _ = writeln!(
-                    stderr,
-                    "{}",
-                    output::colorize_error(
-                        &format!("error: {error}"),
-                        output::color_enabled(output::Stream::Stderr, false, color)
-                    )
-                );
-            }
-            ExitCode::from(error.exit_code())
-        }
-    }
 }
 
 #[cfg(test)]
@@ -764,11 +348,11 @@ fn run_workspace_command_at_with_mode(
         return code;
     }
     match command {
-        CliCommand::Check(args) => check_command::run_at_with_color_and_mode(
-            args, json_mode, color, no_write, root, stdout, stderr,
-        ),
+        CliCommand::Check(args) => {
+            check_command::run_at(args, json_mode, color, no_write, root, stdout, stderr)
+        }
         CliCommand::Build(args) => {
-            build_command::run_at_with_mode(args, json_mode, color, no_write, root, stdout, stderr)
+            build_command::run_at(args, json_mode, color, no_write, root, stdout, stderr)
         }
         CliCommand::Disk(args) => run_disk_at(args, json_mode, color, root, stdout, stderr),
         CliCommand::Review => run_review_at(root, json_mode, color, stdout, stderr),
@@ -776,82 +360,6 @@ fn run_workspace_command_at_with_mode(
         CliCommand::Init(_) => unreachable!("init is dispatched before workspace loading"),
         CliCommand::Sync { .. } => unreachable!("sync is dispatched before workspace loading"),
         CliCommand::Config(_) => unreachable!("config is dispatched before workspace loading"),
-    }
-}
-
-fn run_disk_at(
-    args: bloomery_cli_types::DiskArgs,
-    json_mode: bool,
-    color: output::ColorMode,
-    root: &Path,
-    stdout: &mut impl Write,
-    stderr: &mut impl Write,
-) -> ExitCode {
-    let backend = bloomery_disk::NixCli::default();
-    run_disk_with_backend(args, json_mode, color, root, &backend, stdout, stderr)
-}
-
-fn run_disk_with_backend(
-    args: bloomery_cli_types::DiskArgs,
-    json_mode: bool,
-    color: output::ColorMode,
-    root: &Path,
-    backend: &impl bloomery_disk::NixQuery,
-    stdout: &mut impl Write,
-    stderr: &mut impl Write,
-) -> ExitCode {
-    let tree = args.tree;
-    match bloomery_disk::run(root, &args, backend) {
-        Ok(report) => {
-            if json_mode {
-                let mut document = output::disk_success_json(&report);
-                if tree {
-                    document["operation"] = serde_json::json!("tree");
-                }
-                if write_json(stdout, &document).is_err() {
-                    let _ = writeln!(stderr, "bloomery: unable to render JSON disk result");
-                    return ExitCode::from(1);
-                }
-            } else {
-                let rendered = if tree {
-                    bloomery_disk::render_text(&report)
-                } else {
-                    bloomery_disk::render_summary(&report)
-                };
-                let rendered = output::colorize_check(
-                    &rendered,
-                    output::color_enabled(output::Stream::Stdout, false, color),
-                );
-                let _ = stdout.write_all(rendered.as_bytes());
-            }
-            ExitCode::from(bloomery_disk::exit_code(&report))
-        }
-        Err(error) => {
-            if json_mode {
-                let document = match error.kind() {
-                    bloomery_disk::DiskErrorKind::Usage => {
-                        output::usage_error_json(Some("disk"), error.message())
-                    }
-                    bloomery_disk::DiskErrorKind::Operational => {
-                        output::disk_failure_json(error.message())
-                    }
-                };
-                if write_json(stdout, &document).is_err() {
-                    let _ = writeln!(stderr, "bloomery: unable to render JSON disk error");
-                    return ExitCode::from(1);
-                }
-            } else {
-                let _ = writeln!(
-                    stderr,
-                    "{}",
-                    output::colorize_error(
-                        &format!("error: {error}"),
-                        output::color_enabled(output::Stream::Stderr, false, color)
-                    )
-                );
-            }
-            ExitCode::from(error.exit_code())
-        }
     }
 }
 
@@ -873,340 +381,19 @@ fn run_workspace_command_from_current_dir(
     run_workspace_command_at(command, json_mode, color, &root, stdout, stderr)
 }
 
-fn run_review_at(
-    root: &Path,
-    json_mode: bool,
-    color: output::ColorMode,
+/// Write a JSON document; on failure report `bloomery: unable to render JSON
+/// <subject>` on stderr and return the exit code the command should end with.
+fn emit_json(
     stdout: &mut impl Write,
     stderr: &mut impl Write,
-) -> ExitCode {
-    let context = match bloomery_workspace::load(root) {
-        Ok(context) if context.spec_management_enabled() => context,
-        Ok(_) => {
-            let diagnostics = vec![bloomery_model::Diagnostic::new(
-                "SpecManagementDisabled",
-                "specification management is disabled; set specs.enable = true or add .bloomery/specs",
-            )];
-            return report_review_diagnostics(root, json_mode, color, &diagnostics, stdout, stderr);
-        }
-        Err(mut diagnostics) => {
-            sort_diagnostics(&mut diagnostics);
-            return report_review_diagnostics(root, json_mode, color, &diagnostics, stdout, stderr);
-        }
-    };
-
-    let items = bloomery_review::items(&context);
-    if json_mode {
-        match serde_json::to_value(&items) {
-            Ok(items) => {
-                let document = output::success_envelope(
-                    "review",
-                    None,
-                    output::Status::Succeeded,
-                    items,
-                    Vec::new(),
-                );
-                if write_json(stdout, &document).is_err() {
-                    let _ = writeln!(stderr, "bloomery: unable to render JSON review catalog");
-                    ExitCode::from(1)
-                } else {
-                    ExitCode::SUCCESS
-                }
-            }
-            Err(error) => {
-                let document = output::usage_error_json(Some("review"), &error.to_string());
-                let _ = write_json(stdout, &document);
-                ExitCode::from(1)
-            }
-        }
-    } else {
-        let rendered = bloomery_review::render_text(&items);
-        let rendered = output::colorize_review(
-            &rendered,
-            output::color_enabled(output::Stream::Stdout, false, color),
-        );
-        let _ = stdout.write_all(rendered.as_bytes());
-        ExitCode::SUCCESS
+    value: &Value,
+    subject: &str,
+) -> Result<(), ExitCode> {
+    if write_json(stdout, value).is_err() {
+        let _ = writeln!(stderr, "bloomery: unable to render JSON {subject}");
+        return Err(ExitCode::from(1));
     }
-}
-
-fn report_review_diagnostics(
-    root: &Path,
-    json_mode: bool,
-    color: output::ColorMode,
-    diagnostics: &[bloomery_model::Diagnostic],
-    stdout: &mut impl Write,
-    stderr: &mut impl Write,
-) -> ExitCode {
-    if json_mode {
-        let document = output::diagnostics_json("review", "failed", root, diagnostics);
-        if write_json(stdout, &document).is_err() {
-            let _ = writeln!(stderr, "bloomery: unable to render JSON diagnostics");
-            return ExitCode::from(1);
-        }
-    } else {
-        let rendered = render_diagnostics(root, diagnostics);
-        let rendered = output::colorize_check(
-            &rendered,
-            output::color_enabled(output::Stream::Stderr, false, color),
-        );
-        let _ = stderr.write_all(rendered.as_bytes());
-    }
-    ExitCode::from(1)
-}
-
-fn run_spec_at(
-    args: SpecArgs,
-    json_mode: bool,
-    color: output::ColorMode,
-    root: &Path,
-    stdout: &mut impl Write,
-    stderr: &mut impl Write,
-) -> ExitCode {
-    match bloomery_spec::run_at(&args.operation, root) {
-        Ok(report) => {
-            if json_mode {
-                if write_json(stdout, &output::spec_success_json(&report)).is_err() {
-                    let _ = writeln!(stderr, "bloomery: unable to render JSON spec result");
-                    return ExitCode::from(1);
-                }
-            } else {
-                render_spec_success(&report, color, stdout);
-            }
-            ExitCode::SUCCESS
-        }
-        Err(error) => report_spec_error(error, json_mode, stdout, stderr),
-    }
-}
-
-fn render_spec_success(report: &SpecReport, color: output::ColorMode, stdout: &mut impl Write) {
-    let styled = output::color_enabled(output::Stream::Stdout, false, color);
-    let _ = writeln!(stdout, "{}", output::heading("bloomery spec", styled));
-    match &report.outcome {
-        SpecOutcome::List { records } => {
-            for record in records {
-                let _ = writeln!(
-                    stdout,
-                    "[{}] {} ({}/{}/{}, {})",
-                    record.id,
-                    record.title,
-                    record.area,
-                    record.feature,
-                    record.group,
-                    record.design_ref
-                );
-            }
-        }
-        SpecOutcome::Show { record } => {
-            let _ = writeln!(stdout, "[{}] {}", record.id, record.title);
-            let _ = writeln!(
-                stdout,
-                "{} {} {}",
-                record.area, record.feature, record.group
-            );
-            let mode = if record.manual { "manual" } else { "automated" };
-            let _ = writeln!(stdout, "{}", mode);
-            let _ = writeln!(stdout, "{}", record.statement);
-            let _ = writeln!(stdout, "Design: {}", record.design_ref);
-        }
-        SpecOutcome::Add {
-            id,
-            path,
-            created_group,
-        } => {
-            if *created_group {
-                let _ = writeln!(stdout, "added {id} and created group {path}");
-            } else {
-                let _ = writeln!(stdout, "added {id} to {path}");
-            }
-        }
-        SpecOutcome::Set { id, field, changed } => {
-            if *changed {
-                let _ = writeln!(stdout, "set {id}.{field}");
-            } else {
-                let _ = writeln!(stdout, "{id}.{field} unchanged");
-            }
-        }
-        SpecOutcome::Remove { id, pruned_group } => {
-            if *pruned_group {
-                let _ = writeln!(stdout, "removed {id} and pruned its empty group");
-            } else {
-                let _ = writeln!(stdout, "removed {id}");
-            }
-        }
-        SpecOutcome::Trace { requirements } => {
-            for requirement in requirements {
-                let _ = writeln!(stdout, "[{}] {}", requirement.id, requirement.title);
-                if requirement.references.is_empty() {
-                    let _ = writeln!(stdout, "    (no tied tests)");
-                }
-                for reference in &requirement.references {
-                    match reference.line {
-                        Some(line) => {
-                            let _ = writeln!(
-                                stdout,
-                                "    {} {}:{line}",
-                                reference.scanner, reference.path
-                            );
-                        }
-                        None => {
-                            let _ =
-                                writeln!(stdout, "    {} {}", reference.scanner, reference.path);
-                        }
-                    }
-                }
-            }
-        }
-        SpecOutcome::TraceReport { report } => render_spec_trace_report(report, stdout),
-        SpecOutcome::Candidates { candidates } => {
-            if candidates.is_empty() {
-                let _ = writeln!(stdout, "no untied tests");
-            }
-            for candidate in candidates {
-                let name = candidate.name.as_deref().unwrap_or("<unnamed>");
-                match candidate.line {
-                    Some(line) => {
-                        let _ = writeln!(
-                            stdout,
-                            "{} {name} {}:{line}",
-                            candidate.scanner, candidate.path
-                        );
-                    }
-                    None => {
-                        let _ = writeln!(stdout, "{} {name} {}", candidate.scanner, candidate.path);
-                    }
-                }
-            }
-        }
-    }
-}
-
-fn render_spec_trace_report(report: &bloomery_spec::StaticReport, stdout: &mut impl Write) {
-    let _ = writeln!(
-        stdout,
-        "static report v{} ({})",
-        report.version, report.scope.kind
-    );
-    let _ = writeln!(
-        stdout,
-        "tree: {:?}; specifications: {:?}; discovery: {:?}; relations: {:?}",
-        report.completeness.tree,
-        report.completeness.specifications,
-        report.completeness.discovery,
-        report.completeness.relations
-    );
-    if let Some(quality) = &report.quality {
-        let overrides = quality
-            .tests
-            .iter()
-            .filter(|test| test.exception_reason.is_some())
-            .count();
-        let _ = writeln!(
-            stdout,
-            "test breadth: {} tied sites; {overrides} limit exceptions",
-            quality.tests.len()
-        );
-        for test in quality
-            .tests
-            .iter()
-            .filter(|test| test.exception_reason.is_some())
-        {
-            let _ = writeln!(
-                stdout,
-                "    {} {}:{} {}: {} requirements; limit {}; exception: {}",
-                test.site.scanner,
-                test.site.path,
-                test.site.line.unwrap_or(1),
-                test.name.as_deref().unwrap_or("<unnamed>"),
-                test.requirement_ids.len(),
-                test.limit,
-                test.exception_reason.as_deref().unwrap_or_default()
-            );
-        }
-        let active = quality
-            .untied
-            .iter()
-            .filter(|site| site.exception_reason.is_none())
-            .count();
-        let _ = writeln!(
-            stdout,
-            "untied tests: {active} nonexempt, {} exempt; mode {:?}; limit {}",
-            quality.untied.len() - active,
-            quality.untied_mode,
-            quality.max_untied_tests
-        );
-        for untied in &quality.untied {
-            let _ = writeln!(
-                stdout,
-                "    {} {}:{} {}{}",
-                untied.site.scanner,
-                untied.site.path,
-                untied.site.line.unwrap_or(1),
-                untied.name.as_deref().unwrap_or("<unnamed>"),
-                untied
-                    .exception_reason
-                    .as_ref()
-                    .map(|reason| format!(" (exception: {reason})"))
-                    .unwrap_or_default()
-            );
-        }
-        for package in &quality.crates {
-            let _ = writeln!(
-                stdout,
-                "crate {}: {} requirements; {} feature-linked sites; {}",
-                package.manifest,
-                package.requirements,
-                package.linked_tests,
-                if package.excluded {
-                    "excluded"
-                } else if package.mapped {
-                    "mapped"
-                } else {
-                    "unowned"
-                }
-            );
-            if let Some(reason) = &package.reason {
-                let _ = writeln!(stdout, "    {reason}");
-            }
-        }
-    }
-    for finding in &report.diagnostics {
-        let _ = writeln!(stdout, "[{}] {}", finding.code, finding.message);
-        if let Some(location) = &finding.location {
-            let _ = writeln!(
-                stdout,
-                "    {}:{}",
-                location.path,
-                location.line.unwrap_or(1)
-            );
-        }
-    }
-}
-
-fn report_spec_error(
-    error: SpecError,
-    json_mode: bool,
-    stdout: &mut impl Write,
-    stderr: &mut impl Write,
-) -> ExitCode {
-    let exit_code = error.exit_code();
-    if json_mode {
-        let document = output::spec_failure_json("spec", error.message());
-        if write_json(stdout, &document).is_err() {
-            let _ = writeln!(stderr, "bloomery: unable to render JSON spec error");
-            return ExitCode::from(1);
-        }
-    } else {
-        let _ = writeln!(
-            stderr,
-            "{}",
-            output::colorize_error(
-                &format!("error: {}", error.message()),
-                output::color_enabled(output::Stream::Stderr, false, output::ColorMode::Auto)
-            )
-        );
-    }
-    ExitCode::from(exit_code)
+    Ok(())
 }
 
 fn write_json(writer: &mut impl Write, value: &Value) -> io::Result<()> {
@@ -1231,18 +418,14 @@ fn report_runtime_error(
             message,
             None,
         );
-        if write_json(stdout, &document).is_err() {
-            let _ = writeln!(stderr, "bloomery: unable to render JSON error");
-            return ExitCode::from(1);
+        if let Err(code) = emit_json(stdout, stderr, &document, "error") {
+            return code;
         }
     } else {
-        let _ = writeln!(
+        let _ = output::write_error(
             stderr,
-            "{}",
-            output::colorize_error(
-                &format!("error: bloomery: {message}"),
-                output::color_enabled(output::Stream::Stderr, false, output::ColorMode::Auto)
-            )
+            format_args!("bloomery: {message}"),
+            output::ColorMode::Auto,
         );
     }
     ExitCode::from(1)
@@ -3060,7 +2243,7 @@ mod tests {
         assert!(human.contains("added checks.enable"), "{human}");
         assert!(human.contains("dry run; not written"), "{human}");
 
-        let json = output::config_success_json(&report);
+        let json = super::commands::config::config_success_json(&report);
         assert_eq!(json["result"]["source_version"], 1);
         assert_eq!(json["result"]["target_version"], 2);
         assert_eq!(json["result"]["written"], false);

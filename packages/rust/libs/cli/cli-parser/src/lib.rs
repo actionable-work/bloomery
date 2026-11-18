@@ -453,26 +453,16 @@ impl From<RawDiskArgs> for DiskArgs {
                 tree: true,
                 scope: tree.scope.into(),
                 derivation: tree.derivation,
-                systems: deduplicate_systems(tree.systems),
+                systems: bloomery_nix::deduplicate_systems(&tree.systems),
             },
             None => Self {
                 tree: false,
                 scope: args.scope.into(),
                 derivation: args.derivation,
-                systems: deduplicate_systems(args.systems),
+                systems: bloomery_nix::deduplicate_systems(&args.systems),
             },
         }
     }
-}
-
-fn deduplicate_systems(systems: Vec<String>) -> Vec<String> {
-    let mut deduplicated = Vec::new();
-    for system in systems {
-        if !deduplicated.contains(&system) {
-            deduplicated.push(system);
-        }
-    }
-    deduplicated
 }
 
 #[derive(Debug, Args)]

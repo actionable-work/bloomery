@@ -1,4 +1,16 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+/// Message for the root `flake.nix` preflight required by every command.
+pub const MISSING_FLAKE_MESSAGE: &str = "A Bloomery flake.nix is required; set up a Bloomery flake.nix in the current directory before running this command.";
+
+/// Stable error code shared by the CLI preflight and each command's own
+/// missing-flake boundary check.
+pub const MISSING_FLAKE_CODE: &str = "MissingFlake";
+
+/// Whether `root` contains the Bloomery `flake.nix` every command requires.
+pub fn flake_present(root: &Path) -> bool {
+    root.join("flake.nix").is_file()
+}
 
 pub const DEFAULT_PAGE_LIMIT: usize = 20;
 pub const DETAIL_PAGE_LIMIT: usize = 40;
@@ -198,4 +210,62 @@ pub struct DetailsArgs {
     pub run: Option<String>,
     pub offset: Option<usize>,
     pub limit: usize,
+}
+
+impl CliCommand {
+    /// Top-level command name as typed after `bloomery`.
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Init(_) => "init",
+            Self::Check(_) => "check",
+            Self::Build(_) => "build",
+            Self::Disk(_) => "disk",
+            Self::Review => "review",
+            Self::Sync { .. } => "sync",
+            Self::Config(_) => "config",
+            Self::Spec(_) => "spec",
+        }
+    }
+}
+
+impl CheckOperation {
+    /// Command path of this operation, such as `check health update`.
+    pub fn path(&self) -> &'static str {
+        match self {
+            Self::List(_) => "check list",
+            Self::Failures(_) => "check failures",
+            Self::Details(_) => "check details",
+            Self::Health(_) => "check health",
+            Self::HealthUpdate(_) => "check health update",
+        }
+    }
+}
+
+impl ConfigOperation {
+    /// Command path of this operation, such as `config set`.
+    pub fn path(&self) -> &'static str {
+        match self {
+            Self::Get { .. } => "config get",
+            Self::Set { .. } => "config set",
+            Self::Unset { .. } => "config unset",
+            Self::List { .. } => "config list",
+            Self::Upgrade { .. } => "config upgrade",
+            Self::Document => "config document",
+        }
+    }
+}
+
+impl SpecOperation {
+    /// Command path of this operation; trace reports share `spec trace`.
+    pub fn path(&self) -> &'static str {
+        match self {
+            Self::List { .. } => "spec list",
+            Self::Show { .. } => "spec show",
+            Self::Add { .. } => "spec add",
+            Self::Set { .. } => "spec set",
+            Self::Remove { .. } => "spec remove",
+            Self::Trace { .. } | Self::TraceReport { .. } => "spec trace",
+            Self::Candidates => "spec candidates",
+        }
+    }
 }

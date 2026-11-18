@@ -1,4 +1,5 @@
 [dependencies]
+bloomery-glob = { workspace = true }
 bloomery-model = { workspace = true }
 bloomery-scanning = { workspace = true }
 bloomery-workspace = { workspace = true }

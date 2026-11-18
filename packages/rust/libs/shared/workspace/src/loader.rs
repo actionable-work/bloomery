@@ -354,26 +354,8 @@ fn validate_requirement(
         .file_name()
         .and_then(|value| value.to_str())
         .unwrap_or_default();
-    let parts: Vec<&str> = entry.id.split('-').collect();
-    let valid = parts.len() == 4
-        && parts[..3].iter().all(|part| {
-            !part.is_empty()
-                && part.chars().all(|character| {
-                    character.is_ascii_uppercase() || character.is_ascii_digit() || character == '_'
-                })
-        })
-        && (parts[3].len() == 3 || parts[3].len() == 4)
-        && parts[3].chars().all(|character| character.is_ascii_digit());
-    if !valid {
-        diagnostics.push(
-            Diagnostic::new(
-                "InvalidSpecId",
-                "Requirement ID does not match the required four-segment grammar",
-            )
-            .at(group_path.to_path_buf(), Some(line)),
-        );
-    } else {
-        let expected = format!("{area}-{feature}-{group}-{}", parts[3]);
+    if let Some(parsed) = bloomery_model::parse_requirement_id(&entry.id) {
+        let expected = format!("{area}-{feature}-{group}-{}", parsed.sequence);
         if entry.id != expected {
             diagnostics.push(
                 Diagnostic::new(
@@ -383,7 +365,7 @@ fn validate_requirement(
                 .at(group_path.to_path_buf(), Some(line)),
             );
         }
-        if !sequences.insert(parts[3].to_owned()) {
+        if !sequences.insert(parsed.sequence.to_owned()) {
             diagnostics.push(
                 Diagnostic::new(
                     "DuplicateSequence",
@@ -401,6 +383,14 @@ fn validate_requirement(
                 .at(group_path.to_path_buf(), Some(line)),
             );
         }
+    } else {
+        diagnostics.push(
+            Diagnostic::new(
+                "InvalidSpecId",
+                "Requirement ID does not match the required four-segment grammar",
+            )
+            .at(group_path.to_path_buf(), Some(line)),
+        );
     }
 
     let (relative_path, anchor) = entry

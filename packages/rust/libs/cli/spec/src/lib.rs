@@ -183,7 +183,7 @@ pub fn run_at(operation: &SpecOperation, root: &Path) -> Result<SpecReport, Spec
     let context = bloomery_workspace::load(root).map_err(SpecError::from_diagnostics)?;
     if !context.spec_management_enabled() {
         return Err(SpecError::failure(
-            "specification management is disabled; set specs.enable = true or add .bloomery/specs",
+            bloomery_model::SPEC_MANAGEMENT_DISABLED_MESSAGE,
         ));
     }
     let outcome = match operation {
@@ -248,7 +248,6 @@ pub(crate) fn display_path(root: &Path, path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    pub use bloomery_check::report::StaticReport;
     use bloomery_cli_types::SpecOperation;
     use std::fs;
     use std::path::{Path, PathBuf};

@@ -1,6 +1,4 @@
-use super::{
-    SourceTree, files::glob_matches, ignored_name, path_key, validate_index, validate_path,
-};
+use super::{SourceTree, ignored_name, path_key, validate_index, validate_path};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -78,7 +76,7 @@ impl TreeIndex {
             .filter(|path| {
                 patterns
                     .iter()
-                    .any(|pattern| glob_matches(pattern, Path::new(path)))
+                    .any(|pattern| bloomery_glob::path_matches(pattern, Path::new(path)))
             })
             .map(PathBuf::from)
             .collect()

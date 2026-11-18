@@ -90,6 +90,9 @@ measures realized store paths without building or mutating anything. Spec
 trace and candidate discovery are read-only projections over the requirement
 tree and discovered test sites. Check does not
 own approvals, ticket management, or human review scheduling.
+Check, build, and disk read store-path validity from `nix path-info --json`
+identically: a `null` entry, or `"valid": false` in the older array form, marks
+a path absent.
 Generated Nix outputs no longer include `bloomery:check`; the runner invokes
 other Nix checks directly. See [Nix orchestration](CHECK/design/workspace-check.md).
 

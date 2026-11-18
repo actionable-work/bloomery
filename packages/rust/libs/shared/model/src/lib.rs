@@ -2,6 +2,7 @@ pub mod catalog;
 pub mod clippy;
 pub mod config;
 pub use bloomery_schema::diagnostics;
+pub use bloomery_schema::{RequirementId, is_requirement_id, parse_requirement_id};
 mod domain;
 pub mod health;
 pub mod specifications;
@@ -11,7 +12,8 @@ pub use diagnostics::{Diagnostic, SourceLocation, render_diagnostics, sort_diagn
 pub use domain::{
     Area, CURRENT_REQUIREMENT_SCHEMA_VERSION, Context, DesignReference, EarsStatement, Evidence,
     Feature, MarkdownFrontmatter, Requirement, RequirementEntry, RequirementGroup,
-    RequirementGroupFile, TestSite,
+    RequirementGroupFile, SPEC_MANAGEMENT_DISABLED_MESSAGE, TestSite, catalogue_order,
+    requirement_sequence,
 };
 
 #[cfg(test)]

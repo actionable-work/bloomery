@@ -304,3 +304,10 @@ title = "Build forwards no-write to its check gate"
 manual = false
 design = "design/execution.md#check-gate"
 ears = { type = "event", trigger = "build --check is invoked with --no-write", system = "bloomery build", action = "run the default check suite with the native treefmt check and no-write baseline behavior before realizing selected packages" }
+
+[[requirements]]
+id = "CLI-BUILD-EXECUTION-029"
+title = "Outputs reported invalid by path-info are absent"
+manual = false
+design = "design/execution.md#batched-realization"
+ears = { type = "event", trigger = "nix path-info reports a selected output with a null entry", system = "bloomery build", action = "treat that output as absent and fail its package" }

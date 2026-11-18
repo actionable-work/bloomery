@@ -1,5 +1,6 @@
 //! Nix CLI backend for the build command.
 
+use bloomery_nix::{eval_base_args, evaluated_derivation, full_store_path, parse_cannot_build};
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
 use std::path::Path;
@@ -64,7 +65,7 @@ impl NixCli {
 
 impl NixBackend for NixCli {
     fn host_system(&self, _root: &Path) -> Result<String, String> {
-        bloomery_check_command::host_nix_system()
+        bloomery_nix::host_nix_system()
     }
 
     fn plan_packages(&self, root: &Path, system: &str) -> Result<Vec<PackagePlan>, String> {
@@ -131,7 +132,7 @@ impl NixBackend for NixCli {
         if !output.status.success() {
             return Err(String::from_utf8_lossy(&output.stderr).trim().to_owned());
         }
-        parse_path_info_json(&output.stdout)
+        valid_outputs(&output.stdout)
     }
 }
 
@@ -143,15 +144,7 @@ pub(crate) fn parse_packages_json(system: &str, bytes: &[u8]) -> Result<Vec<Pack
         .ok_or_else(|| "Nix packages catalog is not an object".to_owned())?;
     let mut plans = Vec::with_capacity(object.len());
     for (name, entry) in object {
-        let success = entry
-            .get("success")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false);
-        let derivation = entry
-            .get("drvPath")
-            .and_then(serde_json::Value::as_str)
-            .map(str::to_owned)
-            .filter(|path| valid_derivation_path(path));
+        let (success, derivation) = evaluated_derivation(entry);
         plans.push(PackagePlan {
             name: name.clone(),
             system: system.to_owned(),
@@ -224,21 +217,10 @@ pub(crate) fn parse_derivation_show_json(
     Ok(paths)
 }
 
-fn full_store_path(value: &str) -> String {
-    if value.starts_with("/nix/store/") {
-        value.to_owned()
-    } else {
-        format!("/nix/store/{value}")
-    }
-}
-
-pub(crate) fn parse_path_info_json(bytes: &[u8]) -> Result<BTreeSet<String>, String> {
-    let value: serde_json::Value = serde_json::from_slice(bytes)
-        .map_err(|error| format!("Nix returned invalid path-info JSON: {error}"))?;
-    let object = value
-        .as_object()
-        .ok_or_else(|| "Nix path-info is not an object".to_owned())?;
-    Ok(object.keys().cloned().collect())
+/// Outputs `nix path-info --json` reports as present in the store.
+pub(crate) fn valid_outputs(bytes: &[u8]) -> Result<BTreeSet<String>, String> {
+    let info = bloomery_nix::parse_path_info(bytes)?;
+    Ok(info.valid.into_iter().map(|entry| entry.path).collect())
 }
 
 pub(crate) fn plan_args(system: &str) -> Vec<OsString> {
@@ -289,30 +271,4 @@ fn validity_args() -> Vec<OsString> {
         OsString::from("--no-write-lock-file"),
         OsString::from("--no-update-lock-file"),
     ]
-}
-
-fn eval_base_args() -> Vec<OsString> {
-    ["eval", "--no-write-lock-file", "--no-update-lock-file"]
-        .into_iter()
-        .map(OsString::from)
-        .collect()
-}
-
-fn valid_derivation_path(path: &str) -> bool {
-    let Some(name) = path.strip_prefix("/nix/store/") else {
-        return false;
-    };
-    !name.is_empty()
-        && name.ends_with(".drv")
-        && !name.chars().any(|character| {
-            character.is_control() || character.is_whitespace() || character == '/'
-        })
-}
-
-fn parse_cannot_build(line: &str) -> Option<String> {
-    let start = line.find("Cannot build '")? + "Cannot build '".len();
-    let rest = &line[start..];
-    let end = rest.find('\'')?;
-    let derivation = &rest[..end];
-    valid_derivation_path(derivation).then(|| derivation.to_owned())
 }

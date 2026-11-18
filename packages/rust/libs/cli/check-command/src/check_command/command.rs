@@ -5,30 +5,28 @@ use super::interrupt::InterruptFlag;
 use super::model::{Outcome, RunStatus};
 use super::retrieval::{run_details, run_failures, run_list};
 use super::store;
-use crate::output::TerminalFacts;
+use bloomery_cli_output::TerminalFacts;
 pub use bloomery_cli_types::{CheckArgs, CheckOperation};
 #[cfg(test)]
 pub use bloomery_cli_types::{DetailsArgs, FailureArgs, HealthArgs, HealthUpdateArgs, ListArgs};
 use std::fs;
-use std::io::{self, Write};
+use std::io::Write;
 use std::path::Path;
 use std::process::ExitCode;
 
-pub(crate) use bloomery_check_output::check_command::render::report_error;
+pub(crate) use bloomery_check_output::render::report_error;
 #[cfg(test)]
-pub(crate) use bloomery_check_selection::check_command::selection::{
-    Catalog, effective_systems, missing_check_controls,
-};
-pub(crate) use bloomery_check_selection::check_command::selection::{
+pub(crate) use bloomery_check_selection::selection::missing_check_controls;
+pub(crate) use bloomery_check_selection::selection::{
     PlannedCatalog, discover_for_selection, plan_for_selection, warn_missing_check_controls,
 };
-pub(crate) use bloomery_check_support::check_command::context::CheckError;
-pub(crate) use bloomery_check_support::check_command::validation::validate_args;
+pub(crate) use bloomery_check_support::context::CheckError;
+pub(crate) use bloomery_check_support::validation::validate_args;
 
 pub(super) struct CheckContext<'a> {
     pub(super) root: &'a Path,
     pub(super) json_mode: bool,
-    pub(super) color: crate::output::ColorMode,
+    pub(super) color: bloomery_cli_output::ColorMode,
     pub(super) no_write: bool,
     pub(super) backend: &'a dyn NixBackend,
     pub(super) interrupt: InterruptFlag,
@@ -36,75 +34,11 @@ pub(super) struct CheckContext<'a> {
     pub(super) terminal: TerminalFacts,
 }
 
-pub fn run(args: CheckArgs, json_mode: bool) -> ExitCode {
-    let root = match std::env::current_dir() {
-        Ok(root) => root,
-        Err(error) => {
-            let mut stdout = io::stdout().lock();
-            let mut stderr = io::stderr().lock();
-            return report_error(
-                json_mode,
-                &CheckError::operational(format!("unable to determine workspace root: {error}")),
-                None,
-                &mut stdout,
-                &mut stderr,
-            );
-        }
-    };
-    let interrupt = InterruptFlag::install();
-    let backend = NixCli::default();
-    let mut stdout = io::stdout().lock();
-    let mut stderr = io::stderr().lock();
-    run_at_with(
-        args,
-        CheckContext {
-            root: &root,
-            json_mode,
-            color: crate::output::ColorMode::Auto,
-            no_write: false,
-            backend: &backend,
-            interrupt,
-            cache_base: None,
-            terminal: TerminalFacts::from_environment(),
-        },
-        &mut stdout,
-        &mut stderr,
-    )
-}
-
+/// Execute `bloomery check` with explicit color and write-mode selection.
 pub fn run_at(
     args: CheckArgs,
     json_mode: bool,
-    root: &Path,
-    stdout: &mut impl Write,
-    stderr: &mut impl Write,
-) -> ExitCode {
-    run_at_with_color(
-        args,
-        json_mode,
-        crate::output::ColorMode::Auto,
-        root,
-        stdout,
-        stderr,
-    )
-}
-
-/// Execute `bloomery check` with an explicit human-output color selection.
-pub fn run_at_with_color(
-    args: CheckArgs,
-    json_mode: bool,
-    color: crate::output::ColorMode,
-    root: &Path,
-    stdout: &mut impl Write,
-    stderr: &mut impl Write,
-) -> ExitCode {
-    run_at_with_color_and_mode(args, json_mode, color, false, root, stdout, stderr)
-}
-
-pub fn run_at_with_color_and_mode(
-    args: CheckArgs,
-    json_mode: bool,
-    color: crate::output::ColorMode,
+    color: bloomery_cli_output::ColorMode,
     no_write: bool,
     root: &Path,
     stdout: &mut impl Write,
@@ -128,32 +62,6 @@ pub fn run_at_with_color_and_mode(
     )
 }
 
-pub fn run_at_with_cache(
-    args: CheckArgs,
-    json_mode: bool,
-    root: &Path,
-    cache_base: &Path,
-    stdout: &mut impl Write,
-    stderr: &mut impl Write,
-) -> ExitCode {
-    let backend = NixCli::default();
-    run_at_with(
-        args,
-        CheckContext {
-            root,
-            json_mode,
-            color: crate::output::ColorMode::Auto,
-            no_write: false,
-            backend: &backend,
-            interrupt: InterruptFlag::install(),
-            cache_base: Some(cache_base),
-            terminal: TerminalFacts::from_environment(),
-        },
-        stdout,
-        stderr,
-    )
-}
-
 /// Outcome of running the default check suite as a prerequisite gate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GateOutcome {
@@ -166,16 +74,6 @@ pub struct GateOutcome {
 /// structured outcome. The run is retained through the ordinary check store so
 /// its failures remain retrievable with `check failures` and `check details`.
 pub fn run_gate_at(
-    args: CheckArgs,
-    root: &Path,
-    cache_base: Option<&Path>,
-    stdout: &mut impl Write,
-    stderr: &mut impl Write,
-) -> GateOutcome {
-    run_gate_at_with_mode(args, root, cache_base, false, stdout, stderr)
-}
-
-pub fn run_gate_at_with_mode(
     args: CheckArgs,
     root: &Path,
     cache_base: Option<&Path>,
@@ -213,7 +111,7 @@ pub(super) fn run_gate_at_with_backend_mode(
         CheckContext {
             root,
             json_mode: false,
-            color: crate::output::ColorMode::Auto,
+            color: bloomery_cli_output::ColorMode::Auto,
             no_write,
             backend,
             interrupt: InterruptFlag::install(),
@@ -239,12 +137,7 @@ pub(super) fn run_gate_at_with_backend_mode(
             Err(_) => (RunStatus::Error, Vec::new()),
         };
     GateOutcome {
-        exit_code: match status {
-            RunStatus::Passed => 0,
-            RunStatus::Failed => 1,
-            RunStatus::Interrupted => 130,
-            RunStatus::Error => 2,
-        },
+        exit_code: status.exit_code(),
         status,
         failed_checks,
     }
@@ -274,12 +167,12 @@ pub(super) fn run_at_with(
     }
     // Mirror the shared CLI preflight at the feature boundary so no direct
     // caller can execute or retrieve checks without a root flake.
-    if !context.root.join("flake.nix").is_file() {
+    if !bloomery_cli_types::flake_present(context.root) {
         return report_error(
             context.json_mode,
             &CheckError {
-                code: crate::output::MISSING_FLAKE_CODE,
-                message: crate::output::MISSING_FLAKE_MESSAGE.to_owned(),
+                code: bloomery_cli_types::MISSING_FLAKE_CODE,
+                message: bloomery_cli_types::MISSING_FLAKE_MESSAGE.to_owned(),
             },
             None,
             stdout,
@@ -374,8 +267,8 @@ pub(super) fn run_at_with(
 
 fn health_context<'a>(
     context: &CheckContext<'a>,
-) -> bloomery_check_support::check_command::context::HealthContext<'a, dyn NixBackend + 'a> {
-    bloomery_check_support::check_command::context::HealthContext {
+) -> bloomery_check_support::context::HealthContext<'a, dyn NixBackend + 'a> {
+    bloomery_check_support::context::HealthContext {
         root: context.root,
         json_mode: context.json_mode,
         color: context.color,

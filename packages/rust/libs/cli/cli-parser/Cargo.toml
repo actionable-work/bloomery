@@ -1,5 +1,6 @@
 [dependencies]
 bloomery-cli-types = { workspace = true }
+bloomery-nix = { workspace = true }
 clap = { workspace = true }
 
 [package]

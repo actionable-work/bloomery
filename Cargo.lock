@@ -193,6 +193,8 @@ dependencies = [
  "bloomery-check-command",
  "bloomery-cli-output",
  "bloomery-cli-types",
+ "bloomery-glob",
+ "bloomery-nix",
  "serde_json",
 ]
 
@@ -200,6 +202,7 @@ dependencies = [
 name = "bloomery-check"
 version = "0.1.0"
 dependencies = [
+ "bloomery-glob",
  "bloomery-model",
  "bloomery-scanning",
  "bloomery-workspace",
@@ -213,8 +216,8 @@ name = "bloomery-check-catalog"
 version = "0.1.0"
 dependencies = [
  "bloomery-check",
- "bloomery-check-output",
  "bloomery-check-support",
+ "bloomery-nix",
  "serde_json",
 ]
 
@@ -235,9 +238,7 @@ dependencies = [
  "bloomery-model",
  "bloomery-workspace",
  "serde_json",
- "sha2 0.10.9",
  "toml",
- "tracing",
 ]
 
 [[package]]
@@ -284,7 +285,8 @@ version = "0.1.0"
 dependencies = [
  "bloomery-check-catalog",
  "bloomery-check-support",
- "bloomery-cli-output",
+ "bloomery-cli-types",
+ "bloomery-glob",
  "bloomery-model",
  "toml",
  "tracing",
@@ -304,6 +306,7 @@ version = "0.1.0"
 dependencies = [
  "bloomery-cli-output",
  "bloomery-cli-types",
+ "bloomery-nix",
 ]
 
 [[package]]
@@ -329,7 +332,6 @@ dependencies = [
  "bloomery-review",
  "bloomery-spec",
  "bloomery-sync",
- "bloomery-workspace",
  "serde_json",
  "toml",
  "tracing-subscriber",
@@ -339,13 +341,8 @@ dependencies = [
 name = "bloomery-cli-output"
 version = "0.1.0"
 dependencies = [
- "bloomery-config",
- "bloomery-disk",
- "bloomery-init",
+ "bloomery-cli-types",
  "bloomery-model",
- "bloomery-review",
- "bloomery-spec",
- "bloomery-sync",
  "serde_json",
 ]
 
@@ -354,6 +351,7 @@ name = "bloomery-cli-parser"
 version = "0.1.0"
 dependencies = [
  "bloomery-cli-types",
+ "bloomery-nix",
  "clap",
 ]
 
@@ -381,6 +379,7 @@ name = "bloomery-disk"
 version = "0.1.0"
 dependencies = [
  "bloomery-cli-types",
+ "bloomery-nix",
  "serde",
  "serde_json",
 ]
@@ -405,7 +404,9 @@ name = "bloomery-docs-consistency"
 version = "0.1.0"
 dependencies = [
  "bloomery-cli-types",
+ "bloomery-glob",
  "bloomery-model",
+ "bloomery-workspace",
  "serde",
  "toml",
 ]
@@ -418,6 +419,10 @@ dependencies = [
  "tokio",
  "topcoat",
 ]
+
+[[package]]
+name = "bloomery-glob"
+version = "0.1.0"
 
 [[package]]
 name = "bloomery-init"
@@ -436,10 +441,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "bloomery-nix"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "bloomery-review"
 version = "0.1.0"
 dependencies = [
  "bloomery-model",
+ "bloomery-workspace",
  "serde",
 ]
 
@@ -454,7 +467,6 @@ dependencies = [
  "oxc_parser",
  "oxc_span",
  "proc-macro2",
- "serde_json",
  "syn 2.0.119",
 ]
 
@@ -476,7 +488,6 @@ dependencies = [
  "bloomery-scanning",
  "bloomery-workspace",
  "serde",
- "toml",
  "toml_edit",
 ]
 
@@ -484,6 +495,7 @@ dependencies = [
 name = "bloomery-sync"
 version = "0.1.0"
 dependencies = [
+ "bloomery-cli-types",
  "bloomery-model",
  "serde",
  "serde_json",
@@ -507,6 +519,7 @@ dependencies = [
 name = "bloomery-workspace"
 version = "0.1.0"
 dependencies = [
+ "bloomery-glob",
  "bloomery-model",
  "serde_yaml",
  "toml",

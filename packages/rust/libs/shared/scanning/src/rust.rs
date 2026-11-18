@@ -86,13 +86,7 @@ impl<'ast> Visit<'ast> for Visitor<'_> {
         let conditional_test =
             self.collect_conditions && conditions::conditional_attribute(&attributes, "test");
         self.inherited = CfgExpression::All(vec![inherited.clone(), attributes.clone()]);
-        let is_test = item.attrs.iter().any(|attribute| {
-            attribute
-                .path()
-                .segments
-                .last()
-                .is_some_and(|segment| segment.ident == "test")
-        });
+        let is_test = crate::modules::is_test_fn(&item.attrs);
         if is_test || conditional_test {
             let evidence_start = self.output.evidence.len();
             let name = item.sig.ident.to_string();

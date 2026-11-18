@@ -1,7 +1,7 @@
 //! Source-only Rust metrics used by the static code-health check.
 
 use crate::AnalysisSession;
-use crate::modules::module_paths;
+use crate::modules::{is_test_fn, module_child_dir, module_paths};
 use bloomery_model::Diagnostic;
 use proc_macro2::{Delimiter, Group, TokenStream, TokenTree};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -756,26 +756,6 @@ fn is_test_only(attrs: &[syn::Attribute]) -> bool {
                 .parse_args::<syn::Meta>()
                 .is_ok_and(|meta| matches!(meta, syn::Meta::Path(path) if path.is_ident("test")))
     })
-}
-
-fn is_test_fn(attrs: &[syn::Attribute]) -> bool {
-    attrs.iter().any(|attr| {
-        attr.path().is_ident("test")
-            || attr
-                .path()
-                .segments
-                .last()
-                .is_some_and(|segment| segment.ident == "test")
-    })
-}
-
-fn module_child_dir(path: &Path) -> PathBuf {
-    let parent = path.parent().unwrap_or(Path::new("."));
-    if path.file_name().is_some_and(|name| name == "mod.rs") {
-        parent.to_path_buf()
-    } else {
-        parent.join(path.file_stem().unwrap_or_default())
-    }
 }
 
 fn production_token_lines(tokens: &TokenStream, excluded: &[SourceRange]) -> BTreeSet<usize> {

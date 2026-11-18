@@ -30,7 +30,8 @@ plan once and retains an outcome for each selected package.
 Default execution passes `--keep-going`, so Nix attempts every derivation whose
 prerequisites permit realization. A package whose derivation outputs are valid
 is passed, including a derivation Nix substitutes from a cache; a package whose
-outputs are absent is failed. Resolve each package's output store path from its
+outputs are absent is failed. An output `nix path-info` reports as invalid is
+absent. Resolve each package's output store path from its
 derivation's realized outputs and report it.
 
 A failed derivation is a package failure. Retain its derivation path so a user

@@ -10,6 +10,7 @@ mod backend;
 #[cfg(test)]
 mod tests;
 
+pub use bloomery_check_command::RunStatus;
 use bloomery_cli_output::{
     ColorMode, OutcomeStatus, Status, Stream, color_enabled, error_envelope, heading,
     success_envelope,
@@ -43,36 +44,6 @@ impl Outcome {
     }
 }
 
-/// Overall build outcome.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum BuildStatus {
-    #[default]
-    Passed,
-    Failed,
-    Error,
-    Interrupted,
-}
-
-impl BuildStatus {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Passed => "passed",
-            Self::Failed => "failed",
-            Self::Error => "error",
-            Self::Interrupted => "interrupted",
-        }
-    }
-
-    fn exit_code(self) -> u8 {
-        match self {
-            Self::Passed => 0,
-            Self::Failed => 1,
-            Self::Error => 2,
-            Self::Interrupted => 130,
-        }
-    }
-}
-
 /// One selected package and its realization evidence.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackageResult {
@@ -87,7 +58,7 @@ pub struct PackageResult {
 /// Result of the optional `--check` gate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GateReport {
-    pub status: BuildStatus,
+    pub status: RunStatus,
     pub failed_checks: Vec<String>,
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
@@ -96,7 +67,7 @@ pub struct GateReport {
 /// Complete result of a build invocation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BuildReport {
-    pub status: BuildStatus,
+    pub status: RunStatus,
     pub systems: Vec<String>,
     pub packages: Vec<PackageResult>,
     pub gate: Option<GateReport>,
@@ -163,7 +134,7 @@ impl std::error::Error for BuildError {}
 /// Structured outcome returned by a check gate implementation.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct GateOutcome {
-    pub status: BuildStatus,
+    pub status: RunStatus,
     pub failed_checks: Vec<String>,
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
@@ -189,7 +160,7 @@ impl CheckGate for CheckCommandGate {
         };
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
-        let outcome = bloomery_check_command::run_gate_at_with_mode(
+        let outcome = bloomery_check_command::run_gate_at(
             args,
             root,
             None,
@@ -198,12 +169,7 @@ impl CheckGate for CheckCommandGate {
             &mut stderr,
         );
         GateOutcome {
-            status: match outcome.status {
-                bloomery_check_command::RunStatus::Passed => BuildStatus::Passed,
-                bloomery_check_command::RunStatus::Failed => BuildStatus::Failed,
-                bloomery_check_command::RunStatus::Error => BuildStatus::Error,
-                bloomery_check_command::RunStatus::Interrupted => BuildStatus::Interrupted,
-            },
+            status: outcome.status,
             failed_checks: outcome.failed_checks,
             stdout,
             stderr,
@@ -212,40 +178,8 @@ impl CheckGate for CheckCommandGate {
     }
 }
 
-/// Execute `bloomery build` for the current process.
-pub fn run(args: BuildArgs, json_mode: bool, color: ColorMode) -> ExitCode {
-    let root = match std::env::current_dir() {
-        Ok(root) => root,
-        Err(error) => {
-            let mut stdout = io::stdout().lock();
-            let mut stderr = io::stderr().lock();
-            return report_error(
-                json_mode,
-                color,
-                &BuildError::operational(format!("unable to determine workspace root: {error}")),
-                &mut stdout,
-                &mut stderr,
-            );
-        }
-    };
-    let mut stdout = io::stdout().lock();
-    let mut stderr = io::stderr().lock();
-    run_at(args, json_mode, color, &root, &mut stdout, &mut stderr)
-}
-
-/// Execute `bloomery build` against an injected root.
+/// Execute `bloomery build` against an injected root with the production backends.
 pub fn run_at(
-    args: BuildArgs,
-    json_mode: bool,
-    color: ColorMode,
-    root: &Path,
-    stdout: &mut impl Write,
-    stderr: &mut impl Write,
-) -> ExitCode {
-    run_at_with_mode(args, json_mode, color, false, root, stdout, stderr)
-}
-
-pub fn run_at_with_mode(
     args: BuildArgs,
     json_mode: bool,
     color: ColorMode,
@@ -310,11 +244,11 @@ pub fn run_at_with_backends_and_mode<B: NixBackend, G: CheckGate>(
         color,
         no_write,
     } = options;
-    if !root.join("flake.nix").is_file() {
+    if !bloomery_cli_types::flake_present(root) {
         return report_error(
             json_mode,
             color,
-            &BuildError::usage(bloomery_cli_output::MISSING_FLAKE_MESSAGE),
+            &BuildError::usage(bloomery_cli_types::MISSING_FLAKE_MESSAGE),
             stdout,
             stderr,
         );
@@ -370,12 +304,7 @@ fn report_error(
             }
         }
     } else {
-        let message = format!("error: {error}");
-        let rendered = bloomery_cli_output::colorize_error(
-            &message,
-            color_enabled(Stream::Stderr, false, color),
-        );
-        let _ = writeln!(stderr, "{rendered}");
+        let _ = bloomery_cli_output::write_error(stderr, error, color);
     }
     ExitCode::from(error.exit_code())
 }
@@ -409,7 +338,7 @@ pub fn execute_with_mode<B: NixBackend, G: CheckGate>(
             stdout: outcome.stdout,
             stderr: outcome.stderr,
         });
-        if outcome.status != BuildStatus::Passed {
+        if outcome.status != RunStatus::Passed {
             return Ok(BuildReport {
                 status: outcome.status,
                 systems,
@@ -469,14 +398,14 @@ pub fn execute_with_mode<B: NixBackend, G: CheckGate>(
         .map(|plan| package_result(plan, &realization, &outputs, &valid))
         .collect::<Vec<_>>();
     let status = if !realization.canceled.is_empty() {
-        BuildStatus::Interrupted
+        RunStatus::Interrupted
     } else if packages
         .iter()
         .any(|package| package.outcome == Outcome::Failed)
     {
-        BuildStatus::Failed
+        RunStatus::Failed
     } else {
-        BuildStatus::Passed
+        RunStatus::Passed
     };
     Ok(BuildReport {
         status,
@@ -507,12 +436,7 @@ fn resolve_systems<B: NixBackend>(
     root: &Path,
     backend: &B,
 ) -> Result<Vec<String>, BuildError> {
-    let mut systems = Vec::new();
-    for system in &args.systems {
-        if !systems.contains(system) {
-            systems.push(system.clone());
-        }
-    }
+    let mut systems = bloomery_nix::deduplicate_systems(&args.systems);
     if systems.is_empty() {
         systems.push(backend.host_system(root).map_err(BuildError::operational)?);
     }
@@ -530,7 +454,7 @@ fn select_packages(
     for plan in plans {
         if selectors
             .iter()
-            .any(|selector| glob_matches(selector, &plan.name))
+            .any(|selector| bloomery_glob::matches(selector, &plan.name))
             && !selected.iter().any(|chosen: &PackagePlan| {
                 chosen.system == plan.system && chosen.name == plan.name
             })
@@ -539,7 +463,10 @@ fn select_packages(
         }
     }
     for selector in selectors {
-        if !plans.iter().any(|plan| glob_matches(selector, &plan.name)) {
+        if !plans
+            .iter()
+            .any(|plan| bloomery_glob::matches(selector, &plan.name))
+        {
             return Err(BuildError::usage(format!(
                 "package selector '{selector}' matches no package"
             )));
@@ -663,19 +590,11 @@ fn write_text_report(
                 gate.failed_checks.join(", ")
             )
         };
-        let status = match gate.status.as_str() {
-            "passed" => OutcomeStatus::Passed,
-            "interrupted" => OutcomeStatus::Skipped,
-            _ => OutcomeStatus::Failed,
-        };
+        let status = gate.status.outcome_status();
         writeln!(stdout, "{}", status.render(&summary, styled))?;
     }
-    let overall = match report.status {
-        BuildStatus::Passed => OutcomeStatus::Passed,
-        BuildStatus::Failed | BuildStatus::Error => OutcomeStatus::Failed,
-        BuildStatus::Interrupted => OutcomeStatus::Skipped,
-    };
-    let summary = if report.status == BuildStatus::Passed {
+    let overall = report.status.outcome_status();
+    let summary = if report.status == RunStatus::Passed {
         format!(
             "{} package{}",
             report.packages.len(),
@@ -729,19 +648,10 @@ fn report_json(report: &BuildReport) -> Value {
     success_envelope(
         "build",
         None,
-        envelope_status(report.status),
+        report.status.envelope_status(),
         result,
         Vec::new(),
     )
-}
-
-fn envelope_status(status: BuildStatus) -> Status {
-    match status {
-        BuildStatus::Passed => Status::Succeeded,
-        BuildStatus::Failed => Status::Failed,
-        BuildStatus::Error => Status::Error,
-        BuildStatus::Interrupted => Status::Interrupted,
-    }
 }
 
 fn build_failure_json(message: &str) -> Value {
@@ -754,35 +664,6 @@ fn build_failure_json(message: &str) -> Value {
         message,
         None,
     )
-}
-
-/// Case-sensitive anchored glob with `*` and `?`.
-pub fn glob_matches(pattern: &str, value: &str) -> bool {
-    let pattern = pattern.chars().collect::<Vec<_>>();
-    let value = value.chars().collect::<Vec<_>>();
-    let mut matches = vec![false; value.len() + 1];
-    matches[0] = true;
-
-    for token in pattern {
-        let mut next = vec![false; value.len() + 1];
-        match token {
-            '*' => {
-                next[0] = matches[0];
-                for index in 1..=value.len() {
-                    next[index] = matches[index] || next[index - 1];
-                }
-            }
-            '?' => next[1..].copy_from_slice(&matches[..value.len()]),
-            literal => {
-                for index in 1..=value.len() {
-                    next[index] = matches[index - 1] && value[index - 1] == literal;
-                }
-            }
-        }
-        matches = next;
-    }
-
-    matches[value.len()]
 }
 
 fn valid_system_name(system: &str) -> bool {

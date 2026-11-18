@@ -1,0 +1,639 @@
+use crate::health_report::{
+    HEALTH_ALGORITHM_VERSION, HEALTH_REPORT_SCHEMA_VERSION, HEALTH_SUMMARY_SCHEMA_VERSION,
+    HealthInputDigest, HealthPolicy, HealthPolicyError, health_policy_value, load_health_policy,
+};
+use bloomery_check_catalog::catalog::NixBackend;
+use bloomery_check_output::output::{compact_json, display_score, health_page, health_page_text};
+use bloomery_check_output::render::{report_error, write_page};
+use bloomery_check_storage::store::{RunStore, load_run};
+use bloomery_check_support::context::{CheckError, HealthContext};
+use bloomery_check_support::model::{Outcome, RunMode, RunRecord, RunStatus};
+use bloomery_cli_output::{ColorMode, Status, error_envelope, success_envelope};
+use bloomery_cli_types::{HealthArgs, HealthUpdateArgs};
+use bloomery_model::health::HealthConfig;
+use serde_json::{Value, json};
+use std::collections::BTreeSet;
+use std::fs::{self, OpenOptions};
+use std::io::{self, Write};
+use std::path::{Component, Path, PathBuf};
+use std::process::ExitCode;
+
+/// Health retrieval context over the Nix check catalog backend.
+pub type CheckContext<'a> = HealthContext<'a, dyn NixBackend + 'a>;
+
+pub fn run_retrieve(
+    context: &CheckContext<'_>,
+    args: HealthArgs,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
+    let loaded = match load_run(context.root, context.cache_base, args.run.as_deref()) {
+        Ok(loaded) => loaded,
+        Err(error) => {
+            return report_error(
+                context.json_mode,
+                &error,
+                args.run.as_deref(),
+                stdout,
+                stderr,
+            );
+        }
+    };
+    let report = match read_health_report(&loaded.1) {
+        Ok(report) => report,
+        Err(message) => {
+            return report_error(
+                context.json_mode,
+                &CheckError::retrieval(message),
+                Some(&loaded.0.id),
+                stdout,
+                stderr,
+            );
+        }
+    };
+    let page = match health_page(&report, &loaded.0.id, args.offset, args.limit) {
+        Ok(page) => page,
+        Err(message) => {
+            return report_error(
+                context.json_mode,
+                &CheckError::retrieval(message),
+                Some(&loaded.0.id),
+                stdout,
+                stderr,
+            );
+        }
+    };
+    let bytes = if context.json_mode {
+        page.bytes
+    } else {
+        health_page_text(&page.value, args.offset).into_bytes()
+    };
+    write_page(context.json_mode, context.color, bytes, stdout, stderr)
+}
+
+pub fn run_update(
+    context: &CheckContext<'_>,
+    args: HealthUpdateArgs,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
+    let prepared = match prepare_health_update(context, args.run.as_deref()) {
+        Ok(prepared) => prepared,
+        Err(failure) => return render_update_failure(context, failure, stdout, stderr),
+    };
+    if let Err(message) = atomic_replace(&prepared.destination, &prepared.bytes) {
+        return render_update_failure(
+            context,
+            UpdateFailure::Rejected {
+                code: "HealthExportFailed",
+                message,
+                run: prepared.record.id.clone(),
+            },
+            stdout,
+            stderr,
+        );
+    }
+    render_update_success(context, prepared, stdout, stderr)
+}
+
+struct PreparedHealthUpdate {
+    record: RunRecord,
+    report: Value,
+    destination: PathBuf,
+    bytes: Vec<u8>,
+}
+
+enum UpdateFailure {
+    Operational(String),
+    Retrieval {
+        message: String,
+        run: Option<String>,
+    },
+    Rejected {
+        code: &'static str,
+        message: String,
+        run: String,
+    },
+}
+
+fn prepare_health_update(
+    context: &CheckContext<'_>,
+    selected_run: Option<&str>,
+) -> Result<PreparedHealthUpdate, UpdateFailure> {
+    let store =
+        RunStore::open(context.root, context.cache_base).map_err(UpdateFailure::Operational)?;
+    let (record, directory) =
+        store
+            .load_or_latest(selected_run)
+            .map_err(|message| UpdateFailure::Retrieval {
+                message,
+                run: selected_run.map(str::to_owned),
+            })?;
+    require_exportable_run(&record)?;
+    let report = read_health_report(&directory).map_err(|message| UpdateFailure::Rejected {
+        code: "HealthExportUnavailable",
+        message,
+        run: record.id.clone(),
+    })?;
+    let (policy, effective_policy) = current_health_policy(context.root, &record.id)?;
+    validate_report_freshness(context, &record.id, &report, &effective_policy)?;
+    let destination =
+        validate_destination(context.root, &policy.baseline, &report, &effective_policy).map_err(
+            |message| UpdateFailure::Rejected {
+                code: "HealthBaselinePathRejected",
+                message,
+                run: record.id.clone(),
+            },
+        )?;
+    let bytes = serialize_summary(&report).map_err(|message| UpdateFailure::Rejected {
+        code: "HealthExportFailed",
+        message,
+        run: record.id.clone(),
+    })?;
+    Ok(PreparedHealthUpdate {
+        record,
+        report,
+        destination,
+        bytes,
+    })
+}
+
+fn require_exportable_run(record: &RunRecord) -> Result<(), UpdateFailure> {
+    let formatter_passed = match record.mode {
+        RunMode::Write => record
+            .outcomes
+            .iter()
+            .find(|outcome| outcome.id == "format:workspace")
+            .is_some_and(|outcome| outcome.outcome == Outcome::Passed),
+        RunMode::NoWrite => {
+            !record.selection.systems.is_empty()
+                && record.selection.systems.iter().all(|system| {
+                    record.outcomes.iter().any(|outcome| {
+                        outcome.id
+                            == bloomery_check_catalog::catalog::nix_check_id(
+                                system,
+                                bloomery_check_catalog::catalog::TREEFMT_CHECK_ATTRIBUTE,
+                            )
+                            && outcome.outcome == Outcome::Passed
+                    })
+                })
+        }
+    };
+    if matches!(record.status, RunStatus::Passed | RunStatus::Failed) && formatter_passed {
+        return Ok(());
+    }
+    Err(UpdateFailure::Rejected {
+        code: "HealthExportUnavailable",
+        message: "baseline export requires a finalized uninterrupted run with a passed formatter"
+            .to_owned(),
+        run: record.id.clone(),
+    })
+}
+
+pub fn refresh_baseline(root: &Path, report: &Value) -> Result<(), String> {
+    let HealthPolicy {
+        config: policy,
+        raw: raw_json,
+    } = load_health_policy(root).map_err(HealthPolicyError::into_message)?;
+    let effective_policy = health_policy_value(&policy, &raw_json);
+    let destination = validate_destination(root, &policy.baseline, report, &effective_policy)?;
+    let bytes = serialize_summary(report)?;
+    atomic_replace(&destination, &bytes)
+}
+
+fn current_health_policy(root: &Path, run: &str) -> Result<(HealthConfig, Value), UpdateFailure> {
+    let HealthPolicy {
+        config: policy,
+        raw: raw_json,
+    } = load_health_policy(root).map_err(|error| match error {
+        HealthPolicyError::Config(diagnostic) => stale_export(run, diagnostic.message),
+        HealthPolicyError::Raw(error) => stale_export(run, error.to_string()),
+    })?;
+    let effective_policy = health_policy_value(&policy, &raw_json);
+    Ok((policy, effective_policy))
+}
+
+fn validate_report_freshness(
+    context: &CheckContext<'_>,
+    run: &str,
+    report: &Value,
+    effective_policy: &Value,
+) -> Result<(), UpdateFailure> {
+    if report.get("policy") != Some(effective_policy) {
+        return Err(stale_export(
+            run,
+            "health configuration changed since the retained measurement",
+        ));
+    }
+    let sources = current_health_sources(context, run)?;
+    let current_digest = current_input_digest(context.root, report, &sources, effective_policy)
+        .map_err(|message| stale_export(run, message))?;
+    if report.get("input_digest").and_then(Value::as_str) == Some(&current_digest) {
+        return Ok(());
+    }
+    Err(stale_export(
+        run,
+        "source bytes, discovery inputs, inventory, or health configuration changed since the retained measurement",
+    ))
+}
+
+fn current_health_sources(
+    context: &CheckContext<'_>,
+    run: &str,
+) -> Result<Vec<bloomery_check::HealthSourceCrate>, UpdateFailure> {
+    let system = context
+        .backend
+        .host_system(context.root)
+        .map_err(|message| stale_export(run, message))?;
+    context
+        .backend
+        .health_sources(context.root, &system)
+        .map_err(|message| stale_export(run, message))
+}
+
+fn stale_export(run: &str, message: impl Into<String>) -> UpdateFailure {
+    UpdateFailure::Rejected {
+        code: "HealthExportStale",
+        message: message.into(),
+        run: run.to_owned(),
+    }
+}
+
+fn serialize_summary(report: &Value) -> Result<Vec<u8>, String> {
+    let mut bytes = serde_json::to_vec_pretty(&health_summary(report))
+        .map_err(|error| format!("unable to serialize code health summary: {error}"))?;
+    bytes.push(b'\n');
+    Ok(bytes)
+}
+
+fn render_update_failure(
+    context: &CheckContext<'_>,
+    failure: UpdateFailure,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
+    match failure {
+        UpdateFailure::Operational(message) => report_error(
+            context.json_mode,
+            &CheckError::operational(message),
+            None,
+            stdout,
+            stderr,
+        ),
+        UpdateFailure::Retrieval { message, run } => report_error(
+            context.json_mode,
+            &CheckError::retrieval(message),
+            run.as_deref(),
+            stdout,
+            stderr,
+        ),
+        UpdateFailure::Rejected { code, message, run } => update_error(
+            context.json_mode,
+            code,
+            &message,
+            Some(&run),
+            ExitCode::from(1),
+            stdout,
+            stderr,
+        ),
+    }
+}
+
+fn render_update_success(
+    context: &CheckContext<'_>,
+    prepared: PreparedHealthUpdate,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
+    let relative = prepared
+        .destination
+        .strip_prefix(context.root)
+        .unwrap_or(&prepared.destination)
+        .to_string_lossy();
+    let response = json!({
+        "run": prepared.record.id,
+        "path": relative,
+        "crates": prepared.report.get("crates").and_then(Value::as_array).map_or(0, Vec::len),
+        "workspace_score_hundredths": prepared.report.pointer("/workspace/score_hundredths"),
+    });
+    let bytes = if context.json_mode {
+        compact_json(&success_envelope(
+            "check",
+            Some("health_update"),
+            Status::Succeeded,
+            response,
+            Vec::new(),
+        ))
+        .unwrap_or_default()
+    } else {
+        format!(
+            "updated {} from run {} · workspace score {}\n",
+            relative,
+            prepared.record.id,
+            display_score(prepared.report.pointer("/workspace/score_hundredths")),
+        )
+        .into_bytes()
+    };
+    write_page(context.json_mode, context.color, bytes, stdout, stderr)
+}
+
+fn read_health_report(directory: &Path) -> Result<Value, String> {
+    let report = bloomery_check_storage::store::read_retained_health_report(directory)?;
+    if report.get("schema_version").and_then(Value::as_u64) != Some(HEALTH_REPORT_SCHEMA_VERSION)
+        || report.get("algorithm_version").and_then(Value::as_u64) != Some(HEALTH_ALGORITHM_VERSION)
+    {
+        return Err(
+            "retained health report uses an unsupported schema or algorithm version".to_owned(),
+        );
+    }
+    Ok(report)
+}
+
+fn current_input_digest(
+    root: &Path,
+    report: &Value,
+    sources: &[bloomery_check::HealthSourceCrate],
+    policy: &Value,
+) -> Result<String, String> {
+    let mut digest = HealthInputDigest::discovery(policy, sources, |path| {
+        fs::read(root.join(path))
+            .map_err(|error| format!("unable to recheck discovery input {path}: {error}"))
+    })?;
+    let source_paths = report
+        .get("crates")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "retained report has no crate source inventory".to_owned())?
+        .iter()
+        .flat_map(|crate_record| {
+            crate_record
+                .get("sources")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+        })
+        .collect::<BTreeSet<_>>();
+    for path in source_paths {
+        let bytes = fs::read(root.join(&path))
+            .map_err(|error| format!("unable to recheck analyzed Rust source {path}: {error}"))?;
+        digest.source(&path, &bytes);
+    }
+    digest.finish(policy)
+}
+
+fn health_summary(report: &Value) -> Value {
+    let mut crates = report
+        .get("crates")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .map(summary_crate)
+        .collect::<Vec<_>>();
+    crates.sort_by(|left, right| {
+        left["manifest_path"]
+            .as_str()
+            .cmp(&right["manifest_path"].as_str())
+    });
+    json!({
+        "schema_version": HEALTH_SUMMARY_SCHEMA_VERSION,
+        "algorithm_version": report.get("algorithm_version"),
+        "policy": {
+            "scoring": report.pointer("/policy/scoring"),
+            "selection": report.pointer("/policy/selection"),
+        },
+        "input_digest": report.get("input_digest"),
+        "workspace": {
+            "crate_count": report.get("crates").and_then(Value::as_array).map_or(0, Vec::len),
+            "sloc": report.pointer("/workspace/total_sloc"),
+            "overall_score": score_value(report.pointer("/workspace/score_hundredths")),
+            "subscores": workspace_subscores(report),
+        },
+        "crates": crates,
+    })
+}
+
+fn summary_crate(crate_record: &Value) -> Value {
+    json!({
+        "manifest_path": crate_record.get("manifest_path"),
+        "name": crate_record.get("name"),
+        "sloc": crate_record.get("sloc"),
+        "overall_score": score_value(crate_record.get("score_hundredths")),
+        "subscores": rounded_penalties(crate_record.get("penalties")),
+    })
+}
+
+fn score_value(score: Option<&Value>) -> Value {
+    score
+        .and_then(Value::as_u64)
+        .map(|hundredths| json!(hundredths as f64 / 100.0))
+        .unwrap_or(Value::Null)
+}
+
+fn rounded_penalties(penalties: Option<&Value>) -> Value {
+    let rounded = |name: &str| {
+        let value = penalties
+            .and_then(|value| value.get(name))
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0);
+        (value * 100.0).round() / 100.0
+    };
+    json!({
+        "complexity": rounded("complexity"),
+        "size": rounded("size"),
+        "nesting": rounded("nesting"),
+        "duplication": rounded("duplication"),
+        "crateSize": rounded("crateSize"),
+    })
+}
+
+fn workspace_subscores(report: &Value) -> Value {
+    let total_sloc = report
+        .pointer("/workspace/total_sloc")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let weighted_penalty = |name: &str| {
+        if total_sloc == 0 {
+            return 0.0;
+        }
+        let weighted = report
+            .get("crates")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .map(|crate_record| {
+                let sloc = crate_record
+                    .get("sloc")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0);
+                let penalty = crate_record
+                    .pointer(&format!("/penalties/{name}"))
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0);
+                penalty * sloc as f64
+            })
+            .sum::<f64>()
+            / total_sloc as f64;
+        (weighted * 100.0).round() / 100.0
+    };
+    json!({
+        "complexity": weighted_penalty("complexity"),
+        "size": weighted_penalty("size"),
+        "nesting": weighted_penalty("nesting"),
+        "duplication": weighted_penalty("duplication"),
+        "crateSize": weighted_penalty("crateSize"),
+    })
+}
+
+fn validate_destination(
+    root: &Path,
+    baseline: &str,
+    report: &Value,
+    policy: &Value,
+) -> Result<PathBuf, String> {
+    let root = fs::canonicalize(root)
+        .map_err(|error| format!("unable to resolve repository root: {error}"))?;
+    let relative = Path::new(baseline);
+    if relative.is_absolute()
+        || relative
+            .components()
+            .any(|component| !matches!(component, Component::Normal(_)))
+    {
+        return Err("baseline destination must stay inside the repository".to_owned());
+    }
+    let destination = root.join(relative);
+    let parent = destination
+        .parent()
+        .ok_or_else(|| "baseline destination has no parent".to_owned())?;
+    let mut current = root.clone();
+    for component in parent
+        .strip_prefix(&root)
+        .map_err(|_| "baseline destination escapes the repository".to_owned())?
+        .components()
+    {
+        current.push(component);
+        match fs::symlink_metadata(&current) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                let resolved = fs::canonicalize(&current).map_err(|error| {
+                    format!("unable to resolve baseline parent symlink: {error}")
+                })?;
+                if !resolved.starts_with(&root) {
+                    return Err("baseline parent symlink escapes the repository".to_owned());
+                }
+            }
+            Ok(metadata) if !metadata.is_dir() => {
+                return Err("baseline parent component is not a directory".to_owned());
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => break,
+            Err(error) => return Err(format!("unable to inspect baseline parent: {error}")),
+        }
+    }
+    if let Ok(metadata) = fs::symlink_metadata(&destination)
+        && (metadata.file_type().is_symlink() || !metadata.is_file())
+    {
+        return Err("baseline destination must be a regular repository file".to_owned());
+    }
+    let mut protected = BTreeSet::from([
+        root.join(".bloomery/config.toml"),
+        root.join("Cargo.lock"),
+        root.join("flake.lock"),
+        root.join(".bloomery/specs"),
+    ]);
+    if let Some(manifest) = policy
+        .pointer("/selection/manifest")
+        .and_then(Value::as_str)
+    {
+        protected.insert(root.join(manifest));
+    }
+    if let Some(crate_records) = report.get("crates").and_then(Value::as_array) {
+        for crate_record in crate_records {
+            if let Some(manifest) = crate_record.get("manifest_path").and_then(Value::as_str) {
+                protected.insert(root.join(manifest));
+            }
+            if let Some(sources) = crate_record.get("sources").and_then(Value::as_array) {
+                for source in sources.iter().filter_map(Value::as_str) {
+                    protected.insert(root.join(source));
+                }
+            }
+        }
+    }
+    if protected
+        .iter()
+        .any(|path| destination.starts_with(path) || path.starts_with(&destination))
+    {
+        return Err("baseline destination overlaps a manifest, source, configuration, lockfile, or specification".to_owned());
+    }
+    Ok(destination)
+}
+
+fn atomic_replace(destination: &Path, bytes: &[u8]) -> Result<(), String> {
+    let parent = destination
+        .parent()
+        .ok_or_else(|| "baseline destination has no parent".to_owned())?;
+    fs::create_dir_all(parent)
+        .map_err(|error| format!("unable to create baseline directory: {error}"))?;
+    let file_name = destination
+        .file_name()
+        .ok_or_else(|| "baseline destination has no file name".to_owned())?
+        .to_string_lossy();
+    let temporary = parent.join(format!(".{file_name}.{}.tmp", std::process::id()));
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o644);
+    }
+    let mut created = false;
+    let result = (|| {
+        let mut file = options
+            .open(&temporary)
+            .map_err(|error| format!("unable to create temporary baseline: {error}"))?;
+        created = true;
+        file.write_all(bytes)
+            .map_err(|error| format!("unable to write temporary baseline: {error}"))?;
+        file.sync_all()
+            .map_err(|error| format!("unable to sync temporary baseline: {error}"))?;
+        fs::rename(&temporary, destination)
+            .map_err(|error| format!("unable to atomically replace baseline: {error}"))?;
+        // The rename is the commit point. Directory fsync is best-effort so a
+        // durability warning cannot turn a successful replacement into a
+        // reported failure after the previous baseline has already moved.
+        if let Ok(directory) = fs::File::open(parent) {
+            let _ = directory.sync_all();
+        }
+        Ok(())
+    })();
+    if result.is_err() && created {
+        let _ = fs::remove_file(&temporary);
+    }
+    result
+}
+
+fn update_error(
+    json_mode: bool,
+    code: &str,
+    message: &str,
+    run: Option<&str>,
+    status: ExitCode,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> ExitCode {
+    let envelope = error_envelope(
+        Some("check"),
+        Some("health_update"),
+        Status::Failed,
+        code,
+        "check",
+        message,
+        run.map(|run| json!({"run": run})),
+    );
+    let bytes = if json_mode {
+        compact_json(&envelope).unwrap_or_default()
+    } else {
+        format!("bloomery: {message}\n").into_bytes()
+    };
+    let _ = write_page(json_mode, ColorMode::Never, bytes, stdout, stderr);
+    status
+}

@@ -1,4 +1,4 @@
-use crate::Diagnostic;
+use crate::{Diagnostic, catalog};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -108,11 +108,11 @@ pub struct NixScannerConfig {
 }
 
 fn default_specs_dir() -> String {
-    "specs".to_owned()
+    catalog::default_string(&["specs", "dir"])
 }
 
 fn default_tag_prefix() -> String {
-    "@bloomery:".to_owned()
+    catalog::default_string(&["scanners", "playwright", "tag_prefix"])
 }
 
 fn default_true() -> bool {
@@ -120,27 +120,19 @@ fn default_true() -> bool {
 }
 
 fn default_rust_paths() -> Vec<String> {
-    vec!["packages/rust/**/*.rs".to_owned()]
+    catalog::default_string_list(&["scanners", "rust", "paths"])
 }
 
 fn default_playwright_paths() -> Vec<String> {
-    vec![
-        "packages/playwright/**/*.spec.ts".to_owned(),
-        "packages/playwright/**/*.test.ts".to_owned(),
-    ]
+    catalog::default_string_list(&["scanners", "playwright", "paths"])
 }
 
 fn default_nix_paths() -> Vec<String> {
-    vec![
-        "*.nix".to_owned(),
-        "lib/**/*.nix".to_owned(),
-        "nix/**/*.nix".to_owned(),
-        "tests/**/*.nix".to_owned(),
-    ]
+    catalog::default_string_list(&["scanners", "nix", "paths"])
 }
 
 fn default_nix_test_paths() -> Vec<String> {
-    vec!["**/*.test.nix".to_owned()]
+    catalog::default_string_list(&["scanners", "nix", "testPaths"])
 }
 
 impl Default for SpecsConfig {
