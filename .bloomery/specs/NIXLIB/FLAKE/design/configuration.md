@@ -12,8 +12,9 @@ Build settings live in `[build]` and its `[build.toolchain]`,
 plus `[devShell]`, `[checks]`, `[features]`, `[formatters]`, and `[optimize]`.
 The `[specs]` and `[scanners.*]`
 tables belong to the CLI; the flake interface ignores them. The nested
-`[checks.specifications]`, `[checks.codeHealth]`, and
-`[checks.clippySuppressions]` tables are also CLI-owned. The loader accepts and
+`[checks.specifications]`, `[checks.codeHealth]`,
+`[checks.clippySuppressions]`, and `[checks.unusedDependencies]` tables are
+also CLI-owned. The loader accepts and
 validates them without generating corresponding Nix checks or applying the
 global `checks.enable` switch to them. Code health uses its
 [catalogued shape and constraints](../../../PARSER/CONFIGURATION/design/code-health.md).

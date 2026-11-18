@@ -199,9 +199,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "bloomery-cargo-metadata"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "bloomery-check"
 version = "0.1.0"
 dependencies = [
+ "bloomery-cargo-metadata",
  "bloomery-glob",
  "bloomery-model",
  "bloomery-scanning",
@@ -236,6 +245,7 @@ dependencies = [
  "bloomery-cli-output",
  "bloomery-cli-types",
  "bloomery-model",
+ "bloomery-unused-deps",
  "bloomery-workspace",
  "serde_json",
  "toml",
@@ -513,6 +523,17 @@ version = "0.1.0"
 dependencies = [
  "bloomery-content",
  "topcoat",
+]
+
+[[package]]
+name = "bloomery-unused-deps"
+version = "0.1.0"
+dependencies = [
+ "bloomery-cargo-metadata",
+ "bloomery-model",
+ "bloomery-scanning",
+ "proc-macro2",
+ "toml_edit",
 ]
 
 [[package]]

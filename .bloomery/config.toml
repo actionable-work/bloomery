@@ -197,6 +197,9 @@ features = ["DOCS/SERVER"] # Feature identifiers owned by this crate.
 [checks.specifications.crates."packages/rust/libs/docs/ui/Cargo.toml"]
 features = ["DOCS/UI"] # Feature identifiers owned by this crate.
 
+[checks.specifications.crates."packages/rust/libs/shared/cargo-metadata/Cargo.toml"]
+features = ["CLI/CHECK"] # Feature identifiers owned by this crate.
+
 [checks.specifications.crates."packages/rust/libs/shared/check/Cargo.toml"]
 features = [
   "CLI/CHECK",
@@ -227,6 +230,9 @@ features = [
 [checks.specifications.crates."packages/rust/libs/shared/test-macros/Cargo.toml"]
 exclude = true                                                                 # Exclude this crate from ownership gates with a reason.
 reason = "Test attribute support; this crate provides no production behavior." # Reason for this specification policy exception or ownership.
+
+[checks.specifications.crates."packages/rust/libs/shared/unused-deps/Cargo.toml"]
+features = ["CLI/CHECK"] # Feature identifiers owned by this crate.
 
 [checks.specifications.crates."packages/rust/libs/shared/workspace/Cargo.toml"]
 features = [
@@ -464,6 +470,11 @@ maxRequirements = 7                                                             
 name = "upgrade_adds_absent_recommended_keys_in_sorted_order"                                                       # Exact test name restricted by this breadth exception.
 path = "packages/rust/libs/cli/config/src/lib.rs"                                                                   # Repository-relative path glob for this test breadth exception.
 reason = "One complete upgrade verifies recommended defaults, opt-in controls and stable insertion order together." # Reason for this specification policy exception or ownership.
+
+[checks.unusedDependencies]
+enable = true # Enable the unused Cargo dependency check.
+exceptions = [
+] # Dependency package names exempt from the unused dependency check.
 
 [checks.vulnerabilities]
 ignoreAdvisories = [] # RustSec advisory IDs suppressed by vulnerability checks.

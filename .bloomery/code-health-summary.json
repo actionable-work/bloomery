@@ -69,14 +69,14 @@
     {
       "manifest_path": "packages/rust/libs/cli/check-command/Cargo.toml",
       "name": "bloomery-check-command",
-      "overall_score": 86.16,
-      "sloc": 2145,
+      "overall_score": 85.59,
+      "sloc": 2178,
       "subscores": {
-        "complexity": 0.13,
-        "crateSize": 12.9,
+        "complexity": 0.09,
+        "crateSize": 13.56,
         "duplication": 0.0,
         "nesting": 0.02,
-        "size": 0.79
+        "size": 0.74
       }
     },
     {
@@ -122,7 +122,7 @@
       "manifest_path": "packages/rust/libs/cli/check-selection/Cargo.toml",
       "name": "bloomery-check-selection",
       "overall_score": 99.75,
-      "sloc": 278,
+      "sloc": 289,
       "subscores": {
         "complexity": 0.0,
         "crateSize": 0.0,
@@ -353,16 +353,29 @@
       }
     },
     {
-      "manifest_path": "packages/rust/libs/shared/check/Cargo.toml",
-      "name": "bloomery-check",
-      "overall_score": 86.34,
-      "sloc": 2134,
+      "manifest_path": "packages/rust/libs/shared/cargo-metadata/Cargo.toml",
+      "name": "bloomery-cargo-metadata",
+      "overall_score": 100.0,
+      "sloc": 120,
       "subscores": {
-        "complexity": 0.37,
-        "crateSize": 12.68,
+        "complexity": 0.0,
+        "crateSize": 0.0,
         "duplication": 0.0,
         "nesting": 0.0,
-        "size": 0.62
+        "size": 0.0
+      }
+    },
+    {
+      "manifest_path": "packages/rust/libs/shared/check/Cargo.toml",
+      "name": "bloomery-check",
+      "overall_score": 87.41,
+      "sloc": 2077,
+      "subscores": {
+        "complexity": 0.39,
+        "crateSize": 11.54,
+        "duplication": 0.0,
+        "nesting": 0.0,
+        "size": 0.66
       }
     },
     {
@@ -381,10 +394,10 @@
     {
       "manifest_path": "packages/rust/libs/shared/model/Cargo.toml",
       "name": "bloomery-model",
-      "overall_score": 99.3,
-      "sloc": 1065,
+      "overall_score": 99.32,
+      "sloc": 1102,
       "subscores": {
-        "complexity": 0.54,
+        "complexity": 0.53,
         "crateSize": 0.0,
         "duplication": 0.0,
         "nesting": 0.0,
@@ -394,11 +407,11 @@
     {
       "manifest_path": "packages/rust/libs/shared/scanning/Cargo.toml",
       "name": "bloomery-scanning",
-      "overall_score": 81.38,
-      "sloc": 2364,
+      "overall_score": 81.09,
+      "sloc": 2379,
       "subscores": {
-        "complexity": 0.51,
-        "crateSize": 17.28,
+        "complexity": 0.5,
+        "crateSize": 17.58,
         "duplication": 0.0,
         "nesting": 0.03,
         "size": 0.8
@@ -407,14 +420,14 @@
     {
       "manifest_path": "packages/rust/libs/shared/schema/Cargo.toml",
       "name": "bloomery-schema",
-      "overall_score": 93.41,
-      "sloc": 1775,
+      "overall_score": 92.56,
+      "sloc": 1813,
       "subscores": {
-        "complexity": 0.74,
-        "crateSize": 5.5,
+        "complexity": 0.82,
+        "crateSize": 6.26,
         "duplication": 0.0,
         "nesting": 0.0,
-        "size": 0.35
+        "size": 0.36
       }
     },
     {
@@ -422,6 +435,19 @@
       "name": "bloomery-test-macros",
       "overall_score": 100.0,
       "sloc": 5,
+      "subscores": {
+        "complexity": 0.0,
+        "crateSize": 0.0,
+        "duplication": 0.0,
+        "nesting": 0.0,
+        "size": 0.0
+      }
+    },
+    {
+      "manifest_path": "packages/rust/libs/shared/unused-deps/Cargo.toml",
+      "name": "bloomery-unused-deps",
+      "overall_score": 100.0,
+      "sloc": 216,
       "subscores": {
         "complexity": 0.0,
         "crateSize": 0.0,
@@ -444,7 +470,7 @@
       }
     }
   ],
-  "input_digest": "771c0c67b1156554bbdb3b3fbcc3fb98ad539e3df5e2ed1f85d4250a4979fd84",
+  "input_digest": "305fd9a1f917d544760cd62c6366e3df3caf1bb4d45065f3f8d60232a00fa475",
   "policy": {
     "scoring": {
       "crateSlocLimit": 1500,
@@ -468,15 +494,15 @@
   },
   "schema_version": 4,
   "workspace": {
-    "crate_count": 34,
-    "overall_score": 94.8,
-    "sloc": 27575,
+    "crate_count": 36,
+    "overall_score": 94.83,
+    "sloc": 27988,
     "subscores": {
       "complexity": 0.46,
-      "crateSize": 3.94,
+      "crateSize": 3.93,
       "duplication": 0.04,
       "nesting": 0.01,
-      "size": 0.76
+      "size": 0.75
     }
   }
 }

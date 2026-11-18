@@ -54,7 +54,7 @@ struct PreparedCheckRun {
     selected: BTreeSet<String>,
     health_sources: Option<Result<Vec<bloomery_check::HealthSourceCrate>, String>>,
     health_baseline_path: Option<String>,
-    clippy_policy: Option<bloomery_model::clippy::ClippySuppressionConfig>,
+    policies: StaticPolicies,
     selection: RunSelection,
     store: store::RunStore,
     allocation: store::RunAllocation,
@@ -118,16 +118,7 @@ fn prepare_check_run(
     }
     let (health_sources, health_baseline_path) =
         prepare_health_sources(context.root, context.backend, &selected)?;
-    let clippy_policy = if selected.contains("static:clippy-suppressions") {
-        let loaded = bloomery_model::config::load_with_raw(context.root)
-            .map_err(|diagnostic| CheckError::operational(diagnostic.message))?;
-        Some(
-            bloomery_model::clippy::ClippySuppressionConfig::from_raw(loaded.raw.as_ref())
-                .map_err(|diagnostic| CheckError::operational(diagnostic.message))?,
-        )
-    } else {
-        None
-    };
+    let policies = StaticPolicies::load(context.root, &selected)?;
     let store =
         store::RunStore::open(context.root, context.cache_base).map_err(CheckError::operational)?;
     let allocation = store.allocate().map_err(CheckError::operational)?;
@@ -136,7 +127,7 @@ fn prepare_check_run(
         selected,
         health_sources,
         health_baseline_path,
-        clippy_policy,
+        policies,
         selection,
         store,
         allocation,
@@ -277,7 +268,7 @@ fn execute_after_formatter(
             outputs_by_derivation: &prepared.planned.outputs_by_derivation,
             dependencies: &prepared.planned.dependencies,
             health_sources: prepared.health_sources.clone(),
-            clippy_policy: prepared.clippy_policy.clone(),
+            policies: prepared.policies.clone(),
             no_write: context.no_write,
             interrupt: context.interrupt.clone(),
             jobs: prepared.jobs,
@@ -314,7 +305,7 @@ fn execute_after_formatter(
             outputs_by_derivation: &planned.outputs_by_derivation,
             dependencies: &planned.dependencies,
             health_sources: prepared.health_sources.clone(),
-            clippy_policy: prepared.clippy_policy.clone(),
+            policies: prepared.policies.clone(),
             no_write: context.no_write,
             interrupt: context.interrupt.clone(),
             jobs: prepared.jobs,
@@ -769,8 +760,9 @@ enum InitialTaskResult {
     Traceability(Result<(), Vec<Diagnostic>>),
     Health(Result<HealthOutcome, Vec<Diagnostic>>),
     HealthCanceled,
-    Clippy(Result<(), Vec<Diagnostic>>),
-    ClippyCanceled,
+    /// Outcome of an independently enabled static policy check.
+    Policy(Result<(), Vec<Diagnostic>>),
+    PolicyCanceled,
     SharedAnalysis {
         traceability: Result<(), Vec<Diagnostic>>,
         health: Result<HealthOutcome, Vec<Diagnostic>>,
@@ -788,7 +780,7 @@ enum InitialState {
     HealthFailed(HealthOutcome),
     HealthDiagnosticFailed(Vec<Diagnostic>),
     HealthCanceled,
-    ClippyCanceled,
+    PolicyCanceled,
     Canceled,
     NotRun,
 }
@@ -819,10 +811,60 @@ struct InitialTaskInputs<'a> {
     batch_derivations: Vec<String>,
     batch_outputs: BTreeMap<String, Vec<String>>,
     health_sources: Option<Result<Vec<bloomery_check::HealthSourceCrate>, String>>,
-    clippy_policy: Option<bloomery_model::clippy::ClippySuppressionConfig>,
+    policies: StaticPolicies,
     no_write: bool,
     fail_fast: bool,
     sink: &'a ProgressSink,
+}
+
+const CLIPPY_SUPPRESSIONS_ID: &str = "static:clippy-suppressions";
+const UNUSED_DEPENDENCIES_ID: &str = "static:unused-dependencies";
+
+/// Policies of the selected independently enabled static policy checks; a
+/// policy is present exactly when its check is selected.
+#[derive(Clone, Default)]
+struct StaticPolicies {
+    clippy: Option<bloomery_model::clippy::ClippySuppressionConfig>,
+    unused_dependencies: Option<bloomery_model::unused_dependencies::UnusedDependencyConfig>,
+}
+
+impl StaticPolicies {
+    fn load(root: &Path, selected: &BTreeSet<String>) -> Result<Self, CheckError> {
+        let clippy_selected = selected.contains(CLIPPY_SUPPRESSIONS_ID);
+        let unused_selected = selected.contains(UNUSED_DEPENDENCIES_ID);
+        if !clippy_selected && !unused_selected {
+            return Ok(Self::default());
+        }
+        let operational = |diagnostic: Diagnostic| CheckError::operational(diagnostic.message);
+        let loaded = bloomery_model::config::load_with_raw(root).map_err(operational)?;
+        let raw = loaded.raw.as_ref();
+        Ok(Self {
+            clippy: clippy_selected
+                .then(|| bloomery_model::clippy::ClippySuppressionConfig::from_raw(raw))
+                .transpose()
+                .map_err(operational)?,
+            unused_dependencies: unused_selected
+                .then(|| bloomery_model::unused_dependencies::UnusedDependencyConfig::from_raw(raw))
+                .transpose()
+                .map_err(operational)?,
+        })
+    }
+}
+
+fn policy_task<'a>(
+    id: &str,
+    check: impl FnOnce() -> Result<(), Vec<Diagnostic>> + Send + 'a,
+) -> InitialWork<'a> {
+    (
+        id.to_owned(),
+        Box::new(move |cancellation: CancellationToken| InitialTask {
+            result: if cancellation.is_canceled() {
+                InitialTaskResult::PolicyCanceled
+            } else {
+                InitialTaskResult::Policy(check())
+            },
+        }) as _,
+    )
 }
 
 fn build_initial_tasks<'a>(inputs: InitialTaskInputs<'a>) -> Vec<InitialWork<'a>> {
@@ -835,28 +877,23 @@ fn build_initial_tasks<'a>(inputs: InitialTaskInputs<'a>) -> Vec<InitialWork<'a>
         batch_derivations,
         batch_outputs,
         health_sources,
-        clippy_policy,
+        policies,
         no_write,
         fail_fast,
         sink,
     } = inputs;
     let mut tasks = Vec::new();
-    if selected.contains("static:clippy-suppressions") {
+    if let Some(policy) = policies.clippy {
         let root = root.to_path_buf();
-        let allow = clippy_policy.unwrap_or_default().allow;
-        tasks.push((
-            "static:clippy-suppressions".to_owned(),
-            Box::new(move |cancellation: CancellationToken| {
-                let result = if cancellation.is_canceled() {
-                    InitialTaskResult::ClippyCanceled
-                } else {
-                    InitialTaskResult::Clippy(
-                        bloomery_check::clippy::check_workspace_clippy_suppressions(&root, &allow),
-                    )
-                };
-                InitialTask { result }
-            }) as _,
-        ));
+        tasks.push(policy_task(CLIPPY_SUPPRESSIONS_ID, move || {
+            bloomery_check::clippy::check_workspace_clippy_suppressions(&root, &policy.allow)
+        }));
+    }
+    if let Some(policy) = policies.unused_dependencies {
+        let root = root.to_path_buf();
+        tasks.push(policy_task(UNUSED_DEPENDENCIES_ID, move || {
+            bloomery_unused_deps::check_workspace_unused_dependencies(&root, &policy.exceptions)
+        }));
     }
     if selected.contains("static:structure") {
         let root = root.to_path_buf();
@@ -1082,7 +1119,7 @@ struct SelectedExecutionInputs<'a, W: Write> {
     outputs_by_derivation: &'a BTreeMap<String, Vec<String>>,
     dependencies: &'a BTreeMap<String, Vec<String>>,
     health_sources: Option<Result<Vec<bloomery_check::HealthSourceCrate>, String>>,
-    clippy_policy: Option<bloomery_model::clippy::ClippySuppressionConfig>,
+    policies: StaticPolicies,
     no_write: bool,
     interrupt: InterruptFlag,
     jobs: usize,
@@ -1102,7 +1139,7 @@ fn execute_selected<W: Write>(
         outputs_by_derivation,
         dependencies,
         health_sources,
-        clippy_policy,
+        policies,
         no_write,
         interrupt,
         jobs,
@@ -1151,7 +1188,7 @@ fn execute_selected<W: Write>(
         batch_derivations,
         batch_outputs,
         health_sources: health_sources.clone(),
-        clippy_policy,
+        policies,
         no_write,
         fail_fast,
         sink: &sink,
@@ -1270,9 +1307,9 @@ fn completed_outcome(task: &InitialTask) -> Option<Outcome> {
         }),
         InitialTaskResult::Health(Err(_)) => Some(Outcome::Failed),
         InitialTaskResult::HealthCanceled => Some(Outcome::Canceled),
-        InitialTaskResult::Clippy(Ok(())) => Some(Outcome::Passed),
-        InitialTaskResult::Clippy(Err(_)) => Some(Outcome::Failed),
-        InitialTaskResult::ClippyCanceled => Some(Outcome::Canceled),
+        InitialTaskResult::Policy(Ok(())) => Some(Outcome::Passed),
+        InitialTaskResult::Policy(Err(_)) => Some(Outcome::Failed),
+        InitialTaskResult::PolicyCanceled => Some(Outcome::Canceled),
         InitialTaskResult::SharedAnalysis { .. } => None,
         InitialTaskResult::NixBatch { .. } => None,
     }
@@ -1510,7 +1547,7 @@ fn initial_task_stops_admission(task: &InitialTask, fail_fast: bool) -> bool {
         InitialTaskResult::Structure(Err(_))
         | InitialTaskResult::Traceability(Err(_))
         | InitialTaskResult::Health(Err(_))
-        | InitialTaskResult::Clippy(Err(_)) => fail_fast,
+        | InitialTaskResult::Policy(Err(_)) => fail_fast,
         InitialTaskResult::Health(Ok(health)) => fail_fast && !health.failures.is_empty(),
         InitialTaskResult::NixBatch { result, .. } => {
             result.operational_error.is_some() || (fail_fast && !result.failures.is_empty())
@@ -1518,8 +1555,8 @@ fn initial_task_stops_admission(task: &InitialTask, fail_fast: bool) -> bool {
         InitialTaskResult::Structure(Ok(_))
         | InitialTaskResult::Traceability(Ok(()))
         | InitialTaskResult::HealthCanceled
-        | InitialTaskResult::Clippy(Ok(()))
-        | InitialTaskResult::ClippyCanceled => false,
+        | InitialTaskResult::Policy(Ok(()))
+        | InitialTaskResult::PolicyCanceled => false,
         InitialTaskResult::SharedAnalysis {
             traceability,
             health,
@@ -1638,10 +1675,10 @@ fn reduce_task_state(state: ScheduledState<InitialTask>) -> Option<InitialState>
                 Some(static_state(Err(diagnostics)))
             }
             InitialTaskResult::Health(result) => Some(health_state(result)),
-            InitialTaskResult::Clippy(Ok(())) => Some(InitialState::StaticPassed),
-            InitialTaskResult::Clippy(Err(diagnostics)) => Some(static_state(Err(diagnostics))),
+            InitialTaskResult::Policy(Ok(())) => Some(InitialState::StaticPassed),
+            InitialTaskResult::Policy(Err(diagnostics)) => Some(static_state(Err(diagnostics))),
             InitialTaskResult::HealthCanceled => Some(InitialState::HealthCanceled),
-            InitialTaskResult::ClippyCanceled => Some(InitialState::ClippyCanceled),
+            InitialTaskResult::PolicyCanceled => Some(InitialState::PolicyCanceled),
             InitialTaskResult::SharedAnalysis { .. } | InitialTaskResult::NixBatch { .. } => None,
         },
         ScheduledState::Canceled => Some(InitialState::Canceled),
@@ -1701,7 +1738,7 @@ fn apply_initial_states(
                 failures.extend(diagnostic_failures(root, &id, diagnostics, None));
             }
             InitialState::HealthCanceled => set_outcome(outcomes, &id, Outcome::Canceled),
-            InitialState::ClippyCanceled => set_outcome(outcomes, &id, Outcome::Canceled),
+            InitialState::PolicyCanceled => set_outcome(outcomes, &id, Outcome::Canceled),
             InitialState::Canceled => set_outcome(outcomes, &id, Outcome::Canceled),
             InitialState::NotRun => set_outcome(outcomes, &id, Outcome::NotRun),
         }

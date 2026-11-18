@@ -10,6 +10,7 @@ bloomery-check-support = { workspace = true }
 bloomery-cli-output = { workspace = true }
 bloomery-cli-types = { workspace = true }
 bloomery-model = { workspace = true }
+bloomery-unused-deps = { workspace = true }
 bloomery-workspace = { workspace = true }
 serde_json = { workspace = true }
 

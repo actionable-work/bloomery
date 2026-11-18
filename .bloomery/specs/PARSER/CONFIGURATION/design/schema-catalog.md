@@ -165,8 +165,8 @@ per-member Nix checks in
 The RustSec advisory database path is a `mkFlake` Nix argument, not a
 config.toml key.
 
-`checks.specifications`, `checks.codeHealth`, and
-`checks.clippySuppressions` are CLI-owned nested tables. Their `enable` keys
+`checks.specifications`, `checks.codeHealth`, `checks.clippySuppressions`, and
+`checks.unusedDependencies` are CLI-owned nested tables. Their `enable` keys
 default to `false` and have upgrade recommendations of `true`; their policy
 designs define their scope. The Nix loader validates and accepts these tables
 without generating corresponding Nix checks.
@@ -242,6 +242,15 @@ parsed by the CLI. The table enables the inline Clippy suppression check and
 lists the exact Clippy lint names permitted as exceptions. Its `enable` key
 defaults to `false` and has an upgrade recommendation of `true`. The Nix loader
 accepts the table without creating a Clippy suppression derivation.
+
+### `[checks.unusedDependencies]`
+
+Owned by [CLI/CHECK](../../../CLI/CHECK/design/unused-dependencies.md) and
+parsed by the CLI. The table enables the unused Cargo dependency check and
+lists the dependency package names exempt from it; see
+[unused dependency policy](unused-dependencies.md). Its `enable` key defaults to
+`false` and has an upgrade recommendation of `true`. The Nix loader accepts the
+table without creating an unused dependency derivation.
 
 ### `[features]`
 

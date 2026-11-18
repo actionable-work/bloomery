@@ -61,7 +61,7 @@
   nativeBuildInputs =
     (override.nativeBuildInputs or [])
     ++ [rustc pkgs.stdenv.cc pkgs.zstd]
-    ++ lib.optional (builtins.elem pname ["bloomery-check-command" "bloomery-sync"]) pkgs.cargo
+    ++ lib.optional (builtins.elem pname ["bloomery-check-command" "bloomery-sync" "bloomery-unused-deps"]) pkgs.cargo
     ++ lib.optional (linkerPackage != null) linkerPackage;
   buildInputs = override.buildInputs or [];
   extraRustcFlags = (override.rustcFlags or []) ++ defaultRustcFlags ++ linkerFlags;

@@ -5,7 +5,9 @@ pub use bloomery_schema::diagnostics;
 pub use bloomery_schema::{RequirementId, is_requirement_id, parse_requirement_id};
 mod domain;
 pub mod health;
+mod policy;
 pub mod specifications;
+pub mod unused_dependencies;
 
 pub use config::Config;
 pub use diagnostics::{Diagnostic, SourceLocation, render_diagnostics, sort_diagnostics};

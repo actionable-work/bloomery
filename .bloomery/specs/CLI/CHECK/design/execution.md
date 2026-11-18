@@ -8,6 +8,7 @@
 | `static:traceability` | Enabled scanners and relational evidence checks | enabled specification checks and loaded valid requirement model |
 | `static:code-health` | Rust analysis, health scores, limits, baseline comparison and write-mode refresh | enabled health policy |
 | `static:clippy-suppressions` | Inline Clippy suppression policy | enabled suppression policy |
+| `static:unused-dependencies` | Unused Cargo dependency policy | enabled unused dependency policy |
 | `nix:<system>:<attribute>` | One attribute under `checks.<system>` | Catalog evaluation |
 
 Preserve the existing static validations; these IDs group the existing passes,
@@ -34,6 +35,8 @@ coupling outcomes; see [code health](code-health.md#check-integration).
 `static:clippy-suppressions` follows its independent enablement and does not
 require specification management or Nix check generation; see
 [Clippy suppressions](clippy-suppressions.md#check-integration).
+`static:unused-dependencies` likewise follows its own enablement; see
+[unused dependencies](unused-dependencies.md#check-integration).
 
 ## Check enablement warnings
 
@@ -50,12 +53,14 @@ Specification-check warnings are absent when specification management is
 disabled and those checks are unavailable.
 An explicit `checks.enable = false` suppresses warnings for its Nix check
 controls. Explicitly disabling a check group suppresses warnings for checks in
-that group. Independently configured CLI checks such as code health and Clippy
-suppression policy retain their own warning behavior.
+that group. Independently configured CLI checks such as code health, Clippy
+suppression policy, and unused dependency policy retain their own warning
+behavior.
 
 With no selectors, run every available check: static specification checks when
 specification management and `checks.specifications.enable` are enabled,
-enabled code health and Clippy suppression policy, plus every check attribute
+enabled code health, Clippy suppression, and unused dependency policies, plus
+every check attribute
 for the host Nix system. Include generated
 Rust tests, clippy, documentation, doctests, lock validation, formatter checks,
 and integration-flake checks when present in that output. Package checks are
@@ -137,7 +142,8 @@ with valid empty check sets are distinct from missing system outputs.
 ## Scheduler
 
 After the write-mode formatter gate passes, run independent specification
-static checks, health, Clippy suppression policy, and Nix tasks concurrently.
+static checks, health, Clippy suppression and unused dependency policies, and
+Nix tasks concurrently.
 In no-write mode, the native formatter check shares the batched Nix realization
 with selected Nix checks while static checks run concurrently. Admit
 traceability as soon as structure passes and a task slot is available, ahead of

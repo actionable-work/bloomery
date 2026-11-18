@@ -101,7 +101,7 @@ impl KeySpec {
 }
 
 /// Increment when the catalog changes.
-pub const CATALOG_VERSION: u32 = 15;
+pub const CATALOG_VERSION: u32 = 16;
 
 fn is_check_control(path: &[&str]) -> bool {
     matches!(
@@ -118,6 +118,7 @@ fn is_check_control(path: &[&str]) -> bool {
             | ["checks", "specifications", "enable"]
             | ["checks", "codeHealth", "enable"]
             | ["checks", "clippySuppressions", "enable"]
+            | ["checks", "unusedDependencies", "enable"]
     )
 }
 
@@ -659,6 +660,18 @@ pub const CATALOG: &[CatalogEntry] = &[
         documentation: "Exact Clippy lint names permitted in inline allow attributes.",
     },
     CatalogEntry {
+        path: &["checks", "unusedDependencies", "enable"],
+        value_type: ValueType::Bool,
+        recommended: Some(DefaultValue::Bool(true)),
+        documentation: "Enable the unused Cargo dependency check.",
+    },
+    CatalogEntry {
+        path: &["checks", "unusedDependencies", "exceptions"],
+        value_type: ValueType::StringList,
+        recommended: Some(DefaultValue::StringList(&[])),
+        documentation: "Dependency package names exempt from the unused dependency check.",
+    },
+    CatalogEntry {
         path: &["checks", "codeHealth", "baseline"],
         value_type: ValueType::Path,
         recommended: Some(DefaultValue::String(".bloomery/code-health-summary.json")),
@@ -1171,16 +1184,20 @@ fn license_override_key(path: &[&str]) -> Option<KeySpec> {
     })
 }
 
+fn valid_package_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.as_bytes()[0].is_ascii_alphanumeric()
+        && name.bytes().all(|character| {
+            character.is_ascii_alphanumeric() || character == b'-' || character == b'_'
+        })
+}
+
 fn valid_package_selector(selector: &str) -> bool {
     let mut parts = selector.split('@');
     let Some(name) = parts.next() else {
         return false;
     };
-    let valid_name = !name.is_empty()
-        && name.as_bytes()[0].is_ascii_alphanumeric()
-        && name.bytes().all(|character| {
-            character.is_ascii_alphanumeric() || character == b'-' || character == b'_'
-        });
+    let valid_name = valid_package_name(name);
     match parts.next() {
         None => valid_name,
         Some(version) => valid_name && parts.next().is_none() && valid_exact_version(version),
@@ -1378,6 +1395,28 @@ pub fn validate_raw(raw: &Value) -> Result<(), Diagnostic> {
                 diagnostics.push(Diagnostic::new(
                     "ConfigurationError",
                     format!("checks.clippySuppressions.allow contains duplicate lint '{lint}'"),
+                ));
+            }
+        }
+    }
+    if let Some(exceptions) =
+        raw_at(raw, &["checks", "unusedDependencies", "exceptions"]).and_then(Value::as_array)
+    {
+        let mut seen = std::collections::BTreeSet::new();
+        for name in exceptions.iter().filter_map(Value::as_str) {
+            if !valid_package_name(name) {
+                diagnostics.push(Diagnostic::new(
+                    "ConfigurationError",
+                    format!(
+                        "checks.unusedDependencies.exceptions entries must be Cargo package names; found '{name}'"
+                    ),
+                ));
+            } else if !seen.insert(name) {
+                diagnostics.push(Diagnostic::new(
+                    "ConfigurationError",
+                    format!(
+                        "checks.unusedDependencies.exceptions contains duplicate package '{name}'"
+                    ),
                 ));
             }
         }

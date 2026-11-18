@@ -86,6 +86,10 @@ maxUntiedTests = 0
 requireCrateOwnership = false
 untiedTests = "report"
 
+[checks.unusedDependencies]
+enable = true
+exceptions = []
+
 [checks.vulnerabilities]
 ignoreAdvisories = []
 

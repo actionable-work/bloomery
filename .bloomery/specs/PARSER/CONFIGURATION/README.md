@@ -29,6 +29,7 @@ is rejected before configuration validation.
 - [Schema catalog](design/schema-catalog.md)
 - [Code health policy](design/code-health.md)
 - [Clippy suppression policy](design/clippy-suppressions.md)
+- [Unused dependency policy](design/unused-dependencies.md)
 - [Scanner targets](design/scanner-targets.md)
 
 ## Responsibilities
@@ -60,6 +61,8 @@ is rejected before configuration validation.
   `bloomery config` and sync recommendations.
 - Resolve and validate CLI-owned `checks.codeHealth` scoring and baseline policy.
 - Resolve and validate CLI-owned `checks.clippySuppressions` enablement and exception names.
+- Resolve and validate CLI-owned `checks.unusedDependencies` enablement and
+  exception package names.
 - Resolve and validate CLI-owned `checks.specifications` check enablement and
   per-requirement validating-site limit.
 - Reject malformed or ambiguous configuration before scanning begins.

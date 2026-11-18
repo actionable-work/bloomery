@@ -51,7 +51,7 @@
     ];
     flags = ["rustc" "test" "clippy" "doc" "doctest"];
     devShell = ["enable" "packages" "shellHook"];
-    checks = ["enable" "crates" "packages" "lockFreshness" "workspaceDependencies" "noDefaultFeatures" "vulnerabilities" "licenses" "bans" "codeHealth" "specifications" "clippySuppressions"];
+    checks = ["enable" "crates" "packages" "lockFreshness" "workspaceDependencies" "noDefaultFeatures" "vulnerabilities" "licenses" "bans" "codeHealth" "specifications" "clippySuppressions" "unusedDependencies"];
     features = ["cratesIoIndex"];
   };
 
@@ -215,6 +215,19 @@
     then throw "bloomery: checks.clippySuppressions.allow must contain qualified Clippy lint names"
     else if builtins.length allow != builtins.length (lib.unique allow)
     then throw "bloomery: checks.clippySuppressions.allow must not contain duplicate lint names"
+    else config;
+
+  checkUnusedDependencies = value: let
+    config = checkTable "checks.unusedDependencies" ["enable" "exceptions"] value;
+    exceptions = config.exceptions or [];
+    validName = name: isString name && builtins.match "[A-Za-z0-9][A-Za-z0-9_-]*" name != null;
+  in
+    if (config ? enable && !builtins.isBool config.enable)
+    then throw "bloomery: checks.unusedDependencies.enable must be a boolean"
+    else if !(isList exceptions) || !(builtins.all validName exceptions)
+    then throw "bloomery: checks.unusedDependencies.exceptions must contain Cargo package names"
+    else if builtins.length exceptions != builtins.length (lib.unique exceptions)
+    then throw "bloomery: checks.unusedDependencies.exceptions must not contain duplicate package names"
     else config;
 
   checkBooleanEnable = name: config:
@@ -489,7 +502,8 @@
     checkedHealth = lib.optionalAttrs (rawChecks ? codeHealth) {codeHealth = checkCodeHealth rawChecks.codeHealth;};
     checkedSpecifications = lib.optionalAttrs (rawChecks ? specifications) {specifications = checkSpecifications rawChecks.specifications;};
     checkedClippySuppressions = lib.optionalAttrs (rawChecks ? clippySuppressions) {clippySuppressions = checkClippySuppressions rawChecks.clippySuppressions;};
-    checks = builtins.deepSeq [checkedCrates checkedPackages checkedLockFreshness checkedWorkspaceDependencies checkedNoDefaultFeatures checkedVulnerabilities checkedBans checkedLicenses checkedHealth checkedSpecifications checkedClippySuppressions] (
+    checkedUnusedDependencies = lib.optionalAttrs (rawChecks ? unusedDependencies) {unusedDependencies = checkUnusedDependencies rawChecks.unusedDependencies;};
+    checks = builtins.deepSeq [checkedCrates checkedPackages checkedLockFreshness checkedWorkspaceDependencies checkedNoDefaultFeatures checkedVulnerabilities checkedBans checkedLicenses checkedHealth checkedSpecifications checkedClippySuppressions checkedUnusedDependencies] (
       builtins.removeAttrs rawChecks [
         "crates"
         "packages"
@@ -502,6 +516,7 @@
         "codeHealth"
         "specifications"
         "clippySuppressions"
+        "unusedDependencies"
       ]
       // (lib.optionalAttrs (checkedCrates ? enable) {crateCheck = checkedCrates.enable;})
       // (lib.optionalAttrs (checkedPackages ? enable) {includePackageChecks = checkedPackages.enable;})

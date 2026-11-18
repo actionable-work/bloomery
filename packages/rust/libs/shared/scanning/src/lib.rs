@@ -19,6 +19,7 @@ mod analysis;
 mod clippy;
 mod conditions;
 mod health;
+mod module_tree;
 mod modules;
 mod nix;
 mod positions;
@@ -36,13 +37,14 @@ pub use tree_scan::{DiscoveryState, ScanAnalysis, ScanScope, ScannerDiscovery, s
 #[cfg(test)]
 mod tree_tests;
 
-pub use analysis::AnalysisSession;
+pub use analysis::{AnalysisSession, ParsedRustFile};
 use bloomery_model::{Context, Diagnostic, Evidence, TestSite};
 pub use clippy::find_clippy_suppressions;
 pub use health::{
     HealthCallable, HealthCrateMetrics, HealthSourceCrate, HealthTarget, HealthToken, OpaqueSource,
     analyze_code_health,
 };
+pub use module_tree::{ModuleSourceError, module_tree_files};
 
 /// One scanner pass: requirement references plus discovered test sites.
 #[derive(Debug, Default, PartialEq, Eq)]

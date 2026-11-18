@@ -9,35 +9,8 @@ pub struct ClippySuppressionConfig {
 
 impl ClippySuppressionConfig {
     pub fn from_raw(raw: Option<&Value>) -> Result<Self, Diagnostic> {
-        let Some(table) = raw
-            .and_then(Value::as_table)
-            .and_then(|root| root.get("checks"))
-            .and_then(Value::as_table)
-            .and_then(|checks| checks.get("clippySuppressions"))
-        else {
-            return Ok(Self::default());
-        };
-        let table = table.as_table().ok_or_else(|| {
-            Diagnostic::new(
-                "ConfigurationError",
-                "checks.clippySuppressions must be a table",
-            )
-        })?;
-        let enabled = table
-            .get("enable")
-            .and_then(Value::as_bool)
-            .unwrap_or(false);
-        let allow = table
-            .get("allow")
-            .and_then(Value::as_array)
-            .map(|values| {
-                values
-                    .iter()
-                    .filter_map(Value::as_str)
-                    .map(str::to_owned)
-                    .collect()
-            })
-            .unwrap_or_default();
+        let (enabled, allow) =
+            crate::policy::enabled_string_list(raw, "clippySuppressions", "allow")?;
         Ok(Self { enabled, allow })
     }
 }

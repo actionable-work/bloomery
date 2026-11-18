@@ -34,7 +34,8 @@ parser:
   baseline after a complete selected measurement in write mode, independently
   of specification enablement.
   Inline Clippy suppressions are checked against configured exact-name
-  exceptions independently of specification enablement.
+  exceptions independently of specification enablement. Unused dependency
+  policy rejects Cargo dependency declarations no visible target references.
 - [`bloomery build`](BUILD/README.md) materializes the exact production package
   derivations for the selected systems in one batched Nix realization and
   reports their output store paths. `--check` gates realization on the default

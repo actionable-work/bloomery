@@ -1,0 +1,79 @@
+schema_version = 1
+group = "UNUSED"
+
+[[requirements]]
+id = "CLI-CHECK-UNUSED-001"
+title = "Unused dependency policy is independently selectable"
+manual = false
+design = "design/unused-dependencies.md#check-integration"
+ears = { type = "ubiquitous", system = "Bloomery", action = "include static:unused-dependencies in the catalog exactly when checks.unusedDependencies.enable is true, independently of specs, Rust scanning, Nix checks, and selected systems" }
+
+[[requirements]]
+id = "CLI-CHECK-UNUSED-002"
+title = "Unused dependency policy inspects workspace members"
+manual = false
+design = "design/unused-dependencies.md#check-integration"
+ears = { type = "ubiquitous", system = "Bloomery", action = "inspect the dependency declarations and target module trees of every workspace member of the configured Cargo workspace" }
+
+[[requirements]]
+id = "CLI-CHECK-UNUSED-003"
+title = "Normal dependencies need runtime target references"
+manual = false
+design = "design/unused-dependencies.md#usage-policy"
+ears = { type = "ubiquitous", system = "Bloomery", action = "report each dependencies entry whose crate name no library, binary, or proc-macro target source references" }
+
+[[requirements]]
+id = "CLI-CHECK-UNUSED-004"
+title = "Development dependencies need a target reference"
+manual = false
+design = "design/unused-dependencies.md#usage-policy"
+ears = { type = "ubiquitous", system = "Bloomery", action = "report each dev-dependencies entry whose crate name no non-build-script target source references" }
+
+[[requirements]]
+id = "CLI-CHECK-UNUSED-005"
+title = "Build dependencies need a build-script reference"
+manual = false
+design = "design/unused-dependencies.md#usage-policy"
+ears = { type = "ubiquitous", system = "Bloomery", action = "report each build-dependencies entry whose crate name no build-script source references" }
+
+[[requirements]]
+id = "CLI-CHECK-UNUSED-006"
+title = "References use the dependency Rust crate name"
+manual = false
+design = "design/unused-dependencies.md#usage-policy"
+ears = { type = "ubiquitous", system = "Bloomery", action = "match references against the manifest rename, else the workspace library target name, else the package name, with hyphens replaced by underscores" }
+
+[[requirements]]
+id = "CLI-CHECK-UNUSED-007"
+title = "Any identifier token is a reference"
+manual = false
+design = "design/unused-dependencies.md#usage-policy"
+ears = { type = "ubiquitous", system = "Bloomery", action = "count a crate name identifier anywhere in a target module tree, including attributes, macro bodies, conditionally compiled code, and out-of-line modules, as a reference" }
+
+[[requirements]]
+id = "CLI-CHECK-UNUSED-008"
+title = "Configured exceptions match package names"
+manual = false
+design = "design/unused-dependencies.md#usage-policy"
+ears = { type = "ubiquitous", system = "Bloomery", action = "skip every dependency whose package name is listed in checks.unusedDependencies.exceptions, without matching manifest renames" }
+
+[[requirements]]
+id = "CLI-CHECK-UNUSED-009"
+title = "Unused dependency diagnostics identify the declaration"
+manual = false
+design = "design/unused-dependencies.md#diagnostics"
+ears = { type = "ubiquitous", system = "Bloomery", action = "identify each unused declaration by member package, section, manifest key, repository-relative Cargo.toml path, declaring line, and searched crate name" }
+
+[[requirements]]
+id = "CLI-CHECK-UNUSED-010"
+title = "Discovery failures suppress unused guesses"
+manual = false
+design = "design/unused-dependencies.md#diagnostics"
+ears = { type = "ubiquitous", system = "Bloomery", action = "report metadata and target source failures as UnusedDependencySourceError and report no unused declarations for a member whose sources failed" }
+
+[[requirements]]
+id = "CLI-CHECK-UNUSED-011"
+title = "Unused dependency policy follows check controls"
+manual = false
+design = "design/unused-dependencies.md#check-integration"
+ears = { type = "ubiquitous", system = "Bloomery", action = "apply ordinary check selection, scheduling, cancellation, failure-retention, and exit-code behavior to unused dependency policy" }

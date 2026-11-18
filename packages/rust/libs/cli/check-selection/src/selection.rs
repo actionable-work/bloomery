@@ -50,6 +50,12 @@ fn static_check_ids(root: &Path) -> Result<Vec<String>, CheckError> {
     if clippy.enabled {
         checks.push("static:clippy-suppressions".to_owned());
     }
+    let unused =
+        bloomery_model::unused_dependencies::UnusedDependencyConfig::from_raw(loaded.raw.as_ref())
+            .map_err(|diagnostic| CheckError::operational(diagnostic.message))?;
+    if unused.enabled {
+        checks.push("static:unused-dependencies".to_owned());
+    }
     Ok(checks)
 }
 
@@ -91,6 +97,10 @@ pub fn missing_check_controls(
             "checks.clippySuppressions.enable",
             "static:clippy-suppressions",
         ),
+        (
+            "checks.unusedDependencies.enable",
+            "static:unused-dependencies",
+        ),
     ];
     if specifications_available {
         controls.push(("checks.specifications.enable", "static:structure"));
@@ -102,6 +112,7 @@ pub fn missing_check_controls(
                 && *key != "checks.enable"
                 && *key != "checks.codeHealth.enable"
                 && *key != "checks.clippySuppressions.enable"
+                && *key != "checks.unusedDependencies.enable"
                 && *key != "checks.specifications.enable")
         })
         .filter(|(key, _)| {

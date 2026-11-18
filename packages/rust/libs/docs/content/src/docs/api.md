@@ -103,6 +103,10 @@ enable = true                   # validate workspace dependency declarations
 [checks.noDefaultFeatures]
 enable = true                   # require default features to be disabled
 
+[checks.unusedDependencies]
+enable = true                   # report dependencies no visible target source references
+exceptions = []                 # dependency package names exempt from the check
+
 [features]
 cratesIoIndex = "crates-io-index"
 

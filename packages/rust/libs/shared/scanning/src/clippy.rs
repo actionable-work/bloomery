@@ -1,5 +1,6 @@
 use crate::AnalysisSession;
-use crate::modules::{module_child_dir, module_paths};
+use crate::analysis::ParsedRustFile;
+use crate::module_tree::module_tree_files;
 use bloomery_model::{Diagnostic, sort_diagnostics};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -28,16 +29,13 @@ pub fn find_clippy_suppressions(
     paths.dedup();
     let mut visited = BTreeSet::new();
     for path in paths {
-        let module_dir = path.parent().unwrap_or(&root);
-        scan_source_file(
-            &root,
-            &path,
-            module_dir,
-            &allowed,
-            session,
-            &mut visited,
-            &mut diagnostics,
-        );
+        for file in module_tree_files(&path, session, &mut visited) {
+            match file {
+                Ok(parsed) => scan_source_file(&root, &parsed, &allowed, &mut diagnostics),
+                Err(error) => diagnostics
+                    .push(Diagnostic::new("ClippySourceError", error.message).at(error.path, None)),
+            }
+        }
     }
     if diagnostics.is_empty() {
         Ok(())
@@ -49,63 +47,29 @@ pub fn find_clippy_suppressions(
 
 fn scan_source_file(
     root: &Path,
-    path: &Path,
-    module_dir: &Path,
+    parsed: &ParsedRustFile,
     allowed: &BTreeSet<&str>,
-    session: &AnalysisSession,
-    visited: &mut BTreeSet<PathBuf>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    let parsed = match session.rust_file(path) {
-        Ok(parsed) => parsed,
-        Err(error) => {
-            diagnostics.push(Diagnostic::new("ClippySourceError", error).at(path, None));
-            return;
-        }
-    };
-    if !visited.insert(parsed.path.clone()) {
+    let Ok(relative) = parsed.path.strip_prefix(root) else {
+        diagnostics.push(Diagnostic::new(
+            "ClippySourceError",
+            "Rust target source resolves outside the repository",
+        ));
         return;
-    }
-    let relative = match parsed.path.strip_prefix(root) {
-        Ok(relative) => relative.to_string_lossy().replace('\\', "/"),
-        Err(_) => {
-            diagnostics.push(Diagnostic::new(
-                "ClippySourceError",
-                "Rust target source resolves outside the repository",
-            ));
-            return;
-        }
     };
-    let modules = {
-        let mut visitor = SuppressionVisitor {
-            path: relative,
-            module_dir: module_dir.to_path_buf(),
-            allowed,
-            diagnostics,
-            modules: Vec::new(),
-        };
-        visitor.visit_file(&parsed.syntax);
-        visitor.modules
+    let mut visitor = SuppressionVisitor {
+        path: relative.to_string_lossy().replace('\\', "/"),
+        allowed,
+        diagnostics,
     };
-    for (module_path, child_dir) in modules {
-        scan_source_file(
-            root,
-            &module_path,
-            &child_dir,
-            allowed,
-            session,
-            visited,
-            diagnostics,
-        );
-    }
+    visitor.visit_file(&parsed.syntax);
 }
 
 struct SuppressionVisitor<'a> {
     path: String,
-    module_dir: PathBuf,
     allowed: &'a BTreeSet<&'a str>,
     diagnostics: &'a mut Vec<Diagnostic>,
-    modules: Vec<(PathBuf, PathBuf)>,
 }
 
 impl<'ast> Visit<'ast> for SuppressionVisitor<'_> {
@@ -113,27 +77,6 @@ impl<'ast> Visit<'ast> for SuppressionVisitor<'_> {
         let line = attribute.span().start().line;
         self.inspect_meta(&attribute.meta, line);
         visit::visit_attribute(self, attribute);
-    }
-
-    fn visit_item_mod(&mut self, item: &'ast syn::ItemMod) {
-        for attribute in &item.attrs {
-            self.visit_attribute(attribute);
-        }
-        if let Some((_, items)) = &item.content {
-            let previous = self.module_dir.clone();
-            self.module_dir = previous.join(item.ident.to_string());
-            for child in items {
-                self.visit_item(child);
-            }
-            self.module_dir = previous;
-            return;
-        }
-        for module_path in module_paths(item, &self.module_dir, Path::is_file) {
-            if module_path.is_file() {
-                let child_dir = module_child_dir(&module_path);
-                self.modules.push((module_path, child_dir));
-            }
-        }
     }
 }
 

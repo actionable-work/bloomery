@@ -34,6 +34,8 @@ fn catalog_enumerates_every_recognized_key() {
         "checks.specifications.enable",
         "checks.clippySuppressions.enable",
         "checks.clippySuppressions.allow",
+        "checks.unusedDependencies.enable",
+        "checks.unusedDependencies.exceptions",
         "checks.codeHealth.duplicationFreeRatio",
         "checks.codeHealth.maxNesting",
     ] {
@@ -149,6 +151,59 @@ fn health_crate_exception_keys_are_catalogued_and_validated() {
         "[checks.codeHealth.crateExceptions.\"packages/demo/Cargo.toml\"]\nmaxCrateSloc=6000\n",
     )
     .expect("valid TOML");
+    assert!(validate_raw(&valid).is_ok());
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-UNUSED-001"))]
+fn unused_dependency_policy_is_catalogued() {
+    for (path, value_type, recommended) in [
+        (
+            &["checks", "unusedDependencies", "enable"][..],
+            ValueType::Bool,
+            DefaultValue::Bool(true),
+        ),
+        (
+            &["checks", "unusedDependencies", "exceptions"][..],
+            ValueType::StringList,
+            DefaultValue::StringList(&[]),
+        ),
+    ] {
+        let entry = lookup(path).expect("unused dependency key is catalogued");
+        assert_eq!(entry.value_type, value_type);
+        assert_eq!(entry.recommended, Some(recommended));
+        assert!(!entry.documentation.is_empty());
+    }
+    assert_eq!(
+        effective_default(&["checks", "unusedDependencies", "enable"]),
+        Some(Value::Boolean(false))
+    );
+    assert_eq!(
+        effective_default(&["checks", "unusedDependencies", "exceptions"]),
+        Some(Value::Array(Vec::new()))
+    );
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-UNUSED-003"))]
+#[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-UNUSED-004"))]
+#[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-UNUSED-005"))]
+fn unused_dependency_policy_is_validated_even_when_disabled() {
+    for raw in [
+        "[checks.unusedDependencies]\nenable = false\nunknown = true\n",
+        "[checks.unusedDependencies]\nenable = false\nexceptions = [\"serde@1.0.0\"]\n",
+        "[checks.unusedDependencies]\nenable = false\nexceptions = [\"-serde\"]\n",
+        "[checks.unusedDependencies]\nenable = false\nexceptions = [\"serde\", \"serde\"]\n",
+        "[checks.unusedDependencies]\nenable = \"false\"\n",
+        "[checks.unusedDependencies]\nexceptions = \"serde\"\n",
+    ] {
+        let value = toml::from_str::<Value>(raw).expect("TOML parses");
+        assert!(validate_raw(&value).is_err(), "accepted {raw}");
+    }
+    let valid = toml::from_str::<Value>(
+        "[checks.unusedDependencies]\nenable = false\nexceptions = [\"openssl-sys\", \"serde_json\"]\n",
+    )
+    .expect("TOML parses");
     assert!(validate_raw(&valid).is_ok());
 }
 
@@ -280,6 +335,7 @@ fn effective_defaults_are_distinct_from_upgrade_recommendations() {
         &["checks", "codeHealth", "enable"][..],
         &["checks", "specifications", "enable"][..],
         &["checks", "clippySuppressions", "enable"][..],
+        &["checks", "unusedDependencies", "enable"][..],
     ] {
         let entry = lookup(path).expect("check control is catalogued");
         assert_eq!(entry.recommended, Some(DefaultValue::Bool(true)));
@@ -422,7 +478,7 @@ fn nix_test_paths_are_catalogued() {
 #[test]
 #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-005"))]
 fn catalog_version_tracks_the_binary() {
-    assert_eq!(CATALOG_VERSION, 15);
+    assert_eq!(CATALOG_VERSION, 16);
     assert!(!CATALOG.is_empty());
 }
 

@@ -243,11 +243,7 @@ id = "PARSER-CONFIGURATION-CATALOG-023"
 title = "CLI check policies are catalogued"
 manual = false
 design = "design/schema-catalog.md#checks"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the schema catalog"
-action = "include checks.specifications, checks.codeHealth, and checks.clippySuppressions as CLI-owned nested policy tables with documented catalog entries"
+ears = { type = "ubiquitous", system = "the schema catalog", action = "include checks.specifications, checks.codeHealth, checks.clippySuppressions, and checks.unusedDependencies as CLI-owned nested policy tables with documented catalog entries" }
 
 [[requirements]]
 id = "PARSER-CONFIGURATION-CATALOG-024"

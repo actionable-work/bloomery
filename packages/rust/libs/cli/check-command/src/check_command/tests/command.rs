@@ -72,6 +72,7 @@ fn missing_check_control_warnings_respect_explicit_values_and_available_groups()
     assert!(keys.contains(&"checks.workspaceDependencies.enable"));
     assert!(keys.contains(&"checks.noDefaultFeatures.enable"));
     assert!(keys.contains(&"checks.clippySuppressions.enable"));
+    assert!(keys.contains(&"checks.unusedDependencies.enable"));
     assert!(!keys.contains(&"checks.packages.enable"));
     assert!(!keys.contains(&"checks.codeHealth.enable"));
     assert!(!keys.contains(&"checks.specifications.enable"));
@@ -87,6 +88,7 @@ fn missing_check_control_warnings_respect_explicit_values_and_available_groups()
     assert!(!keys.contains(&"checks.workspaceDependencies.enable"));
     assert!(keys.contains(&"checks.codeHealth.enable"));
     assert!(keys.contains(&"checks.clippySuppressions.enable"));
+    assert!(keys.contains(&"checks.unusedDependencies.enable"));
     assert!(keys.contains(&"checks.specifications.enable"));
 }
 
@@ -151,6 +153,48 @@ fn clippy_suppression_check_scans_each_cargo_target_kind() {
             "missing diagnostic for {target}: {output}"
         );
     }
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-UNUSED-001"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-UNUSED-011"))]
+fn unused_dependency_check_is_independently_selectable_and_fails_on_unused_entries() {
+    let config = "[specs]\nenable = false\n\n[checks]\nenable = false\n\n[checks.unusedDependencies]\nenable = true\nexceptions = []\n";
+    let (root, cache) = fixture_without_specs(true, config);
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"unused-fixture\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\n[dependencies]\nserde = \"1\"\n",
+    )
+    .expect("manifest");
+    fs::create_dir_all(root.join("src")).expect("source directory");
+    fs::write(root.join("src/lib.rs"), "pub fn fixture() {}\n").expect("library source");
+    let backend = FakeNix::default();
+    let selectors = vec!["static:*".to_owned()];
+    let catalog =
+        discover_for_selection(&root, &selectors, &[], &backend).expect("static-only catalog");
+    assert_eq!(catalog.ids, ["static:unused-dependencies"]);
+
+    let mut args = request();
+    args.selectors = vec!["static:unused-dependencies".to_owned()];
+    let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::FAILURE);
+    let output = String::from_utf8_lossy(&stdout);
+    assert!(output.contains("UnusedDependency"), "{output}");
+    assert!(output.contains("Cargo.toml"), "{output}");
+
+    fs::write(
+        root.join(".bloomery/config.toml"),
+        format!(
+            "version = 2\n{}\n[checks.codeHealth]\nenable = false\n",
+            config.replace("enable = true\n", "enable = false\n")
+        ),
+    )
+    .expect("disable unused dependency policy");
+    let catalog = discover_for_selection(&root, &selectors, &[], &backend)
+        .expect("disabled static-only catalog");
+    assert!(catalog.ids.is_empty());
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
 }

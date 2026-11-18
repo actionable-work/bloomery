@@ -458,9 +458,13 @@ in {
           enable = true;
           allow = ["clippy::unwrap_used"];
         };
+        config.checks.unusedDependencies = {
+          enable = true;
+          exceptions = ["openssl-sys"];
+        };
       };
     in {
-      policiesRemoved = !(args.checks ? specifications) && !(args.checks ? clippySuppressions);
+      policiesRemoved = !(args.checks ? specifications) && !(args.checks ? clippySuppressions) && !(args.checks ? unusedDependencies);
       badSpecType = fails (loader.toWorkspaceArgs {
         root = ./.;
         config.checks.specifications.enable = "true";
@@ -530,6 +534,18 @@ in {
         root = ./.;
         config.checks.clippySuppressions.allow = ["clippy::unwrap_used" "clippy::unwrap_used"];
       });
+      badUnusedException = fails (loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.unusedDependencies.exceptions = ["serde@1.0.0"];
+      });
+      duplicateUnusedException = fails (loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.unusedDependencies.exceptions = ["serde" "serde"];
+      });
+      badUnusedEnable = fails (loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.unusedDependencies.enable = "true";
+      });
     };
     expected = {
       policiesRemoved = true;
@@ -538,6 +554,9 @@ in {
       badSpecExceptions = true;
       badLintName = true;
       duplicateLint = true;
+      badUnusedException = true;
+      duplicateUnusedException = true;
+      badUnusedEnable = true;
     };
   };
 

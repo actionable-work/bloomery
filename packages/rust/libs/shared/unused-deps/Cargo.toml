@@ -1,0 +1,12 @@
+[dependencies]
+bloomery-cargo-metadata = { workspace = true }
+bloomery-model = { workspace = true }
+bloomery-scanning = { workspace = true }
+proc-macro2 = { workspace = true }
+toml_edit = { workspace = true }
+
+[package]
+edition = "2024"
+license.workspace = true
+name = "bloomery-unused-deps"
+version = "0.1.0"

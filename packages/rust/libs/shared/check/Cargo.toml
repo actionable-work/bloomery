@@ -1,4 +1,5 @@
 [dependencies]
+bloomery-cargo-metadata = { workspace = true }
 bloomery-glob = { workspace = true }
 bloomery-model = { workspace = true }
 bloomery-scanning = { workspace = true }

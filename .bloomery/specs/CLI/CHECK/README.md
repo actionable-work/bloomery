@@ -14,6 +14,8 @@ description: |
   complete selected health measurement in write mode.
   Clippy suppression policy checks inline Rust attributes and rejects disabled
   Clippy lints unless their exact lint names are configured as exceptions.
+  Unused dependency policy rejects Cargo dependency declarations that no
+  target able to see them references.
   Unconfigured check controls default to off; `bloomery config upgrade` sets
   missing supported check controls to `true` and preserves configured values.
   Check warns through tracing when a supported check key is missing.
@@ -37,7 +39,8 @@ remains necessary but is not a substitute for executing the selected Nix checks.
 Static specification checks
 run only when specification management and `checks.specifications.enable` are
 enabled. If either is disabled, check runs the native formatter check,
-independently enabled code health and Clippy suppression policy, and Nix checks
+independently enabled code health, Clippy suppression, and unused dependency
+policies, and Nix checks
 without specification passes.
 
 ## Design documents
@@ -54,6 +57,7 @@ without specification passes.
 - [Hermetic Nix boundary tests](design/testing.md)
 - [Code health scores and baseline snapshots](design/code-health.md)
 - [Inline Clippy suppression policy](design/clippy-suppressions.md)
+- [Unused dependency policy](design/unused-dependencies.md)
 
 ## Responsibilities
 
@@ -61,7 +65,8 @@ without specification passes.
   from the [PARSER area](../../PARSER/README.md) when specification management
   and `checks.specifications.enable` are enabled.
 - Run the native no-write formatter check, enabled code health,
-  enabled Clippy suppression policy, and Nix checks without a specification
+  enabled Clippy suppression and unused dependency policies, and Nix checks
+  without a specification
   tree when specification management is disabled.
 - Require the shared root-flake preflight for every command.
 - Format before selected checks in write mode; include the native treefmt
@@ -85,6 +90,7 @@ without specification passes.
   lockfiles unchanged.
 - Share Rust ingestion between health and traceability without coupling outcomes.
 - Check inline Clippy lint suppressions against configured exceptions.
+- Reject workspace dependency declarations that no visible target references.
 - Reject automated requirements with too many distinct authored validating sites.
 - Warn through tracing when a supported check-control key is absent.
 - Score production SLOC per crate to reward smaller crates and preserve a

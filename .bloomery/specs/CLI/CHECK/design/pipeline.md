@@ -12,8 +12,8 @@ auto-detected from the specification tree or explicitly configured
 `static:traceability` are absent from the catalog and no specification workspace
 or evidence pass runs. The
 Write-mode formatting, the native no-write formatter check, enabled
-code health, enabled Clippy suppression policy, and Nix checks are unaffected.
-Health and suppression policy are independent static branches without
+code health, enabled Clippy suppression and unused dependency policies, and
+Nix checks are unaffected. Health and the policy checks are independent static branches without
 requirement-model prerequisites; see
 [code health](code-health.md). Health can request source ingestion while evidence
 scanning is disabled, without producing specification references.
