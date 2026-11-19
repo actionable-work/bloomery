@@ -23,10 +23,11 @@
   version = pkg.version;
   crateName = pkg.crateName;
 
-  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc clippy pkgs.stdenv.cc pkgs.zstd];
+  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc clippy pkgs.stdenv.cc pkgs.zstd] ++ tailwind.nativeBuildInputs;
   buildInputs = override.buildInputs or [];
   extraRustcFlags = (override.rustcFlags or []) ++ defaultRustcFlags;
-  userEnv = override.env or {};
+  tailwind = (import ./tailwind.nix {inherit pkgs lib;}).forBuildScript buildScriptDependencies;
+  userEnv = tailwind.env // (override.env or {});
 
   warningFlags = lib.optional denyWarnings "-Dwarnings";
 in

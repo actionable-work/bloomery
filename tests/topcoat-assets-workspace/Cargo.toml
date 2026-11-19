@@ -1,0 +1,23 @@
+[workspace]
+members = [
+  "packages/rust/site",
+  "packages/rust/site_brand",
+  "packages/rust/site_server",
+  "packages/rust/site_ui",
+]
+resolver = "2"
+
+[workspace.dependencies]
+site_brand = { path = "packages/rust/site_brand" }
+site_server = { path = "packages/rust/site_server" }
+site_ui = { path = "packages/rust/site_ui" }
+tokio = { default-features = false, features = [
+  "net",
+  "rt-multi-thread",
+], version = "1" }
+topcoat = { default-features = false, features = [
+  "asset",
+  "router",
+  "serve",
+  "view",
+], version = "0.10.0" }

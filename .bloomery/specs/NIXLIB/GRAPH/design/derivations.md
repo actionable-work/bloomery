@@ -76,7 +76,8 @@ plus configured asset directories, and forward dependency assets. Binary
 derivations bundle dependency, workspace, and crate-local assets into
 `$out/bin/<dir>` and `$out/share/<bin>/<dir>`; explicit override assets are
 bundled under `assets/`. Crate-local assets take precedence over dependency
-assets.
+assets. Topcoat `asset!` declarations are indexed and bundled as described in
+[Topcoat assets](topcoat-assets.md).
 
 ## Compressed crate artifacts
 

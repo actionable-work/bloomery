@@ -181,7 +181,65 @@
     defaultRustcFlags = [];
     prebuilt = prebuiltBin;
   };
+  indexedPrebuiltBinDrv = (builderExports.buildBinWith {defaultLinker = null;}) {
+    binName = "bin-fixture";
+    pkg = {
+      name = "bin-fixture";
+      version = "0.1.0";
+      crateName = "bin_fixture";
+    };
+    src = source;
+    entry = "src/main.rs";
+    defaultRustcFlags = [];
+    prebuilt = prebuiltBin;
+    assetIndexFrom = binDrv;
+  };
+  tailwindProvider = {bloomeryProvidesTailwind = true;};
+  tailwindCrate = override:
+    (builderExports.buildCrateWith {defaultLinker = null;}) {
+      pkg = {
+        name = "tailwind-fixture";
+        version = "0.1.0";
+        crateName = "tailwind_fixture";
+        id = "tailwind-fixture-0.1.0";
+        isWorkspace = true;
+      };
+      src = source;
+      buildScriptDependencies = [tailwindProvider];
+      inherit override;
+    };
 in {
+  testTailwindOverrideKeepsUserCli = {
+    expr = {
+      defaultCli = builtins.unsafeDiscardStringContext (tailwindCrate {}).TAILWIND_CLI;
+      overriddenCli = (tailwindCrate {env.TAILWIND_CLI = "/custom/tailwindcss";}).TAILWIND_CLI;
+    };
+    expected = {
+      defaultCli = builtins.unsafeDiscardStringContext "${pkgs.tailwindcss_4}/bin/tailwindcss";
+      overriddenCli = "/custom/tailwindcss";
+    };
+    passthru.bloomery = ["NIXLIB-GRAPH-ASSETS-013"];
+  };
+
+  testOptimizedBinaryReusesPublishedAssetIndex = {
+    expr = {
+      mergesReleaseIndex =
+        lib.hasInfix
+        (builtins.unsafeDiscardStringContext "${binDrv}/share/$BIN_NAME/topcoat-assets")
+        (builtins.unsafeDiscardStringContext indexedPrebuiltBinDrv.installPhase);
+      skipsOwnIndexing = !(lib.hasInfix "index --crate" indexedPrebuiltBinDrv.installPhase);
+      releasePublishesIndex = lib.hasInfix "--index \"$out/share/$BIN_NAME/topcoat-assets\"" binDrv.installPhase;
+      bundlesThroughIndex = lib.hasInfix "bundle \"$TOPCOAT_INDEX\"" indexedPrebuiltBinDrv.installPhase;
+    };
+    expected = {
+      mergesReleaseIndex = true;
+      skipsOwnIndexing = true;
+      releasePublishesIndex = true;
+      bundlesThroughIndex = true;
+    };
+    passthru.bloomery = ["NIXLIB-GRAPH-ASSETS-017"];
+  };
+
   testDependencyPolicyBuilderReportsFindingsWithoutCrateInputs = {
     expr = {
       warningHasMemberAndAdvisory = lib.hasInfix "app-0.1.0 policy finding: serde-1.0.0 RUSTSEC-2024-0001" policyWarning.passthru.policyBuildCommand;

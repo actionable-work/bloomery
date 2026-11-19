@@ -1,0 +1,7 @@
+[dependencies]
+topcoat = { workspace = true }
+
+[package]
+edition = "2024"
+name = "site_brand"
+version = "0.1.0"

@@ -42,6 +42,9 @@
   buildScriptDependencies ? dependencies,
 }: let
   compilerFlags = import ./compiler-flags.nix {inherit pkgs lib stdenv;};
+  tailwindSupport = import ./tailwind.nix {inherit pkgs lib;};
+  tailwind = tailwindSupport.forBuildScript buildScriptDependencies;
+  topcoatBundler = "${pkgs.buildPackages.python3}/bin/python3 ${./topcoat-bundler.py}";
   pname = pkg.name;
   version = pkg.version;
   crateName = pkg.crateName;
@@ -53,7 +56,7 @@
     then lld
     else null;
 
-  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc pkgs.zstd] ++ lib.optional (linkerPackage != null) linkerPackage;
+  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc pkgs.zstd] ++ lib.optional (linkerPackage != null) linkerPackage ++ tailwind.nativeBuildInputs;
   buildInputs = override.buildInputs or [];
   featureList =
     if override ? features && override.features != null
@@ -72,7 +75,7 @@
       "-Cmetadata=${disambiguator}"
     ]
     ++ lib.optional (!pkg.isWorkspace) "--cap-lints=allow";
-  userEnv = override.env or {};
+  userEnv = tailwind.env // (override.env or {});
 in
   stdenv.mkDerivation (_finalAttrs:
     {
@@ -117,6 +120,11 @@ in
 
       passthru = {
         inherit pkg crateName dependencyBindings buildScriptBindings;
+        bloomeryProvidesTailwind = tailwindSupport.provides {
+          inherit pkg dependencies;
+          features = featureList;
+        };
+        bloomeryNeedsTailwind = tailwind.needed;
       };
 
       unpackPhase = ''
@@ -557,6 +565,16 @@ in
           )
         fi
 
+        # Index the files this crate's Topcoat asset declarations resolve to
+        # while its sources and build-script OUT_DIR still exist.
+        if [ "$METADATA_ONLY" != "1" ]; then
+          mapfile -t TOPCOAT_ARTIFACTS < <(grep -rlaF TOPCOAT_ASSET "$out/lib" || true)
+          if [ ''${#TOPCOAT_ARTIFACTS[@]} -gt 0 ]; then
+            mkdir -p "$out/topcoat-assets"
+            ${topcoatBundler} index --crate "$CRATE_NAME" --index "$out/topcoat-assets" "''${TOPCOAT_ARTIFACTS[@]}"
+          fi
+        fi
+
         DEP_LIB_NAME="$(basename "$OUT_LIB")"
         tar --zstd -cf "$out/lib.tar.zst" -C "$out/lib" .
         rm -rf "$out/lib"
@@ -595,6 +613,16 @@ in
             done
           fi
         done
+
+        # Forward dependency Topcoat asset indexes for transitive consumers
+        for dep in $dependencies; do
+          if [ -d "$dep/topcoat-assets" ]; then
+            ${topcoatBundler} merge "$out/topcoat-assets" "$dep/topcoat-assets"
+          fi
+        done
+        if [ -d "$out/topcoat-assets" ] && [ -z "$(ls -A "$out/topcoat-assets")" ]; then
+          rmdir "$out/topcoat-assets"
+        fi
 
         # Discover and forward dependency assets for transitive downstream consumers
         for dep in $dependencies; do

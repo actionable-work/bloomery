@@ -1,0 +1,128 @@
+schema_version = 1
+group = "ASSETS"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-001"
+title = "Crates index their own Topcoat asset files"
+manual = false
+design = "design/topcoat-assets.md#asset-index"
+ears = { type = "ubiquitous", system = "the crate builder", action = "copy each local file resolved by the crate's own Topcoat asset declarations into its asset index keyed by asset ID" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-002"
+title = "Build-script generated asset files are indexed"
+manual = false
+design = "design/topcoat-assets.md#asset-index"
+ears = { type = "event", trigger = "a crate's Topcoat asset declaration resolves into its build-script OUT_DIR", system = "the crate builder", action = "index the generated file like a checked-in asset file" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-003"
+title = "Asset indexes reach dependents transitively"
+manual = false
+design = "design/topcoat-assets.md#asset-index"
+ears = { type = "ubiquitous", system = "the crate builder", action = "link every dependency asset index entry into the crate's own asset index" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-004"
+title = "Declarations resolve by asset ID"
+manual = false
+design = "design/topcoat-assets.md#binary-bundling"
+ears = { type = "ubiquitous", system = "the binary builder", action = "resolve each Topcoat asset declaration through the merged asset index by asset ID so same-named files from different crates bundle separately" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-005"
+title = "Unresolved declarations fail the binary"
+manual = false
+design = "design/topcoat-assets.md#binary-bundling"
+ears = { type = "unwanted_behavior", trigger = "a Topcoat asset declaration in the binary has no asset index entry", system = "the binary builder", action = "fail and name the declared path, declaring crate, source file, and resolved path" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-006"
+title = "Binary crates index their own declarations"
+manual = false
+design = "design/topcoat-assets.md#binary-bundling"
+ears = { type = "ubiquitous", system = "the binary builder", action = "index the binary crate's own Topcoat asset declarations from its sources and build-script OUT_DIR and publish them under share/<bin>/topcoat-assets" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-007"
+title = "Remote declarations are reported as unsupported"
+manual = false
+design = "design/topcoat-assets.md#binary-bundling"
+ears = { type = "unwanted_behavior", trigger = "a Topcoat asset declaration names an http or https URL", system = "the binary builder", action = "fail and name the URL and declaring crate instead of downloading it" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-008"
+title = "Bundled file names follow Topcoat"
+manual = false
+design = "design/topcoat-assets.md#bundle-format"
+ears = { type = "ubiquitous", system = "the binary builder", action = "name bundled files from the rename or source stem, a 16-digit SHA-256 prefix, and the extension option or source extension as Topcoat does" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-009"
+title = "Bundled content types follow Topcoat"
+manual = false
+design = "design/topcoat-assets.md#bundle-format"
+ears = { type = "ubiquitous", system = "the binary builder", action = "use the content_type option or guess the content type from the bundled file name with Topcoat's table" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-010"
+title = "Asset checksums are verified"
+manual = false
+design = "design/topcoat-assets.md#bundle-format"
+ears = { type = "unwanted_behavior", trigger = "a Topcoat asset checksum option is not a matching sha256 digest", system = "the binary builder", action = "fail and name the declared path and checksum" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-011"
+title = "Tailwind build scripts receive the nixpkgs CLI"
+manual = false
+design = "design/topcoat-assets.md#tailwind"
+ears = { type = "event", trigger = "a build-script dependency provides the topcoat-tailwind build feature", system = "every builder that runs the build script", action = "put tailwindcss_4 on PATH and set TAILWIND_CLI to its executable" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-012"
+title = "Other build scripts receive no Tailwind CLI"
+manual = false
+design = "design/topcoat-assets.md#tailwind"
+ears = { type = "event", trigger = "no build-script dependency provides the topcoat-tailwind build feature", system = "every builder that runs the build script", action = "omit tailwindcss_4 and TAILWIND_CLI" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-013"
+title = "Override TAILWIND_CLI takes precedence"
+manual = false
+design = "design/topcoat-assets.md#tailwind"
+ears = { type = "event", trigger = "an override sets env.TAILWIND_CLI", system = "every builder that runs the build script", action = "keep the override value" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-014"
+title = "The development shell carries the Tailwind CLI"
+manual = false
+design = "design/topcoat-assets.md#tailwind"
+ears = { type = "event", trigger = "a workspace member build script needs the Tailwind CLI", system = "the development shell", action = "include tailwindcss_4 and set TAILWIND_CLI" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-015"
+title = "The bundle manifest follows Topcoat"
+manual = false
+design = "design/topcoat-assets.md#bundle-format"
+ears = { type = "ubiquitous", system = "the binary builder", action = "write a version 1 manifest.toml with id, file, hash, and content_type per asset ID in declaration order to bin/assets and share/<bin>/assets" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-016"
+title = "Generated Tailwind stylesheets are served"
+manual = false
+design = "design/topcoat-assets.md#tailwind"
+ears = { type = "event", trigger = "a crate declares topcoat::tailwind::stylesheet!() and its build script renders Tailwind", system = "the binary package", action = "serve the generated stylesheet with its utility classes from the bundle" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-017"
+title = "Optimized packages reuse the release asset index"
+manual = false
+design = "design/topcoat-assets.md#binary-bundling"
+ears = { type = "ubiquitous", system = "the optimized package builder", action = "resolve the binary crate's own declarations through the asset index published by the release compilation it optimizes" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-018"
+title = "Conflicting content types fail the bundle"
+manual = false
+design = "design/topcoat-assets.md#bundle-format"
+ears = { type = "unwanted_behavior", trigger = "one bundled file is declared with two content types", system = "the binary builder", action = "fail and name the file and both content types" }

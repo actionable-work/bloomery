@@ -1589,23 +1589,31 @@ in
         else {}
       );
 
+    # Build scripts of workspace members that run the Topcoat Tailwind
+    # integration receive the same Tailwind CLI in the shell as in builds.
+    devShellTailwind =
+      (import ./builders/tailwind.nix {inherit pkgs lib;}).forShell
+      (map (member: globalCrates.${member.id}) parsed.workspacePackages);
+
     devShell =
       if cfg.devShell.enable
       then
-        pkgs.mkShell {
-          packages =
-            [
-              rustc
-              clippy
-              cargo
-              pkgs.nix-fast-build
-            ]
-            ++ (lib.optional (defaultLinker == "lld") lld)
-            ++ (lib.optional (defaultLinker == "mold") mold)
-            ++ (lib.optional (cfg.devShell.bloomeryCli != null) cfg.devShell.bloomeryCli)
-            ++ cfg.devShell.packages;
-          shellHook = cfg.devShell.shellHook;
-        }
+        pkgs.mkShell ({
+            packages =
+              [
+                rustc
+                clippy
+                cargo
+                pkgs.nix-fast-build
+              ]
+              ++ (lib.optional (defaultLinker == "lld") lld)
+              ++ (lib.optional (defaultLinker == "mold") mold)
+              ++ (lib.optional (cfg.devShell.bloomeryCli != null) cfg.devShell.bloomeryCli)
+              ++ devShellTailwind.nativeBuildInputs
+              ++ cfg.devShell.packages;
+            shellHook = cfg.devShell.shellHook;
+          }
+          // devShellTailwind.env)
       else null;
 
     defaultPackage =

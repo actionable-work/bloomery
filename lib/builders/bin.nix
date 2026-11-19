@@ -54,8 +54,13 @@ in
     # Used by the optimization pipeline to reuse the asset and runtime-wrapper
     # install phases for an already-optimized binary.
     prebuilt ? null,
+    # Binary derivation whose published Topcoat asset index resolves the
+    # binary crate's own declarations when `prebuilt` skips compilation.
+    assetIndexFrom ? null,
   }: let
     compilerFlags = import ./compiler-flags.nix {inherit pkgs lib stdenv;};
+    tailwind = (import ./tailwind.nix {inherit pkgs lib;}).forBuildScript buildScriptDependencies;
+    topcoatBundler = "${pkgs.buildPackages.python3}/bin/python3 ${./topcoat-bundler.py}";
     pname = binName;
     version = pkg.version;
     crateName = lib.replaceStrings ["-"] ["_"] binName;
@@ -76,19 +81,21 @@ in
       then ["-Clink-arg=-fuse-ld=${defaultLinker}"]
       else [];
     runtimeDependencies = override.runtimeDependencies or [];
-    nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc pkgs.zstd] ++ lib.optional (linkerPackage != null) linkerPackage ++ lib.optional (runtimeDependencies != []) pkgs.makeWrapper;
+    nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc pkgs.zstd] ++ lib.optional (linkerPackage != null) linkerPackage ++ lib.optional (runtimeDependencies != []) pkgs.makeWrapper ++ tailwind.nativeBuildInputs;
     buildInputs = override.buildInputs or [];
     cleanDefaultFlags =
       if evaluatedProfile.optLevel != null
       then lib.filter (f: !lib.hasPrefix "-Copt-level=" f && !lib.hasPrefix "-C opt-level=" f) defaultRustcFlags
       else defaultRustcFlags;
     extraRustcFlags = (override.rustcFlags or []) ++ cleanDefaultFlags ++ profileFlags ++ linkerFlags;
-    userEnv = override.env or {};
+    userEnv = tailwind.env // (override.env or {});
   in
     stdenv.mkDerivation (_finalAttrs:
       {
         name = "${binName}-${version}";
         inherit pname version src crateDrv;
+
+        passthru.bloomeryNeedsTailwind = tailwind.needed;
 
         meta = {
           mainProgram = binName;
@@ -372,10 +379,28 @@ in
             fi
           '') (override.assets or [])}
 
-          # 5. Native framework asset bundling (Topcoat asset! macro support)
-          if [ -d "$out/bin/assets" ] && [ -f "$out/bin/$BIN_NAME" ]; then
-            ${pkgs.python3}/bin/python3 ${./topcoat-bundler.py} "$out/bin/$BIN_NAME" "$out/bin/assets" "$out/share/$BIN_NAME/assets"
-          fi
+          # 5. Topcoat asset bundling: resolve every asset! declaration in the
+          # binary by asset ID through the dependency asset indexes and the
+          # binary crate's own declarations.
+          TOPCOAT_INDEX="$NIX_BUILD_TOP/topcoat-assets"
+          mkdir -p "$TOPCOAT_INDEX"
+          for dep in $dependencies $crateDrv; do
+            if [ -d "$dep/topcoat-assets" ]; then
+              ${topcoatBundler} merge "$TOPCOAT_INDEX" "$dep/topcoat-assets"
+            fi
+          done
+          ${
+            if prebuilt != null
+            then
+              lib.optionalString (assetIndexFrom != null) ''
+                ${topcoatBundler} merge "$TOPCOAT_INDEX" "${assetIndexFrom}/share/$BIN_NAME/topcoat-assets"
+              ''
+            else ''
+              ${topcoatBundler} index --crate "$CRATE_NAME" --index "$out/share/$BIN_NAME/topcoat-assets" --known "$TOPCOAT_INDEX" "$out/bin/$BIN_NAME"
+              ${topcoatBundler} merge "$TOPCOAT_INDEX" "$out/share/$BIN_NAME/topcoat-assets"
+            ''
+          }
+          ${topcoatBundler} bundle "$TOPCOAT_INDEX" "$out/bin/$BIN_NAME" "$out/bin/assets" "$out/share/$BIN_NAME/assets"
 
           # Ensure copied assets have standard write permissions in derivation
           chmod -R u+w "$out/bin/assets" "$out/bin/static" "$out/bin/public" "$out/share" 2>/dev/null || true

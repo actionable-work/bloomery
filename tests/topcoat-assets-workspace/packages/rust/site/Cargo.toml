@@ -1,0 +1,8 @@
+[dependencies]
+site_server = { workspace = true }
+topcoat = { workspace = true }
+
+[package]
+edition = "2024"
+name = "site"
+version = "0.1.0"

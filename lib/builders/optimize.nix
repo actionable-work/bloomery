@@ -432,6 +432,7 @@
         defaultRustcFlags
         ;
       prebuilt = optimizedBinary;
+      assetIndexFrom = boltInput;
     };
   in {
     inherit
