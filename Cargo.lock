@@ -518,6 +518,15 @@ name = "bloomery-test-macros"
 version = "0.1.0"
 
 [[package]]
+name = "bloomery-topcoat-bundler"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "sha2 0.10.9",
+ "toml",
+]
+
+[[package]]
 name = "bloomery-ui"
 version = "0.1.0"
 dependencies = [

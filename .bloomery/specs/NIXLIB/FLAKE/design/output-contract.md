@@ -64,7 +64,9 @@ lock model and `config` exposes the evaluated options.
 
 When enabled, `devShell` is a shell containing `rustc`, `clippy`, `cargo`,
 `nix-fast-build`, and the Bloomery CLI, plus the selected linker and user
-packages, with the configured shell hook. When disabled, `devShell` is null and
+packages, with the configured shell hook. It also carries the Tailwind CLI and
+`TAILWIND_CLI` when a workspace build script needs them, as described in
+[Topcoat assets](../../GRAPH/design/topcoat-assets.md#tailwind). When disabled, `devShell` is null and
 `mkFlake` omits the default shell.
 
 ## Formatter

@@ -1,0 +1,10 @@
+[dependencies]
+serde = { workspace = true }
+sha2 = { workspace = true }
+toml = { workspace = true }
+
+[package]
+edition = "2024"
+license.workspace = true
+name = "bloomery-topcoat-bundler"
+version = "0.1.0"

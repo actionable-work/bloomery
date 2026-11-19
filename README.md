@@ -165,6 +165,7 @@ Every supported setup style is verified by an isolated sub-flake in CI:
 | [`tests/flake-parts-workspace`](./tests/flake-parts-workspace) | Internal flake-parts module | Exercises the internal flake-parts module directly; the public API is `mkFlake` |
 | [`tests/edge-cases-workspace`](./tests/edge-cases-workspace) | Config-driven `mkFlake` | Root package, glob members, excluded crates, build cfgs, integration tests, and multiple binary layouts |
 | [`tests/overrides-workspace`](./tests/overrides-workspace) | Multi-Crate Overrides | Validates colocated member overrides and flake-level overrides merging in a multi-crate workspace |
+| [`tests/topcoat-assets-workspace`](./tests/topcoat-assets-workspace) | Config-driven `mkFlake` | Topcoat asset bundling with a build-script Tailwind stylesheet and same-named assets from two crates |
 | [`tests/template-basic`](./tests/template-basic) | Rendered `basic` template | Builds the Bloomery checks generated for the default template |
 | [`tests/template-axum`](./tests/template-axum) | Rendered `axum` template | Builds the Bloomery checks generated for the Axum template |
 | [`tests/template-topcoat`](./tests/template-topcoat) | Rendered `topcoat` template | Builds the Bloomery checks generated for the Topcoat template |

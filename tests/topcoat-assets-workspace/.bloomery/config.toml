@@ -1,0 +1,17 @@
+version = 2
+
+[build]
+devPackages = false
+libPackages = false
+
+[checks]
+enable = true
+
+[checks.crates]
+enable = true
+
+[checks.noDefaultFeatures]
+enable = false
+
+[checks.workspaceDependencies]
+enable = false

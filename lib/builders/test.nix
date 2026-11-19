@@ -62,10 +62,11 @@
     (override.nativeBuildInputs or [])
     ++ [rustc pkgs.stdenv.cc pkgs.zstd]
     ++ lib.optional (builtins.elem pname ["bloomery-check-command" "bloomery-sync" "bloomery-unused-deps"]) pkgs.cargo
-    ++ lib.optional (linkerPackage != null) linkerPackage;
+    ++ lib.optional (linkerPackage != null) linkerPackage ++ tailwind.nativeBuildInputs;
   buildInputs = override.buildInputs or [];
   extraRustcFlags = (override.rustcFlags or []) ++ defaultRustcFlags ++ linkerFlags;
-  userEnv = override.env or {};
+  tailwind = (import ./tailwind.nix {inherit pkgs lib;}).forBuildScript buildScriptDependencies;
+  userEnv = tailwind.env // (override.env or {});
 in
   stdenv.mkDerivation (_finalAttrs:
     {

@@ -21,10 +21,11 @@
   version = pkg.version;
   crateName = pkg.crateName;
 
-  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc pkgs.zstd];
+  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc pkgs.zstd] ++ tailwind.nativeBuildInputs;
   buildInputs = override.buildInputs or [];
   extraRustdocFlags = (override.rustdocFlags or []) ++ defaultRustdocFlags;
-  userEnv = override.env or {};
+  tailwind = (import ./tailwind.nix {inherit pkgs lib;}).forBuildScript buildScriptDependencies;
+  userEnv = tailwind.env // (override.env or {});
 in
   stdenv.mkDerivation (_finalAttrs:
     {

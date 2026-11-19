@@ -178,10 +178,11 @@
   # Force a real end-to-end build of the optimized binary through a smoke run.
   smokeRun =
     pkgs.runCommand "opt-app-smoke-run" {
-      passthru.bloomery = ["NIXLIB-OPTIMIZE-PIPELINE-034"];
+      passthru.bloomery = ["NIXLIB-GRAPH-ASSETS-025" "NIXLIB-OPTIMIZE-PIPELINE-034"];
     } ''
       result="$(${base.packages."opt-app"}/bin/opt-app)"
       test "$result" = "opt-app result: 332833507"
+      cmp "${base.packages."opt-app"}/bin/resources/banner.txt" ${optRoot}/crates/opt-app/resources/banner.txt
       mkdir -p "$out"
       printf '%s' "$result" > "$out/result"
     '';

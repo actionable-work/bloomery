@@ -59,6 +59,8 @@ Bloomery solves this natively inside `builderCrate` and `builderBin`:
 2. **Binary Aggregation**: When compiling a binary, `builderBin` automatically scans its direct and transitive dependency closure. Any assets discovered in upstream libraries are copied into `$out/bin/assets/` and `$out/share/<binName>/assets/`.
 3. **Workspace & Custom Overrides**: Workspace-level assets and crate-specific directories (`assetDirs = [ "templates" ];` or `assets = [ ./data.txt ];`) are seamlessly bundled into the final executable package.
 4. **Zero-Configuration Serving**: Binary executables can find their bundled assets alongside their executable path (`std::env::current_exe().parent().join("assets")`) in development and production alike.
+5. **Topcoat Bundles**: Each crate derivation indexes the files its Topcoat `asset!` declarations resolve to by asset ID, including files its build script generates in `OUT_DIR`. `builderBin` resolves every declaration in the executable through those indexes and writes content-hashed files plus a Topcoat `manifest.toml` into `$out/bin/assets/`, failing the build on any declaration it cannot resolve.
+6. **Native Tailwind**: Build scripts that depend on `topcoat` with its `tailwind` feature get nixpkgs `tailwindcss_4` on `PATH` and `TAILWIND_CLI` set, in builds and in the development shell. Select it with `topcoat::tailwind::BuildConfig::new().executable_env("TAILWIND_CLI").render()`.
 
 ---
 

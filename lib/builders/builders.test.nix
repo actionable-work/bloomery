@@ -181,7 +181,92 @@
     defaultRustcFlags = [];
     prebuilt = prebuiltBin;
   };
+  prebuiltWithAssets = (builderExports.buildBinWith {defaultLinker = null;}) {
+    binName = "bin-fixture";
+    pkg = {
+      name = "bin-fixture";
+      version = "0.1.0";
+      crateName = "bin_fixture";
+    };
+    src = source;
+    entry = "src/main.rs";
+    defaultRustcFlags = [];
+    prebuilt = prebuiltBin;
+    assetsFrom = binDrv;
+  };
+  prebuiltTopcoatBin = assetsFrom:
+    (builderExports.buildBinWith {defaultLinker = null;}) {
+      binName = "bin-fixture";
+      pkg = {
+        name = "bin-fixture";
+        version = "0.1.0";
+        crateName = "bin_fixture";
+      };
+      src = source;
+      entry = "src/main.rs";
+      defaultRustcFlags = [];
+      dependencies = [{bloomeryHasTopcoatAssets = true;}];
+      prebuilt = prebuiltBin;
+      inherit assetsFrom;
+    };
+  tailwindProvider = {bloomeryProvidesTailwind = true;};
+  tailwindCrate = override:
+    (builderExports.buildCrateWith {defaultLinker = null;}) {
+      pkg = {
+        name = "tailwind-fixture";
+        version = "0.1.0";
+        crateName = "tailwind_fixture";
+        id = "tailwind-fixture-0.1.0";
+        isWorkspace = true;
+      };
+      src = source;
+      buildScriptDependencies = [tailwindProvider];
+      inherit override;
+    };
 in {
+  testTailwindOverrideKeepsUserCli = {
+    expr = {
+      defaultCli = builtins.unsafeDiscardStringContext (tailwindCrate {}).TAILWIND_CLI;
+      overriddenCli = (tailwindCrate {env.TAILWIND_CLI = "/custom/tailwindcss";}).TAILWIND_CLI;
+    };
+    expected = {
+      defaultCli = builtins.unsafeDiscardStringContext "${pkgs.tailwindcss_4}/bin/tailwindcss";
+      overriddenCli = "/custom/tailwindcss";
+    };
+    passthru.bloomery = ["NIXLIB-GRAPH-ASSETS-013"];
+  };
+
+  testPrebuiltTopcoatBinaryRequiresCompiledAssets = {
+    expr = {
+      withoutAssetsFrom = (builtins.tryEval (prebuiltTopcoatBin null).drvPath).success;
+      withAssetsFrom = (builtins.tryEval (prebuiltTopcoatBin binDrv).installPhase).success;
+    };
+    expected = {
+      withoutAssetsFrom = false;
+      withAssetsFrom = true;
+    };
+    passthru.bloomery = ["NIXLIB-GRAPH-ASSETS-026"];
+  };
+
+  testOptimizedBinaryReusesCompiledAssets = let
+    contains = text:
+      lib.hasInfix
+      (builtins.unsafeDiscardStringContext text)
+      (builtins.unsafeDiscardStringContext prebuiltWithAssets.installPhase);
+  in {
+    expr = {
+      usesCompiledBundle = contains "${binDrv}/bin/$dir";
+      usesPublishedShare = contains "${binDrv}/share/$BIN_NAME/.";
+      skipsBundling = !(contains "TOPCOAT_INDEX");
+    };
+    expected = {
+      usesCompiledBundle = true;
+      usesPublishedShare = true;
+      skipsBundling = true;
+    };
+    passthru.bloomery = ["NIXLIB-GRAPH-ASSETS-017"];
+  };
+
   testDependencyPolicyBuilderReportsFindingsWithoutCrateInputs = {
     expr = {
       warningHasMemberAndAdvisory = lib.hasInfix "app-0.1.0 policy finding: serde-1.0.0 RUSTSEC-2024-0001" policyWarning.passthru.policyBuildCommand;

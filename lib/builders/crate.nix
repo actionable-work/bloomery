@@ -42,6 +42,14 @@
   buildScriptDependencies ? dependencies,
 }: let
   compilerFlags = import ./compiler-flags.nix {inherit pkgs lib stdenv;};
+  tailwindSupport = import ./tailwind.nix {inherit pkgs lib;};
+  tailwind = tailwindSupport.forBuildScript buildScriptDependencies;
+  hasTopcoatAssets = pkg.name == "topcoat-asset" || lib.any (dep: dep.bloomeryHasTopcoatAssets or false) dependencies;
+  topcoat = import ./topcoat-tool.nix {inherit pkgs;};
+  sourceDir =
+    if hasTopcoatAssets
+    then topcoat.sourceDirectory pkg src
+    else "src";
   pname = pkg.name;
   version = pkg.version;
   crateName = pkg.crateName;
@@ -53,7 +61,7 @@
     then lld
     else null;
 
-  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc pkgs.zstd] ++ lib.optional (linkerPackage != null) linkerPackage;
+  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc pkgs.zstd] ++ lib.optional (linkerPackage != null) linkerPackage ++ tailwind.nativeBuildInputs;
   buildInputs = override.buildInputs or [];
   featureList =
     if override ? features && override.features != null
@@ -72,7 +80,7 @@
       "-Cmetadata=${disambiguator}"
     ]
     ++ lib.optional (!pkg.isWorkspace) "--cap-lints=allow";
-  userEnv = override.env or {};
+  userEnv = tailwind.env // (override.env or {});
 in
   stdenv.mkDerivation (_finalAttrs:
     {
@@ -117,17 +125,23 @@ in
 
       passthru = {
         inherit pkg crateName dependencyBindings buildScriptBindings;
+        bloomeryHasTopcoatAssets = hasTopcoatAssets;
+        bloomeryProvidesTailwind = tailwindSupport.provides {
+          inherit pkg dependencies;
+          features = featureList;
+        };
+        bloomeryNeedsTailwind = tailwind.needed;
       };
 
       unpackPhase = ''
         runHook preUnpack
-        mkdir -p src
+        mkdir -p ${sourceDir}
         if [ -f "$src" ]; then
-          tar -xzf "$src" --strip-components=1 -C src
-          cd src
+          tar -xzf "$src" --strip-components=1 -C ${sourceDir}
+          cd ${sourceDir}
         else
-          cp -r "$src"/* ./src/ 2>/dev/null || cp -r "$src"/. ./src/
-          cd src
+          cp -r "$src"/* ./${sourceDir}/ 2>/dev/null || cp -r "$src"/. ./${sourceDir}/
+          cd ${sourceDir}
           chmod -R u+w .
         fi
         runHook postUnpack
@@ -557,7 +571,14 @@ in
           )
         fi
 
-        DEP_LIB_NAME="$(basename "$OUT_LIB")"
+        ${lib.optionalString (hasTopcoatAssets && !metadataOnly) ''
+          # Index files while the crate's sources and build-script OUT_DIR
+          # still exist.
+          mapfile -t TOPCOAT_ARTIFACTS < <(grep -rlaF TOPCOAT_ASSET "$out/lib" || true)
+          if [ ''${#TOPCOAT_ARTIFACTS[@]} -gt 0 ]; then
+            ${topcoat.executable} index "$CRATE_NAME" "$CARGO_MANIFEST_DIR" "$out/topcoat-assets" "" "''${TOPCOAT_ARTIFACTS[@]}"
+          fi
+        ''}DEP_LIB_NAME="$(basename "$OUT_LIB")"
         tar --zstd -cf "$out/lib.tar.zst" -C "$out/lib" .
         rm -rf "$out/lib"
 
@@ -596,7 +617,10 @@ in
           fi
         done
 
-        # Discover and forward dependency assets for transitive downstream consumers
+        ${lib.optionalString (hasTopcoatAssets && !metadataOnly) ''
+          # Forward dependency Topcoat asset indexes for transitive consumers.
+          ${topcoat.executable} merge "$out/topcoat-assets" ${lib.concatMapStringsSep " " (dep: ''"${dep}/topcoat-assets"'') dependencies}
+        ''}# Discover and forward dependency assets for transitive downstream consumers
         for dep in $dependencies; do
           for adir in "assets" "static" "public"; do
             if [ -d "$dep/$adir" ]; then

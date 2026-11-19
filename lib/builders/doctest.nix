@@ -58,10 +58,11 @@
     if defaultLinker != null
     then ["-Clink-arg=-fuse-ld=${defaultLinker}"]
     else [];
-  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc pkgs.zstd] ++ lib.optional (linkerPackage != null) linkerPackage;
+  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc pkgs.zstd] ++ lib.optional (linkerPackage != null) linkerPackage ++ tailwind.nativeBuildInputs;
   buildInputs = override.buildInputs or [];
   extraRustdocFlags = (override.rustdocFlags or []) ++ defaultRustdocFlags ++ linkerFlags;
-  userEnv = override.env or {};
+  tailwind = (import ./tailwind.nix {inherit pkgs lib;}).forBuildScript buildScriptDependencies;
+  userEnv = tailwind.env // (override.env or {});
 in
   stdenv.mkDerivation (_finalAttrs:
     {
