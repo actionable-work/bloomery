@@ -121,6 +121,9 @@ features = ["DOCS/CONSISTENCY"] # Feature identifiers owned by this crate.
 [checks.specifications.crates."packages/rust/bins/docs/Cargo.toml"]
 features = ["DOCS/SERVER"] # Feature identifiers owned by this crate.
 
+[checks.specifications.crates."packages/rust/bins/topcoat-bundler/Cargo.toml"]
+features = ["NIXLIB/GRAPH"]
+
 [checks.specifications.crates."packages/rust/libs/cli/build-command/Cargo.toml"]
 features = ["CLI/BUILD"] # Feature identifiers owned by this crate.
 
@@ -458,11 +461,6 @@ maxRequirements = 13                                                            
 name = "summaries_agree_between_human_and_json_and_do_not_stream_logs"                                                          # Exact test name restricted by this breadth exception.
 path = "packages/rust/libs/cli/check-command/src/check_command/tests/execution.rs"                                              # Repository-relative path glob for this test breadth exception.
 reason = "The same failed run is rendered through both output modes to verify equivalent bounded summaries and log separation." # Reason for this specification policy exception or ownership.
-
-[checks.specifications.testExceptions.topcoat_assets_workspace]
-maxRequirements = 10                                                                                                           # Requirement ID limit for matching validating sites.
-path = "tests/topcoat-assets-workspace/checks.nix"                                                                             # Repository-relative path glob for this test breadth exception.
-reason = "This fixture file aggregates independent bundle, serving and Tailwind provisioning checks of one Topcoat workspace." # Reason for this specification policy exception or ownership.
 
 [checks.specifications.testExceptions.trace_reports_tied_tests]
 maxRequirements = 8                                                                                                                       # Requirement ID limit for matching validating sites.

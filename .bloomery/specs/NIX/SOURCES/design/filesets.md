@@ -18,6 +18,9 @@ The common compilation fileset includes:
 - Crate-local `assets`, `static`, `public`, and configured `assetDirs` consumed
   by the builders.
 
+Custom asset directories are combined from default, colocated, and explicit
+overrides, keeping the first occurrence of each directory.
+
 A supported entrypoint that is a symlink is selected like any other entrypoint.
 Because filesets preserve symlinks but cannot select their targets, and
 unresolved targets would leave the build source dangling, the build source also

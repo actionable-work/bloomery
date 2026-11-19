@@ -369,6 +369,12 @@
             --instrumentation-file=profile/bolt.fdata \
             -o "$out/bin/${binName}"
           chmod +x "$out/bin/${binName}"
+          for dir in ${lib.escapeShellArgs (lib.unique (["assets" "static" "public"] ++ (override.assetDirs or [])))}; do
+            if [ -d "${boltInput}/bin/$dir" ] && [ ! -e "$out/bin/$dir" ]; then
+              mkdir -p "$(dirname "$out/bin/$dir")"
+              ln -s "${boltInput}/bin/$dir" "$out/bin/$dir"
+            fi
+          done
         '';
 
     boltTraining =
@@ -432,7 +438,7 @@
         defaultRustcFlags
         ;
       prebuilt = optimizedBinary;
-      assetIndexFrom = boltInput;
+      assetsFrom = boltInput;
     };
   in {
     inherit

@@ -1,7 +1,9 @@
 # Topcoat assets
 
 Bloomery bundles Topcoat `asset!` declarations natively, replacing Topcoat's
-own bundler step. Each declaration embedded in a compiled artifact carries its
+own bundler step. The crate graph builds the Rust bundler for the build host
+and uses it for artifact graphs that include `topcoat-asset`. Each declaration
+embedded in a compiled artifact carries its
 asset ID, declared path, declaring crate name, `CARGO_MANIFEST_DIR`, declaring
 source file, and the `rename`, `extension`, `checksum`, and `content_type`
 options. The bundler decodes all of them and follows Topcoat's path resolution:
@@ -11,8 +13,11 @@ directory.
 
 ## Asset index
 
-A crate derivation scans its compiled library artifacts for declarations made
-by its own crate name and copies each local file they resolve to into
+A workspace or registry crate scans its compiled libraries for declarations
+matching its crate name and manifest directory. Topcoat builds use
+source-specific directories inside the sandbox so that dependencies with
+the same Rust crate name remain distinguishable. The indexer copies each
+resolved local file into
 `$out/topcoat-assets/<asset-id>/<file-name>`. Indexing runs inside the crate
 build, so paths into the crate sources and into the build-script `OUT_DIR`
 both resolve; files a build script generates, such as a Tailwind stylesheet,
@@ -20,17 +25,19 @@ are indexed like checked-in files. Declarations that do not resolve at this
 stage are left for the binary to report. Metadata-only variants do not index.
 
 A crate derivation links each dependency's index entries into its own index,
-so a binary sees the transitive closure. Two different files published under
-one asset ID fail the build.
+so a binary sees the transitive closure. Different contents published under
+one asset ID fail indexing or merging.
 
 ## Binary bundling
 
 A binary derivation merges the indexes of its dependencies and its library
 crate, then indexes the binary crate's own declarations from its sources and
 build-script `OUT_DIR`. It publishes those own entries under
-`$out/share/<bin>/topcoat-assets`. An optimized package installs a prebuilt
-executable, so it merges the index published by the release compilation it
-optimizes instead of indexing.
+`$out/share/<bin>/topcoat-assets`. An optimized package copies the assets
+installed by the compilation supplying its executable, including assets from
+profile-use dependencies. BOLT training exposes the compilation's asset
+directories, including configured directories, next to the instrumented
+executable.
 
 Every declaration in the executable is resolved by asset ID through the merged
 index; file names never select an entry, so same-named files from different
@@ -44,14 +51,15 @@ the URL and crate, and the file must be vendored into the crate.
 
 Bundled files follow Topcoat's naming: the stem is the `rename` option or the
 source file stem, the extension is the `extension` option or the source
-extension, and the first 16 hex digits of the content's SHA-256 are inserted as
+extension. Both must be file name components. The first 16 hex digits of the
+content's SHA-256 are inserted as
 `<stem>-<hash>.<ext>`. An empty stem yields `<hash>.<ext>`, and a missing or
 empty extension yields `<stem>.<hash>`. The content type is the
 `content_type` option, otherwise it is guessed from the bundled file name with
-Topcoat's table for common web types, falling back to
+the built-in table for common web types, falling back to
 `application/octet-stream`. A `checksum` option must be `sha256:<hex>` and
-match the content. One bundled file declared with two content types fails the
-build.
+match the content. A bundled name must identify one set of contents and one
+content type.
 
 `manifest.toml` has `version = 1` and one `[[assets]]` entry per asset ID, in
 declaration order, with `id`, `file`, `hash`, and `content_type`. The bundle is

@@ -62,7 +62,7 @@ id = "NIXLIB-GRAPH-ASSETS-009"
 title = "Bundled content types follow Topcoat"
 manual = false
 design = "design/topcoat-assets.md#bundle-format"
-ears = { type = "ubiquitous", system = "the binary builder", action = "use the content_type option or guess the content type from the bundled file name with Topcoat's table" }
+ears = { type = "ubiquitous", system = "the binary builder", action = "use the explicit content type or derive it from the bundled file extension using the built-in web type table" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-ASSETS-010"
@@ -115,10 +115,10 @@ ears = { type = "event", trigger = "a crate declares topcoat::tailwind::styleshe
 
 [[requirements]]
 id = "NIXLIB-GRAPH-ASSETS-017"
-title = "Optimized packages reuse the release asset index"
+title = "Optimized packages reuse the compiled asset bundle"
 manual = false
 design = "design/topcoat-assets.md#binary-bundling"
-ears = { type = "ubiquitous", system = "the optimized package builder", action = "resolve the binary crate's own declarations through the asset index published by the release compilation it optimizes" }
+ears = { type = "ubiquitous", system = "the optimized package builder", action = "install the bundle produced by the compilation supplying the executable" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-ASSETS-018"
@@ -126,3 +126,52 @@ title = "Conflicting content types fail the bundle"
 manual = false
 design = "design/topcoat-assets.md#bundle-format"
 ears = { type = "unwanted_behavior", trigger = "one bundled file is declared with two content types", system = "the binary builder", action = "fail and name the file and both content types" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-019"
+title = "Colliding asset IDs must have identical contents"
+manual = false
+design = "design/topcoat-assets.md#asset-index"
+ears = { type = "unwanted_behavior", trigger = "an asset ID resolves to different contents during indexing or merging", system = "the asset indexer", action = "fail and name the ID and both files" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-020"
+title = "Colliding bundled filenames must have identical contents"
+manual = false
+design = "design/topcoat-assets.md#bundle-format"
+ears = { type = "unwanted_behavior", trigger = "two assets select the same bundled filename with different contents", system = "the binary builder", action = "fail and name the bundled file" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-021"
+title = "Bundled filename options use single components"
+manual = false
+design = "design/topcoat-assets.md#bundle-format"
+ears = { type = "unwanted_behavior", trigger = "an asset rename or extension includes a path separator or NUL character", system = "the binary builder", action = "fail and name the declaration" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-022"
+title = "Binaries without asset declarations omit the manifest"
+manual = false
+design = "design/topcoat-assets.md#bundle-format"
+ears = { type = "event", trigger = "the executable contains no Topcoat asset declarations", system = "the binary builder", action = "omit the Topcoat manifest" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-023"
+title = "Registry crate assets reach the bundle"
+manual = false
+design = "design/topcoat-assets.md#asset-index"
+ears = { type = "event", trigger = "a declaration in the executable refers to a file packaged in a registry crate", system = "the binary builder", action = "include the asset from that crate index in the bundle" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-024"
+title = "Indexing distinguishes crate builds with the same name"
+manual = false
+design = "design/topcoat-assets.md#asset-index"
+ears = { type = "ubiquitous", system = "the asset indexer", action = "identify local declarations by their manifest directory and crate name" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-025"
+title = "BOLT training retains installed asset directories"
+manual = false
+design = "design/topcoat-assets.md#binary-bundling"
+ears = { type = "event", trigger = "the compiled binary installs an asset directory", system = "BOLT training", action = "expose that directory next to the instrumented binary" }

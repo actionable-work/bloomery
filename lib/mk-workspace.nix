@@ -179,6 +179,7 @@ in
           nativeBuildInputs = (a.nativeBuildInputs or []) ++ (b.nativeBuildInputs or []);
           buildInputs = (a.buildInputs or []) ++ (b.buildInputs or []);
           runtimeDependencies = (a.runtimeDependencies or []) ++ (b.runtimeDependencies or []);
+          assetDirs = lib.unique ((a.assetDirs or []) ++ (b.assetDirs or []));
           rustcFlags = (a.rustcFlags or []) ++ (b.rustcFlags or []);
           rustdocFlags = (a.rustdocFlags or []) ++ (b.rustdocFlags or []);
           env = (a.env or {}) // (b.env or {});

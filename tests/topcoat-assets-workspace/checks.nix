@@ -7,59 +7,6 @@
     then "1"
     else "0";
 in {
-  bundles-declared-assets =
-    pkgs.runCommand "validate-topcoat-asset-bundle" {
-      nativeBuildInputs = [pkgs.python3];
-      passthru.bloomery = [
-        "NIXLIB-GRAPH-ASSETS-001"
-        "NIXLIB-GRAPH-ASSETS-003"
-        "NIXLIB-GRAPH-ASSETS-004"
-        "NIXLIB-GRAPH-ASSETS-006"
-        "NIXLIB-GRAPH-ASSETS-015"
-      ];
-    } ''
-      python3 - ${site}/bin/assets ${./packages/rust} <<'PY'
-      import hashlib, os, sys, tomllib
-      bundle, sources = sys.argv[1], sys.argv[2]
-      with open(os.path.join(bundle, "manifest.toml"), "rb") as handle:
-          manifest = tomllib.load(handle)
-      assert manifest["version"] == 1, manifest
-      entries = manifest["assets"]
-      def read(path):
-          with open(path, "rb") as handle:
-              return handle.read()
-      for entry in entries:
-          content = read(os.path.join(bundle, entry["file"]))
-          digest = hashlib.sha256(content).hexdigest()
-          assert entry["hash"] == digest, entry
-          stem, ext = os.path.splitext(entry["file"])
-          assert stem.endswith("-" + digest[:16]), entry
-      files = sorted(entry["file"].rsplit("-", 1)[0] + os.path.splitext(entry["file"])[1] for entry in entries)
-      assert files == ["robots.txt", "site.css", "site.css", "tailwind.css"], files
-      types = {entry["file"]: entry["content_type"] for entry in entries}
-      for name, content_type in types.items():
-          expected = "text/plain" if name.endswith(".txt") else "text/css"
-          assert content_type == expected, (name, content_type)
-      bundled = {read(os.path.join(bundle, entry["file"])) for entry in entries if entry["file"].startswith("site-")}
-      expected = {
-          read(os.path.join(sources, "site_ui/assets/site.css")),
-          read(os.path.join(sources, "site_brand/assets/site.css")),
-      }
-      assert bundled == expected, "same-named stylesheets from two crates must both be bundled"
-      assert len({entry["id"] for entry in entries}) == len(entries), entries
-      tailwind = next(entry for entry in entries if entry["file"].startswith("tailwind-"))
-      css = read(os.path.join(bundle, tailwind["file"])).decode()
-      for utility in ("bg-red-500", "text-center", "underline"):
-          assert "." + utility in css, utility
-      robots = next(entry for entry in entries if entry["file"].startswith("robots-"))
-      assert read(os.path.join(bundle, robots["file"])) == read(os.path.join(sources, "site/assets/robots.txt"))
-      print("bundle ok:", [entry["file"] for entry in entries])
-      PY
-      cmp ${site}/bin/assets/manifest.toml ${site}/share/site/assets/manifest.toml
-      mkdir "$out"
-      echo "OK" > "$out/success"
-    '';
-
   serves-generated-tailwind =
     pkgs.runCommand "validate-topcoat-tailwind-serving" {
       nativeBuildInputs = [pkgs.curl];

@@ -54,13 +54,19 @@ in
     # Used by the optimization pipeline to reuse the asset and runtime-wrapper
     # install phases for an already-optimized binary.
     prebuilt ? null,
-    # Binary derivation whose published Topcoat asset index resolves the
-    # binary crate's own declarations when `prebuilt` skips compilation.
-    assetIndexFrom ? null,
+    # Assets installed alongside the executable before it was optimized.
+    assetsFrom ? null,
   }: let
     compilerFlags = import ./compiler-flags.nix {inherit pkgs lib stdenv;};
     tailwind = (import ./tailwind.nix {inherit pkgs lib;}).forBuildScript buildScriptDependencies;
-    topcoatBundler = "${pkgs.buildPackages.python3}/bin/python3 ${./topcoat-bundler.py}";
+    assetDeps = dependencies ++ lib.optional (crateDrv != null) crateDrv;
+    hasTopcoatAssets = lib.any (dep: dep.bloomeryHasTopcoatAssets or false) assetDeps;
+    topcoat = import ./topcoat-tool.nix {inherit pkgs;};
+    sourceDir =
+      if hasTopcoatAssets
+      then topcoat.sourceDirectory pkg src
+      else "src";
+    assetDirs = lib.unique (["assets" "static" "public"] ++ (override.assetDirs or []));
     pname = binName;
     version = pkg.version;
     crateName = lib.replaceStrings ["-"] ["_"] binName;
@@ -137,13 +143,13 @@ in
           ''
           else ''
             runHook preUnpack
-            mkdir -p src
+            mkdir -p ${sourceDir}
             if [ -f "$src" ]; then
-              tar -xzf "$src" --strip-components=1 -C src
-              cd src
+              tar -xzf "$src" --strip-components=1 -C ${sourceDir}
+              cd ${sourceDir}
             else
-              cp -r "$src"/* ./src/ 2>/dev/null || cp -r "$src"/. ./src/
-              cd src
+              cp -r "$src"/* ./${sourceDir}/ 2>/dev/null || cp -r "$src"/. ./${sourceDir}/
+              cd ${sourceDir}
               chmod -R u+w .
             fi
             runHook postUnpack
@@ -309,98 +315,102 @@ in
           # Discover, collect, and bundle assets into $out/bin and $out/share
           mkdir -p "$out/share/$BIN_NAME"
 
-          # 1. Collect assets from dependencies (libraries, UI crates, asset packs)
-          for dep in $dependencies $crateDrv; do
-            if [ -d "$dep/assets" ]; then
-              mkdir -p "$out/bin/assets" "$out/share/$BIN_NAME/assets"
-              cp -rn "$dep/assets"/* "$out/bin/assets/" 2>/dev/null || cp -r "$dep/assets"/* "$out/bin/assets/" 2>/dev/null || true
-              cp -rn "$dep/assets"/* "$out/share/$BIN_NAME/assets/" 2>/dev/null || cp -r "$dep/assets"/* "$out/share/$BIN_NAME/assets/" 2>/dev/null || true
-            fi
-            if [ -d "$dep/static" ]; then
-              mkdir -p "$out/bin/static" "$out/share/$BIN_NAME/static"
-              cp -rn "$dep/static"/* "$out/bin/static/" 2>/dev/null || cp -r "$dep/static"/* "$out/bin/static/" 2>/dev/null || true
-              cp -rn "$dep/static"/* "$out/share/$BIN_NAME/static/" 2>/dev/null || cp -r "$dep/static"/* "$out/share/$BIN_NAME/static/" 2>/dev/null || true
-            fi
-            if [ -d "$dep/public" ]; then
-              mkdir -p "$out/bin/public" "$out/share/$BIN_NAME/public"
-              cp -rn "$dep/public"/* "$out/bin/public/" 2>/dev/null || cp -r "$dep/public"/* "$out/bin/public/" 2>/dev/null || true
-              cp -rn "$dep/public"/* "$out/share/$BIN_NAME/public/" 2>/dev/null || cp -r "$dep/public"/* "$out/share/$BIN_NAME/public/" 2>/dev/null || true
-            fi
-          done
-
-          # 2. Collect workspace-level assets (if present at workspace root)
-          ${lib.optionalString (workspaceAssets != null) ''
-            if [ -d "${workspaceAssets}" ]; then
-              mkdir -p "$out/bin/assets" "$out/share/$BIN_NAME/assets"
-              cp -rn "${workspaceAssets}"/* "$out/bin/assets/" 2>/dev/null || cp -r "${workspaceAssets}"/* "$out/bin/assets/" 2>/dev/null || true
-              cp -rn "${workspaceAssets}"/* "$out/share/$BIN_NAME/assets/" 2>/dev/null || cp -r "${workspaceAssets}"/* "$out/share/$BIN_NAME/assets/" 2>/dev/null || true
-            fi
-          ''}
-          ${lib.optionalString (workspaceStatic != null) ''
-            if [ -d "${workspaceStatic}" ]; then
-              mkdir -p "$out/bin/static" "$out/share/$BIN_NAME/static"
-              cp -rn "${workspaceStatic}"/* "$out/bin/static/" 2>/dev/null || cp -r "${workspaceStatic}"/* "$out/bin/static/" 2>/dev/null || true
-              cp -rn "${workspaceStatic}"/* "$out/share/$BIN_NAME/static/" 2>/dev/null || cp -r "${workspaceStatic}"/* "$out/share/$BIN_NAME/static/" 2>/dev/null || true
-            fi
-          ''}
-          ${lib.optionalString (workspacePublic != null) ''
-            if [ -d "${workspacePublic}" ]; then
-              mkdir -p "$out/bin/public" "$out/share/$BIN_NAME/public"
-              cp -rn "${workspacePublic}"/* "$out/bin/public/" 2>/dev/null || cp -r "${workspacePublic}"/* "$out/bin/public/" 2>/dev/null || true
-              cp -rn "${workspacePublic}"/* "$out/share/$BIN_NAME/public/" 2>/dev/null || cp -r "${workspacePublic}"/* "$out/share/$BIN_NAME/public/" 2>/dev/null || true
-            fi
-          ''}
-
-          # 3. Collect binary crate's own assets (takes precedence over dependency assets)
-          for adir in "assets" "static" "public" ${lib.concatStringsSep " " (override.assetDirs or [])}; do
-            if [ -d "$adir" ]; then
-              mkdir -p "$out/bin/$adir" "$out/share/$BIN_NAME/$adir"
-              cp -r "$adir"/* "$out/bin/$adir/" 2>/dev/null || true
-              cp -r "$adir"/* "$out/share/$BIN_NAME/$adir/" 2>/dev/null || true
-            fi
-          done
-
-          # 4. Explicit extra asset paths from overrides.nix. Entries are
-          # normally { path, name } after workspace materialization; raw paths
-          # are accepted for direct builder use.
-          ${lib.concatMapStringsSep "\n" (entry: let
-            asset =
-              if builtins.isAttrs entry && entry ? path
-              then entry
-              else {
-                path = entry;
-                name = builtins.baseNameOf (toString entry);
-              };
-          in ''
-            if [ -e "${asset.path}" ]; then
-              mkdir -p "$out/bin/assets" "$out/share/$BIN_NAME/assets"
-              cp -r "${asset.path}" "$out/bin/assets/${asset.name}" 2>/dev/null || true
-              cp -r "${asset.path}" "$out/share/$BIN_NAME/assets/${asset.name}" 2>/dev/null || true
-            fi
-          '') (override.assets or [])}
-
-          # 5. Topcoat asset bundling: resolve every asset! declaration in the
-          # binary by asset ID through the dependency asset indexes and the
-          # binary crate's own declarations.
-          TOPCOAT_INDEX="$NIX_BUILD_TOP/topcoat-assets"
-          mkdir -p "$TOPCOAT_INDEX"
-          for dep in $dependencies $crateDrv; do
-            if [ -d "$dep/topcoat-assets" ]; then
-              ${topcoatBundler} merge "$TOPCOAT_INDEX" "$dep/topcoat-assets"
-            fi
-          done
           ${
-            if prebuilt != null
-            then
-              lib.optionalString (assetIndexFrom != null) ''
-                ${topcoatBundler} merge "$TOPCOAT_INDEX" "${assetIndexFrom}/share/$BIN_NAME/topcoat-assets"
-              ''
+            if assetsFrom != null
+            then ''
+              for dir in ${lib.escapeShellArgs assetDirs}; do
+                if [ -d "${assetsFrom}/bin/$dir" ] && [ ! -d "$out/bin/$dir" ]; then
+                  mkdir -p "$(dirname "$out/bin/$dir")"
+                  cp -r "${assetsFrom}/bin/$dir" "$out/bin/$dir"
+                  fi
+                done
+                cp -r "${assetsFrom}/share/$BIN_NAME/." "$out/share/$BIN_NAME/"
+            ''
             else ''
-              ${topcoatBundler} index --crate "$CRATE_NAME" --index "$out/share/$BIN_NAME/topcoat-assets" --known "$TOPCOAT_INDEX" "$out/bin/$BIN_NAME"
-              ${topcoatBundler} merge "$TOPCOAT_INDEX" "$out/share/$BIN_NAME/topcoat-assets"
+                # 1. Collect assets from dependencies (libraries, UI crates, asset packs)
+                for dep in $dependencies $crateDrv; do
+                  if [ -d "$dep/assets" ]; then
+                    mkdir -p "$out/bin/assets" "$out/share/$BIN_NAME/assets"
+                    cp -rn "$dep/assets"/* "$out/bin/assets/" 2>/dev/null || cp -r "$dep/assets"/* "$out/bin/assets/" 2>/dev/null || true
+                    cp -rn "$dep/assets"/* "$out/share/$BIN_NAME/assets/" 2>/dev/null || cp -r "$dep/assets"/* "$out/share/$BIN_NAME/assets/" 2>/dev/null || true
+                  fi
+                  if [ -d "$dep/static" ]; then
+                    mkdir -p "$out/bin/static" "$out/share/$BIN_NAME/static"
+                    cp -rn "$dep/static"/* "$out/bin/static/" 2>/dev/null || cp -r "$dep/static"/* "$out/bin/static/" 2>/dev/null || true
+                    cp -rn "$dep/static"/* "$out/share/$BIN_NAME/static/" 2>/dev/null || cp -r "$dep/static"/* "$out/share/$BIN_NAME/static/" 2>/dev/null || true
+                  fi
+                  if [ -d "$dep/public" ]; then
+                    mkdir -p "$out/bin/public" "$out/share/$BIN_NAME/public"
+                    cp -rn "$dep/public"/* "$out/bin/public/" 2>/dev/null || cp -r "$dep/public"/* "$out/bin/public/" 2>/dev/null || true
+                    cp -rn "$dep/public"/* "$out/share/$BIN_NAME/public/" 2>/dev/null || cp -r "$dep/public"/* "$out/share/$BIN_NAME/public/" 2>/dev/null || true
+                  fi
+                done
+
+                # 2. Collect workspace-level assets (if present at workspace root)
+                ${lib.optionalString (workspaceAssets != null) ''
+                if [ -d "${workspaceAssets}" ]; then
+                  mkdir -p "$out/bin/assets" "$out/share/$BIN_NAME/assets"
+                  cp -rn "${workspaceAssets}"/* "$out/bin/assets/" 2>/dev/null || cp -r "${workspaceAssets}"/* "$out/bin/assets/" 2>/dev/null || true
+                  cp -rn "${workspaceAssets}"/* "$out/share/$BIN_NAME/assets/" 2>/dev/null || cp -r "${workspaceAssets}"/* "$out/share/$BIN_NAME/assets/" 2>/dev/null || true
+                fi
+              ''}
+                ${lib.optionalString (workspaceStatic != null) ''
+                if [ -d "${workspaceStatic}" ]; then
+                  mkdir -p "$out/bin/static" "$out/share/$BIN_NAME/static"
+                  cp -rn "${workspaceStatic}"/* "$out/bin/static/" 2>/dev/null || cp -r "${workspaceStatic}"/* "$out/bin/static/" 2>/dev/null || true
+                  cp -rn "${workspaceStatic}"/* "$out/share/$BIN_NAME/static/" 2>/dev/null || cp -r "${workspaceStatic}"/* "$out/share/$BIN_NAME/static/" 2>/dev/null || true
+                fi
+              ''}
+                ${lib.optionalString (workspacePublic != null) ''
+                if [ -d "${workspacePublic}" ]; then
+                  mkdir -p "$out/bin/public" "$out/share/$BIN_NAME/public"
+                  cp -rn "${workspacePublic}"/* "$out/bin/public/" 2>/dev/null || cp -r "${workspacePublic}"/* "$out/bin/public/" 2>/dev/null || true
+                  cp -rn "${workspacePublic}"/* "$out/share/$BIN_NAME/public/" 2>/dev/null || cp -r "${workspacePublic}"/* "$out/share/$BIN_NAME/public/" 2>/dev/null || true
+                fi
+              ''}
+
+                # 3. Collect binary crate's own assets (takes precedence over dependency assets)
+              for adir in ${lib.escapeShellArgs assetDirs}; do
+                  if [ -d "$adir" ]; then
+                    mkdir -p "$out/bin/$adir" "$out/share/$BIN_NAME/$adir"
+                    cp -r "$adir"/* "$out/bin/$adir/" 2>/dev/null || true
+                    cp -r "$adir"/* "$out/share/$BIN_NAME/$adir/" 2>/dev/null || true
+                  fi
+                done
+
+                # 4. Explicit extra asset paths from overrides.nix. Entries are
+                # normally { path, name } after workspace materialization; raw paths
+                # are accepted for direct builder use.
+                ${lib.concatMapStringsSep "\n" (entry: let
+                asset =
+                  if builtins.isAttrs entry && entry ? path
+                  then entry
+                  else {
+                    path = entry;
+                    name = builtins.baseNameOf (toString entry);
+                  };
+              in ''
+                if [ -e "${asset.path}" ]; then
+                  mkdir -p "$out/bin/assets" "$out/share/$BIN_NAME/assets"
+                  cp -r "${asset.path}" "$out/bin/assets/${asset.name}" 2>/dev/null || true
+                  cp -r "${asset.path}" "$out/share/$BIN_NAME/assets/${asset.name}" 2>/dev/null || true
+                fi
+              '') (override.assets or [])}
+
+                # 5. Topcoat asset bundling: resolve every asset! declaration in the
+                # binary by asset ID through the dependency asset indexes and the
+                # binary crate's own declarations.
+                ${lib.optionalString hasTopcoatAssets ''
+                  TOPCOAT_INDEX="$NIX_BUILD_TOP/topcoat-assets"
+                ${topcoat.executable} merge "$TOPCOAT_INDEX" ${lib.concatMapStringsSep " " (dep: ''"${dep}/topcoat-assets"'') assetDeps}
+                  ${lib.optionalString (prebuilt == null) ''
+                  ${topcoat.executable} index "$CRATE_NAME" "$CARGO_MANIFEST_DIR" "$out/share/$BIN_NAME/topcoat-assets" "$TOPCOAT_INDEX" "$out/bin/$BIN_NAME"
+                  ${topcoat.executable} merge "$TOPCOAT_INDEX" "$out/share/$BIN_NAME/topcoat-assets"
+                ''}
+                ${topcoat.executable} bundle "$TOPCOAT_INDEX" "$out/bin/$BIN_NAME" "$out/bin/assets" "$out/share/$BIN_NAME/assets"
+              ''}
             ''
           }
-          ${topcoatBundler} bundle "$TOPCOAT_INDEX" "$out/bin/$BIN_NAME" "$out/bin/assets" "$out/share/$BIN_NAME/assets"
 
           # Ensure copied assets have standard write permissions in derivation
           chmod -R u+w "$out/bin/assets" "$out/bin/static" "$out/bin/public" "$out/share" 2>/dev/null || true

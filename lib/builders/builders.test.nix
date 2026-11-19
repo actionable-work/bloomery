@@ -181,7 +181,7 @@
     defaultRustcFlags = [];
     prebuilt = prebuiltBin;
   };
-  indexedPrebuiltBinDrv = (builderExports.buildBinWith {defaultLinker = null;}) {
+  prebuiltWithAssets = (builderExports.buildBinWith {defaultLinker = null;}) {
     binName = "bin-fixture";
     pkg = {
       name = "bin-fixture";
@@ -192,7 +192,7 @@
     entry = "src/main.rs";
     defaultRustcFlags = [];
     prebuilt = prebuiltBin;
-    assetIndexFrom = binDrv;
+    assetsFrom = binDrv;
   };
   tailwindProvider = {bloomeryProvidesTailwind = true;};
   tailwindCrate = override:
@@ -221,21 +221,21 @@ in {
     passthru.bloomery = ["NIXLIB-GRAPH-ASSETS-013"];
   };
 
-  testOptimizedBinaryReusesPublishedAssetIndex = {
+  testOptimizedBinaryReusesCompiledAssets = let
+    contains = text:
+      lib.hasInfix
+      (builtins.unsafeDiscardStringContext text)
+      (builtins.unsafeDiscardStringContext prebuiltWithAssets.installPhase);
+  in {
     expr = {
-      mergesReleaseIndex =
-        lib.hasInfix
-        (builtins.unsafeDiscardStringContext "${binDrv}/share/$BIN_NAME/topcoat-assets")
-        (builtins.unsafeDiscardStringContext indexedPrebuiltBinDrv.installPhase);
-      skipsOwnIndexing = !(lib.hasInfix "index --crate" indexedPrebuiltBinDrv.installPhase);
-      releasePublishesIndex = lib.hasInfix "--index \"$out/share/$BIN_NAME/topcoat-assets\"" binDrv.installPhase;
-      bundlesThroughIndex = lib.hasInfix "bundle \"$TOPCOAT_INDEX\"" indexedPrebuiltBinDrv.installPhase;
+      usesCompiledBundle = contains "${binDrv}/bin/$dir";
+      usesPublishedShare = contains "${binDrv}/share/$BIN_NAME/.";
+      skipsBundling = !(contains "TOPCOAT_INDEX");
     };
     expected = {
-      mergesReleaseIndex = true;
-      skipsOwnIndexing = true;
-      releasePublishesIndex = true;
-      bundlesThroughIndex = true;
+      usesCompiledBundle = true;
+      usesPublishedShare = true;
+      skipsBundling = true;
     };
     passthru.bloomery = ["NIXLIB-GRAPH-ASSETS-017"];
   };

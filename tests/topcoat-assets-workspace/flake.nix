@@ -22,6 +22,11 @@
           system:
             perSystemWorkspace.${system}.checks
             // ((import ./checks.nix {inherit nixpkgs;}) system perSystemWorkspace.${system})
+            // (import ./bundle-check.nix {
+              pkgs = nixpkgs.legacyPackages.${system};
+              site = perSystemWorkspace.${system}.packages.site;
+              runtime = perSystemWorkspace.${system}.globalCrates."topcoat-runtime-0.10.0";
+            })
         );
       };
     };

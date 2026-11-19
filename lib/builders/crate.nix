@@ -44,7 +44,12 @@
   compilerFlags = import ./compiler-flags.nix {inherit pkgs lib stdenv;};
   tailwindSupport = import ./tailwind.nix {inherit pkgs lib;};
   tailwind = tailwindSupport.forBuildScript buildScriptDependencies;
-  topcoatBundler = "${pkgs.buildPackages.python3}/bin/python3 ${./topcoat-bundler.py}";
+  hasTopcoatAssets = pkg.name == "topcoat-asset" || lib.any (dep: dep.bloomeryHasTopcoatAssets or false) dependencies;
+  topcoat = import ./topcoat-tool.nix {inherit pkgs;};
+  sourceDir =
+    if hasTopcoatAssets
+    then topcoat.sourceDirectory pkg src
+    else "src";
   pname = pkg.name;
   version = pkg.version;
   crateName = pkg.crateName;
@@ -120,6 +125,7 @@ in
 
       passthru = {
         inherit pkg crateName dependencyBindings buildScriptBindings;
+        bloomeryHasTopcoatAssets = hasTopcoatAssets;
         bloomeryProvidesTailwind = tailwindSupport.provides {
           inherit pkg dependencies;
           features = featureList;
@@ -129,13 +135,13 @@ in
 
       unpackPhase = ''
         runHook preUnpack
-        mkdir -p src
+        mkdir -p ${sourceDir}
         if [ -f "$src" ]; then
-          tar -xzf "$src" --strip-components=1 -C src
-          cd src
+          tar -xzf "$src" --strip-components=1 -C ${sourceDir}
+          cd ${sourceDir}
         else
-          cp -r "$src"/* ./src/ 2>/dev/null || cp -r "$src"/. ./src/
-          cd src
+          cp -r "$src"/* ./${sourceDir}/ 2>/dev/null || cp -r "$src"/. ./${sourceDir}/
+          cd ${sourceDir}
           chmod -R u+w .
         fi
         runHook postUnpack
@@ -565,17 +571,14 @@ in
           )
         fi
 
-        # Index the files this crate's Topcoat asset declarations resolve to
-        # while its sources and build-script OUT_DIR still exist.
-        if [ "$METADATA_ONLY" != "1" ]; then
+        ${lib.optionalString (hasTopcoatAssets && !metadataOnly) ''
+          # Index files while the crate's sources and build-script OUT_DIR
+          # still exist.
           mapfile -t TOPCOAT_ARTIFACTS < <(grep -rlaF TOPCOAT_ASSET "$out/lib" || true)
           if [ ''${#TOPCOAT_ARTIFACTS[@]} -gt 0 ]; then
-            mkdir -p "$out/topcoat-assets"
-            ${topcoatBundler} index --crate "$CRATE_NAME" --index "$out/topcoat-assets" "''${TOPCOAT_ARTIFACTS[@]}"
+            ${topcoat.executable} index "$CRATE_NAME" "$CARGO_MANIFEST_DIR" "$out/topcoat-assets" "" "''${TOPCOAT_ARTIFACTS[@]}"
           fi
-        fi
-
-        DEP_LIB_NAME="$(basename "$OUT_LIB")"
+        ''}DEP_LIB_NAME="$(basename "$OUT_LIB")"
         tar --zstd -cf "$out/lib.tar.zst" -C "$out/lib" .
         rm -rf "$out/lib"
 
@@ -614,17 +617,10 @@ in
           fi
         done
 
-        # Forward dependency Topcoat asset indexes for transitive consumers
-        for dep in $dependencies; do
-          if [ -d "$dep/topcoat-assets" ]; then
-            ${topcoatBundler} merge "$out/topcoat-assets" "$dep/topcoat-assets"
-          fi
-        done
-        if [ -d "$out/topcoat-assets" ] && [ -z "$(ls -A "$out/topcoat-assets")" ]; then
-          rmdir "$out/topcoat-assets"
-        fi
-
-        # Discover and forward dependency assets for transitive downstream consumers
+        ${lib.optionalString (hasTopcoatAssets && !metadataOnly) ''
+          # Forward dependency Topcoat asset indexes for transitive consumers.
+          ${topcoat.executable} merge "$out/topcoat-assets" ${lib.concatMapStringsSep " " (dep: ''"${dep}/topcoat-assets"'') dependencies}
+        ''}# Discover and forward dependency assets for transitive downstream consumers
         for dep in $dependencies; do
           for adir in "assets" "static" "public"; do
             if [ -d "$dep/$adir" ]; then
