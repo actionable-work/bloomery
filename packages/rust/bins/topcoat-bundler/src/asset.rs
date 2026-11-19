@@ -103,7 +103,9 @@ fn normalize(path: &Path) -> PathBuf {
         match component {
             Component::CurDir => {}
             Component::ParentDir => {
-                output.pop();
+                if !output.pop() {
+                    output.push(component);
+                }
             }
             _ => output.push(component),
         }

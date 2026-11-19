@@ -331,3 +331,39 @@ fn indexing_distinguishes_two_builds_with_the_same_crate_name() {
         b"own"
     );
 }
+
+#[test]
+#[cfg_attr(any(), bloomery("NIXLIB-GRAPH-ASSETS-009"))]
+fn guessed_content_types_match_topcoat() {
+    // Values from mime_guess 2.0.5, which Topcoat's bundler uses.
+    for (file, expected) in [
+        ("a.avif", "image/avif"),
+        ("a.css", "text/css"),
+        ("a.gif", "image/gif"),
+        ("a.htm", "text/html"),
+        ("a.html", "text/html"),
+        ("a.ico", "image/x-icon"),
+        ("a.jpg", "image/jpeg"),
+        ("a.JPEG", "image/jpeg"),
+        ("a.js", "text/javascript"),
+        ("a.mjs", "application/javascript"),
+        ("a.json", "application/json"),
+        ("a.map", "text/plain"),
+        ("a.txt", "text/plain"),
+        ("a.mp4", "video/mp4"),
+        ("a.otf", "application/font-sfnt"),
+        ("a.pdf", "application/pdf"),
+        ("a.png", "image/png"),
+        ("a.svg", "image/svg+xml"),
+        ("a.ttf", "font/ttf"),
+        ("a.wasm", "application/wasm"),
+        ("a.webm", "video/webm"),
+        ("a.webp", "image/webp"),
+        ("a.woff", "application/font-woff"),
+        ("a.woff2", "font/woff2"),
+        ("a.xml", "text/xml"),
+        ("a.unknown", "application/octet-stream"),
+    ] {
+        assert_eq!(bundle::guess_content_type(file), expected, "{file}");
+    }
+}

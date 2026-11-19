@@ -35,7 +35,10 @@ crate, then indexes the binary crate's own declarations from its sources and
 build-script `OUT_DIR`. It publishes those own entries under
 `$out/share/<bin>/topcoat-assets`. An optimized package copies the assets
 installed by the compilation supplying its executable, including assets from
-profile-use dependencies. BOLT training exposes the compilation's asset
+profile-use dependencies. A prebuilt executable with Topcoat dependencies
+must name the compilation it came from, because only that compilation can
+index the executable's own declarations; otherwise evaluation fails naming the
+binary. BOLT training exposes the compilation's asset
 directories, including configured directories, next to the instrumented
 executable.
 

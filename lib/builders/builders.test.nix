@@ -194,6 +194,21 @@
     prebuilt = prebuiltBin;
     assetsFrom = binDrv;
   };
+  prebuiltTopcoatBin = assetsFrom:
+    (builderExports.buildBinWith {defaultLinker = null;}) {
+      binName = "bin-fixture";
+      pkg = {
+        name = "bin-fixture";
+        version = "0.1.0";
+        crateName = "bin_fixture";
+      };
+      src = source;
+      entry = "src/main.rs";
+      defaultRustcFlags = [];
+      dependencies = [{bloomeryHasTopcoatAssets = true;}];
+      prebuilt = prebuiltBin;
+      inherit assetsFrom;
+    };
   tailwindProvider = {bloomeryProvidesTailwind = true;};
   tailwindCrate = override:
     (builderExports.buildCrateWith {defaultLinker = null;}) {
@@ -219,6 +234,18 @@ in {
       overriddenCli = "/custom/tailwindcss";
     };
     passthru.bloomery = ["NIXLIB-GRAPH-ASSETS-013"];
+  };
+
+  testPrebuiltTopcoatBinaryRequiresCompiledAssets = {
+    expr = {
+      withoutAssetsFrom = (builtins.tryEval (prebuiltTopcoatBin null).drvPath).success;
+      withAssetsFrom = (builtins.tryEval (prebuiltTopcoatBin binDrv).installPhase).success;
+    };
+    expected = {
+      withoutAssetsFrom = false;
+      withAssetsFrom = true;
+    };
+    passthru.bloomery = ["NIXLIB-GRAPH-ASSETS-026"];
   };
 
   testOptimizedBinaryReusesCompiledAssets = let

@@ -167,7 +167,7 @@ fn file_name(asset: &Declaration<'_>, short_hash: &str) -> Result<String> {
     })
 }
 
-fn guess_content_type(file: &str) -> &'static str {
+pub(crate) fn guess_content_type(file: &str) -> &'static str {
     match Path::new(file)
         .extension()
         .and_then(|ext| ext.to_str())
@@ -181,7 +181,8 @@ fn guess_content_type(file: &str) -> &'static str {
         "htm" | "html" => "text/html",
         "ico" => "image/x-icon",
         "jpg" | "jpeg" => "image/jpeg",
-        "js" | "mjs" => "text/javascript",
+        "js" => "text/javascript",
+        "mjs" => "application/javascript",
         "json" => "application/json",
         "map" | "txt" => "text/plain",
         "mp4" => "video/mp4",
@@ -193,7 +194,7 @@ fn guess_content_type(file: &str) -> &'static str {
         "wasm" => "application/wasm",
         "webm" => "video/webm",
         "webp" => "image/webp",
-        "woff" => "font/woff",
+        "woff" => "application/font-woff",
         "woff2" => "font/woff2",
         "xml" => "text/xml",
         _ => "application/octet-stream",

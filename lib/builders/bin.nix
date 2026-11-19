@@ -95,6 +95,10 @@ in
       else defaultRustcFlags;
     extraRustcFlags = (override.rustcFlags or []) ++ cleanDefaultFlags ++ profileFlags ++ linkerFlags;
     userEnv = tailwind.env // (override.env or {});
+    # A prebuilt executable's own Topcoat declarations can only be indexed by
+    # the compilation that produced it, so its assets must come from that output.
+    checkedPrebuilt = assert lib.assertMsg (assetsFrom != null || !hasTopcoatAssets)
+    "bloomery: prebuilt binary ${binName} uses Topcoat assets and requires assetsFrom"; prebuilt;
   in
     stdenv.mkDerivation (_finalAttrs:
       {
@@ -227,7 +231,7 @@ in
           then ''
             runHook preBuild
             mkdir -p "$out/bin"
-            cp "${prebuilt}/bin/$BIN_NAME" "$out/bin/$BIN_NAME"
+            cp "${checkedPrebuilt}/bin/$BIN_NAME" "$out/bin/$BIN_NAME"
             chmod +x "$out/bin/$BIN_NAME"
             runHook postBuild
           ''
@@ -322,9 +326,9 @@ in
                 if [ -d "${assetsFrom}/bin/$dir" ] && [ ! -d "$out/bin/$dir" ]; then
                   mkdir -p "$(dirname "$out/bin/$dir")"
                   cp -r "${assetsFrom}/bin/$dir" "$out/bin/$dir"
-                  fi
-                done
-                cp -r "${assetsFrom}/share/$BIN_NAME/." "$out/share/$BIN_NAME/"
+                fi
+              done
+              cp -r "${assetsFrom}/share/$BIN_NAME/." "$out/share/$BIN_NAME/"
             ''
             else ''
                 # 1. Collect assets from dependencies (libraries, UI crates, asset packs)
@@ -401,12 +405,10 @@ in
                 # binary by asset ID through the dependency asset indexes and the
                 # binary crate's own declarations.
                 ${lib.optionalString hasTopcoatAssets ''
-                  TOPCOAT_INDEX="$NIX_BUILD_TOP/topcoat-assets"
+                TOPCOAT_INDEX="$NIX_BUILD_TOP/topcoat-assets"
                 ${topcoat.executable} merge "$TOPCOAT_INDEX" ${lib.concatMapStringsSep " " (dep: ''"${dep}/topcoat-assets"'') assetDeps}
-                  ${lib.optionalString (prebuilt == null) ''
-                  ${topcoat.executable} index "$CRATE_NAME" "$CARGO_MANIFEST_DIR" "$out/share/$BIN_NAME/topcoat-assets" "$TOPCOAT_INDEX" "$out/bin/$BIN_NAME"
-                  ${topcoat.executable} merge "$TOPCOAT_INDEX" "$out/share/$BIN_NAME/topcoat-assets"
-                ''}
+                ${topcoat.executable} index "$CRATE_NAME" "$CARGO_MANIFEST_DIR" "$out/share/$BIN_NAME/topcoat-assets" "$TOPCOAT_INDEX" "$out/bin/$BIN_NAME"
+                ${topcoat.executable} merge "$TOPCOAT_INDEX" "$out/share/$BIN_NAME/topcoat-assets"
                 ${topcoat.executable} bundle "$TOPCOAT_INDEX" "$out/bin/$BIN_NAME" "$out/bin/assets" "$out/share/$BIN_NAME/assets"
               ''}
             ''

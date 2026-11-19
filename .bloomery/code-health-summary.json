@@ -44,7 +44,7 @@
       "manifest_path": "packages/rust/bins/topcoat-bundler/Cargo.toml",
       "name": "bloomery-topcoat-bundler",
       "overall_score": 97.44,
-      "sloc": 423,
+      "sloc": 426,
       "subscores": {
         "complexity": 2.01,
         "crateSize": 0.0,
@@ -483,7 +483,7 @@
       }
     }
   ],
-  "input_digest": "d0ad7c3fb25fb712470f153475f0a64fcbe62e7dd8e284437b62a0145cb612c6",
+  "input_digest": "77aa002dbad0468935eb4f32b23a9ed4599fcbf2ae88065c22fd1d7e4bfc00b8",
   "policy": {
     "scoring": {
       "crateSlocLimit": 1500,
@@ -509,7 +509,7 @@
   "workspace": {
     "crate_count": 37,
     "overall_score": 94.86,
-    "sloc": 28415,
+    "sloc": 28418,
     "subscores": {
       "complexity": 0.48,
       "crateSize": 3.87,

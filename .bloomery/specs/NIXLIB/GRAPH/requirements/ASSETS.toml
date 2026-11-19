@@ -175,3 +175,10 @@ title = "BOLT training retains installed asset directories"
 manual = false
 design = "design/topcoat-assets.md#binary-bundling"
 ears = { type = "event", trigger = "the compiled binary installs an asset directory", system = "BOLT training", action = "expose that directory next to the instrumented binary" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ASSETS-026"
+title = "Prebuilt Topcoat binaries require compiled assets"
+manual = false
+design = "design/topcoat-assets.md#binary-bundling"
+ears = { type = "unwanted_behavior", trigger = "a prebuilt binary whose dependencies carry Topcoat assets is given no compiled output to take assets from", system = "the binary builder", action = "fail evaluation and name the binary" }
