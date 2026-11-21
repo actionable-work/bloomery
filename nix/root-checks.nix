@@ -30,6 +30,10 @@ in
     inherit lib pkgs;
     inherit (self) mkFlake;
   })
+  // (import ../lib/check-catalog.test.nix {
+    inherit lib pkgs;
+    inherit (self) mkFlake;
+  })
   // {
     "billet:elevation" = import ../lib/billets-elevation.test.nix {
       inherit lib pkgs;
@@ -40,6 +44,16 @@ in
       inherit (self) mkFlake;
     };
     "billet:diagnostics" = import ../lib/billets-diagnostics.test.nix {inherit pkgs;};
+  }
+  # Budgets are recorded per system; systems without one have no budget check.
+  // lib.optionalAttrs ((lib.importJSON ../lib/check-catalog-budget.json) ? ${system}) {
+    "check-catalog:budget" = import ../lib/check-catalog-budget.test.nix {
+      inherit lib pkgs;
+      source = self.outPath;
+      treefmtNix = self.inputs.treefmt-nix;
+    };
+  }
+  // {
     "optimization-smoke" = bloomery.tests.optimizedBinarySmoke;
     "naming-public-compatibility" =
       pkgs.runCommand "bloomery-naming-public-compatibility" {

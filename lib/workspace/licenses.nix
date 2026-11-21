@@ -152,6 +152,12 @@
 in {
   inherit parse compatibilityEntry;
   validExpression = expression: parse expression != null;
+  evaluateAst = {
+    ast,
+    allow ? [],
+    deny ? [],
+  }:
+    evaluateNode {inherit ast allow deny;};
   evaluate = {
     expression,
     allow ? [],

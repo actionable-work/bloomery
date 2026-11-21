@@ -1,4 +1,3 @@
-use crate::nix_progress::NixProgressCollector;
 use bloomery_check_support::interrupt::CancellationToken;
 use bloomery_check_support::model::{Notice, valid_system_name};
 use bloomery_check_support::private_file::{private_open_options, restrict_to_owner};
@@ -7,13 +6,14 @@ use bloomery_nix::{
     eval_base_args, evaluated_derivation, full_store_path, parse_cannot_build,
     valid_derivation_path,
 };
+use bloomery_nix_progress::NixProgressCollector;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::path::Path;
-use std::process::{Command, ExitStatus, Stdio};
+use std::process::{Command, ExitStatus, Output, Stdio};
 use std::thread;
 use std::time::Duration;
 
@@ -80,6 +80,50 @@ pub struct PlannedSystem {
     pub dependencies: BTreeMap<String, Vec<String>>,
 }
 
+/// A formatter recorded in a flake's check catalog.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecordedFormatter {
+    pub derivation: String,
+    pub program: String,
+}
+
+/// Catalog facts available only from a flake's `bloomeryCatalog.<system>`.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RecordedCatalog {
+    /// The evaluated native formatter check, when the catalog has one.
+    pub format_check: Option<CheckPlan>,
+    pub formatter: Option<RecordedFormatter>,
+    pub health_sources: Option<Vec<bloomery_check::HealthSourceCrate>>,
+}
+
+/// One system's check catalog, read once before formatting or planning.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SystemCatalog {
+    /// Check attribute names, including an exact legacy attribute when present.
+    pub attributes: Vec<String>,
+    /// `None` for flakes without Bloomery catalog outputs.
+    pub recorded: Option<RecordedCatalog>,
+}
+
+/// The selected attributes one system's plan must cover.
+pub struct PlanRequest<'a> {
+    pub catalog: &'a SystemCatalog,
+    pub attributes: &'a BTreeSet<String>,
+}
+
+impl PlanRequest<'_> {
+    /// Whether every catalog check except the native formatter check is selected.
+    pub fn complete(&self) -> bool {
+        self.catalog
+            .attributes
+            .iter()
+            .filter(|attribute| {
+                *attribute != LEGACY_CHECK_ATTRIBUTE && *attribute != TREEFMT_CHECK_ATTRIBUTE
+            })
+            .all(|attribute| self.attributes.contains(attribute))
+    }
+}
+
 /// Retained failure evidence for one failed derivation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FailureBlock {
@@ -101,16 +145,23 @@ pub struct BatchRealization {
 
 pub trait NixBackend: Send + Sync {
     fn host_system(&self, root: &Path) -> Result<String, String>;
-    fn discover(&self, root: &Path, system: &str) -> Result<Vec<String>, String>;
-    /// Evaluate the whole check catalog for one system in a single Nix
-    /// evaluation, including per-attribute derivation paths and dependency
-    /// metadata.
-    fn plan_checks(&self, root: &Path, system: &str) -> Result<PlannedSystem, String>;
-    /// Run the flake's default formatter once from the workspace root. The
-    /// caller supplies a run-local log path that receives all command output.
+    /// Read one system's check catalog.
+    fn catalog(&self, root: &Path, system: &str) -> Result<SystemCatalog, String>;
+    /// Resolve derivation paths and output metadata for the requested
+    /// attributes of one system in a single Nix invocation.
+    fn plan_checks(
+        &self,
+        root: &Path,
+        system: &str,
+        request: &PlanRequest<'_>,
+    ) -> Result<PlannedSystem, String>;
+    /// Run the flake's default formatter once from the workspace root: the
+    /// recorded formatter when the host catalog has one, otherwise `nix fmt`.
+    /// The caller supplies a run-local log path that receives all output.
     fn format_workspace(
         &self,
         root: &Path,
+        formatter: Option<&RecordedFormatter>,
         log_path: &Path,
         cancellation: CancellationToken,
     ) -> NixTaskResult<()>;
@@ -160,6 +211,8 @@ impl Default for NixCli {
 }
 
 struct LoggedCommand<'a> {
+    /// Program to run instead of the Nix CLI.
+    program: Option<&'a OsStr>,
     root: &'a Path,
     args: &'a [OsString],
     log_path: &'a Path,
@@ -185,29 +238,83 @@ impl NixCli {
         }
     }
 
+    fn run_catalog_output(
+        &self,
+        root: &Path,
+        args: &[OsString],
+        operation: &str,
+    ) -> Result<Output, String> {
+        Command::new(&self.executable)
+            .args(args)
+            .current_dir(root)
+            .output()
+            .map_err(|error| nix_start_error(operation, error))
+    }
+
     fn run_catalog_command(
         &self,
         root: &Path,
         args: &[OsString],
         operation: &str,
     ) -> Result<Vec<u8>, String> {
-        let output = Command::new(&self.executable)
-            .args(args)
-            .current_dir(root)
-            .output()
-            .map_err(|error| nix_start_error(operation, error))?;
+        let output = self.run_catalog_output(root, args, operation)?;
         if !output.status.success() {
-            let detail = bounded_process_error(&output.stderr);
-            return Err(if detail.is_empty() {
-                format!("Nix {operation} failed with {}", status_text(output.status))
-            } else {
-                format!(
-                    "Nix {operation} failed with {}: {detail}",
-                    status_text(output.status)
-                )
-            });
+            return Err(catalog_failure(operation, &output));
         }
         Ok(output.stdout)
+    }
+
+    /// Read one catalog record from the flake. `None` means the flake does not
+    /// provide the record attribute.
+    fn read_record(
+        &self,
+        root: &Path,
+        system: &str,
+        record: &CatalogRecord,
+    ) -> Result<Option<Value>, String> {
+        let output =
+            self.run_catalog_output(root, &record_args(record.output, system), record.operation)?;
+        if !output.status.success() {
+            if missing_flake_attribute(&output.stderr) {
+                return Ok(None);
+            }
+            return Err(catalog_failure(record.operation, &output));
+        }
+        parse_record(&output.stdout, record.field).map(Some)
+    }
+
+    fn run_recorded_formatter(
+        &self,
+        root: &Path,
+        formatter: &RecordedFormatter,
+        log_path: &Path,
+        cancellation: CancellationToken,
+    ) -> NixTaskResult<Vec<u8>> {
+        if !valid_derivation_path(&formatter.derivation)
+            || !Path::new(&formatter.program).is_absolute()
+        {
+            return NixTaskResult::OperationalError(
+                "the check catalog recorded an invalid formatter".to_owned(),
+            );
+        }
+        if let Err(message) = self.run_catalog_command(
+            root,
+            &formatter_build_args(&formatter.derivation),
+            "formatter realization",
+        ) {
+            return NixTaskResult::OperationalError(message);
+        }
+        self.run_logged_command(LoggedCommand {
+            program: Some(OsStr::new(&formatter.program)),
+            root,
+            args: &[],
+            log_path,
+            cancellation,
+            capture_stdout: false,
+            failure_code: Some("NixFormatFailed"),
+            failure_description: "formatter failed",
+            progress: None,
+        })
     }
 
     fn read_derivation_log(&self, root: &Path, store_path: &str) -> Result<Vec<u8>, String> {
@@ -241,6 +348,7 @@ impl NixCli {
 
     fn run_logged_command(&self, command: LoggedCommand<'_>) -> NixTaskResult<Vec<u8>> {
         let LoggedCommand {
+            program,
             root,
             args,
             log_path,
@@ -260,7 +368,7 @@ impl NixCli {
         };
         let collector = progress.cloned().filter(NixProgressCollector::is_active);
 
-        let mut command = Command::new(&self.executable);
+        let mut command = Command::new(program.unwrap_or(&self.executable));
         command.args(args).current_dir(root);
         if collector.is_some() {
             command.stderr(Stdio::piped());
@@ -402,24 +510,20 @@ impl NixBackend for NixCli {
         bloomery_nix::host_nix_system()
     }
 
-    fn discover(&self, root: &Path, system: &str) -> Result<Vec<String>, String> {
+    fn catalog(&self, root: &Path, system: &str) -> Result<SystemCatalog, String> {
         if !valid_system_name(system) {
             return Err(format!("invalid Nix system name '{system}'"));
+        }
+        if let Some(record) = self.read_record(root, system, &CATALOG_RECORD)? {
+            return parse_recorded_catalog(&record);
         }
         let output = self.run_catalog_command(root, &discover_args(system), "check discovery")?;
         let value: Value = serde_json::from_slice(&output)
             .map_err(|error| format!("Nix returned invalid check catalog JSON: {error}"))?;
-        value
-            .as_array()
-            .ok_or_else(|| "Nix check catalog is not an array".to_owned())?
-            .iter()
-            .map(|attribute| {
-                attribute
-                    .as_str()
-                    .map(str::to_owned)
-                    .ok_or_else(|| "Nix check catalog contains a non-string name".to_owned())
-            })
-            .collect()
+        Ok(SystemCatalog {
+            attributes: string_list(&value, "Nix check catalog")?,
+            recorded: None,
+        })
     }
 
     fn health_sources(
@@ -437,50 +541,7 @@ impl NixBackend for NixCli {
         )?;
         let value: Value = serde_json::from_slice(&output)
             .map_err(|error| format!("Nix returned invalid Rust health source JSON: {error}"))?;
-        let object = value
-            .as_object()
-            .ok_or_else(|| "Nix Rust health source projection is not an object".to_owned())?;
-        let mut crates = Vec::with_capacity(object.len());
-        for (name, entry) in object {
-            let manifest_path = entry
-                .get("manifest_path")
-                .and_then(Value::as_str)
-                .ok_or_else(|| format!("health crate '{name}' has no manifest_path"))?;
-            let targets = entry
-                .get("targets")
-                .and_then(Value::as_array)
-                .ok_or_else(|| format!("health crate '{name}' has no target list"))?
-                .iter()
-                .map(|target| {
-                    let kind = target.get("kind").and_then(Value::as_str).ok_or_else(|| {
-                        format!("health crate '{name}' has a target without kind")
-                    })?;
-                    let path = target.get("path").and_then(Value::as_str).ok_or_else(|| {
-                        format!("health crate '{name}' has a target without path")
-                    })?;
-                    if Path::new(path).is_absolute() || Path::new(manifest_path).is_absolute() {
-                        return Err(format!(
-                            "health crate '{name}' contains an absolute source path"
-                        ));
-                    }
-                    Ok(bloomery_check::HealthTarget {
-                        kind: kind.to_owned(),
-                        path: path.to_owned(),
-                    })
-                })
-                .collect::<Result<Vec<_>, String>>()?;
-            crates.push(bloomery_check::HealthSourceCrate {
-                name: entry
-                    .get("name")
-                    .and_then(Value::as_str)
-                    .unwrap_or(name)
-                    .to_owned(),
-                manifest_path: manifest_path.to_owned(),
-                targets,
-            });
-        }
-        crates.sort_by(|left, right| left.manifest_path.cmp(&right.manifest_path));
-        Ok(crates)
+        parse_health_sources(&value)
     }
 
     fn read_derivation_log(&self, root: &Path, store_path: &str) -> Result<Vec<u8>, String> {
@@ -490,20 +551,25 @@ impl NixBackend for NixCli {
     fn format_workspace(
         &self,
         root: &Path,
+        formatter: Option<&RecordedFormatter>,
         log_path: &Path,
         cancellation: CancellationToken,
     ) -> NixTaskResult<()> {
-        let args = format_args();
-        match self.run_logged_command(LoggedCommand {
-            root,
-            args: &args,
-            log_path,
-            cancellation,
-            capture_stdout: false,
-            failure_code: Some("NixFormatFailed"),
-            failure_description: "nix fmt failed",
-            progress: None,
-        }) {
+        let result = match formatter {
+            Some(formatter) => self.run_recorded_formatter(root, formatter, log_path, cancellation),
+            None => self.run_logged_command(LoggedCommand {
+                program: None,
+                root,
+                args: &format_args(),
+                log_path,
+                cancellation,
+                capture_stdout: false,
+                failure_code: Some("NixFormatFailed"),
+                failure_description: "nix fmt failed",
+                progress: None,
+            }),
+        };
+        match result {
             NixTaskResult::Succeeded(_) => NixTaskResult::Succeeded(()),
             NixTaskResult::Failed { code, message } => NixTaskResult::Failed { code, message },
             NixTaskResult::Canceled => NixTaskResult::Canceled,
@@ -511,42 +577,55 @@ impl NixBackend for NixCli {
         }
     }
 
-    fn plan_checks(&self, root: &Path, system: &str) -> Result<PlannedSystem, String> {
+    fn plan_checks(
+        &self,
+        root: &Path,
+        system: &str,
+        request: &PlanRequest<'_>,
+    ) -> Result<PlannedSystem, String> {
         if !valid_system_name(system) {
             return Err(format!("invalid Nix system name '{system}'"));
         }
-        let output =
-            self.run_catalog_command(root, &plan_args(system), "check catalog evaluation")?;
-        let value: Value = serde_json::from_slice(&output)
-            .map_err(|error| format!("Nix returned invalid check catalog JSON: {error}"))?;
-        let legacy = value
-            .get("legacy")
-            .and_then(Value::as_bool)
-            .unwrap_or(false);
-        let plan_object = value
-            .get("plan")
-            .and_then(Value::as_object)
-            .ok_or_else(|| "Nix check catalog has no plan map".to_owned())?;
-        let mut plans = Vec::with_capacity(plan_object.len());
-        for (attribute, entry) in plan_object {
-            match evaluated_derivation(entry) {
-                (true, Some(derivation)) => plans.push(CheckPlan {
-                    attribute: attribute.clone(),
-                    derivation: Some(derivation),
-                    eval_error: None,
-                    outputs: Vec::new(),
-                }),
-                _ => plans.push(CheckPlan {
-                    attribute: attribute.clone(),
-                    derivation: None,
-                    eval_error: Some(PlanError {
-                        code: "EvaluationFailed".to_owned(),
-                        message: format!("{attribute} did not evaluate to a derivation"),
-                    }),
-                    outputs: Vec::new(),
-                }),
+        let recorded = request.catalog.recorded.as_ref();
+        let format_check = recorded
+            .and_then(|catalog| catalog.format_check.clone())
+            .filter(|_| request.attributes.contains(TREEFMT_CHECK_ATTRIBUTE));
+        let (legacy, mut plans) = if recorded.is_some() && request.complete() {
+            let record = self
+                .read_record(root, system, &PLAN_RECORD)?
+                .ok_or_else(|| {
+                    format!(
+                        "the flake exposes bloomeryCatalog.{system} without bloomeryPlan.{system}"
+                    )
+                })?;
+            let (legacy, plans) = parse_plan(&record)?;
+            let selected = plans
+                .into_iter()
+                .filter(|plan| request.attributes.contains(&plan.attribute))
+                .collect();
+            (legacy, selected)
+        } else {
+            let evaluated = request
+                .attributes
+                .iter()
+                .filter(|attribute| format_check.is_none() || *attribute != TREEFMT_CHECK_ATTRIBUTE)
+                .cloned()
+                .collect::<Vec<_>>();
+            if evaluated.is_empty() {
+                (false, Vec::new())
+            } else {
+                let output = self.run_catalog_command(
+                    root,
+                    &plan_args(system, &evaluated),
+                    "check catalog evaluation",
+                )?;
+                let value: Value = serde_json::from_slice(&output)
+                    .map_err(|error| format!("Nix returned invalid check catalog JSON: {error}"))?;
+                parse_plan(&value)?
             }
-        }
+        };
+        plans.extend(format_check);
+        plans.sort_by(|left, right| left.attribute.cmp(&right.attribute));
         let relevant = plans
             .iter()
             .filter_map(|plan| plan.derivation.clone())
@@ -559,7 +638,6 @@ impl NixBackend for NixCli {
                 plan.outputs = paths.clone();
             }
         }
-        plans.sort_by(|left, right| left.attribute.cmp(&right.attribute));
         Ok(PlannedSystem {
             legacy,
             plans,
@@ -635,6 +713,7 @@ impl NixBackend for NixCli {
             args.push(OsString::from("internal-json"));
         }
         let result = self.run_logged_command(LoggedCommand {
+            program: None,
             root,
             args: &args,
             log_path,
@@ -846,27 +925,256 @@ fn group_output_paths(
     Ok(resolved)
 }
 
+/// A catalog record read from a flake attribute with `nix derivation show`.
+struct CatalogRecord {
+    output: &'static str,
+    field: &'static str,
+    operation: &'static str,
+}
+
+const CATALOG_RECORD: CatalogRecord = CatalogRecord {
+    output: "bloomeryCatalog",
+    field: "catalog",
+    operation: "check catalog read",
+};
+
+const PLAN_RECORD: CatalogRecord = CatalogRecord {
+    output: "bloomeryPlan",
+    field: "plan",
+    operation: "check plan read",
+};
+
+fn catalog_failure(operation: &str, output: &Output) -> String {
+    let detail = bounded_process_error(&output.stderr);
+    if detail.is_empty() {
+        format!("Nix {operation} failed with {}", status_text(output.status))
+    } else {
+        format!(
+            "Nix {operation} failed with {}: {detail}",
+            status_text(output.status)
+        )
+    }
+}
+
+/// Nix reports an absent flake attribute with this phrase; any other failure
+/// is an operational error.
+fn missing_flake_attribute(stderr: &[u8]) -> bool {
+    String::from_utf8_lossy(stderr).contains("does not provide attribute")
+}
+
+/// Decode the JSON stored in one environment field of a shown record.
+fn parse_record(output: &[u8], field: &str) -> Result<Value, String> {
+    let value: Value = serde_json::from_slice(output)
+        .map_err(|error| format!("Nix returned invalid catalog record JSON: {error}"))?;
+    let derivations = value
+        .get("derivations")
+        .and_then(Value::as_object)
+        .or_else(|| value.as_object())
+        .ok_or_else(|| "Nix catalog record has no derivation map".to_owned())?;
+    let mut entries = derivations.values();
+    let (Some(derivation), None) = (entries.next(), entries.next()) else {
+        return Err("Nix catalog record must show exactly one derivation".to_owned());
+    };
+    let text = derivation
+        .get("env")
+        .and_then(|env| env.get(field))
+        .and_then(Value::as_str)
+        .ok_or_else(|| format!("Nix catalog record has no {field} field"))?;
+    serde_json::from_str(text).map_err(|error| format!("Nix catalog {field} is not JSON: {error}"))
+}
+
+fn string_list(value: &Value, subject: &str) -> Result<Vec<String>, String> {
+    value
+        .as_array()
+        .ok_or_else(|| format!("{subject} is not an array"))?
+        .iter()
+        .map(|entry| {
+            entry
+                .as_str()
+                .map(str::to_owned)
+                .ok_or_else(|| format!("{subject} contains a non-string name"))
+        })
+        .collect()
+}
+
+fn parse_recorded_catalog(value: &Value) -> Result<SystemCatalog, String> {
+    let mut attributes = string_list(
+        value.get("checks").unwrap_or(&Value::Null),
+        "Nix check catalog",
+    )?;
+    if value
+        .get("legacy")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        attributes.push(LEGACY_CHECK_ATTRIBUTE.to_owned());
+    }
+    let format_check = match value.get("formatCheck") {
+        None | Some(Value::Null) => None,
+        Some(entry) => Some(plan_entry(TREEFMT_CHECK_ATTRIBUTE, entry)),
+    };
+    let formatter = match value.get("formatter") {
+        None | Some(Value::Null) => None,
+        Some(entry) => {
+            let field = |name: &str| {
+                entry
+                    .get(name)
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+                    .ok_or_else(|| format!("Nix check catalog formatter has no {name}"))
+            };
+            Some(RecordedFormatter {
+                derivation: field("drvPath")?,
+                program: field("program")?,
+            })
+        }
+    };
+    let health_sources = match value.get("healthSources") {
+        None | Some(Value::Null) => None,
+        Some(sources) => Some(parse_health_sources(sources)?),
+    };
+    Ok(SystemCatalog {
+        attributes,
+        recorded: Some(RecordedCatalog {
+            format_check,
+            formatter,
+            health_sources,
+        }),
+    })
+}
+
+fn plan_entry(attribute: &str, entry: &Value) -> CheckPlan {
+    match evaluated_derivation(entry) {
+        (true, Some(derivation)) => CheckPlan {
+            attribute: attribute.to_owned(),
+            derivation: Some(derivation),
+            eval_error: None,
+            outputs: Vec::new(),
+        },
+        _ => CheckPlan {
+            attribute: attribute.to_owned(),
+            derivation: None,
+            eval_error: Some(PlanError {
+                code: "EvaluationFailed".to_owned(),
+                message: format!("{attribute} did not evaluate to a derivation"),
+            }),
+            outputs: Vec::new(),
+        },
+    }
+}
+
+/// Parse a `{legacy, plan}` projection into per-attribute plans.
+fn parse_plan(value: &Value) -> Result<(bool, Vec<CheckPlan>), String> {
+    let legacy = value
+        .get("legacy")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let plan_object = value
+        .get("plan")
+        .and_then(Value::as_object)
+        .ok_or_else(|| "Nix check catalog has no plan map".to_owned())?;
+    let plans = plan_object
+        .iter()
+        .map(|(attribute, entry)| plan_entry(attribute, entry))
+        .collect();
+    Ok((legacy, plans))
+}
+
+fn parse_health_sources(value: &Value) -> Result<Vec<bloomery_check::HealthSourceCrate>, String> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| "Nix Rust health source projection is not an object".to_owned())?;
+    let mut crates = Vec::with_capacity(object.len());
+    for (name, entry) in object {
+        let manifest_path = entry
+            .get("manifest_path")
+            .and_then(Value::as_str)
+            .ok_or_else(|| format!("health crate '{name}' has no manifest_path"))?;
+        let targets =
+            entry
+                .get("targets")
+                .and_then(Value::as_array)
+                .ok_or_else(|| format!("health crate '{name}' has no target list"))?
+                .iter()
+                .map(|target| {
+                    let kind = target.get("kind").and_then(Value::as_str).ok_or_else(|| {
+                        format!("health crate '{name}' has a target without kind")
+                    })?;
+                    let path = target.get("path").and_then(Value::as_str).ok_or_else(|| {
+                        format!("health crate '{name}' has a target without path")
+                    })?;
+                    if Path::new(path).is_absolute() || Path::new(manifest_path).is_absolute() {
+                        return Err(format!(
+                            "health crate '{name}' contains an absolute source path"
+                        ));
+                    }
+                    Ok(bloomery_check::HealthTarget {
+                        kind: kind.to_owned(),
+                        path: path.to_owned(),
+                    })
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+        crates.push(bloomery_check::HealthSourceCrate {
+            name: entry
+                .get("name")
+                .and_then(Value::as_str)
+                .unwrap_or(name)
+                .to_owned(),
+            manifest_path: manifest_path.to_owned(),
+            targets,
+        });
+    }
+    crates.sort_by(|left, right| left.manifest_path.cmp(&right.manifest_path));
+    Ok(crates)
+}
+
+/// Rust health sources from a recorded catalog, otherwise from the flake's
+/// `healthSources.<system>` output.
+pub fn catalog_health_sources(
+    root: &Path,
+    backend: &dyn NixBackend,
+    system: &str,
+    catalog: &SystemCatalog,
+) -> Result<Vec<bloomery_check::HealthSourceCrate>, String> {
+    match catalog
+        .recorded
+        .as_ref()
+        .and_then(|recorded| recorded.health_sources.clone())
+    {
+        Some(sources) => Ok(sources),
+        None => backend.health_sources(root, system),
+    }
+}
+
+/// Check IDs, notices, and per-system catalogs for the selected systems.
+#[derive(Debug, Clone, Default)]
+pub struct DiscoveredCatalog {
+    pub ids: Vec<String>,
+    pub notices: Vec<Notice>,
+    pub catalogs: BTreeMap<String, SystemCatalog>,
+}
+
 pub fn discover_catalog(
     root: &Path,
     systems: &[String],
     backend: &dyn NixBackend,
-) -> Result<(Vec<String>, Vec<Notice>), String> {
-    let mut ids = Vec::new();
-    let mut notices = Vec::new();
+) -> Result<DiscoveredCatalog, String> {
+    let mut discovered = DiscoveredCatalog::default();
     for system in systems {
-        let attributes = backend.discover(root, system)?;
-        for attribute in attributes {
+        let catalog = backend.catalog(root, system)?;
+        for attribute in &catalog.attributes {
             if attribute == LEGACY_CHECK_ATTRIBUTE {
-                notices.push(legacy_check_notice(system));
+                discovered.notices.push(legacy_check_notice(system));
                 continue;
             }
-            ids.push(nix_check_id(system, &attribute));
+            discovered.ids.push(nix_check_id(system, attribute));
         }
+        discovered.catalogs.insert(system.clone(), catalog);
     }
-    ids.sort();
-    ids.dedup();
-    normalize_notices(&mut notices);
-    Ok((ids, notices))
+    discovered.ids.sort();
+    discovered.ids.dedup();
+    normalize_notices(&mut discovered.notices);
+    Ok(discovered)
 }
 
 #[cfg(test)]
@@ -982,15 +1290,64 @@ fn health_sources_args(system: &str) -> Vec<OsString> {
     args
 }
 
-fn plan_args(system: &str) -> Vec<OsString> {
+fn plan_args(system: &str, attributes: &[String]) -> Vec<OsString> {
     let mut args = eval_base_args();
     args.extend([
         OsString::from("--json"),
         OsString::from(format!(".#checks.{system}")),
         OsString::from("--apply"),
-        OsString::from(NIX_PLAN_EXPRESSION),
+        OsString::from(plan_expression(attributes)),
     ]);
     args
+}
+
+/// The plan projection applied to the selected attribute names.
+pub fn plan_expression(attributes: &[String]) -> String {
+    let names = attributes
+        .iter()
+        .map(|attribute| nix_string_literal(attribute))
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!("checks: ({NIX_PLAN_EXPRESSION}) [{names}] checks")
+}
+
+/// Quote a value as a Nix string literal that never interpolates.
+fn nix_string_literal(value: &str) -> String {
+    let mut literal = String::with_capacity(value.len() + 2);
+    literal.push('"');
+    for character in value.chars() {
+        match character {
+            '"' => literal.push_str("\\\""),
+            '\\' => literal.push_str("\\\\"),
+            '$' => literal.push_str("\\$"),
+            '\n' => literal.push_str("\\n"),
+            '\r' => literal.push_str("\\r"),
+            '\t' => literal.push_str("\\t"),
+            other => literal.push(other),
+        }
+    }
+    literal.push('"');
+    literal
+}
+
+/// `nix derivation show` of one catalog record attribute.
+fn record_args(output: &str, system: &str) -> Vec<OsString> {
+    vec![
+        OsString::from("derivation"),
+        OsString::from("show"),
+        OsString::from("--no-write-lock-file"),
+        OsString::from("--no-update-lock-file"),
+        OsString::from(format!(".#{output}.{system}")),
+    ]
+}
+
+/// Realize a recorded formatter from its derivation without flake evaluation.
+fn formatter_build_args(derivation: &str) -> Vec<OsString> {
+    vec![
+        OsString::from("build"),
+        OsString::from("--no-link"),
+        OsString::from(format!("{derivation}^out")),
+    ]
 }
 
 fn metadata_args() -> Vec<OsString> {
@@ -1155,15 +1512,19 @@ fn is_nix_notice(line: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        NixBackend, NixCli, NixTaskResult, PlannedSystem, batch_build_args, bounded_process_error,
-        discover_catalog, drain_progress_stderr, format_args, group_output_paths,
-        nix_log_store_path, parse_nix_id, parse_valid_outputs, plan_args, validity_args,
+        DiscoveredCatalog, LEGACY_CHECK_ATTRIBUTE, NixBackend, NixCli, NixTaskResult, PlanRequest,
+        PlannedSystem, RecordedCatalog, RecordedFormatter, SystemCatalog, TREEFMT_CHECK_ATTRIBUTE,
+        batch_build_args, bounded_process_error, discover_catalog, drain_progress_stderr,
+        format_args, group_output_paths, missing_flake_attribute, nix_log_store_path,
+        nix_string_literal, parse_nix_id, parse_record, parse_recorded_catalog,
+        parse_valid_outputs, plan_args, plan_expression, validity_args,
     };
-    use crate::nix_progress::NixProgressCollector;
     use bloomery_check_support::interrupt::{CancellationToken, InterruptFlag};
     use bloomery_check_support::model::valid_system_name;
     use bloomery_check_support::progress::ProgressSink;
+    use bloomery_nix_progress::NixProgressCollector;
     use std::collections::BTreeMap;
+    use std::collections::BTreeSet;
     use std::ffi::OsString;
     use std::fs;
     use std::io::{self, Read, Write};
@@ -1208,20 +1569,29 @@ mod tests {
             Ok("x86_64-linux".to_owned())
         }
 
-        fn discover(&self, _root: &Path, _system: &str) -> Result<Vec<String>, String> {
-            Ok(self.names.clone())
+        fn catalog(&self, _root: &Path, _system: &str) -> Result<SystemCatalog, String> {
+            Ok(SystemCatalog {
+                attributes: self.names.clone(),
+                recorded: None,
+            })
         }
 
         fn format_workspace(
             &self,
             _root: &Path,
+            _formatter: Option<&RecordedFormatter>,
             _log_path: &Path,
             _cancellation: CancellationToken,
         ) -> NixTaskResult<()> {
             unreachable!("catalog test does not format the workspace")
         }
 
-        fn plan_checks(&self, _root: &Path, _system: &str) -> Result<PlannedSystem, String> {
+        fn plan_checks(
+            &self,
+            _root: &Path,
+            _system: &str,
+            _request: &PlanRequest<'_>,
+        ) -> Result<PlannedSystem, String> {
             unreachable!("catalog test does not plan checks")
         }
 
@@ -1262,9 +1632,12 @@ mod tests {
                 "bloomery:check".to_owned(),
             ],
         };
-        let (catalog, notices) =
-            discover_catalog(Path::new("."), &["x86_64-linux".to_owned()], &backend)
-                .expect("catalog");
+        let DiscoveredCatalog {
+            ids: catalog,
+            notices,
+            ..
+        } = discover_catalog(Path::new("."), &["x86_64-linux".to_owned()], &backend)
+            .expect("catalog");
 
         assert!(catalog.windows(2).all(|pair| pair[0] <= pair[1]));
         assert!(catalog.contains(&"nix:x86_64-linux:unit-tests".to_owned()));
@@ -1283,13 +1656,111 @@ mod tests {
                 "aggregate:checks".to_owned(),
             ],
         };
-        let (catalog, notices) =
-            discover_catalog(Path::new("."), &["x86_64-linux".to_owned()], &backend)
-                .expect("catalog");
+        let DiscoveredCatalog {
+            ids: catalog,
+            notices,
+            ..
+        } = discover_catalog(Path::new("."), &["x86_64-linux".to_owned()], &backend)
+            .expect("catalog");
 
         assert!(catalog.contains(&"nix:x86_64-linux:basic-workspace:workspace:lock".to_owned()));
         assert!(catalog.contains(&"nix:x86_64-linux:aggregate:checks".to_owned()));
         assert!(notices.is_empty());
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-033"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-039"))]
+    fn recorded_catalogs_carry_names_formatter_check_formatter_and_health_sources() {
+        let drv = "/nix/store/0123456789abcdfghijklmnpqrsvwxyz-treefmt-check.drv";
+        let formatter = "/nix/store/0123456789abcdfghijklmnpqrsvwxyz-treefmt.drv";
+        let value = serde_json::json!({
+            "checks": ["core:treefmt-check", "unit-tests"],
+            "legacy": true,
+            "formatCheck": {"success": true, "drvPath": drv},
+            "formatter": {"drvPath": formatter, "program": "/nix/store/x-treefmt/bin/treefmt"},
+            "healthSources": {"demo": {"manifest_path": "Cargo.toml", "targets": [{"kind": "lib", "path": "src/lib.rs"}]}},
+        });
+        let shown = serde_json::json!({"derivations": {
+            "/nix/store/x-bloomery-catalog.drv": {"env": {"catalog": value.to_string()}},
+        }});
+        let record = parse_record(shown.to_string().as_bytes(), "catalog").expect("record");
+        let catalog = parse_recorded_catalog(&record).expect("catalog");
+        assert_eq!(
+            catalog.attributes,
+            ["core:treefmt-check", "unit-tests", LEGACY_CHECK_ATTRIBUTE]
+        );
+        let recorded = catalog.recorded.expect("recorded facts");
+        assert_eq!(
+            recorded.format_check.and_then(|plan| plan.derivation),
+            Some(drv.to_owned())
+        );
+        assert_eq!(
+            recorded.formatter,
+            Some(RecordedFormatter {
+                derivation: formatter.to_owned(),
+                program: "/nix/store/x-treefmt/bin/treefmt".to_owned(),
+            })
+        );
+        assert_eq!(
+            recorded.health_sources.expect("health sources")[0].name,
+            "demo"
+        );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-034"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-036"))]
+    fn only_missing_attribute_errors_select_the_generic_catalog() {
+        assert!(missing_flake_attribute(
+            b"error: flake 'path:/w' does not provide attribute 'bloomeryCatalog.x86_64-linux'"
+        ));
+        assert!(!missing_flake_attribute(
+            b"error: syntax error, unexpected '}'"
+        ));
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-037"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-038"))]
+    fn plan_requests_are_complete_only_when_every_non_format_check_is_selected() {
+        let catalog = SystemCatalog {
+            attributes: vec![
+                "a".to_owned(),
+                "b".to_owned(),
+                TREEFMT_CHECK_ATTRIBUTE.to_owned(),
+                LEGACY_CHECK_ATTRIBUTE.to_owned(),
+            ],
+            recorded: Some(RecordedCatalog::default()),
+        };
+        let complete = BTreeSet::from(["a".to_owned(), "b".to_owned()]);
+        let partial = BTreeSet::from(["a".to_owned(), TREEFMT_CHECK_ATTRIBUTE.to_owned()]);
+        assert!(
+            PlanRequest {
+                catalog: &catalog,
+                attributes: &complete
+            }
+            .complete()
+        );
+        assert!(
+            !PlanRequest {
+                catalog: &catalog,
+                attributes: &partial
+            }
+            .complete()
+        );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-016"))]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-038"))]
+    fn restricted_plan_names_are_non_interpolating_nix_literals() {
+        assert_eq!(
+            nix_string_literal("a\"b\\c${d}\n\t"),
+            r#""a\"b\\c\${d}\n\t""#
+        );
+        let expression = plan_expression(&["x".to_owned(), "y z".to_owned()]);
+        assert!(expression.ends_with(r#") ["x" "y z"] checks"#));
     }
 
     #[test]
@@ -1347,7 +1818,7 @@ mod tests {
     #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-016"))]
     #[cfg_attr(any(), bloomery("CLI-CHECK-NIX-017"))]
     fn nix_invocations_are_pure_lock_safe_and_pass_attribute_names_as_literals() {
-        let plan = strings(&plan_args("x86_64-linux"));
+        let plan = strings(&plan_args("x86_64-linux", &["unit-tests".to_owned()]));
         let derivations = vec![
             "/nix/store/0123456789abcdfghijklmnpqrsvwxyz-first.drv".to_owned(),
             "/nix/store/0123456789abcdfghijklmnpqrsvwxyz-second.drv".to_owned(),
@@ -1382,7 +1853,7 @@ mod tests {
     fn a_missing_nix_executable_is_an_operational_error() {
         let missing = NixCli::with_executable("/missing/bloomery-nix-cli");
         let error = missing
-            .discover(Path::new("."), "x86_64-linux")
+            .catalog(Path::new("."), "x86_64-linux")
             .expect_err("missing executable");
         assert!(error.contains("nix"));
     }
@@ -1394,6 +1865,7 @@ mod tests {
         let log = std::env::temp_dir().join("bloomery-missing-nix-format.log");
         let result = missing.format_workspace(
             Path::new("."),
+            None,
             &log,
             CancellationToken::new(InterruptFlag::new()),
         );

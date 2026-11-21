@@ -1,6 +1,13 @@
-checks: let
+selected: checks: let
   legacy = builtins.hasAttr "bloomery:check" checks;
-  filtered = builtins.removeAttrs checks ["bloomery:check"];
+  # Only selected attributes are forced; a selected name that no longer exists
+  # is omitted so the caller can report it.
+  wanted = builtins.listToAttrs (map (name: {
+      inherit name;
+      value = null;
+    })
+    selected);
+  filtered = builtins.intersectAttrs wanted (builtins.removeAttrs checks ["bloomery:check"]);
   plan = builtins.mapAttrs (_name: value: let
     attempt = builtins.tryEval value.drvPath;
   in

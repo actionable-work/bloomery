@@ -1,0 +1,6 @@
+{
+  "x86_64-linux": {
+    "manifest-policy-workspace": 465000,
+    "topcoat-assets-workspace": 723000
+  }
+}

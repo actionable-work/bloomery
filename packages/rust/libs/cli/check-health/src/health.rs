@@ -245,10 +245,17 @@ fn current_health_sources(
         .backend
         .host_system(context.root)
         .map_err(|message| stale_export(run, message))?;
-    context
+    let catalog = context
         .backend
-        .health_sources(context.root, &system)
-        .map_err(|message| stale_export(run, message))
+        .catalog(context.root, &system)
+        .map_err(|message| stale_export(run, message))?;
+    bloomery_check_catalog::catalog::catalog_health_sources(
+        context.root,
+        context.backend,
+        &system,
+        &catalog,
+    )
+    .map_err(|message| stale_export(run, message))
 }
 
 fn stale_export(run: &str, message: impl Into<String>) -> UpdateFailure {

@@ -4,8 +4,9 @@ name: Format-Gated Check Runner
 tagline: Formatting first, then concurrent static and batched Nix checks with bounded failure output.
 description: |
   Check is the workspace testing entry point. Every command requires a root
-  `flake.nix`. Write-mode check execution runs `nix fmt` before static
-  specification validation and Nix check derivations. In no-write mode,
+  `flake.nix`. Write-mode check execution runs the flake's default formatter
+  before static specification validation and Nix check derivations, in place
+  of the native treefmt check. In no-write mode,
   the native treefmt check runs as a Nix derivation. Static checks and one
   batched Nix realization run concurrently, with terminal work metrics and
   seekable retained failures.
@@ -30,8 +31,9 @@ description: |
 
 A full successful run is the workspace readiness gate. A successful subset run
 certifies only its selection. The shared CLI preflight requires a root
-`flake.nix` for every command. Every valid write-mode check runs `nix fmt`
-before selected checks start. With `--no-write`, check does not run `nix fmt`;
+`flake.nix` for every command. Every valid write-mode check runs the flake's
+default formatter before selected checks start, superseding the native
+`core:treefmt-check` derivation. With `--no-write`, check does not format;
 it includes the native `core:treefmt-check` Nix derivation for every selected
 system and reports a catalog error if it is missing. That derivation checks
 its configured source set without modifying workspace files. Static evidence
@@ -105,9 +107,9 @@ without specification passes.
 
 ## Boundaries
 
-Write-mode check executions run `nix fmt` before validation and Nix builds.
+Write-mode check executions run the default formatter before validation and Nix builds.
 The shared CLI preflight requires a root `flake.nix` for every command. Check
-writes a private workspace-scoped user cache. Write-mode `nix fmt` may modify
+writes a private workspace-scoped user cache. Write-mode formatting may modify
 source files; those edits are not rolled back if formatting fails. Retained logs
 can contain sensitive build output and are not removed automatically; delete
 the workspace cache to remove them. A write-mode health check refreshes its

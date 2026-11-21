@@ -34,6 +34,7 @@ The Rust workspace contains these binaries and libraries:
 | `packages/rust/libs/cli/nix` | `bloomery-nix` | `CLI/BUILD`, `CLI/CHECK`, `CLI/DISK` |
 | `packages/rust/libs/cli/check-command` | `bloomery-check-command` | `CLI/CHECK` |
 | `packages/rust/libs/cli/check-catalog` | `bloomery-check-catalog` | `CLI/CHECK` |
+| `packages/rust/libs/cli/nix-progress` | `bloomery-nix-progress` | `CLI/CHECK` |
 | `packages/rust/libs/cli/check-health` | `bloomery-check-health` | `CLI/CHECK` |
 | `packages/rust/libs/cli/check-output` | `bloomery-check-output` | `CLI/CHECK` |
 | `packages/rust/libs/cli/check-retrieval` | `bloomery-check-retrieval` | `CLI/CHECK` |

@@ -1,3 +1,5 @@
+//! Parses Nix internal-json build logs into Bloomery derivation progress.
+
 use bloomery_check_support::progress::{DerivationEvent, ProgressEvent, ProgressSink};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -15,7 +17,7 @@ const MAX_RECORD_BYTES: usize = 1 << 20;
 const IGNORED_ACTIVITY_TYPES: &[u64] = &[0, 101, 102, 103, 104, 106, 107, 109, 110, 111, 112];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) enum AssignedWork {
+pub(crate) enum AssignedWork {
     Build,
     Substitute,
 }
@@ -23,12 +25,12 @@ pub(super) enum AssignedWork {
 /// One structured activity frame extracted from Nix's `internal-json` log
 /// format. Only the fields used for metric normalization are retained.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct NixRecord {
-    pub(super) action: String,
-    pub(super) id: Option<u64>,
-    pub(super) kind: Option<u64>,
-    pub(super) fields: Vec<Value>,
-    pub(super) payload: Option<Value>,
+pub(crate) struct NixRecord {
+    pub(crate) action: String,
+    pub(crate) id: Option<u64>,
+    pub(crate) kind: Option<u64>,
+    pub(crate) fields: Vec<Value>,
+    pub(crate) payload: Option<Value>,
 }
 
 impl NixRecord {
@@ -40,14 +42,14 @@ impl NixRecord {
 /// Incremental newline-framed parser for `@nix {...}` records. It tolerates
 /// split frames, malformed JSON, unknown records, and oversized garbage.
 #[derive(Debug, Default)]
-pub(super) struct InternalJsonParser {
+pub(crate) struct InternalJsonParser {
     buffer: Vec<u8>,
 }
 
 impl InternalJsonParser {
     /// Feed bytes and collect complete records. Returns `true` when a non-empty
     /// line could not be parsed, which leaves metric availability incomplete.
-    pub(super) fn push(&mut self, bytes: &[u8], out: &mut Vec<NixRecord>) -> bool {
+    pub fn push(&mut self, bytes: &[u8], out: &mut Vec<NixRecord>) -> bool {
         self.buffer.extend_from_slice(bytes);
         if self.buffer.len() > MAX_RECORD_BYTES && !self.buffer.contains(&b'\n') {
             self.buffer.clear();
@@ -73,7 +75,7 @@ impl InternalJsonParser {
 
     /// A final record without a newline terminator was never parsed; its
     /// absence from the record list must not be read as proven zero work.
-    pub(super) fn has_pending(&self) -> bool {
+    pub fn has_pending(&self) -> bool {
         !self.buffer.is_empty()
     }
 }
@@ -101,7 +103,7 @@ fn parse_record(line: &[u8]) -> Option<NixRecord> {
 }
 
 #[derive(Clone)]
-pub(super) struct NixProgressCollector {
+pub struct NixProgressCollector {
     inner: Arc<Mutex<CollectorState>>,
 }
 
@@ -121,7 +123,7 @@ struct CollectorState {
 }
 
 impl NixProgressCollector {
-    pub(super) fn new(sink: ProgressSink) -> Self {
+    pub fn new(sink: ProgressSink) -> Self {
         Self {
             inner: Arc::new(Mutex::new(CollectorState {
                 sink,
@@ -138,7 +140,7 @@ impl NixProgressCollector {
         }
     }
 
-    pub(super) fn is_active(&self) -> bool {
+    pub fn is_active(&self) -> bool {
         self.inner
             .lock()
             .map(|state| state.sink.is_enabled())
@@ -149,7 +151,7 @@ impl NixProgressCollector {
     /// substitution activities can be attributed to derivations. Failure to
     /// obtain metadata leaves substitution metrics unavailable without failing
     /// the check.
-    pub(super) fn set_output_metadata(&self, metadata: BTreeMap<String, String>) {
+    pub fn set_output_metadata(&self, metadata: BTreeMap<String, String>) {
         if let Ok(mut state) = self.inner.lock() {
             state.output_to_drv.extend(metadata);
             state.defer_substitutions = false;
@@ -160,19 +162,19 @@ impl NixProgressCollector {
         }
     }
 
-    pub(super) fn defer_unmapped_substitutions(&self) {
+    pub fn defer_unmapped_substitutions(&self) {
         if let Ok(mut state) = self.inner.lock() {
             state.defer_substitutions = true;
         }
     }
 
-    pub(super) fn needs_output_metadata(&self) -> bool {
+    pub fn needs_output_metadata(&self) -> bool {
         self.inner
             .lock()
             .is_ok_and(|state| !state.deferred_substitutions.is_empty())
     }
 
-    pub(super) fn consume(&self, bytes: &[u8]) {
+    pub fn consume(&self, bytes: &[u8]) {
         let Ok(mut state) = self.inner.lock() else {
             return;
         };
@@ -195,21 +197,21 @@ impl NixProgressCollector {
         }
     }
 
-    pub(super) fn finish_success(&self) {
+    pub fn finish_success(&self) {
         let Ok(mut state) = self.inner.lock() else {
             return;
         };
         finish(&mut state, Finish::Success);
     }
 
-    pub(super) fn finish_failure(&self) {
+    pub fn finish_failure(&self) {
         let Ok(mut state) = self.inner.lock() else {
             return;
         };
         finish(&mut state, Finish::Failure);
     }
 
-    pub(super) fn finish_canceled(&self) {
+    pub fn finish_canceled(&self) {
         let Ok(mut state) = self.inner.lock() else {
             return;
         };

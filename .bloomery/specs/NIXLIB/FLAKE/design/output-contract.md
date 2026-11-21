@@ -60,6 +60,37 @@ through `extraOutputs`, as defined by [the runner](../../PLAYWRIGHT/design/runne
 workspace package IDs to dev-profile derivations. `lock` exposes the parsed
 lock model and `config` exposes the evaluated options.
 
+## Check catalog
+
+`healthSources.<system>` projects each workspace crate's manifest path and
+production Rust targets for CLI code health.
+
+`bloomeryCatalog.<system>` and `bloomeryPlan.<system>` carry evaluated catalog
+facts for `bloomery check`. Each is a derivation that is never built: its JSON
+record lives in one environment attribute, so `nix derivation show` of the
+flake attribute reads it and Nix's flake evaluation cache answers that read for
+an unchanged locked workspace. They are computed from the final
+`checks.<system>`, including `extraOutputs` checks, elevated sub-flake checks,
+and generated Billet checks, and exist for every evaluated system.
+
+The `catalog` attribute of `bloomeryCatalog.<system>` records every check
+attribute name except an exact legacy `bloomery:check`, whether that legacy
+attribute exists, the evaluated `core:treefmt-check` derivation path, the
+`formatter.<system>` derivation path and executable, and the
+`healthSources.<system>` projection. The `plan` attribute of
+`bloomeryPlan.<system>` records every other check attribute except
+`core:treefmt-check` with its derivation path, or an evaluation failure
+marker when the attribute does not evaluate to a derivation. Recorded
+derivation paths are plain store references: a record keeps each recorded
+`.drv` file without depending on its outputs, so reading a record realizes
+nothing.
+
+A plan budget check evaluates `bloomeryPlan.<system>` for fixture workspaces in
+a fresh evaluator with a private store and fails when the evaluator's thunk
+count exceeds that fixture's budget for the system. Budgets sit about 10%
+above the measured count for the pinned nixpkgs and are recorded only for
+systems that run the check.
+
 ## Development shell
 
 When enabled, `devShell` is a shell containing `rustc`, `clippy`, `cargo`,

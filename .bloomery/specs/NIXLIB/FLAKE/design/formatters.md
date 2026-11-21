@@ -1,8 +1,10 @@
 # Default formatter
 
 The workspace builder produces a default formatter for each evaluated system.
-`mkFlake` exposes it as the standard `formatter.<system>` flake attribute, so
-`nix fmt` and the `bloomery check` formatter preflight run the same derivation.
+`mkFlake` exposes it as the standard `formatter.<system>` flake attribute and
+records its derivation and executable in the
+[check catalog](output-contract.md#check-catalog), so `nix fmt` and the
+`bloomery check` formatter preflight run the same derivation.
 It also exposes `checks.<system>."core:treefmt-check"` as a native check
 derivation using the same resolved formatter configuration.
 

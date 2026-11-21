@@ -2,7 +2,8 @@
 
 Bloomery bundles Topcoat `asset!` declarations natively, replacing Topcoat's
 own bundler step. The crate graph builds the Rust bundler for the build host
-and uses it for artifact graphs that include `topcoat-asset`. Each declaration
+once per package set and shares it across every artifact graph that includes
+`topcoat-asset`. Each declaration
 embedded in a compiled artifact carries its
 asset ID, declared path, declaring crate name, `CARGO_MANIFEST_DIR`, declaring
 source file, and the `rename`, `extension`, `checksum`, and `content_type`

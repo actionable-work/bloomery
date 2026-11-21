@@ -4,7 +4,7 @@ use crate::AnalysisSession;
 use crate::modules::{is_test_fn, module_child_dir, module_paths};
 use bloomery_model::Diagnostic;
 use proc_macro2::{Delimiter, Group, TokenStream, TokenTree};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap};
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use syn::spanned::Spanned;
@@ -878,23 +878,93 @@ fn flatten_group(group: &Group, visitor: &mut impl FnMut(HealthToken)) {
     }
 }
 
-#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-struct TokenKey(String, String);
-
-#[derive(Clone)]
+/// One sliding token window within a callable body.
 struct WindowRef {
     crate_index: usize,
     callable_index: usize,
     start: usize,
-    end: usize,
-    physical_callable: (String, usize, usize, usize, usize),
+    physical_callable: u32,
+}
+
+/// Callable bodies with tokens interned to compact IDs. Equal IDs mean equal
+/// token kind and text, so windows compare as integer slices instead of
+/// cloned strings.
+struct InternedBodies {
+    bodies: Vec<Vec<Vec<u32>>>,
+    /// A physical callable included by more than one crate shares one ID.
+    physical_callables: Vec<Vec<u32>>,
+}
+
+impl InternedBodies {
+    fn new(crates: &[HealthCrateMetrics]) -> Self {
+        let mut tokens: HashMap<(&str, &str), u32> = HashMap::new();
+        let mut callables: HashMap<(&str, usize, usize, usize, usize), u32> = HashMap::new();
+        let mut bodies = Vec::with_capacity(crates.len());
+        let mut physical_callables = Vec::with_capacity(crates.len());
+        for crate_metrics in crates {
+            let mut crate_bodies = Vec::with_capacity(crate_metrics.callables.len());
+            let mut crate_physical = Vec::with_capacity(crate_metrics.callables.len());
+            for callable in &crate_metrics.callables {
+                let ids = callable
+                    .body_tokens
+                    .iter()
+                    .map(|token| {
+                        let next = tokens.len() as u32;
+                        *tokens
+                            .entry((token.kind.as_str(), token.text.as_str()))
+                            .or_insert(next)
+                    })
+                    .collect();
+                crate_bodies.push(ids);
+                let identity = (
+                    callable.path.as_str(),
+                    callable.start_line,
+                    callable.start_column,
+                    callable.end_line,
+                    callable.end_column,
+                );
+                let next_callable = callables.len() as u32;
+                crate_physical.push(*callables.entry(identity).or_insert(next_callable));
+            }
+            bodies.push(crate_bodies);
+            physical_callables.push(crate_physical);
+        }
+        Self {
+            bodies,
+            physical_callables,
+        }
+    }
+
+    fn for_each_window<'a>(&'a self, minimum: usize, mut visit: impl FnMut(WindowRef, &'a [u32])) {
+        for (crate_index, callables) in self.bodies.iter().enumerate() {
+            for (callable_index, ids) in callables.iter().enumerate() {
+                if ids.len() < minimum {
+                    continue;
+                }
+                for start in 0..=ids.len() - minimum {
+                    let window = WindowRef {
+                        crate_index,
+                        callable_index,
+                        start,
+                        physical_callable: self.physical_callables[crate_index][callable_index],
+                    };
+                    visit(window, &ids[start..start + minimum]);
+                }
+            }
+        }
+    }
+}
+
+fn window_hash(ids: &[u32]) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    ids.hash(&mut hasher);
+    hasher.finish()
 }
 
 fn mark_duplicates(crates: &mut [HealthCrateMetrics], minimum: usize) {
     if minimum == 0 {
         return;
     }
-    let mut groups: HashMap<u64, Vec<(Vec<TokenKey>, WindowRef)>> = HashMap::new();
     let mut covered = crates
         .iter()
         .map(|crate_metrics| {
@@ -905,57 +975,31 @@ fn mark_duplicates(crates: &mut [HealthCrateMetrics], minimum: usize) {
                 .collect::<Vec<_>>()
         })
         .collect::<Vec<_>>();
-    for (crate_index, crate_metrics) in crates.iter().enumerate() {
-        for (callable_index, callable) in crate_metrics.callables.iter().enumerate() {
-            if callable.body_tokens.len() < minimum {
-                continue;
-            }
-            let physical_callable = (
-                callable.path.clone(),
-                callable.start_line,
-                callable.start_column,
-                callable.end_line,
-                callable.end_column,
-            );
-            for start in 0..=callable.body_tokens.len() - minimum {
-                let end = start + minimum;
-                let key = callable.body_tokens[start..end]
-                    .iter()
-                    .map(|token| TokenKey(token.kind.clone(), token.text.clone()))
-                    .collect::<Vec<_>>();
-                let mut hasher = std::collections::hash_map::DefaultHasher::new();
-                key.hash(&mut hasher);
-                groups.entry(hasher.finish()).or_default().push((
-                    key,
-                    WindowRef {
-                        crate_index,
-                        callable_index,
-                        start,
-                        end,
-                        physical_callable: physical_callable.clone(),
-                    },
-                ));
-            }
+    let interned = InternedBodies::new(crates);
+    // Most windows are unique. Counting hashes first keeps only windows that
+    // can repeat; exact slice grouping then rules out hash collisions.
+    let mut hash_counts: HashMap<u64, u32> = HashMap::new();
+    interned.for_each_window(minimum, |_, ids| {
+        *hash_counts.entry(window_hash(ids)).or_default() += 1;
+    });
+    let mut exact: HashMap<&[u32], Vec<WindowRef>> = HashMap::new();
+    interned.for_each_window(minimum, |window, ids| {
+        if hash_counts[&window_hash(ids)] > 1 {
+            exact.entry(ids).or_default().push(window);
         }
-    }
-    for candidates in groups.values() {
-        let mut exact: BTreeMap<Vec<TokenKey>, Vec<&WindowRef>> = BTreeMap::new();
-        for (key, reference) in candidates {
-            exact.entry(key.clone()).or_default().push(reference);
+    });
+    for windows in exact.values() {
+        let distinct = windows
+            .iter()
+            .map(|window| window.physical_callable)
+            .collect::<BTreeSet<_>>();
+        if distinct.len() < 2 {
+            continue;
         }
-        for references in exact.values() {
-            let distinct = references
-                .iter()
-                .map(|reference| reference.physical_callable.clone())
-                .collect::<BTreeSet<_>>();
-            if distinct.len() < 2 {
-                continue;
-            }
-            for reference in references {
-                covered[reference.crate_index][reference.callable_index]
-                    [reference.start..reference.end]
-                    .fill(true);
-            }
+        for window in windows {
+            covered[window.crate_index][window.callable_index]
+                [window.start..window.start + minimum]
+                .fill(true);
         }
     }
     for (crate_index, crate_metrics) in crates.iter_mut().enumerate() {

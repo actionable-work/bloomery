@@ -21,7 +21,8 @@
       value = shared;
     })
     names);
-  projected = plan (fixtures
+  allNames = names ++ ["broken" "bloomery:check"];
+  projected = plan allNames (fixtures
     // {
       broken = throw "fixture evaluation error";
       "bloomery:check" = throw "legacy output must not be evaluated";
@@ -61,8 +62,21 @@
         plan = expectedPlan;
       };
     };
+    testSelectedPlanForcesOnlySelectedAttributes = {
+      expr = builtins.fromJSON (builtins.unsafeDiscardStringContext (builtins.toJSON (plan ["alias-a" "removed"] (fixtures
+        // {
+          broken = throw "unselected attributes must not be evaluated";
+        }))));
+      expected = {
+        legacy = false;
+        plan."alias-a" = {
+          success = true;
+          drvPath = shared.drvPath;
+        };
+      };
+    };
     testMetadataOnlyPlanDoesNotRealizeBuilders = {
-      expr = plan {"never-build" = shared;};
+      expr = plan ["never-build"] {"never-build" = shared;};
       expected = {
         legacy = false;
         plan = {
@@ -74,7 +88,7 @@
       };
     };
     testEmpty = {
-      expr = plan {};
+      expr = plan [] {};
       expected = {
         legacy = false;
         plan = {};
@@ -114,7 +128,7 @@
     else ''cat ${pkgs.writeText "catalog-failures.json" (builtins.toJSON failures)}; exit 1'';
   mismatches = lib.runTests {
     testMismatch = {
-      expr = plan {};
+      expr = plan [] {};
       expected = {};
     };
   };

@@ -5,35 +5,35 @@ id = "CLI-CHECK-FORMAT-001"
 title = "Write-mode check formats before selected checks"
 manual = false
 design = "design/execution.md#formatting"
-ears = { type = "event", trigger = "a valid bloomery check execution is requested without --no-write", system = "bloomery check", action = "run nix fmt once as a write-mode preflight before admitting selected checks, regardless of selected checks or systems" }
+ears = { type = "event", trigger = "a valid bloomery check execution is requested without --no-write", system = "bloomery check", action = "run the flake's default formatter once as a write-mode preflight before admitting selected checks, regardless of selected checks or systems" }
 
 [[requirements]]
 id = "CLI-CHECK-FORMAT-002"
 title = "Write-mode formatting failure stops check work"
 manual = false
 design = "design/execution.md#formatting"
-ears = { type = "event", trigger = "write-mode nix fmt exits unsuccessfully", system = "bloomery check", action = "record format:workspace as failed with a NixFormatFailed record, mark selected checks not_run, and fail without starting check work regardless of --fail-fast" }
+ears = { type = "event", trigger = "write-mode formatting exits unsuccessfully", system = "bloomery check", action = "record format:workspace as failed with a NixFormatFailed record, mark selected checks not_run, and fail without starting check work regardless of --fail-fast" }
 
 [[requirements]]
 id = "CLI-CHECK-FORMAT-003"
 title = "Write-mode checks use the formatted workspace"
 manual = false
 design = "design/workspace-check.md#formatting-execution"
-ears = { type = "event", trigger = "write-mode nix fmt exits successfully", system = "bloomery check", action = "run selected checks against the workspace state produced by formatting" }
+ears = { type = "event", trigger = "write-mode formatting exits successfully", system = "bloomery check", action = "run selected checks against the workspace state produced by formatting" }
 
 [[requirements]]
 id = "CLI-CHECK-FORMAT-004"
 title = "Write-mode formatter edits are not rolled back"
 manual = false
 design = "design/workspace-check.md#formatting-execution"
-ears = { type = "event", trigger = "write-mode nix fmt modifies workspace files", system = "bloomery check", action = "leave formatter edits in the workspace, including edits made before a formatting failure" }
+ears = { type = "event", trigger = "write-mode formatting modifies workspace files", system = "bloomery check", action = "leave formatter edits in the workspace, including edits made before a formatting failure" }
 
 [[requirements]]
 id = "CLI-CHECK-FORMAT-005"
 title = "Read-only check operations do not format"
 manual = false
 design = "design/execution.md#formatting"
-ears = { type = "state", state = "check list, check failures, check details, or check health retrieval is selected", system = "bloomery check", action = "do not invoke nix fmt" }
+ears = { type = "state", state = "check list, check failures, check details, or check health retrieval is selected", system = "bloomery check", action = "do not run the formatter" }
 
 [[requirements]]
 id = "CLI-CHECK-FORMAT-006"
@@ -47,7 +47,7 @@ id = "CLI-CHECK-FORMAT-007"
 title = "Write-mode formatter output is captured"
 manual = false
 design = "design/workspace-check.md#formatting-execution"
-ears = { type = "event", trigger = "write-mode nix fmt runs", system = "bloomery check", action = "capture formatter output in a run-local log without streaming it to normal output" }
+ears = { type = "event", trigger = "write-mode formatting runs", system = "bloomery check", action = "capture formatter output in a run-local log without streaming it to normal output" }
 
 [[requirements]]
 id = "CLI-CHECK-FORMAT-008"
@@ -83,3 +83,31 @@ title = "No-write requires the native treefmt check"
 manual = false
 design = "design/workspace-check.md#formatting-execution"
 ears = { type = "event", trigger = "bloomery check runs with --no-write and a selected system catalog lacks core:treefmt-check", system = "bloomery check", action = "report an operational catalog error before starting check work" }
+
+[[requirements]]
+id = "CLI-CHECK-FORMAT-013"
+title = "Catalog formatter runs without flake evaluation"
+manual = false
+design = "design/workspace-check.md#formatting-execution"
+ears = { type = "event", trigger = "write-mode formatting runs and the host system catalog records a formatter", system = "bloomery check", action = "realize the recorded formatter derivation and execute its program from the workspace root without invoking nix fmt" }
+
+[[requirements]]
+id = "CLI-CHECK-FORMAT-014"
+title = "Generic flakes format with nix fmt"
+manual = false
+design = "design/workspace-check.md#formatting-execution"
+ears = { type = "event", trigger = "write-mode formatting runs and the flake provides no host system catalog output", system = "bloomery check", action = "invoke nix fmt once from the workspace root" }
+
+[[requirements]]
+id = "CLI-CHECK-FORMAT-015"
+title = "Write mode supersedes the native treefmt check"
+manual = false
+design = "design/execution.md#formatting"
+ears = { type = "state", state = "bloomery check runs without --no-write", system = "bloomery check", action = "drop nix:<system>:core:treefmt-check from the validated selection without evaluating or realizing its derivation" }
+
+[[requirements]]
+id = "CLI-CHECK-FORMAT-016"
+title = "Write-mode selectors may name the superseded check"
+manual = false
+design = "design/execution.md#selection"
+ears = { type = "event", trigger = "a write-mode selector matches only nix:<system>:core:treefmt-check", system = "bloomery check", action = "accept the selector and run the formatter gate without a native formatter check" }

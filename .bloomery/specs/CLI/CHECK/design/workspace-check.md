@@ -9,8 +9,8 @@ code health, and test/build orchestration:
 
 ```text
 bloomery check
-├── write mode: catalog/selection setup → format:workspace (`nix fmt`) → checks
-├── no-write mode: native treefmt check in batched Nix realization + selected checks
+├── write mode: catalog/selection setup → format:workspace (default formatter) → plan → checks
+├── no-write mode: catalog/selection setup → plan with native treefmt check → checks
 └── list/failures/details/health retrieval and update: shared flake gate; no formatting
 ```
 
@@ -32,16 +32,20 @@ recursive integration; custom derivations must not invoke the runner themselves.
 
 ## Formatting execution
 
-For each valid write-mode `bloomery check` execution, invoke `nix fmt` once
-from the workspace root, using the flake's default formatter. Run it regardless
-of check selectors or selected systems, after catalog/selection setup and
-before evaluating selected derivation paths or admitting check work. In
-no-write mode, include the native
-`checks.<system>."core:treefmt-check"` derivation for every selected system,
-regardless of selectors. A missing attribute is an operational catalog error
-before check work begins. Realize the check in the same
-batched Nix invocation as other selected checks. Do not invoke `nix fmt` or
-forward `--check` to the formatter. The native derivation retains its ordinary
+For each valid write-mode `bloomery check` execution, run the flake's default
+formatter once from the workspace root, regardless of check selectors or
+selected systems, after catalog/selection setup and before evaluating selected
+derivation paths or admitting check work. When the host system's catalog
+records a formatter, realize its recorded derivation and execute its program
+directly, so formatting performs no flake evaluation. Otherwise invoke
+`nix fmt`. Never forward `--check` to the formatter.
+
+The formatter gate supersedes the native `nix:<system>:core:treefmt-check`
+in write mode: after selectors are validated, drop it from the selection, and
+never evaluate or realize its derivation. In no-write mode, include the native
+check for every selected system, regardless of selectors. A missing attribute
+is an operational catalog error before check work begins. Realize it in the
+same batched Nix invocation as other selected checks. It retains its ordinary
 Nix check ID and uses its configured source set; untracked files omitted by
 that source set are not validated. Read-only check subcommands do not run
 formatting, but still require the shared flake gate.
@@ -51,20 +55,32 @@ normal output. A non-zero write-mode exit is the `NixFormatFailed` check failure
 described in [selection and execution](execution.md#formatting); it prevents
 selected checks from starting. A failed no-write native check is an ordinary
 Nix check failure and independent work continues unless `--fail-fast` applies.
-Failure to start Nix or retain the log is operational. Leave write-mode source
-edits in place, including partial edits from a failed formatter. Disable
-lockfile writes and updates for every Nix operation.
+Failure to start Nix or the formatter, or to retain the log, is operational.
+Leave write-mode source edits in place, including partial edits from a failed
+formatter. Disable lockfile writes and updates for every Nix operation.
 
 ## Catalog evaluation
 
-`bloomery check` discovers each selected system's check catalog once. In
-write mode, discover attribute names to validate selectors, run `nix fmt`,
-then evaluate selected derivation paths from the formatted workspace. In
-no-write mode, one `nix eval` per selected system returns every non-legacy
-`checks.<system>` attribute and its derivation path. Each mode evaluates
-selected paths once and uses that plan as the sole input to realization;
-derivation-path evaluation is not repeated per attribute. Read-only catalog
-listing evaluates attribute names without derivation paths.
+`bloomery check` reads each selected system's check catalog once per run,
+before formatting or planning, to validate selectors. When the flake exposes
+[`bloomeryCatalog.<system>`](../../../NIXLIB/FLAKE/design/output-contract.md#check-catalog),
+read it with `nix derivation show` of that flake attribute. Nix answers this
+installable from its flake evaluation cache, so an unchanged locked workspace
+is read without evaluation. When Nix reports that the flake does not provide
+the attribute, use generic evaluation: `nix eval` of `checks.<system>`
+attribute names, `nix fmt` for formatting, and `healthSources.<system>` for
+code health. Any other catalog failure is operational. The host system's
+catalog also supplies the formatter and health sources.
+
+Planning evaluates derivation paths once per system, after write-mode
+formatting or from the workspace as found in no-write mode. When a system's
+selection contains every catalog check except the native formatter check and
+the flake exposes `bloomeryPlan.<system>`, read that output with
+`nix derivation show`. Otherwise one `nix eval` per system forces derivation
+paths only for selected attributes. Either way, a recorded catalog supplies the
+native formatter check's derivation path. Each mode uses that plan as the sole input to
+realization; derivation-path evaluation is not repeated per attribute.
+Read-only catalog listing reads the catalog without derivation paths.
 
 An attribute that cannot produce a derivation path is recorded as that check's
 evaluation failure while the remaining attributes continue to evaluate. A

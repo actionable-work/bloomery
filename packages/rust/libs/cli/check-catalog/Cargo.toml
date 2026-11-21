@@ -2,6 +2,7 @@
 bloomery-check = { workspace = true }
 bloomery-check-support = { workspace = true }
 bloomery-nix = { workspace = true }
+bloomery-nix-progress = { workspace = true }
 serde_json = { workspace = true }
 
 [package]

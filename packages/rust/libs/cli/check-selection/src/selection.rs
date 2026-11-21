@@ -1,4 +1,4 @@
-use bloomery_check_catalog::catalog::{self, CheckPlan, NixBackend};
+use bloomery_check_catalog::catalog::{self, CheckPlan, NixBackend, PlanRequest, SystemCatalog};
 use bloomery_check_support::context::CheckError;
 use bloomery_check_support::model::{Notice, valid_system_name};
 use bloomery_cli_types::{MISSING_FLAKE_CODE, MISSING_FLAKE_MESSAGE, flake_present};
@@ -10,14 +10,14 @@ pub struct Catalog {
     pub ids: Vec<String>,
     pub systems: Vec<String>,
     pub notices: Vec<Notice>,
+    /// Catalogs read for the selected systems, keyed by system.
+    pub catalogs: BTreeMap<String, SystemCatalog>,
 }
 
-/// Full execution catalog evaluation: check IDs plus the per-system derivation
-/// plan and dependency graph resolved in one Nix evaluation per system.
+/// Derivation plans for selected Nix checks, keyed by check ID, with their
+/// output and direct dependency metadata.
+#[derive(Default)]
 pub struct PlannedCatalog {
-    pub ids: Vec<String>,
-    pub systems: Vec<String>,
-    pub notices: Vec<Notice>,
     pub plans: BTreeMap<String, CheckPlan>,
     pub outputs_by_derivation: BTreeMap<String, Vec<String>>,
     pub dependencies: BTreeMap<String, Vec<String>>,
@@ -186,60 +186,43 @@ pub fn select_ids(catalog: &[String], selectors: &[String]) -> Result<Vec<String
     Ok(selected.into_iter().collect())
 }
 
-pub fn plan_for_selection(
+/// Plan the selected Nix checks with one plan invocation per system that has
+/// a selected check.
+pub fn plan_selected(
     root: &Path,
-    selectors: &[String],
-    requested_systems: &[String],
+    catalog: &Catalog,
+    selected: &BTreeSet<String>,
     backend: &dyn NixBackend,
 ) -> Result<PlannedCatalog, CheckError> {
-    let (static_ids, systems) = match selection_scope(root, selectors, requested_systems, backend)?
-    {
-        SelectionScope::StaticOnly(static_ids) => {
-            return Ok(PlannedCatalog {
-                ids: static_ids,
-                systems: Vec::new(),
-                notices: Vec::new(),
-                plans: BTreeMap::new(),
-                outputs_by_derivation: BTreeMap::new(),
-                dependencies: BTreeMap::new(),
-            });
+    let mut planned = PlannedCatalog::default();
+    for (system, system_catalog) in &catalog.catalogs {
+        let prefix = format!("nix:{system}:");
+        let attributes = selected
+            .iter()
+            .filter_map(|id| id.strip_prefix(&prefix))
+            .map(str::to_owned)
+            .collect::<BTreeSet<_>>();
+        if attributes.is_empty() {
+            continue;
         }
-        SelectionScope::WithNix {
-            static_ids,
-            systems,
-        } => (static_ids, systems),
-    };
-    let mut ids = static_ids;
-    let mut notices = Vec::new();
-    let mut plans = BTreeMap::new();
-    let mut outputs_by_derivation = BTreeMap::new();
-    let mut dependencies = BTreeMap::new();
-    for system in &systems {
-        let planned = backend
-            .plan_checks(root, system)
+        let request = PlanRequest {
+            catalog: system_catalog,
+            attributes: &attributes,
+        };
+        let system_plan = backend
+            .plan_checks(root, system, &request)
             .map_err(CheckError::operational)?;
-        if planned.legacy {
-            notices.push(catalog::legacy_check_notice(system));
-        }
-        outputs_by_derivation.extend(planned.outputs_by_derivation);
-        dependencies.extend(planned.dependencies);
-        for plan in planned.plans {
-            let id = catalog::nix_check_id(system, &plan.attribute);
-            plans.insert(id.clone(), plan);
-            ids.push(id);
+        planned
+            .outputs_by_derivation
+            .extend(system_plan.outputs_by_derivation);
+        planned.dependencies.extend(system_plan.dependencies);
+        for plan in system_plan.plans {
+            planned
+                .plans
+                .insert(catalog::nix_check_id(system, &plan.attribute), plan);
         }
     }
-    ids.sort();
-    ids.dedup();
-    catalog::normalize_notices(&mut notices);
-    Ok(PlannedCatalog {
-        ids,
-        systems,
-        notices,
-        plans,
-        outputs_by_derivation,
-        dependencies,
-    })
+    Ok(planned)
 }
 
 pub fn discover_for_selection(
@@ -255,6 +238,7 @@ pub fn discover_for_selection(
                 ids: static_ids,
                 systems: Vec::new(),
                 notices: Vec::new(),
+                catalogs: BTreeMap::new(),
             });
         }
         SelectionScope::WithNix {
@@ -262,15 +246,17 @@ pub fn discover_for_selection(
             systems,
         } => (static_ids, systems),
     };
-    let (mut ids, notices) =
+    let discovered =
         catalog::discover_catalog(root, &systems, backend).map_err(CheckError::operational)?;
+    let mut ids = discovered.ids;
     ids.extend(static_ids);
     ids.sort();
     ids.dedup();
     Ok(Catalog {
         ids,
         systems,
-        notices,
+        notices: discovered.notices,
+        catalogs: discovered.catalogs,
     })
 }
 

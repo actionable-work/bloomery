@@ -1,5 +1,11 @@
-use super::catalog::{BatchRealization, CheckPlan, NixBackend, NixTaskResult};
-use super::command::{CheckArgs, CheckContext, CheckError, plan_for_selection, report_error};
+use super::catalog::{
+    BatchRealization, CheckPlan, NixBackend, NixTaskResult, RecordedFormatter, SystemCatalog,
+    TREEFMT_CHECK_ATTRIBUTE, nix_check_id,
+};
+use super::command::{
+    Catalog, CheckArgs, CheckContext, CheckError, PlannedCatalog, discover_for_selection,
+    plan_selected, report_error,
+};
 use super::interrupt::{CancellationToken, InterruptFlag};
 pub(super) use super::model::FailureDraft;
 use super::model::{
@@ -50,7 +56,10 @@ pub(super) fn run_checks(
 }
 
 struct PreparedCheckRun {
-    planned: super::command::PlannedCatalog,
+    catalog: Catalog,
+    /// No-write plans; write mode plans after the formatter gate.
+    planned: PlannedCatalog,
+    formatter: Option<RecordedFormatter>,
     selected: BTreeSet<String>,
     health_sources: Option<Result<Vec<bloomery_check::HealthSourceCrate>, String>>,
     health_baseline_path: Option<String>,
@@ -66,20 +75,27 @@ fn prepare_check_run(
     args: &CheckArgs,
     context: &CheckContext<'_>,
 ) -> Result<PreparedCheckRun, CheckError> {
-    let planned = if context.no_write {
-        // No-write mode needs the native formatter derivation even for a
-        // static-only partial selection, so force system catalog planning.
-        let planned = plan_for_selection(context.root, &[], &args.systems, context.backend)?;
-        let missing = planned
+    // No-write mode needs the native formatter derivation even for a
+    // static-only partial selection, so it always reads system catalogs.
+    let discovery_selectors: &[String] = if context.no_write {
+        &[]
+    } else {
+        &args.selectors
+    };
+    let catalog = discover_for_selection(
+        context.root,
+        discovery_selectors,
+        &args.systems,
+        context.backend,
+    )?;
+    if context.no_write {
+        let missing = catalog
             .systems
             .iter()
             .filter(|system| {
-                !planned
+                !catalog
                     .ids
-                    .contains(&bloomery_check_catalog::catalog::nix_check_id(
-                        system,
-                        bloomery_check_catalog::catalog::TREEFMT_CHECK_ATTRIBUTE,
-                    ))
+                    .contains(&nix_check_id(system, TREEFMT_CHECK_ATTRIBUTE))
             })
             .cloned()
             .collect::<Vec<_>>();
@@ -89,41 +105,47 @@ fn prepare_check_run(
                 missing.join(", ")
             )));
         }
-        planned
-    } else {
-        let catalog = super::command::discover_for_selection(
-            context.root,
-            &args.selectors,
-            &args.systems,
-            context.backend,
-        )?;
-        super::command::PlannedCatalog {
-            ids: catalog.ids,
-            systems: catalog.systems,
-            notices: catalog.notices,
-            plans: BTreeMap::new(),
-            outputs_by_derivation: BTreeMap::new(),
-            dependencies: BTreeMap::new(),
-        }
-    };
-    let (mut selected, mut selection) = prepare_selection(args, &planned)?;
-    if context.no_write {
-        for system in &planned.systems {
-            selected.insert(bloomery_check_catalog::catalog::nix_check_id(
-                system,
-                bloomery_check_catalog::catalog::TREEFMT_CHECK_ATTRIBUTE,
-            ));
-        }
-        selection.selected_checks = selected.iter().cloned().collect();
     }
-    let (health_sources, health_baseline_path) =
-        prepare_health_sources(context.root, context.backend, &selected)?;
+    let (mut selected, mut selection) = prepare_selection(args, &catalog)?;
+    for system in &catalog.systems {
+        let format_check = nix_check_id(system, TREEFMT_CHECK_ATTRIBUTE);
+        if context.no_write {
+            selected.insert(format_check);
+        } else {
+            // The write-mode formatter gate supersedes the native check.
+            selected.remove(&format_check);
+        }
+    }
+    selection.selected_checks = selected.iter().cloned().collect();
+    let needs_host_catalog = !context.no_write || selected.contains("static:code-health");
+    let host_catalog = if needs_host_catalog {
+        Some(host_catalog(context.root, context.backend, &catalog)?)
+    } else {
+        None
+    };
+    let planned = if context.no_write {
+        plan_selected(context.root, &catalog, &selected, context.backend)?
+    } else {
+        PlannedCatalog::default()
+    };
+    let (health_sources, health_baseline_path) = prepare_health_sources(
+        context.root,
+        context.backend,
+        host_catalog.as_ref(),
+        &selected,
+    )?;
+    let formatter = host_catalog
+        .as_ref()
+        .and_then(|(_, catalog)| catalog.recorded.as_ref())
+        .and_then(|recorded| recorded.formatter.clone());
     let policies = StaticPolicies::load(context.root, &selected)?;
     let store =
         store::RunStore::open(context.root, context.cache_base).map_err(CheckError::operational)?;
     let allocation = store.allocate().map_err(CheckError::operational)?;
     Ok(PreparedCheckRun {
+        catalog,
         planned,
+        formatter,
         selected,
         health_sources,
         health_baseline_path,
@@ -136,20 +158,36 @@ fn prepare_check_run(
     })
 }
 
+/// The host system and its catalog, reusing a catalog already read for the
+/// selection.
+fn host_catalog(
+    root: &Path,
+    backend: &dyn NixBackend,
+    catalog: &Catalog,
+) -> Result<(String, SystemCatalog), CheckError> {
+    let system = backend.host_system(root).map_err(CheckError::operational)?;
+    let host = match catalog.catalogs.get(&system) {
+        Some(host) => host.clone(),
+        None => backend
+            .catalog(root, &system)
+            .map_err(CheckError::operational)?,
+    };
+    Ok((system, host))
+}
+
 fn prepare_selection(
     args: &CheckArgs,
-    planned: &super::command::PlannedCatalog,
+    catalog: &Catalog,
 ) -> Result<(BTreeSet<String>, RunSelection), CheckError> {
-    let direct = select_ids(&planned.ids, &args.selectors).map_err(CheckError::usage)?;
+    let direct = select_ids(&catalog.ids, &args.selectors).map_err(CheckError::usage)?;
     validate_execution_selection(&direct)?;
     let mut selected = direct.into_iter().collect::<BTreeSet<_>>();
     if selected.contains("static:traceability") {
         selected.insert("static:structure".to_owned());
     }
-    validate_execution_selection(&selected.iter().cloned().collect::<Vec<_>>())?;
     let selection = RunSelection {
         selectors: args.selectors.clone(),
-        systems: planned.systems.clone(),
+        systems: catalog.systems.clone(),
         selected_checks: selected.iter().cloned().collect(),
         partial: !args.selectors.is_empty() || !args.systems.is_empty(),
     };
@@ -164,6 +202,7 @@ type PreparedHealthSources = (
 fn prepare_health_sources(
     root: &Path,
     backend: &dyn NixBackend,
+    host_catalog: Option<&(String, SystemCatalog)>,
     selected: &BTreeSet<String>,
 ) -> Result<PreparedHealthSources, CheckError> {
     if !selected.contains("static:code-health") {
@@ -174,9 +213,8 @@ fn prepare_health_sources(
         raw: raw_json,
     } = health_report::load_health_policy(root)
         .map_err(|error| CheckError::operational(error.into_message()))?;
-    let projection = backend
-        .host_system(root)
-        .and_then(|system| backend.health_sources(root, &system));
+    let (system, host) = host_catalog.expect("code health selection reads the host catalog");
+    let projection = super::catalog::catalog_health_sources(root, backend, system, host);
     if let Ok(sources) = &projection {
         let manifests = sources
             .iter()
@@ -234,6 +272,7 @@ fn execute_check_run(
         Some(run_format_gate(
             context.root,
             context.backend,
+            prepared.formatter.as_ref(),
             &prepared.allocation,
             &context.interrupt,
             &mut progress,
@@ -277,10 +316,10 @@ fn execute_after_formatter(
         });
     }
     if format.is_some_and(|format| format.outcome == Outcome::Passed) {
-        let planned = plan_for_selection(
+        let planned = plan_selected(
             context.root,
-            &args.selectors,
-            &prepared.planned.systems,
+            &prepared.catalog,
+            &prepared.selected,
             context.backend,
         )
         .map_err(|error| error.message)?;
@@ -417,7 +456,7 @@ fn assemble_run_record(
                 selection: prepared.selection.clone(),
                 outcomes,
                 failures: Vec::new(),
-                notices: prepared.planned.notices.clone(),
+                notices: prepared.catalog.notices.clone(),
             };
             (record, Some(message), final_metrics)
         }
@@ -588,7 +627,7 @@ fn run_notices(
     health_report_available: bool,
     operational: bool,
 ) -> Vec<super::model::Notice> {
-    let mut notices = prepared.planned.notices.clone();
+    let mut notices = prepared.catalog.notices.clone();
     if health_report_available && operational {
         notices.push(super::model::Notice {
             code: "HealthReportRetained".to_owned(),
@@ -658,6 +697,7 @@ struct FormatGate {
 fn run_format_gate<W: Write>(
     root: &Path,
     backend: &dyn NixBackend,
+    formatter: Option<&RecordedFormatter>,
     allocation: &store::RunAllocation,
     interrupt: &InterruptFlag,
     progress: &mut ProgressReporter<W>,
@@ -682,7 +722,12 @@ fn run_format_gate<W: Write>(
             };
         }
     };
-    match backend.format_workspace(root, &log_path, CancellationToken::new(interrupt.clone())) {
+    match backend.format_workspace(
+        root,
+        formatter,
+        &log_path,
+        CancellationToken::new(interrupt.clone()),
+    ) {
         NixTaskResult::Succeeded(()) => {
             finalize(progress, Outcome::Passed);
             FormatGate {

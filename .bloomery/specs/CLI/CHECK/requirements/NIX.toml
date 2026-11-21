@@ -95,23 +95,14 @@ id = "CLI-CHECK-NIX-012"
 title = "Missing Nix is explicit"
 manual = false
 design = "design/workspace-check.md#formatting-execution"
-
-[requirements.ears]
-type = "unwanted_behavior"
-trigger = "a check execution requires nix fmt or selected Nix checks but the Nix CLI is unavailable"
-system = "bloomery check"
-action = "report an operational error rather than silently skip the formatter or selected Nix checks"
+ears = { type = "unwanted_behavior", trigger = "a check execution requires formatting or selected Nix checks but the Nix CLI is unavailable", system = "bloomery check", action = "report an operational error rather than silently skip the formatter or selected Nix checks" }
 
 [[requirements]]
 id = "CLI-CHECK-NIX-013"
 title = "Check does not update flake locks"
 manual = false
 design = "design/workspace-check.md#formatting-execution"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "bloomery check"
-action = "disable lockfile writes and updates in every Nix operation, including nix fmt"
+ears = { type = "ubiquitous", system = "bloomery check", action = "disable lockfile writes and updates in every Nix operation, including formatting" }
 
 [[requirements]]
 id = "CLI-CHECK-NIX-014"
@@ -160,14 +151,10 @@ action = "run Nix operations without impure evaluation mode"
 
 [[requirements]]
 id = "CLI-CHECK-NIX-018"
-title = "Check IDs are discovered once per system"
+title = "Check catalogs are read once per system"
 manual = false
 design = "design/workspace-check.md#catalog-evaluation"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "bloomery check"
-action = "discover every selected system's check IDs once per system for selector validation before write-mode formatting"
+ears = { type = "ubiquitous", system = "bloomery check", action = "read every selected system's check catalog once per run, before formatting or planning, to validate selectors" }
 
 [[requirements]]
 id = "CLI-CHECK-NIX-019"
@@ -302,23 +289,14 @@ id = "CLI-CHECK-NIX-030"
 title = "Write-mode derivation paths use formatted sources"
 manual = false
 design = "design/workspace-check.md#catalog-evaluation"
-
-[requirements.ears]
-type = "event"
-trigger = "write-mode nix fmt completes successfully"
-system = "bloomery check"
-action = "evaluate selected check derivation paths from the formatted workspace before realization"
+ears = { type = "event", trigger = "write-mode formatting completes successfully", system = "bloomery check", action = "evaluate selected check derivation paths from the formatted workspace before realization" }
 
 [[requirements]]
 id = "CLI-CHECK-NIX-031"
-title = "No-write plan evaluates once per system"
+title = "No-write derivation paths are planned once per system"
 manual = false
 design = "design/workspace-check.md#catalog-evaluation"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "bloomery check with --no-write"
-action = "evaluate selected system check IDs and selected derivation paths together once per system before realization"
+ears = { type = "ubiquitous", system = "bloomery check with --no-write", action = "evaluate selected derivation paths once per system from the workspace as found before realization" }
 
 [[requirements]]
 id = "CLI-CHECK-NIX-032"
@@ -326,3 +304,52 @@ title = "Catalog planning does not realize checks"
 manual = false
 design = "design/workspace-check.md#catalog-evaluation"
 ears = { type = "ubiquitous", system = "bloomery check catalog evaluation", action = "inspect check names and derivation metadata without realizing outputs or running builders" }
+
+[[requirements]]
+id = "CLI-CHECK-NIX-033"
+title = "Bloomery catalogs are read from the flake output"
+manual = false
+design = "design/workspace-check.md#catalog-evaluation"
+ears = { type = "event", trigger = "the flake exposes bloomeryCatalog.<system>", system = "bloomery check", action = "read that system's catalog with nix derivation show of the flake attribute instead of evaluating checks.<system>" }
+
+[[requirements]]
+id = "CLI-CHECK-NIX-034"
+title = "Generic flakes use catalog evaluation"
+manual = false
+design = "design/workspace-check.md#catalog-evaluation"
+ears = { type = "event", trigger = "Nix reports that the flake does not provide bloomeryCatalog.<system>", system = "bloomery check", action = "evaluate checks.<system> attribute names with nix eval" }
+
+[[requirements]]
+id = "CLI-CHECK-NIX-035"
+title = "Generic flakes evaluate health sources"
+manual = false
+design = "design/workspace-check.md#catalog-evaluation"
+ears = { type = "event", trigger = "code health is selected and the flake does not provide bloomeryCatalog for the host system", system = "bloomery check", action = "evaluate healthSources.<system> for the host system" }
+
+[[requirements]]
+id = "CLI-CHECK-NIX-036"
+title = "Catalog read failures are operational"
+manual = false
+design = "design/workspace-check.md#catalog-evaluation"
+ears = { type = "unwanted_behavior", trigger = "reading bloomeryCatalog.<system> fails for a reason other than a missing attribute", system = "bloomery check", action = "report an operational catalog error before check work begins" }
+
+[[requirements]]
+id = "CLI-CHECK-NIX-037"
+title = "Complete selections read the plan output"
+manual = false
+design = "design/workspace-check.md#catalog-evaluation"
+ears = { type = "state", state = "a system's selection contains every catalog check except core:treefmt-check and the flake exposes bloomeryPlan.<system>", system = "bloomery check", action = "read selected derivation paths with nix derivation show of bloomeryPlan.<system>" }
+
+[[requirements]]
+id = "CLI-CHECK-NIX-038"
+title = "Partial selections evaluate only selected derivation paths"
+manual = false
+design = "design/workspace-check.md#catalog-evaluation"
+ears = { type = "state", state = "a system's selection omits a catalog check other than core:treefmt-check, or the flake lacks bloomeryPlan.<system>", system = "bloomery check", action = "force derivation paths only for selected check attributes in one nix eval per system" }
+
+[[requirements]]
+id = "CLI-CHECK-NIX-039"
+title = "Native formatter check path comes from the catalog"
+manual = false
+design = "design/workspace-check.md#catalog-evaluation"
+ears = { type = "event", trigger = "no-write planning reads bloomeryPlan.<system>", system = "bloomery check", action = "take the core:treefmt-check derivation path from that system's catalog" }

@@ -172,6 +172,9 @@ features = ["CLI/DISK"] # Feature identifiers owned by this crate.
 [checks.specifications.crates."packages/rust/libs/cli/init/Cargo.toml"]
 features = ["CLI/INIT"] # Feature identifiers owned by this crate.
 
+[checks.specifications.crates."packages/rust/libs/cli/nix-progress/Cargo.toml"]
+features = ["CLI/CHECK"] # Feature identifiers owned by this crate.
+
 [checks.specifications.crates."packages/rust/libs/cli/nix/Cargo.toml"]
 features = [
   "CLI/BUILD",

@@ -345,3 +345,45 @@ title = "Enabled policy checks are generated per member"
 manual = false
 design = "design/output-contract.md#checks"
 ears = { type = "event", trigger = "a dependency policy is enabled and checks.enable is true", system = "the workspace builder", action = "expose a separate <member>:vulnerabilities, <member>:licenses, or <member>:bans check for each selected member and enabled policy" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-031"
+title = "Check catalog output records catalog facts"
+manual = false
+design = "design/output-contract.md#check-catalog"
+ears = { type = "ubiquitous", system = "mkFlake", action = "expose bloomeryCatalog.<system> whose catalog attribute records non-legacy check attribute names, legacy bloomery:check presence, the core:treefmt-check derivation path, the formatter derivation path and executable, and the healthSources projection" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-032"
+title = "Check plan output records derivation paths"
+manual = false
+design = "design/output-contract.md#check-catalog"
+ears = { type = "ubiquitous", system = "mkFlake", action = "expose bloomeryPlan.<system> whose plan attribute records each check attribute except core:treefmt-check and bloomery:check with its derivation path or an evaluation failure marker" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-033"
+title = "Catalog records are readable without building"
+manual = false
+design = "design/output-contract.md#check-catalog"
+ears = { type = "ubiquitous", system = "mkFlake", action = "define bloomeryCatalog and bloomeryPlan as derivations whose records nix derivation show reads without realizing anything, for every evaluated system" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-034"
+title = "Catalog records reference recorded derivation files"
+manual = false
+design = "design/output-contract.md#check-catalog"
+ears = { type = "ubiquitous", system = "mkFlake", action = "record derivation paths in catalog records as plain store references without output dependencies" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-035"
+title = "Catalog records cover composed checks"
+manual = false
+design = "design/output-contract.md#check-catalog"
+ears = { type = "ubiquitous", system = "mkFlake", action = "compute bloomeryCatalog and bloomeryPlan from the final checks.<system>, including extraOutputs, elevated sub-flake, and Billet checks" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OUTPUTS-036"
+title = "Plan evaluation stays within its budget"
+manual = false
+design = "design/output-contract.md#check-catalog"
+ears = { type = "unwanted_behavior", trigger = "evaluating bloomeryPlan.<system> for a budgeted fixture workspace in a fresh evaluator exceeds that fixture's recorded thunk budget", system = "the plan budget check", action = "fail and report the measured thunk count against the budget" }

@@ -1,6 +1,7 @@
 {
   pkgs,
   lib,
+  topcoat ? import ./topcoat-tool.nix {inherit pkgs;},
   rustc ? pkgs.rustc,
   stdenv ? pkgs.stdenv,
   mold ? pkgs.mold,
@@ -45,7 +46,6 @@
   tailwindSupport = import ./tailwind.nix {inherit pkgs lib;};
   tailwind = tailwindSupport.forBuildScript buildScriptDependencies;
   hasTopcoatAssets = pkg.name == "topcoat-asset" || lib.any (dep: dep.bloomeryHasTopcoatAssets or false) dependencies;
-  topcoat = import ./topcoat-tool.nix {inherit pkgs;};
   sourceDir =
     if hasTopcoatAssets
     then topcoat.sourceDirectory pkg src

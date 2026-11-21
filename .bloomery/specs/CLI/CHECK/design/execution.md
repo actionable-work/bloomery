@@ -13,9 +13,10 @@
 
 Preserve the existing static validations; these IDs group the existing passes,
 not new independent validation semantics. In write mode, `format:workspace` is
-a mandatory preflight task, not a catalog entry. In no-write mode, the native
-`nix:<system>:core:treefmt-check` catalog entry supplies formatting validation
-for each selected system. Static structure is a prerequisite
+a mandatory preflight task, not a catalog entry. The write-mode preflight supersedes the
+native `nix:<system>:core:treefmt-check` catalog entry, which is dropped from
+write-mode selections. In no-write mode, that entry supplies formatting
+validation for each selected system. Static structure is a prerequisite
 of traceability. `static:structure` and `static:traceability` exist in the
 catalog only when specification management is enabled and
 `checks.specifications.enable` is true; otherwise they are absent and cannot
@@ -76,34 +77,37 @@ remain valid while specification management is disabled.
 
 ## Formatting
 
-For each valid write-mode `bloomery check` execution, run `nix fmt` once from
-the workspace root after selection validation and run-store allocation, but
-before admitting any selected check. The formatter runs for full and partial
-selections, including selections containing only static checks. In no-write
-mode, include `nix:<system>:core:treefmt-check` for every selected system,
-even when a partial selector does not match it. A missing attribute is a
-catalog setup error. Realize the check in the normal batched Nix invocation; do not invoke
-`nix fmt` or `nix fmt -- --check`. This native derivation checks the files in
-its own source set, so untracked files excluded by that source set are not
-validated. `check list`, `check failures`, `check details`, and `check health`
-require the shared flake preflight but do not run formatting.
+For each valid write-mode `bloomery check` execution, run the flake's default
+formatter once from the workspace root after selection validation and run-store
+allocation, but before admitting any selected check. The formatter runs for
+full and partial selections, including selections containing only static
+checks. In write mode, the formatter gate replaces
+`nix:<system>:core:treefmt-check`: drop it from the selection after selector
+validation and do not evaluate or realize it. In no-write mode, include
+`nix:<system>:core:treefmt-check` for every selected system, even when a
+partial selector does not match it. A missing attribute is a catalog setup
+error. Realize the check in the normal batched Nix invocation; do not run the
+formatter. This native derivation checks the files in its own source set, so
+untracked files excluded by that source set are not validated. `check list`,
+`check failures`, `check details`, and `check health` require the shared flake
+preflight but do not run formatting.
 
 Record the write-mode formatter as `format:workspace`. In no-write mode, retain
 the native Nix check under its ordinary `nix:<system>:core:treefmt-check` ID
 and capture it with the batched realization output. Write-mode selected check
-derivation paths are evaluated after `nix fmt` so they use the resulting
+derivation paths are evaluated after formatting so they use the resulting
 workspace; no-write checks use the workspace as found. Keep write-mode
 formatter edits in the working tree, including edits made before a formatting
 failure; do not roll them back.
 
-A non-zero write-mode `nix fmt` exit is a formatter check failure, not an
+A non-zero write-mode formatter exit is a formatter check failure, not an
 operational failure. Record `format:workspace` as failed with a
 `NixFormatFailed` failure record, mark every selected check `not_run`, and
 finalize the run as failed with exit code 1. This preflight failure prevents
 check work regardless of `--fail-fast`. A no-write native formatter failure
 is an ordinary Nix check failure under its native catalog ID; let independent
-checks continue unless `--fail-fast` cancels them. Failure to start Nix or
-retain formatter output is an operational error with exit code 2; retain the
+checks continue unless `--fail-fast` cancels them. Failure to start Nix or the
+formatter, or to retain formatter output, is an operational error with exit code 2; retain the
 partial run. User interruption retains the usual interrupted status and exit
 code.
 
@@ -119,7 +123,8 @@ globs to avoid shell expansion. Every selector must match at least one catalog
 entry or the invocation fails before executing checks. In no-write execution,
 the native formatter check is added for each selected system even when an
 explicit selector does not match it; a direct selector match deduplicates with
-this implicit inclusion. `check list` shows
+this implicit inclusion. In write execution, a selector may match it, but it is
+dropped after validation because the formatter gate supersedes it. `check list` shows
 native catalog entries and applies selectors without execution-only implicit
 inclusions.
 

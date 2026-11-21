@@ -1,5 +1,6 @@
 use crate::check_command::catalog::{
-    CheckPlan, NIX_DISCOVER_EXPRESSION, NIX_PLAN_EXPRESSION, NixBackend, NixCli,
+    CheckPlan, NIX_DISCOVER_EXPRESSION, NixBackend, NixCli, PlanRequest, SystemCatalog,
+    plan_expression,
 };
 use crate::check_command::command::{CheckArgs, CheckOperation, DetailsArgs};
 use crate::check_command::interrupt::{CancellationToken, InterruptFlag};
@@ -21,7 +22,7 @@ fn strings(args: &[&str]) -> Vec<String> {
     args.iter().map(|arg| (*arg).to_owned()).collect()
 }
 
-fn eval_args(system: &str, planning: bool) -> Vec<String> {
+fn eval_args(system: &str, expression: String) -> Vec<String> {
     vec![
         "eval".into(),
         "--no-write-lock-file".into(),
@@ -29,13 +30,58 @@ fn eval_args(system: &str, planning: bool) -> Vec<String> {
         "--json".into(),
         format!(".#checks.{system}"),
         "--apply".into(),
-        if planning {
-            NIX_PLAN_EXPRESSION
-        } else {
-            NIX_DISCOVER_EXPRESSION
-        }
-        .into(),
+        expression,
     ]
+}
+
+fn discovery_args(system: &str) -> Vec<String> {
+    eval_args(system, NIX_DISCOVER_EXPRESSION.to_owned())
+}
+
+/// Restricted plan evaluation of the selected attribute names.
+fn plan_args(system: &str, names: &[&str]) -> Vec<String> {
+    let mut names = names
+        .iter()
+        .map(|name| (*name).to_owned())
+        .collect::<Vec<_>>();
+    names.sort();
+    eval_args(system, plan_expression(&names))
+}
+
+fn record_args(output: &str, system: &str) -> Vec<String> {
+    vec![
+        "derivation".into(),
+        "show".into(),
+        "--no-write-lock-file".into(),
+        "--no-update-lock-file".into(),
+        format!(".#{output}.{system}"),
+    ]
+}
+
+/// A generic flake without Bloomery catalog records.
+fn missing_record(script: &mut NixFixture, output: &str, system: &str) -> PathBuf {
+    let call = script.expect(&record_args(output, system), "");
+    fs::write(call.join("status"), "1").unwrap();
+    fs::write(
+        call.join("stderr"),
+        format!("error: flake 'path:/workspace' does not provide attribute '{output}.{system}'\n"),
+    )
+    .unwrap();
+    call
+}
+
+/// A shown catalog record whose environment field holds `value` as JSON.
+fn record(script: &mut NixFixture, output: &str, field: &str, system: &str, value: &Value) {
+    let shown = json!({"derivations": {
+        format!("/nix/store/{output}.drv"): {"env": {field: value.to_string()}},
+    }});
+    script.expect(&record_args(output, system), &shown.to_string());
+}
+
+fn host() -> String {
+    NixCli::with_executable("/missing/nix")
+        .host_system(Path::new("."))
+        .expect("host system")
 }
 
 fn metadata(entries: &[(&str, &str, &[&str])]) -> Value {
@@ -60,8 +106,9 @@ fn plan_calls(script: &mut NixFixture, names: &[(&str, &str)], metadata: Value) 
         .iter()
         .map(|(name, drv)| ((*name).to_owned(), json!({"success": true, "drvPath": drv})))
         .collect::<serde_json::Map<_, _>>();
+    let selected = names.iter().map(|(name, _)| *name).collect::<Vec<_>>();
     script.expect(
-        &eval_args("x86_64-linux", true),
+        &plan_args("x86_64-linux", &selected),
         &json!({"legacy": false, "plan": plans}).to_string(),
     );
     let mut args = strings(&["derivation", "show"]);
@@ -72,9 +119,10 @@ fn plan_calls(script: &mut NixFixture, names: &[(&str, &str)], metadata: Value) 
 }
 
 fn discover_calls(script: &mut NixFixture, system: &str, names: &[&str]) {
+    missing_record(script, "bloomeryCatalog", system);
     let mut names = names.to_vec();
     names.sort();
-    script.expect(&eval_args(system, false), &json!(names).to_string());
+    script.expect(&discovery_args(system), &json!(names).to_string());
 }
 
 fn formatter(script: &mut NixFixture) -> PathBuf {
@@ -170,12 +218,15 @@ fn production_adapter_preserves_names_and_builds_shared_derivations_once() {
     ];
     let mut sorted = names.to_vec();
     sorted.sort();
-    script.expect(
-        &eval_args("x86_64-linux", false),
-        &json!(sorted).to_string(),
-    );
+    discover_calls(&mut script, "x86_64-linux", &names);
     let backend = script.backend();
-    assert_eq!(backend.discover(&root, "x86_64-linux").unwrap(), sorted);
+    assert_eq!(
+        backend.catalog(&root, "x86_64-linux").unwrap(),
+        SystemCatalog {
+            attributes: sorted.iter().map(|name| (*name).to_owned()).collect(),
+            recorded: None,
+        }
+    );
     discover_calls(&mut script, "x86_64-linux", &names);
     formatter(&mut script);
     plan_calls(
@@ -218,7 +269,8 @@ fn production_adapter_preserves_names_and_builds_shared_derivations_once() {
 fn production_adapter_distinguishes_missing_and_empty_systems() {
     let (root, cache) = fixture(true);
     let mut script = NixFixture::new(&root);
-    let missing = script.expect(&eval_args("aarch64-darwin", false), "");
+    missing_record(&mut script, "bloomeryCatalog", "aarch64-darwin");
+    let missing = script.expect(&discovery_args("aarch64-darwin"), "");
     fs::write(missing.join("status"), "1").unwrap();
     fs::write(missing.join("stderr"), "missing checks output\n").unwrap();
     let mut args = request();
@@ -228,11 +280,10 @@ fn production_adapter_distinguishes_missing_and_empty_systems() {
     let error: Value = serde_json::from_slice(&stdout).unwrap();
     assert_eq!(error["error"]["code"], "OperationalError");
     discover_calls(&mut script, "aarch64-linux", &[]);
+    // The formatter comes from the host catalog, read separately when the
+    // host system is not selected.
+    discover_calls(&mut script, &host(), &[]);
     formatter(&mut script);
-    script.expect(
-        &eval_args("aarch64-linux", true),
-        r#"{"legacy":false,"plan":{}}"#,
-    );
     let mut args = request();
     args.systems = vec!["aarch64-linux".into()];
     let (status, _, _) = invoke(args, &root, &cache, &script.backend(), true);
@@ -256,7 +307,7 @@ fn operational_catalog_error_reports_the_fatal_cause_after_notices() {
         let mut script = NixFixture::new(&root);
         discover_calls(&mut script, "x86_64-linux", &["core:unit-tests"]);
         formatter(&mut script);
-        let failed_plan = script.expect(&eval_args("x86_64-linux", true), "");
+        let failed_plan = script.expect(&plan_args("x86_64-linux", &["core:unit-tests"]), "");
         fs::write(failed_plan.join("status"), "1").unwrap();
         fs::write(
             failed_plan.join("stderr"),
@@ -302,7 +353,8 @@ fn operational_catalog_error_reports_the_fatal_cause_after_notices() {
 fn operational_nix_error_falls_back_to_status_and_non_notice_detail() {
     let (root, _) = fixture(true);
     let mut script = NixFixture::new(&root);
-    let failed_discovery = script.expect(&eval_args("x86_64-linux", false), "");
+    missing_record(&mut script, "bloomeryCatalog", "x86_64-linux");
+    let failed_discovery = script.expect(&discovery_args("x86_64-linux"), "");
     fs::write(failed_discovery.join("status"), "7").unwrap();
     fs::write(
         failed_discovery.join("stderr"),
@@ -312,7 +364,7 @@ fn operational_nix_error_falls_back_to_status_and_non_notice_detail() {
 
     let backend = script.backend();
     let error = backend
-        .discover(&root, "x86_64-linux")
+        .catalog(&root, "x86_64-linux")
         .expect_err("failed Nix discovery");
 
     assert!(error.contains("Nix check discovery failed with exit code 7"));
@@ -333,6 +385,11 @@ fn production_no_write_realizes_the_native_treefmt_check_without_formatting() {
     let sentinel = root.join("no-write-sentinel.txt");
     fs::write(&sentinel, "unchanged\n").unwrap();
     let mut script = NixFixture::new(&root);
+    discover_calls(
+        &mut script,
+        "x86_64-linux",
+        &["core:treefmt-check", "unselected"],
+    );
     plan_calls(
         &mut script,
         &[("core:treefmt-check", SHARED)],
@@ -368,10 +425,7 @@ fn production_no_write_realizes_the_native_treefmt_check_without_formatting() {
 fn production_no_write_requires_the_native_treefmt_attribute_before_check_work() {
     let (root, cache) = fixture(true);
     let mut script = NixFixture::new(&root);
-    script.expect(
-        &eval_args("x86_64-linux", true),
-        r#"{"legacy":false,"plan":{}}"#,
-    );
+    discover_calls(&mut script, "x86_64-linux", &["core:unit-tests"]);
     let mut args = request();
     args.systems = vec!["x86_64-linux".into()];
     args.selectors = vec!["static:structure".into()];
@@ -588,7 +642,16 @@ fn fixed_output_metadata_uses_the_injected_store_executable() {
         &strings(&["--query", "--outputs", SHARED]),
         &format!("{OUTPUT}\n"),
     );
-    let plan = script.backend().plan_checks(&root, "x86_64-linux").unwrap();
+    let attributes = ["fixed".to_owned()].into();
+    let catalog = SystemCatalog::default();
+    let request = PlanRequest {
+        catalog: &catalog,
+        attributes: &attributes,
+    };
+    let plan = script
+        .backend()
+        .plan_checks(&root, "x86_64-linux", &request)
+        .unwrap();
     assert_eq!(plan.plans[0].outputs, [OUTPUT]);
     script.verify().unwrap();
 }
@@ -662,13 +725,15 @@ fn independent_fixture_scenarios_can_run_concurrently() {
             scope.spawn(move || {
                 let (root, _) = fixture(true);
                 let mut script = NixFixture::new(&root);
-                script.expect(
-                    &eval_args("x86_64-linux", false),
-                    &json!([format!("scenario-{index}")]).to_string(),
-                );
+                let name = format!("scenario-{index}");
+                discover_calls(&mut script, "x86_64-linux", &[&name]);
                 assert_eq!(
-                    script.backend().discover(&root, "x86_64-linux").unwrap(),
-                    [format!("scenario-{index}")]
+                    script
+                        .backend()
+                        .catalog(&root, "x86_64-linux")
+                        .unwrap()
+                        .attributes,
+                    [name]
                 );
                 script.verify().unwrap();
             });
@@ -718,5 +783,183 @@ fn fail_fast_batch_omits_keep_going_and_cancels_its_owned_process() {
         assert!(result.operational_error.is_none());
     });
     assert!(!call.join("finished").exists());
+    script.verify().unwrap();
+}
+
+const FORMAT_CHECK: &str = "/nix/store/0123456789abcdfghijklmnpqrsvwxyz-treefmt-check.drv";
+const FORMAT_OUTPUT: &str = "/nix/store/treefmt-check-out";
+
+fn recorded_catalog(script: &mut NixFixture, system: &str, formatter: Value) {
+    record(
+        script,
+        "bloomeryCatalog",
+        "catalog",
+        system,
+        &json!({
+            "checks": ["core:treefmt-check", "one", "two"],
+            "legacy": false,
+            "formatCheck": {"success": true, "drvPath": FORMAT_CHECK},
+            "formatter": formatter,
+            "healthSources": null,
+        }),
+    );
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-033"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-037"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-039"))]
+fn complete_no_write_selections_read_recorded_catalog_and_plan() {
+    let (root, cache) = fixture(true);
+    let mut script = NixFixture::new(&root);
+    let two = "/nix/store/two.drv";
+    recorded_catalog(&mut script, "x86_64-linux", Value::Null);
+    record(
+        &mut script,
+        "bloomeryPlan",
+        "plan",
+        "x86_64-linux",
+        &json!({"legacy": false, "plan": {
+            "one": {"success": true, "drvPath": SHARED},
+            "two": {"success": true, "drvPath": two},
+        }}),
+    );
+    let data = metadata(&[
+        (FORMAT_CHECK, FORMAT_OUTPUT, &[]),
+        (SHARED, OUTPUT, &[]),
+        (two, "/nix/store/two-out", &[]),
+    ]);
+    script.expect(
+        &strings(&["derivation", "show", FORMAT_CHECK, SHARED, two]),
+        &data.to_string(),
+    );
+    build(&mut script, &[FORMAT_CHECK, SHARED, two], false);
+    validity(
+        &mut script,
+        &[
+            (FORMAT_OUTPUT, true),
+            (OUTPUT, true),
+            ("/nix/store/two-out", true),
+        ],
+    );
+    let mut args = request();
+    args.systems = vec!["x86_64-linux".into()];
+    // Every Nix check is selected; static checks would race with the fixture
+    // writing its call records inside the workspace.
+    args.selectors = vec!["nix:*".into()];
+    let (status, stdout, stderr) =
+        invoke_with_mode(args, &root, &cache, &script.backend(), true, true);
+    assert_eq!(
+        status,
+        ExitCode::SUCCESS,
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&stdout),
+        String::from_utf8_lossy(&stderr)
+    );
+    let record = latest(&root, &cache);
+    for name in ["core:treefmt-check", "one", "two"] {
+        assert!(record.outcomes.iter().any(|outcome| {
+            outcome.id == format!("nix:x86_64-linux:{name}") && outcome.outcome == Outcome::Passed
+        }));
+    }
+    script.verify().unwrap();
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-038"))]
+fn partial_recorded_selections_evaluate_only_selected_attributes() {
+    let (root, cache) = fixture(true);
+    let mut script = NixFixture::new(&root);
+    recorded_catalog(&mut script, "x86_64-linux", Value::Null);
+    // The catalog's formatter check is reused; only `one` is evaluated.
+    script.expect(
+        &plan_args("x86_64-linux", &["one"]),
+        &json!({"legacy": false, "plan": {"one": {"success": true, "drvPath": SHARED}}})
+            .to_string(),
+    );
+    script.expect(
+        &strings(&["derivation", "show", FORMAT_CHECK, SHARED]),
+        &metadata(&[(FORMAT_CHECK, FORMAT_OUTPUT, &[]), (SHARED, OUTPUT, &[])]).to_string(),
+    );
+    build(&mut script, &[FORMAT_CHECK, SHARED], false);
+    validity(&mut script, &[(FORMAT_OUTPUT, true), (OUTPUT, true)]);
+    let mut args = request();
+    args.systems = vec!["x86_64-linux".into()];
+    args.selectors = vec!["nix:*:one".into()];
+    let (status, _, _) = invoke_with_mode(args, &root, &cache, &script.backend(), true, true);
+    assert_eq!(status, ExitCode::SUCCESS);
+    script.verify().unwrap();
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-013"))]
+fn recorded_formatters_are_realized_and_run_without_nix_fmt() {
+    let (root, cache) = fixture(true);
+    let mut script = NixFixture::new(&root);
+    let formatter = "/nix/store/0123456789abcdfghijklmnpqrsvwxyz-treefmt.drv";
+    recorded_catalog(
+        &mut script,
+        &host(),
+        json!({"drvPath": formatter, "program": NixFixture::executable()}),
+    );
+    script.expect(
+        &strings(&["build", "--no-link", &format!("{formatter}^out")]),
+        "",
+    );
+    // The fixture executable stands in for the recorded program; it is
+    // invoked with no arguments from the workspace root.
+    script.expect(&[], "formatted\n");
+    let mut args = request();
+    args.selectors = vec!["static:structure".into()];
+    let (status, _, _) = invoke(args, &root, &cache, &script.backend(), true);
+    assert_eq!(status, ExitCode::SUCCESS);
+    assert!(
+        latest(&root, &cache).outcomes.iter().any(|outcome| {
+            outcome.id == "format:workspace" && outcome.outcome == Outcome::Passed
+        })
+    );
+    script.verify().unwrap();
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-036"))]
+fn catalog_read_failures_other_than_a_missing_attribute_are_operational() {
+    let (root, cache) = fixture(true);
+    let mut script = NixFixture::new(&root);
+    let failed = script.expect(&record_args("bloomeryCatalog", "x86_64-linux"), "");
+    fs::write(failed.join("status"), "1").unwrap();
+    fs::write(
+        failed.join("stderr"),
+        "error: syntax error, unexpected '}'\n",
+    )
+    .unwrap();
+    let mut args = request();
+    args.systems = vec!["x86_64-linux".into()];
+    let (status, stdout, _) = invoke(args, &root, &cache, &script.backend(), true);
+    assert_eq!(status, ExitCode::from(2));
+    let error: Value = serde_json::from_slice(&stdout).unwrap();
+    assert_eq!(error["error"]["code"], "OperationalError");
+    assert!(
+        error["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("check catalog read failed")
+    );
+    script.verify().unwrap();
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-014"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-034"))]
+fn generic_flakes_discover_with_nix_eval_and_format_with_nix_fmt() {
+    let (root, cache) = fixture(true);
+    let mut script = NixFixture::new(&root);
+    // The missing catalog record selects attribute-name evaluation and `nix fmt`.
+    discover_calls(&mut script, &host(), &["one"]);
+    formatter(&mut script);
+    let mut args = request();
+    args.selectors = vec!["static:structure".into()];
+    let (status, _, _) = invoke(args, &root, &cache, &script.backend(), true);
+    assert_eq!(status, ExitCode::SUCCESS);
     script.verify().unwrap();
 }

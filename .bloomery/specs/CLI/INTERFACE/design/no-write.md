@@ -32,8 +32,9 @@ Nix store.
 
 ## Check execution
 
-Without `--no-write`, every valid check execution runs `nix fmt` before
-selected checks. It leaves formatter edits in the workspace. When
+Without `--no-write`, every valid check execution runs the flake's default
+formatter before selected checks, in place of the native
+`checks.<system>."core:treefmt-check"` derivation. It leaves formatter edits in the workspace. When
 `static:code-health` is enabled and selected, check compares its measurement
 with the configured baseline and atomically replaces the baseline after a
 complete measurement. Refresh occurs even when health policy gates or unrelated
@@ -42,7 +43,7 @@ or cancellation or interruption before measurement completes does not refresh
 the baseline. Health remains opt-in and selectors continue to control its
 measurement.
 
-With `--no-write`, check does not run `nix fmt`. It includes the native
+With `--no-write`, check does not run the formatter. It includes the native
 `checks.<system>."core:treefmt-check"` derivation for every selected system,
 even for partial selections. A missing attribute is an operational catalog
 error. The derivation follows

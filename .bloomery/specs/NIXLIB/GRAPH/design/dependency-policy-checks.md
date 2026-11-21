@@ -21,6 +21,10 @@ Every dependency policy check requires a version-3 `bloomery.lock` whose
 applies even when `checks.lockFreshness.enable` is disabled. A missing, older,
 or stale Bloomery lock fails evaluation with guidance to run `bloomery sync`.
 
+Each member's dependency context is walked once, breadth first, and shared by
+its vulnerability, license, and ban checks. The first path that reaches a
+package is the example path reported for it.
+
 Each policy check is a small Nix derivation over the evaluated graph and policy
 result. Warnings are printed in the successful check log. Denied findings fail
 the check derivation and print the member, offending package and version, and
@@ -70,6 +74,10 @@ error. Bloomery's Rust packages inherit `MIT OR Apache-2.0` from the root
 `[workspace.package]` metadata. The repository includes the corresponding full
 license texts as `LICENSE-MIT` and `LICENSE-APACHE`, with 2026 Actionable Work,
 LLC copyright notices in both files.
+
+Each distinct license expression is parsed and classified against the allow
+and deny lists once per workspace; members that share a dependency share its
+verdict. Exceptions apply per package after classification.
 
 Workspace packages are first-party dependencies. The license check accepts them
 without requiring or evaluating their license metadata, overrides, or global

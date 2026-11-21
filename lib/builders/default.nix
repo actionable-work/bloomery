@@ -1,7 +1,10 @@
 {
   pkgs,
   lib ? pkgs.lib,
-}: rec {
+}: let
+  # One Topcoat bundler per package set; every crate and binary shares it.
+  topcoat = import ./topcoat-tool.nix {inherit pkgs;};
+in rec {
   buildCrateWith = {
     rustc ? pkgs.rustc,
     stdenv ? pkgs.stdenv,
@@ -29,7 +32,7 @@
       else null
     ),
   }:
-    import ./crate.nix {inherit pkgs lib rustc stdenv mold lld useMold useLld defaultLinker;};
+    import ./crate.nix {inherit pkgs lib topcoat rustc stdenv mold lld useMold useLld defaultLinker;};
 
   buildBinWith = {
     rustc ? pkgs.rustc,
@@ -58,7 +61,7 @@
       else null
     ),
   }:
-    import ./bin.nix {inherit pkgs lib rustc stdenv mold lld useMold useLld defaultLinker;};
+    import ./bin.nix {inherit pkgs lib topcoat rustc stdenv mold lld useMold useLld defaultLinker;};
 
   testCrateWith = {
     rustc ? pkgs.rustc,

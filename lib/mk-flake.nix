@@ -239,14 +239,35 @@ in
       if collisions == []
       then existing // generated
       else throw "bloomery: Billet check name(s) collide on ${system}: ${lib.concatStringsSep ", " collisions}");
+
+    composedOutputs =
+      if billets != null && !lib.isFunction billets
+      then throw "bloomery: billets must be a callback taking { pkgs, packages }"
+      else if !billetsEnabled
+      then outputs
+      else if extra ? billets
+      then throw "bloomery: extraOutputs.billets conflicts with the billets callback or [flakes.<name>].billets elevation"
+      else
+        outputs
+        // {billets = billetOutputs;}
+        // lib.optionalAttrs (billets != null) {checks = checksWithBillets;};
+
+    # Catalog records read by `bloomery check`, computed from the final checks
+    # so composed, elevated, and Billet checks are all cataloged.
+    checkCatalog = import ./check-catalog.nix {inherit lib;};
   in
-    if billets != null && !lib.isFunction billets
-    then throw "bloomery: billets must be a callback taking { pkgs, packages }"
-    else if !billetsEnabled
-    then outputs
-    else if extra ? billets
-    then throw "bloomery: extraOutputs.billets conflicts with the billets callback or [flakes.<name>].billets elevation"
-    else
-      outputs
-      // {billets = billetOutputs;}
-      // lib.optionalAttrs (billets != null) {checks = checksWithBillets;}
+    composedOutputs
+    // {
+      bloomeryCatalog = eachSystem (system:
+        checkCatalog.catalog {
+          inherit system;
+          checks = composedOutputs.checks.${system};
+          formatter = composedOutputs.formatter.${system} or null;
+          healthSources = composedOutputs.healthSources.${system} or null;
+        });
+      bloomeryPlan = eachSystem (system:
+        checkCatalog.plan {
+          inherit system;
+          checks = composedOutputs.checks.${system};
+        });
+    }

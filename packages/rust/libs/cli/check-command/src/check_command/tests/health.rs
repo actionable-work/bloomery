@@ -804,3 +804,35 @@ fn health_retrieval_does_not_fall_back_when_latest_report_is_missing() {
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
 }
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-033"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-035"))]
+fn health_sources_come_from_the_host_catalog_or_the_generic_projection() {
+    for recorded in [false, true] {
+        let (root, cache, generic) = health_fixture();
+        let backend = if recorded {
+            FakeNix {
+                recorded: Some(crate::check_command::catalog::RecordedCatalog {
+                    health_sources: Some(generic.health_crates.clone()),
+                    ..Default::default()
+                }),
+                ..FakeNix::default()
+            }
+        } else {
+            generic
+        };
+        let mut args = request();
+        args.selectors = vec!["static:code-health".to_owned()];
+        let (status, _, _) = invoke(args, &root, &cache, &backend, true);
+        assert_eq!(status, std::process::ExitCode::SUCCESS);
+        assert_eq!(
+            backend
+                .health_source_calls
+                .load(std::sync::atomic::Ordering::SeqCst),
+            usize::from(!recorded)
+        );
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_dir_all(cache);
+    }
+}

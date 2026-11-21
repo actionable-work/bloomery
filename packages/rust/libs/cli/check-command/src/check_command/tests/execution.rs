@@ -637,7 +637,8 @@ fn every_execution_shape_formats_once_before_any_check() {
             assert_eq!(catalog_events[1], "format");
             assert!(catalog_events[2].starts_with("plan:"));
         } else {
-            assert_eq!(catalog_events, ["format"]);
+            // Static-only selections read only the host catalog's formatter.
+            assert_eq!(catalog_events, ["discover:x86_64-linux", "format"]);
         }
         assert!(
             events[1..]
@@ -680,14 +681,14 @@ fn no_write_selects_and_deduplicates_the_native_formatter_per_system() {
     assert_eq!(backend.evaluations.load(Ordering::SeqCst), 2);
     assert_eq!(backend.formatter_runs.load(Ordering::SeqCst), 0);
     assert_eq!(backend.build_commands.load(Ordering::SeqCst), 1);
-    assert_eq!(backend.catalog_events.lock().unwrap().len(), 2);
-    assert!(
-        backend
-            .catalog_events
-            .lock()
-            .unwrap()
-            .iter()
-            .all(|event| event.starts_with("plan:"))
+    assert_eq!(
+        backend.catalog_events.lock().unwrap().as_slice(),
+        [
+            "discover:aarch64-linux",
+            "discover:x86_64-linux",
+            "plan:aarch64-linux",
+            "plan:x86_64-linux",
+        ]
     );
     assert_eq!(
         fs::read(&important).expect("preserved sentinel"),
@@ -745,7 +746,7 @@ fn no_write_rejects_a_catalog_without_the_native_formatter_before_work() {
             .unwrap()
             .contains("core:treefmt-check")
     );
-    assert_eq!(backend.evaluations.load(Ordering::SeqCst), 1);
+    assert_eq!(backend.evaluations.load(Ordering::SeqCst), 0);
     assert_eq!(backend.formatter_runs.load(Ordering::SeqCst), 0);
     assert_eq!(backend.build_commands.load(Ordering::SeqCst), 0);
     assert!(
@@ -1083,4 +1084,134 @@ fn check_gate_passes_without_spec_management() {
     );
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-015"))]
+fn write_mode_drops_the_native_treefmt_check_without_planning_it() {
+    let (root, cache) = fixture(true);
+    let backend = FakeNix {
+        names: vec!["core:treefmt-check".to_owned(), "other".to_owned()],
+        unique_derivations: true,
+        ..FakeNix::default()
+    };
+    let (status, _, _) = invoke(request(), &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::SUCCESS);
+    assert_eq!(
+        backend.planned_attributes.lock().unwrap().as_slice(),
+        [vec!["x86_64-linux:other".to_owned()]]
+    );
+    let record = RunStore::open(&root, Some(&cache))
+        .expect("run store")
+        .latest()
+        .expect("latest run")
+        .0;
+    assert!(
+        !record
+            .outcomes
+            .iter()
+            .any(|outcome| outcome.id.ends_with(":core:treefmt-check"))
+    );
+    assert!(
+        !record
+            .selection
+            .selected_checks
+            .iter()
+            .any(|id| id.ends_with(":core:treefmt-check"))
+    );
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-016"))]
+fn write_mode_accepts_a_selector_matching_only_the_superseded_check() {
+    let (root, cache) = fixture(true);
+    let backend = FakeNix {
+        names: vec!["core:treefmt-check".to_owned(), "other".to_owned()],
+        ..FakeNix::default()
+    };
+    let mut args = request();
+    args.selectors = vec!["nix:*:core:treefmt-check".to_owned()];
+    let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
+    assert_eq!(status, std::process::ExitCode::SUCCESS);
+    let summary: Value = serde_json::from_slice(&stdout).expect("summary");
+    assert_eq!(summary["result"]["counts"]["passed"], 1);
+    assert_eq!(backend.formatter_runs.load(Ordering::SeqCst), 1);
+    assert_eq!(backend.evaluations.load(Ordering::SeqCst), 0);
+    assert_eq!(backend.build_commands.load(Ordering::SeqCst), 0);
+    let record = RunStore::open(&root, Some(&cache))
+        .expect("run store")
+        .latest()
+        .expect("latest run")
+        .0;
+    assert_eq!(
+        record
+            .outcomes
+            .iter()
+            .map(|outcome| outcome.id.as_str())
+            .collect::<Vec<_>>(),
+        ["format:workspace"]
+    );
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-NIX-038"))]
+fn partial_selections_plan_only_selected_attributes() {
+    let (root, cache) = fixture(true);
+    let backend = FakeNix {
+        names: vec![
+            "core:treefmt-check".to_owned(),
+            "one".to_owned(),
+            "two".to_owned(),
+        ],
+        unique_derivations: true,
+        ..FakeNix::default()
+    };
+    let mut args = request();
+    args.selectors = vec!["nix:*:one".to_owned()];
+    let (status, _, _) = invoke_with_mode(args, &root, &cache, &backend, true, true);
+    assert_eq!(status, std::process::ExitCode::SUCCESS);
+    assert_eq!(
+        backend.planned_attributes.lock().unwrap().as_slice(),
+        [vec![
+            "x86_64-linux:core:treefmt-check".to_owned(),
+            "x86_64-linux:one".to_owned(),
+        ]]
+    );
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(cache);
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-013"))]
+#[cfg_attr(any(), bloomery("CLI-CHECK-FORMAT-014"))]
+fn the_formatter_gate_uses_the_host_catalog_formatter_when_recorded() {
+    let formatter = crate::check_command::catalog::RecordedFormatter {
+        derivation: "/nix/store/0123456789abcdfghijklmnpqrsvwxyz-treefmt.drv".to_owned(),
+        program: "/nix/store/0123456789abcdfghijklmnpqrsvwxyz-treefmt/bin/treefmt".to_owned(),
+    };
+    for recorded in [
+        None,
+        Some(crate::check_command::catalog::RecordedCatalog {
+            formatter: Some(formatter.clone()),
+            ..Default::default()
+        }),
+    ] {
+        let (root, cache) = fixture(true);
+        let backend = FakeNix {
+            recorded: recorded.clone(),
+            ..FakeNix::default()
+        };
+        let mut args = request();
+        args.selectors = vec!["static:structure".to_owned()];
+        let (status, _, _) = invoke(args, &root, &cache, &backend, true);
+        assert_eq!(status, std::process::ExitCode::SUCCESS);
+        let expected = recorded.and_then(|catalog| catalog.formatter);
+        assert_eq!(backend.formatters.lock().unwrap().as_slice(), [expected]);
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_dir_all(cache);
+    }
 }

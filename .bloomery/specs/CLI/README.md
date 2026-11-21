@@ -21,7 +21,7 @@ parser:
   workspace from a bundled template. It is the only command that does not
   require a root `flake.nix` or `.bloomery/config.toml`.
 - [`bloomery check`](CHECK/README.md) requires a root `flake.nix`; write mode
-  runs `nix fmt` before static validation and Nix checks, while `--no-write`
+  runs the default formatter before static validation and Nix checks, while `--no-write`
   includes the native treefmt check in the batched Nix realization for every
   selected system.
   It runs independent
@@ -120,7 +120,7 @@ other Nix checks directly. See [Nix orchestration](CHECK/design/workspace-check.
 └── current directory + `flake.nix` presence gate
     ├── `bloomery check` execution
     │   ├── catalog/selection setup
-    │   ├── write mode: `nix fmt` before checks
+    │   ├── write mode: default formatter before checks
     │   └── no-write mode: native treefmt check in batched Nix realization
     ├── `bloomery build` ──► batched `packages.<system>` realization
     ├── `bloomery disk` ──► realized Nix store closure measurement

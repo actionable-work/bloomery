@@ -1,6 +1,6 @@
 use super::catalog::{
-    BatchRealization, CheckPlan, FailureBlock, NixBackend, NixTaskResult, PlanError, PlannedSystem,
-    nix_log_store_path,
+    BatchRealization, CheckPlan, FailureBlock, NixBackend, NixTaskResult, PlanError, PlanRequest,
+    PlannedSystem, RecordedCatalog, RecordedFormatter, SystemCatalog, nix_log_store_path,
 };
 use super::command::{CheckArgs, CheckContext, run_at_with};
 use super::interrupt::{CancellationToken, InterruptFlag};
@@ -27,7 +27,16 @@ pub(super) struct FakeNix {
     pub(super) names: Vec<String>,
     pub(super) health_crates: Vec<bloomery_check::HealthSourceCrate>,
     pub(super) interrupt_on_health_source: Option<InterruptFlag>,
+    /// Number of `healthSources` projections requested.
+    pub(super) health_source_calls: AtomicUsize,
     pub(super) discovery_error: Option<String>,
+    /// Recorded catalog facts returned with every system catalog; `None`
+    /// models a generic flake.
+    pub(super) recorded: Option<RecordedCatalog>,
+    /// Attributes requested by each `plan_checks` call, as `system:attribute`.
+    pub(super) planned_attributes: Mutex<Vec<Vec<String>>>,
+    /// Formatter passed to each formatter gate run.
+    pub(super) formatters: Mutex<Vec<Option<RecordedFormatter>>>,
     pub(super) unique_derivations: bool,
     /// Attributes whose derivation fails during `plan_checks` evaluation.
     pub(super) plan_eval_failures: Vec<String>,
@@ -85,7 +94,7 @@ impl NixBackend for FakeNix {
         Ok("x86_64-linux".to_owned())
     }
 
-    fn discover(&self, _root: &Path, system: &str) -> Result<Vec<String>, String> {
+    fn catalog(&self, _root: &Path, system: &str) -> Result<SystemCatalog, String> {
         self.catalog_events
             .lock()
             .expect("catalog event lock")
@@ -97,16 +106,24 @@ impl NixBackend for FakeNix {
         if let Some(error) = &self.discovery_error {
             return Err(error.clone());
         }
-        Ok(self.names.clone())
+        Ok(SystemCatalog {
+            attributes: self.names.clone(),
+            recorded: self.recorded.clone(),
+        })
     }
 
     fn format_workspace(
         &self,
         root: &Path,
+        formatter: Option<&RecordedFormatter>,
         log_path: &Path,
         _cancellation: CancellationToken,
     ) -> NixTaskResult<()> {
         self.formatter_runs.fetch_add(1, Ordering::SeqCst);
+        self.formatters
+            .lock()
+            .expect("formatter lock")
+            .push(formatter.cloned());
         self.events
             .lock()
             .expect("event lock")
@@ -131,7 +148,22 @@ impl NixBackend for FakeNix {
             .unwrap_or(NixTaskResult::Succeeded(()))
     }
 
-    fn plan_checks(&self, _root: &Path, system: &str) -> Result<PlannedSystem, String> {
+    fn plan_checks(
+        &self,
+        _root: &Path,
+        system: &str,
+        request: &PlanRequest<'_>,
+    ) -> Result<PlannedSystem, String> {
+        self.planned_attributes
+            .lock()
+            .expect("planned attribute lock")
+            .push(
+                request
+                    .attributes
+                    .iter()
+                    .map(|attribute| format!("{system}:{attribute}"))
+                    .collect(),
+            );
         self.catalog_events
             .lock()
             .expect("catalog event lock")
@@ -145,7 +177,11 @@ impl NixBackend for FakeNix {
             return Err(error.clone());
         }
         let mut plans = Vec::new();
-        for attribute in &self.names {
+        for attribute in self
+            .names
+            .iter()
+            .filter(|attribute| request.attributes.contains(*attribute))
+        {
             let derivation = if self.unique_derivations {
                 format!("/nix/store/{attribute}.drv")
             } else {
@@ -407,6 +443,7 @@ impl NixBackend for FakeNix {
         _root: &Path,
         _system: &str,
     ) -> Result<Vec<bloomery_check::HealthSourceCrate>, String> {
+        self.health_source_calls.fetch_add(1, Ordering::SeqCst);
         if let Some(interrupt) = &self.interrupt_on_health_source {
             interrupt.interrupt();
         }

@@ -1,0 +1,9 @@
+[dependencies]
+bloomery-check-support = { workspace = true }
+serde_json = { workspace = true }
+
+[package]
+edition = "2024"
+license.workspace = true
+name = "bloomery-nix-progress"
+version = "0.1.0"

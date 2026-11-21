@@ -24,30 +24,21 @@
           inherit id;
           path = [memberId id];
         }) (lib.filter (id: id != memberId) (root.dependencies or []));
-    walk = queue: visited: paths:
-      if queue == []
-      then paths
-      else let
-        current = builtins.head queue;
-        rest = builtins.tail queue;
-        id = current.id;
-      in
-        if visited ? ${id}
-        then walk rest visited paths
-        else let
-          package = packages.${id} or null;
-          next =
-            if package == null
-            then []
-            else
-              map (dependency: {
-                id = dependency;
-                path = current.path ++ [dependency];
-              }) (lib.filter (dependency: dependency != memberId) ((context.${id} or {}).dependencies or []));
-        in
-          walk (rest ++ next) (visited // {"${id}" = true;}) (paths // {"${id}" = current.path;});
+    # Breadth-first: the first path that reaches a package is its shortest.
+    reached = builtins.genericClosure {
+      startSet = map (item: item // {key = item.id;}) initial;
+      operator = current:
+        if !(packages ? ${current.id})
+        then []
+        else
+          map (dependency: {
+            key = dependency;
+            id = dependency;
+            path = current.path ++ [dependency];
+          }) (lib.filter (dependency: dependency != memberId) ((context.${current.id} or {}).dependencies or []));
+    };
   in
-    walk initial {} {};
+    lib.listToAttrs (map (item: lib.nameValuePair item.id item.path) reached);
 
   renderPath = path: packages:
     lib.concatStringsSep " -> " (map (id: let
@@ -95,27 +86,49 @@
     then override
     else entry.metadata.license or null;
 
+  # Classify one license expression against the allow and deny lists.
+  classifyLicense = config: expression: let
+    ast = licenses.parse expression;
+  in {
+    valid = ast != null;
+    compatible =
+      ast
+      != null
+      && licenses.evaluateAst {
+        inherit ast;
+        allow = config.allow;
+        deny = config.deny;
+      };
+  };
+
+  # Memoize classification over the expressions a workspace can produce, so
+  # members that share dependencies share verdicts.
+  licenseClassifier = {
+    config,
+    expressions,
+  }: let
+    known = lib.unique (builtins.filter builtins.isString expressions);
+    table = lib.listToAttrs (map (expression: lib.nameValuePair expression (classifyLicense config expression)) known);
+  in
+    expression: table.${expression} or (classifyLicense config expression);
+
   licensesCheckFromEntries = {
     entries,
     config,
+    classify ? classifyLicense config,
   }:
     builtins.concatMap (entry: let
       expression = licenseExpression entry config;
       excepted = matchesAny config.exceptions entry;
+      verdict = classify expression;
       parsed =
-        if expression == null
+        if expression == null || !verdict.valid
         then null
-        else licenses.parse expression;
+        else true;
       compatible =
         if parsed == null
         then false
-        else
-          excepted
-          || licenses.evaluate {
-            inherit expression;
-            allow = config.allow;
-            deny = config.deny;
-          };
+        else excepted || verdict.compatible;
     in
       if entry.package.isWorkspace or false
       then []
@@ -155,5 +168,5 @@
       inherit (args) config;
     };
 in {
-  inherit dependencyPaths packageEntries bans bansFromEntries licensesCheck licensesCheckFromEntries matchesSelector matchesAny renderPath;
+  inherit classifyLicense licenseClassifier dependencyPaths packageEntries bans bansFromEntries licensesCheck licensesCheckFromEntries matchesSelector matchesAny renderPath;
 }

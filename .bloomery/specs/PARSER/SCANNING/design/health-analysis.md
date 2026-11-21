@@ -93,7 +93,9 @@ Exact duplication compares contiguous windows of `duplicateMinTokens` body
 tokens across distinct callables, retaining token kinds, identifier spelling,
 and literal spelling while ignoring comments, whitespace, and source spans.
 Do not normalize names or literals. Windows cannot cross callable boundaries.
-Hash windows for candidate grouping and compare complete token sequences to
+Intern each token kind and spelling once; windows reference interned token
+sequences instead of copying tokens. Hash windows for candidate grouping,
+retain only windows whose hash repeats, and compare complete token sequences to
 confirm equality; hash collisions cannot create duplicates. Merge overlapping
 matched ranges. A physical range compared to itself through another target or
 crate ownership is not a clone; disjoint callables in the same file can be.

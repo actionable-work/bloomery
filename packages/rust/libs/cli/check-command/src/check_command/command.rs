@@ -18,7 +18,7 @@ pub(crate) use bloomery_check_output::render::report_error;
 #[cfg(test)]
 pub(crate) use bloomery_check_selection::selection::missing_check_controls;
 pub(crate) use bloomery_check_selection::selection::{
-    PlannedCatalog, discover_for_selection, plan_for_selection, warn_missing_check_controls,
+    Catalog, PlannedCatalog, discover_for_selection, plan_selected, warn_missing_check_controls,
 };
 pub(crate) use bloomery_check_support::context::CheckError;
 pub(crate) use bloomery_check_support::validation::validate_args;

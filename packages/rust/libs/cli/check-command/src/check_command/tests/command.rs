@@ -20,10 +20,10 @@ fn default_and_explicit_selection_choose_static_and_requested_system_catalogs() 
     let (status, stdout, _) = invoke(request(), &root, &cache, &static_backend, true);
     assert_eq!(status, std::process::ExitCode::SUCCESS);
     let result: Value = serde_json::from_slice(&stdout).expect("summary JSON");
-    // Two static checks plus the implicit format:workspace gate; one catalog
-    // evaluation resolves the (empty) Nix plan.
+    // Two static checks plus the implicit format:workspace gate; an empty Nix
+    // selection needs no plan evaluation.
     assert_eq!(result["result"]["counts"]["passed"], 3);
-    assert_eq!(static_backend.evaluations.load(Ordering::SeqCst), 1);
+    assert_eq!(static_backend.evaluations.load(Ordering::SeqCst), 0);
     assert_eq!(static_backend.formatter_runs.load(Ordering::SeqCst), 1);
 
     let (root, cache2) = fixture(true);
@@ -326,11 +326,12 @@ fn explicitly_selected_system_with_empty_checks_is_a_valid_static_only_run() {
 
     let (status, stdout, _) = invoke(args, &root, &cache, &backend, true);
     assert_eq!(status, std::process::ExitCode::SUCCESS);
+    // The selected system's catalog, then the host catalog for the formatter.
     assert_eq!(
         backend.systems.lock().unwrap().as_slice(),
-        &["aarch64-linux", "aarch64-linux"]
+        &["aarch64-linux", "x86_64-linux"]
     );
-    assert_eq!(backend.evaluations.load(Ordering::SeqCst), 1);
+    assert_eq!(backend.evaluations.load(Ordering::SeqCst), 0);
     let result: Value = serde_json::from_slice(&stdout).expect("summary JSON");
     assert_eq!(result["result"]["counts"]["passed"], 3);
     assert_eq!(result["result"]["scope"]["systems"][0], "aarch64-linux");

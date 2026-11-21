@@ -1515,12 +1515,15 @@ in
           lockPackages = lockManifest.packages or {};
         };
 
+    # Shared by every policy family so each member's dependency walk runs once.
+    policyEntries = lib.listToAttrs (map (member: lib.nameValuePair member.id (policyEntriesFor member)) selectedWorkspacePackages);
+
     memberPolicyChecks = family: enabled: evaluate:
       if !enabled
       then {}
       else
         lib.listToAttrs (lib.concatMap (member: let
-            findings = map (finding: finding // {member = member.id;}) (evaluate member (policyEntriesFor member));
+            findings = map (finding: finding // {member = member.id;}) (evaluate member policyEntries.${member.id});
             warnings = builtins.filter (finding: (finding.outcome or "deny") == "warn") findings;
             violations = builtins.filter (finding: (finding.outcome or "deny") != "warn") findings;
           in [
@@ -1539,12 +1542,20 @@ in
           config = cfg.checks.bans;
         });
 
-    licensePolicyChecks =
-      memberPolicyChecks "licenses" cfg.checks.licenses.enable
+    licensePolicyChecks = let
+      config = cfg.checks.licenses;
+      # Every member shares one verdict per distinct license expression.
+      classify = dependencyPolicy.licenseClassifier {
+        inherit config;
+        expressions =
+          lib.mapAttrsToList (_: package: package.license or null) (lockManifest.packages or {})
+          ++ builtins.attrValues config.overrides;
+      };
+    in
+      memberPolicyChecks "licenses" config.enable
       (_member: entries:
         dependencyPolicy.licensesCheckFromEntries {
-          inherit entries;
-          config = cfg.checks.licenses;
+          inherit entries config classify;
         });
 
     vulnerabilityPolicyChecks =

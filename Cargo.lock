@@ -227,6 +227,7 @@ dependencies = [
  "bloomery-check",
  "bloomery-check-support",
  "bloomery-nix",
+ "bloomery-nix-progress",
  "serde_json",
 ]
 
@@ -454,6 +455,14 @@ dependencies = [
 name = "bloomery-nix"
 version = "0.1.0"
 dependencies = [
+ "serde_json",
+]
+
+[[package]]
+name = "bloomery-nix-progress"
+version = "0.1.0"
+dependencies = [
+ "bloomery-check-support",
  "serde_json",
 ]
 
