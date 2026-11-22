@@ -3,15 +3,21 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub(crate) struct NixFixture {
+    workspace: PathBuf,
     root: PathBuf,
     calls: Vec<PathBuf>,
 }
 
 impl NixFixture {
+    /// Call records live beside the workspace, matching the fixture
+    /// executable, so checks that scan the workspace never observe them.
     pub(crate) fn new(workspace: &Path) -> Self {
-        let root = workspace.join(".nix-fixture");
+        let workspace = fs::canonicalize(workspace).expect("fixture workspace");
+        let name = workspace.file_name().expect("fixture workspace name");
+        let root = workspace.with_file_name(format!("{}.nix-fixture", name.to_string_lossy()));
         fs::create_dir(&root).expect("fixture script directory");
         Self {
+            workspace,
             root,
             calls: Vec::new(),
         }
@@ -42,14 +48,7 @@ impl NixFixture {
             .flat_map(|arg| arg.bytes().chain([0]))
             .collect::<Vec<_>>();
         fs::write(call.join("args"), encoded).unwrap();
-        fs::write(
-            call.join("cwd"),
-            fs::canonicalize(self.root.parent().unwrap())
-                .unwrap()
-                .to_str()
-                .unwrap(),
-        )
-        .unwrap();
+        fs::write(call.join("cwd"), self.workspace.to_str().unwrap()).unwrap();
         fs::write(call.join("stdout"), stdout).unwrap();
         fs::write(call.join("stderr"), "").unwrap();
         fs::write(call.join("status"), "0").unwrap();

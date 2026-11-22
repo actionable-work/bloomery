@@ -222,15 +222,13 @@ in
             fi
           done
         fi
-        ${
-          if defaultLinker != null
-          then ''
-            if [ "$IS_PROC_MACRO" = "1" ]; then
-              EXTRA_FLAGS+=("-Clink-arg=-fuse-ld=${defaultLinker}")
-            fi
-          ''
-          else ""
-        }
+        # Proc macros and cdylib or staticlib outputs link; plain rlib and
+        # metadata compilations only need dependency metadata.
+        STAGING_MODE=meta
+        if [ "$IS_PROC_MACRO" = "1" ] || { [ "$METADATA_ONLY" != "1" ] && [ ''${#EXTRA_CRATE_TYPES[@]} -gt 0 ]; }; then
+          STAGING_MODE=link
+          ${lib.optionalString (defaultLinker != null) ''EXTRA_FLAGS+=("-Clink-arg=-fuse-ld=${defaultLinker}")''}
+        fi
 
         # Determine entrypoint
         ENTRY=""
@@ -255,17 +253,11 @@ in
         ${import ./dependencies.nix {inherit lib;} {inherit dependencyBindings buildScriptBindings;}}
         EXTERN_FLAGS=("''${EXTRA_FLAGS[@]}")
         EXTRA_LINK_FLAGS=()
-        SKIP_PROC_MACRO_CLOSURE=${
-          if metadataOnly
-          then "1"
-          else "0"
-        }
-        resolve_deps EXTERN_FLAGS EXTRA_LINK_FLAGS _deps $dependencies
+        resolve_deps EXTERN_FLAGS EXTRA_LINK_FLAGS _deps "$STAGING_MODE" $dependencies
         BUILD_SCRIPT_DEPS_DIR="_deps_bs"
         BUILD_SCRIPT_EXTERN_FLAGS=()
         BUILD_SCRIPT_DEP_LINK_FLAGS=()
-        SKIP_PROC_MACRO_CLOSURE=0
-        resolve_deps BUILD_SCRIPT_EXTERN_FLAGS BUILD_SCRIPT_DEP_LINK_FLAGS _deps_bs $buildScriptDependencies
+        resolve_deps BUILD_SCRIPT_EXTERN_FLAGS BUILD_SCRIPT_DEP_LINK_FLAGS _deps_bs link $buildScriptDependencies
 
         # Resolve active features and expand implied features from Cargo.toml
         ACTIVE_FEATURES=(${lib.escapeShellArgs (
@@ -509,7 +501,9 @@ in
         fi
 
         # Compile the crate
-        mkdir -p $out/lib $out/nix-support
+        # rustc writes to a build-local directory; $out receives only archives.
+        RUSTC_OUT="$PWD/_rustc_out"
+        mkdir -p "$RUSTC_OUT" $out/nix-support
         echo "Compiling $CRATE_NAME ($CRATE_TYPE)..."
 
         $RUSTC "$ENTRY" \
@@ -524,7 +518,7 @@ in
           "''${EXTRA_LINK_FLAGS[@]}" \
           ${lib.escapeShellArgs (extraRustcFlags ++ compilerFlags.target)} \
           "''${FEATURE_FLAGS[@]}" \
-          --out-dir "$out/lib"
+          --out-dir "$RUSTC_OUT"
 
         runHook postBuild
       '';
@@ -534,88 +528,98 @@ in
 
         OUT_LIB=""
         if [ "$METADATA_ONLY" = "1" ]; then
-          OUT_LIB=$(ls $out/lib/lib$CRATE_NAME*.rmeta 2>/dev/null | head -n 1)
+          OUT_LIB=$(ls $RUSTC_OUT/lib$CRATE_NAME*.rmeta 2>/dev/null | head -n 1)
           if [ -z "$OUT_LIB" ]; then
-            OUT_LIB=$(ls $out/lib/*.rmeta 2>/dev/null | head -n 1)
+            OUT_LIB=$(ls $RUSTC_OUT/*.rmeta 2>/dev/null | head -n 1)
           fi
         elif [ "$IS_PROC_MACRO" = "1" ] || [ "$CRATE_TYPE" = "proc-macro" ]; then
-          OUT_LIB=$(ls $out/lib/lib$CRATE_NAME*.so $out/lib/lib$CRATE_NAME*.dylib 2>/dev/null | head -n 1)
+          OUT_LIB=$(ls $RUSTC_OUT/lib$CRATE_NAME*.so $RUSTC_OUT/lib$CRATE_NAME*.dylib 2>/dev/null | head -n 1)
           if [ -z "$OUT_LIB" ]; then
-            OUT_LIB=$(ls $out/lib/*.so $out/lib/*.dylib 2>/dev/null | head -n 1)
+            OUT_LIB=$(ls $RUSTC_OUT/*.so $RUSTC_OUT/*.dylib 2>/dev/null | head -n 1)
           fi
         else
-          OUT_LIB=$(ls $out/lib/lib$CRATE_NAME*.rlib 2>/dev/null | head -n 1)
+          OUT_LIB=$(ls $RUSTC_OUT/lib$CRATE_NAME*.rlib 2>/dev/null | head -n 1)
           if [ -z "$OUT_LIB" ]; then
-            OUT_LIB=$(ls $out/lib/*.rlib 2>/dev/null | head -n 1)
+            OUT_LIB=$(ls $RUSTC_OUT/*.rlib 2>/dev/null | head -n 1)
           fi
           if [ -z "$OUT_LIB" ]; then
-            OUT_LIB=$(ls $out/lib/lib$CRATE_NAME*.a $out/lib/lib$CRATE_NAME*.so $out/lib/lib$CRATE_NAME*.dylib 2>/dev/null | head -n 1)
+            OUT_LIB=$(ls $RUSTC_OUT/lib$CRATE_NAME*.a $RUSTC_OUT/lib$CRATE_NAME*.so $RUSTC_OUT/lib$CRATE_NAME*.dylib 2>/dev/null | head -n 1)
           fi
         fi
         if [ -z "$OUT_LIB" ]; then
-          OUT_LIB=$(ls $out/lib/lib* 2>/dev/null | head -n 1)
+          OUT_LIB=$(ls $RUSTC_OUT/lib* 2>/dev/null | head -n 1)
         fi
         if [ -z "$OUT_LIB" ]; then
-          echo "Error: rustc did not produce any library in $out/lib"
+          echo "Error: rustc did not produce any library in $RUSTC_OUT"
           exit 1
-        fi
-
-        # Install build-script native libraries so they travel with the crate archive.
-        if [ -n "''${OUT_DIR:-}" ] && [ -d "$OUT_DIR" ]; then
-          (
-            cd "$OUT_DIR"
-            find . -type f \( -name '*.a' -o -name '*.so' -o -name '*.dylib' \) | while IFS= read -r native_lib; do
-              mkdir -p "$out/lib/$(dirname "$native_lib")"
-              cp -p "$native_lib" "$out/lib/$native_lib"
-            done
-          )
         fi
 
         ${lib.optionalString (hasTopcoatAssets && !metadataOnly) ''
           # Index files while the crate's sources and build-script OUT_DIR
           # still exist.
-          mapfile -t TOPCOAT_ARTIFACTS < <(grep -rlaF TOPCOAT_ASSET "$out/lib" || true)
+          mapfile -t TOPCOAT_ARTIFACTS < <(grep -rlaF TOPCOAT_ASSET "$RUSTC_OUT" || true)
           if [ ''${#TOPCOAT_ARTIFACTS[@]} -gt 0 ]; then
             ${topcoat.executable} index "$CRATE_NAME" "$CARGO_MANIFEST_DIR" "$out/topcoat-assets" "" "''${TOPCOAT_ARTIFACTS[@]}"
           fi
         ''}DEP_LIB_NAME="$(basename "$OUT_LIB")"
-        tar --zstd -cf "$out/lib.tar.zst" -C "$out/lib" .
-        rm -rf "$out/lib"
+        DEP_META_NAME="$DEP_LIB_NAME"
+        if [ "$IS_PROC_MACRO" != "1" ]; then
+          DEP_META_NAME=$(cd "$RUSTC_OUT" && ls lib$CRATE_NAME*.rmeta *.rmeta 2>/dev/null | head -n 1)
+        fi
 
-        mkdir -p "$out/nix-support/deps-closure"
-        ln -sf "$out/lib.tar.zst" "$out/nix-support/deps-closure/$(basename "$out")-lib.tar.zst"
-        for dep in $dependencies; do
-          dep_is_proc_macro=0
-          dep_archive=""
-          if [ -f "$dep/nix-support/meta.sh" ]; then
-            # Read the dependency metadata without sourcing it: sourcing would
-            # overwrite this crate's own DEP_* values before they are published.
-            dep_is_proc_macro=$(sed -n 's/^export DEP_IS_PROC_MACRO="\(.*\)"$/\1/p' "$dep/nix-support/meta.sh" | head -n 1)
-            dep_archive=$(sed -n 's/^export DEP_LIB_ARCHIVE="\(.*\)"$/\1/p' "$dep/nix-support/meta.sh" | head -n 1)
-          fi
-          if [ "$METADATA_ONLY" = "1" ] && [ "$dep_is_proc_macro" = "1" ]; then
-            # Propagate the proc-macro itself but not its full release closure.
-            if [ -n "$dep_archive" ] && [ -f "$dep_archive" ]; then
-              ln -sf "$dep_archive" "$out/nix-support/deps-closure/$(basename "$dep")-lib.tar.zst"
-            fi
-            continue
-          fi
-          if [ -d "$dep/nix-support/deps-closure" ]; then
-            for f in "$dep/nix-support/deps-closure"/*; do
-              if [ -e "$f" ]; then
-                target=$(readlink -f "$f")
-                ln -sf "$target" "$out/nix-support/deps-closure/$(basename "$f")"
+        # Compile-time artifacts (metadata, the proc-macro library, and
+        # build-script native libraries) go to meta.tar.zst; linkable outputs
+        # go to lib.tar.zst.
+        mkdir -p _archive/meta _archive/lib
+        for artifact in "$RUSTC_OUT"/*; do
+          case "$artifact" in
+            *.rmeta) mv "$artifact" _archive/meta/ ;;
+            *)
+              if [ "$IS_PROC_MACRO" = "1" ]; then
+                mv "$artifact" _archive/meta/
+              else
+                mv "$artifact" _archive/lib/
               fi
-            done
-          elif [ -d "$dep/lib" ]; then
-            for f in "$dep/lib"/*; do
-              if [ -e "$f" ]; then
-                target=$(readlink -f "$f")
-                ln -sf "$target" "$out/nix-support/deps-closure/$(basename "$f")"
-              fi
-            done
-          fi
+              ;;
+          esac
         done
+        # Build-script native libraries keep their path relative to OUT_DIR.
+        if [ -n "''${OUT_DIR:-}" ] && [ -d "$OUT_DIR" ]; then
+          meta_dir="$PWD/_archive/meta"
+          (
+            cd "$OUT_DIR"
+            find . -type f \( -name '*.a' -o -name '*.so' -o -name '*.dylib' \) | while IFS= read -r native_lib; do
+              mkdir -p "$meta_dir/$(dirname "$native_lib")"
+              cp "$native_lib" "$meta_dir/$native_lib"
+            done
+          )
+        fi
+
+        # Archives are byte-reproducible: sorted members, fixed timestamps and
+        # ownership, and a fixed single-threaded zstd level.
+        write_archive() {
+          tar --sort=name --mtime=@1 --owner=0 --group=0 --numeric-owner --format=gnu \
+            --use-compress-program='zstd -3 -T1 -q' -cf "$1" -C "$2" .
+        }
+        write_archive "$out/meta.tar.zst" _archive/meta
+        if [ "$METADATA_ONLY" != "1" ] && [ "$IS_PROC_MACRO" != "1" ]; then
+          write_archive "$out/lib.tar.zst" _archive/lib
+        fi
+
+        # The closure lists this crate and every crate a consumer must stage
+        # with it. A proc macro is self-contained, so its closure is itself.
+        {
+          echo "$out"
+          if [ "$IS_PROC_MACRO" != "1" ]; then
+            for dep in $dependencies; do
+              if [ -f "$dep/nix-support/deps-closure" ]; then
+                cat "$dep/nix-support/deps-closure"
+              elif [ -d "$dep/lib" ]; then
+                echo "$dep"
+              fi
+            done
+          fi
+        } | LC_ALL=C sort -u > "$out/nix-support/deps-closure"
 
         ${lib.optionalString (hasTopcoatAssets && !metadataOnly) ''
           # Forward dependency Topcoat asset indexes for transitive consumers.
@@ -644,11 +648,15 @@ in
         cat << EOF > "$out/nix-support/meta.sh"
         export DEP_PKG_NAME="$PKG_NAME"
         export DEP_CRATE_NAME="$CRATE_NAME"
-        export DEP_LIB_ARCHIVE="$out/lib.tar.zst"
+        export DEP_META_ARCHIVE="$out/meta.tar.zst"
+        export DEP_META_NAME="$DEP_META_NAME"
         export DEP_LIB_NAME="$DEP_LIB_NAME"
         export DEP_IS_PROC_MACRO="$IS_PROC_MACRO"
         export DEP_RUSTC_LINK_FLAGS="''${BUILD_SCRIPT_LINK_FLAGS[*]}"
         EOF
+        if [ -f "$out/lib.tar.zst" ]; then
+          echo "export DEP_LIB_ARCHIVE=\"$out/lib.tar.zst\"" >> "$out/nix-support/meta.sh"
+        fi
         if [ -d "$out/assets" ]; then
           echo 'export DEP_HAS_ASSETS=1' >> "$out/nix-support/meta.sh"
           echo "export DEP_ASSETS_DIR=\"$out/assets\"" >> "$out/nix-support/meta.sh"

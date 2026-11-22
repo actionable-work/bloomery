@@ -36,7 +36,7 @@
             echo "Validating links metadata, native propagation, and crate types..."
 
             native_dir="$(mktemp -d)"
-            tar --zstd -xf "${linksSys}/lib.tar.zst" -C "$native_dir"
+            tar --zstd -xf "${linksSys}/meta.tar.zst" -C "$native_dir"
             output="$(LD_LIBRARY_PATH="$native_dir" ${workspace.packages."link-user"}/bin/link-user)"
             case "$output" in
               *"dep seen"*) : ;;
@@ -56,10 +56,10 @@
               exit 1
             fi
 
-            links_list="$(tar --zstd -tf "${linksSys}/lib.tar.zst")"
+            links_list="$(tar --zstd -tf "${linksSys}/meta.tar.zst")"
             printf '%s\n' "$links_list" | grep -q 'liblinks_sys_static\.a' || { echo "missing static native library in links-sys archive"; exit 1; }
             printf '%s\n' "$links_list" | grep -Eq 'liblinks_sys_shared\.(so|dylib)' || { echo "missing shared native library in links-sys archive"; exit 1; }
-            test -f "${linksSys}/nix-support/deps-closure/$(basename "${linksSys}")-lib.tar.zst" || { echo "missing links-sys archive in dependency closure"; exit 1; }
+            grep -qx "${linksSys}" "${linksSys}/nix-support/deps-closure" || { echo "links-sys missing from its dependency closure"; exit 1; }
 
             grep -q 'DEP_RUSTC_LINK_FLAGS' "${linksSys}/nix-support/meta.sh" || { echo "missing propagated link flags"; exit 1; }
             if grep -q '_build_script' "${linksSys}/nix-support/meta.sh"; then

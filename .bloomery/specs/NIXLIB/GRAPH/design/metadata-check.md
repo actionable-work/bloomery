@@ -60,9 +60,11 @@ compilation applies to the same crates in every source kind.
 
 A metadata-only variant publishes its crate name, `.rmeta` path, proc-macro
 flag, link flags, assets, sys-crate metadata, and dependency closure through the
-same metadata contract as a release crate. Its dependency closure contains the
-metadata-only archives of its non-proc-macro dependencies and the release
-archives of proc-macro and build-script dependencies.
+same metadata contract as a release crate and publishes only `meta.tar.zst`.
+Its dependency closure contains its metadata-only non-proc-macro dependencies'
+closures and its proc-macro dependencies, whose closures list only themselves.
+Build-script dependencies are staged for the build script and are not
+propagated.
 
 ## Check outcomes
 

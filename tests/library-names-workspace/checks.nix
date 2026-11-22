@@ -102,6 +102,7 @@
     second = version "2.0.0";
     uncompressed = pkgs.runCommand "naming-uncompressed-library" {nativeBuildInputs = [pkgs.zstd];} ''
       mkdir -p "$out/lib"
+      tar --zstd -xf ${first}/meta.tar.zst -C "$out/lib"
       tar --zstd -xf ${first}/lib.tar.zst -C "$out/lib"
     '';
     aliasTest = (builders.testCrateWith {defaultLinker = null;}) {
@@ -169,9 +170,9 @@
         grep -q 'DEP_CRATE_NAME="actual_library"' ${dep}/nix-support/meta.sh
         grep -q 'DEP_PKG_NAME="different-name"' ${dep}/nix-support/meta.sh
         tar --zstd -tf ${dep}/lib.tar.zst | grep -E 'libactual_library.*\.rlib$'
-        tar --zstd -tf ${macro}/lib.tar.zst | grep -E 'libactual_macro.*\.(so|dylib)$'
-        tar --zstd -tf ${metadata}/lib.tar.zst | grep -E 'libactual_library.*\.rmeta$'
-        if tar --zstd -tf ${metadata}/lib.tar.zst | grep -q '\.rlib$'; then exit 1; fi
+        tar --zstd -tf ${macro}/meta.tar.zst | grep -E 'libactual_macro.*\.(so|dylib)$'
+        tar --zstd -tf ${metadata}/meta.tar.zst | grep -E 'libactual_library.*\.rmeta$'
+        test ! -e ${metadata}/lib.tar.zst
         mkdir "$out"
       '';
     validate-index-fallback =

@@ -73,8 +73,8 @@
             test -x "${workspace.packages."bin-report"}/bin/bin-report" || { echo "Missing bin-report"; exit 1; }
             test "$("${workspace.packages."bin-calc"}/bin/bin-calc")" = "bin-calc result: 140" || { echo "bin-calc did not link its workspace libraries"; exit 1; }
             test -f "${workspace.crates."lib-core-0.1.0"}/nix-support/meta.sh" || { echo "Missing crate metadata"; exit 1; }
-            test -d "${workspace.crates."lib-core-0.1.0"}/nix-support/deps-closure" || { echo "Missing dependency closure"; exit 1; }
-            ls "${workspace.crates."lib-core-0.1.0"}/nix-support/deps-closure" >/dev/null || { echo "Empty dependency closure"; exit 1; }
+            test -s "${workspace.crates."lib-core-0.1.0"}/nix-support/deps-closure" || { echo "Missing dependency closure"; exit 1; }
+            grep -qx "${workspace.crates."lib-core-0.1.0"}" "${workspace.crates."lib-core-0.1.0"}/nix-support/deps-closure" || { echo "Dependency closure omits the crate"; exit 1; }
             test -n "${injectedCli}" || { echo "Missing injected bloomery CLI"; exit 1; }
             if grep -q "${pkgs.cargo}/bin" "${injectedCli}/bin/bloomery"; then echo "Injected bloomery CLI must not wrap cargo"; exit 1; fi
             mkdir $out

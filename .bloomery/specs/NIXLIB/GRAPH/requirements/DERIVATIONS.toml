@@ -293,51 +293,35 @@ action = "reference every declared runtime tool dependency from the wrapped bina
 id = "NIXLIB-GRAPH-DERIVATIONS-027"
 title = "Crate outputs are compressed"
 manual = false
-design = "design/derivations.md#compressed-crate-artifacts"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the crate builder"
-action = "install a crate's compiled libraries as a single zstd-compressed archive instead of an uncompressed library directory"
+design = "design/crate-archives.md#archive-layout"
+ears = { type = "ubiquitous", system = "the crate builder", action = "install a crate's compiled artifacts as zstd-compressed archives instead of an uncompressed library directory" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-DERIVATIONS-028"
-title = "Crate metadata advertises the archive"
+title = "Crate metadata advertises the archives"
 manual = false
-design = "design/derivations.md#compressed-crate-artifacts"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the crate builder"
-action = "publish the archive path and the archive member filename through the crate's metadata script"
+design = "design/crate-archives.md#archive-layout"
+ears = { type = "ubiquitous", system = "the crate builder", action = "publish each archive path and the primary archive member for each staging mode through the crate's metadata script" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-DERIVATIONS-029"
 title = "Dependency archives are extracted before compilation"
 manual = false
-design = "design/derivations.md#compressed-crate-artifacts"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the Rust builders"
-action = "extract every dependency archive into the build-local dependency directory before invoking rustc"
+design = "design/crate-archives.md#staging"
+ears = { type = "ubiquitous", system = "the Rust builders", action = "extract the staged dependency archives into the build-local dependency directory before invoking rustc" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-DERIVATIONS-030"
-title = "Transitive dependency archives propagate"
+title = "Dependency closures list transitive crates"
 manual = false
-design = "design/derivations.md#compressed-crate-artifacts"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the crate builder"
-action = "publish its archive together with the transitive dependency archives in its dependency closure"
+design = "design/crate-archives.md#dependency-closure"
+ears = { type = "ubiquitous", system = "the crate builder", action = "list the crate itself and the union of its dependencies' closures as sorted crate output paths in its dependency closure" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-DERIVATIONS-031"
 title = "Compression preserves build behavior"
 manual = false
-design = "design/derivations.md#compressed-crate-artifacts"
+design = "design/crate-archives.md"
 
 [requirements.ears]
 type = "ubiquitous"
@@ -393,14 +377,10 @@ action = "rewrite build-script link-search directives whose path is under OUT_DI
 
 [[requirements]]
 id = "NIXLIB-GRAPH-DERIVATIONS-036"
-title = "Native artifacts travel in the crate archive"
+title = "Native artifacts travel in the compile-time archive"
 manual = false
 design = "design/native-artifacts.md#archive-and-closure"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the crate builder"
-action = "include installed native libraries in the single compressed crate archive and the published dependency closure"
+ears = { type = "ubiquitous", system = "the crate builder", action = "include installed native libraries in the crate's compile-time archive" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-DERIVATIONS-037"
@@ -464,11 +444,7 @@ id = "NIXLIB-GRAPH-DERIVATIONS-042"
 title = "Native archive propagation is covered by builder tests"
 manual = false
 design = "design/native-artifacts.md#builder-tests"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the crate builder test suite"
-action = "assert that native libraries are members of the crate archive and dependency closure and that the crate output has no uncompressed library directory"
+ears = { type = "ubiquitous", system = "the crate builder test suite", action = "assert that native libraries are members of the compile-time archive, that the crate lists itself in its dependency closure, and that the crate output has no uncompressed library directory" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-DERIVATIONS-043"
@@ -515,3 +491,38 @@ design = "design/derivations.md#build-scripts"
 type = "ubiquitous"
 system = "the crate builder test suite"
 action = "compile a links-declaring fixture whose build script reads CARGO_MANIFEST_LINKS"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-047"
+title = "Integration tests link with the selected linker"
+manual = false
+design = "design/derivations.md#linking"
+ears = { type = "ubiquitous", system = "the test builder", action = "link integration test binaries with the selected linker" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-048"
+title = "Build scripts link with the selected linker"
+manual = false
+design = "design/derivations.md#linking"
+ears = { type = "ubiquitous", system = "the Rust builders", action = "link build scripts with the selected linker in every builder, including check, clippy, and documentation builds" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-049"
+title = "Linked crate types use the selected linker"
+manual = false
+design = "design/derivations.md#linking"
+ears = { type = "ubiquitous", system = "the crate builder", action = "link cdylib and staticlib crate types with the selected linker" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-050"
+title = "Integration tests compile in parallel"
+manual = false
+design = "design/derivations.md#checks"
+ears = { type = "ubiquitous", system = "the test builder", action = "compile integration test binaries in parallel bounded by the build cores before running any of them" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-DERIVATIONS-051"
+title = "Integration test compile failures stop the run"
+manual = false
+design = "design/derivations.md#checks"
+ears = { type = "event", system = "the test builder", trigger = "an integration test fails to compile", action = "report every compile failure and fail before running integration tests" }

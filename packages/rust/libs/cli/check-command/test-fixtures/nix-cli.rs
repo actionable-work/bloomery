@@ -83,10 +83,15 @@ fn run(root: &Path) -> io::Result<i32> {
     Ok(status)
 }
 
+/// Call records live beside the workspace so checks that scan the workspace
+/// never observe the fixture writing them.
+fn records_dir(workspace: &Path) -> PathBuf {
+    let name = workspace.file_name().expect("fixture workspace name");
+    workspace.with_file_name(format!("{}.nix-fixture", name.to_string_lossy()))
+}
+
 fn main() {
-    let root = std::env::current_dir()
-        .expect("fixture cwd")
-        .join(".nix-fixture");
+    let root = records_dir(&std::env::current_dir().expect("fixture cwd"));
     match run(&root) {
         Ok(status) => std::process::exit(status),
         Err(error) => {

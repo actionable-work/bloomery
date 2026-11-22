@@ -23,6 +23,7 @@ build.
 - [Derivation contracts](design/derivations.md)
 - [Metadata-only check compilation](design/metadata-check.md)
 - [Check profile selection](design/check-profiles.md)
+- [Crate archives and dependency staging](design/crate-archives.md)
 - [Build-script native artifacts](design/native-artifacts.md)
 - [Topcoat assets](design/topcoat-assets.md)
 - [Manifest policy checks](design/manifest-checks.md)
@@ -33,7 +34,8 @@ build.
 This feature covers graph inputs, workspace discovery, feature and dependency
 resolution, library names and dependency aliases, feature unification modes,
 crate sourcing, crate identity, binary
-discovery, build scripts, build-script native artifacts, propagation metadata,
+discovery, build scripts, crate archives and dependency staging, build-script
+native artifacts, propagation metadata,
 asset flow, Topcoat asset bundling and Tailwind provisioning, lock validation,
 metadata-only check compilation, check profile selection, manifest policy
 checks, dependency policy checks, and the workspace check derivations. Fileset

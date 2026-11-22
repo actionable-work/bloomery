@@ -43,32 +43,41 @@ in ''
     done
   }
 
-  # Extract direct and transitive artifacts, but expose only direct bindings.
+  # Stage the union of the direct dependencies' closures, extracting each
+  # crate archive once, and expose only direct bindings. Mode `meta` stages
+  # compile-time archives for compilations that do not link; mode `link` also
+  # stages the linkable libraries.
   resolve_deps() {
-    local array_name="$1" link_name="$2" deps_dir="$3"
-    shift 3
+    local array_name="$1" link_name="$2" deps_dir="$3" mode="$4"
+    shift 4
     local -n resolved_links="$link_name"
-    local dep f fname cname target env_var dep_is_proc_macro flags
-    local -A loose_libraries=()
-    local DEP_LIB_PATH DEP_LIB_ARCHIVE DEP_LIB_NAME DEP_CRATE_NAME DEP_RUSTC_LINK_FLAGS DEP_IS_PROC_MACRO
+    local dep f fname cname env_var flags primary entry jobs
+    local -A loose_libraries=() staged=()
+    local -a archives=()
+    local DEP_LIB_NAME DEP_META_NAME DEP_CRATE_NAME DEP_RUSTC_LINK_FLAGS
+    case "$mode" in
+      meta | link) ;;
+      *)
+        echo "resolve_deps: unknown staging mode '$mode'" >&2
+        return 1
+        ;;
+    esac
     mkdir -p "$deps_dir"
     for dep in "$@"; do
-      DEP_LIB_PATH="" DEP_LIB_ARCHIVE="" DEP_LIB_NAME="" DEP_CRATE_NAME=""
-      DEP_RUSTC_LINK_FLAGS="" DEP_IS_PROC_MACRO=0
-      dep_is_proc_macro=0
       if [ -f "$dep/nix-support/meta.sh" ]; then
+        DEP_LIB_NAME="" DEP_META_NAME="" DEP_CRATE_NAME="" DEP_RUSTC_LINK_FLAGS=""
         source "$dep/nix-support/meta.sh"
-        dep_is_proc_macro="''${DEP_IS_PROC_MACRO:-0}"
-        if [ -n "$DEP_LIB_ARCHIVE" ]; then
-          tar --zstd -xf "$DEP_LIB_ARCHIVE" -C "$deps_dir"
-          DEP_LIB_PATH="$deps_dir/$DEP_LIB_NAME"
-        fi
-        if [ -n "$DEP_LIB_PATH" ] && [ -f "$DEP_LIB_PATH" ]; then
-          add_extern_bindings "$array_name" "$dep" "$DEP_CRATE_NAME" "$DEP_LIB_PATH"
+        primary="$DEP_LIB_NAME"
+        if [ "$mode" = meta ]; then primary="$DEP_META_NAME"; fi
+        if [ -n "$primary" ]; then
+          add_extern_bindings "$array_name" "$dep" "$DEP_CRATE_NAME" "$deps_dir/$primary"
         fi
         flags="''${DEP_RUSTC_LINK_FLAGS//_deps/$deps_dir}"
         resolved_links+=($flags)
         for env_var in ''${!DEP_@}; do export "$env_var"; done
+        while IFS= read -r entry; do
+          if [ -n "$entry" ]; then staged[$entry]=1; fi
+        done < "$dep/nix-support/deps-closure"
       elif [ -d "$dep/lib" ]; then
         loose_libraries=()
         for f in "$dep/lib"/*.rlib "$dep/lib"/*.so "$dep/lib"/*.dylib "$dep/lib"/*.rmeta; do
@@ -81,26 +90,29 @@ in ''
             fi
           fi
         done
+        staged[$dep]=1
       fi
-      if [ "''${SKIP_PROC_MACRO_CLOSURE:-0}" = 1 ] && [ "$dep_is_proc_macro" = 1 ]; then continue; fi
-      if [ -d "$dep/nix-support/deps-closure" ]; then
-        for f in "$dep/nix-support/deps-closure"/*; do
-          if [ -e "$f" ]; then
-            case "$f" in
-              *.tar.zst) tar --zstd -xf "$f" -C "$deps_dir" ;;
-              *) ln -sf "$(readlink -f "$f")" "$deps_dir/$(basename "$f")" ;;
-            esac
-          fi
-        done
-      fi
-      if [ -d "$dep/lib" ]; then
-        for f in "$dep/lib"/*; do
-          if [ -e "$f" ]; then
-            target=$(readlink -f "$f")
-            ln -sf "$target" "$deps_dir/$(basename "$f")"
-          fi
+    done
+
+    for entry in "''${!staged[@]}"; do
+      if [ -f "$entry/meta.tar.zst" ]; then
+        archives+=("$entry/meta.tar.zst")
+        if [ "$mode" = link ] && [ -f "$entry/lib.tar.zst" ]; then
+          archives+=("$entry/lib.tar.zst")
+        fi
+      elif [ -d "$entry/lib" ]; then
+        for f in "$entry/lib"/*; do
+          if [ -e "$f" ]; then ln -sf "$(readlink -f "$f")" "$deps_dir/$(basename "$f")"; fi
         done
       fi
     done
+    if [ ''${#archives[@]} -gt 0 ]; then
+      jobs="''${NIX_BUILD_CORES:-1}"
+      if [ "$jobs" -lt 1 ]; then jobs=1; fi
+      if ! printf '%s\0' "''${archives[@]}" | xargs -0 -n 1 -P "$jobs" tar --zstd -C "$deps_dir" -xf; then
+        echo "resolve_deps: failed to extract dependency archives" >&2
+        return 1
+      fi
+    fi
   }
 ''

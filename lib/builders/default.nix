@@ -4,6 +4,7 @@
 }: let
   # One Topcoat bundler per package set; every crate and binary shares it.
   topcoat = import ./topcoat-tool.nix {inherit pkgs;};
+  linker = import ./linker.nix {inherit pkgs lib;};
 in rec {
   buildCrateWith = {
     rustc ? pkgs.rustc,
@@ -12,25 +13,7 @@ in rec {
     lld ? pkgs.lld,
     useMold ? null,
     useLld ? null,
-    defaultLinker ? (
-      if useLld != null
-      then
-        (
-          if useLld
-          then "lld"
-          else null
-        )
-      else if useMold != null
-      then
-        (
-          if useMold
-          then "mold"
-          else null
-        )
-      else if stdenv.hostPlatform.isLinux
-      then "lld"
-      else null
-    ),
+    defaultLinker ? linker.defaultFor {inherit stdenv useMold useLld;},
   }:
     import ./crate.nix {inherit pkgs lib topcoat rustc stdenv mold lld useMold useLld defaultLinker;};
 
@@ -41,25 +24,7 @@ in rec {
     lld ? pkgs.lld,
     useMold ? null,
     useLld ? null,
-    defaultLinker ? (
-      if useLld != null
-      then
-        (
-          if useLld
-          then "lld"
-          else null
-        )
-      else if useMold != null
-      then
-        (
-          if useMold
-          then "mold"
-          else null
-        )
-      else if stdenv.hostPlatform.isLinux
-      then "lld"
-      else null
-    ),
+    defaultLinker ? linker.defaultFor {inherit stdenv useMold useLld;},
   }:
     import ./bin.nix {inherit pkgs lib topcoat rustc stdenv mold lld useMold useLld defaultLinker;};
 
@@ -70,25 +35,7 @@ in rec {
     lld ? pkgs.lld,
     useMold ? null,
     useLld ? null,
-    defaultLinker ? (
-      if useLld != null
-      then
-        (
-          if useLld
-          then "lld"
-          else null
-        )
-      else if useMold != null
-      then
-        (
-          if useMold
-          then "mold"
-          else null
-        )
-      else if stdenv.hostPlatform.isLinux
-      then "lld"
-      else null
-    ),
+    defaultLinker ? linker.defaultFor {inherit stdenv useMold useLld;},
   }:
     import ./test.nix {inherit pkgs lib rustc stdenv mold lld useMold useLld defaultLinker;};
 
@@ -96,20 +43,35 @@ in rec {
     rustc ? pkgs.rustc,
     clippy ? pkgs.clippy,
     stdenv ? pkgs.stdenv,
+    mold ? pkgs.mold,
+    lld ? pkgs.lld,
+    useMold ? null,
+    useLld ? null,
+    defaultLinker ? linker.defaultFor {inherit stdenv useMold useLld;},
   }:
-    import ./clippy.nix {inherit pkgs lib rustc clippy stdenv;};
+    import ./clippy.nix {inherit pkgs lib rustc clippy stdenv mold lld defaultLinker;};
 
   checkCrateWith = {
     rustc ? pkgs.rustc,
     stdenv ? pkgs.stdenv,
+    mold ? pkgs.mold,
+    lld ? pkgs.lld,
+    useMold ? null,
+    useLld ? null,
+    defaultLinker ? linker.defaultFor {inherit stdenv useMold useLld;},
   }:
-    import ./check.nix {inherit pkgs lib rustc stdenv;};
+    import ./check.nix {inherit pkgs lib rustc stdenv mold lld defaultLinker;};
 
   docCrateWith = {
     rustc ? pkgs.rustc,
     stdenv ? pkgs.stdenv,
+    mold ? pkgs.mold,
+    lld ? pkgs.lld,
+    useMold ? null,
+    useLld ? null,
+    defaultLinker ? linker.defaultFor {inherit stdenv useMold useLld;},
   }:
-    import ./doc.nix {inherit pkgs lib rustc stdenv;};
+    import ./doc.nix {inherit pkgs lib rustc stdenv mold lld defaultLinker;};
 
   doctestCrateWith = {
     rustc ? pkgs.rustc,
@@ -118,25 +80,7 @@ in rec {
     lld ? pkgs.lld,
     useMold ? null,
     useLld ? null,
-    defaultLinker ? (
-      if useLld != null
-      then
-        (
-          if useLld
-          then "lld"
-          else null
-        )
-      else if useMold != null
-      then
-        (
-          if useMold
-          then "mold"
-          else null
-        )
-      else if stdenv.hostPlatform.isLinux
-      then "lld"
-      else null
-    ),
+    defaultLinker ? linker.defaultFor {inherit stdenv useMold useLld;},
   }:
     import ./doctest.nix {inherit pkgs lib rustc stdenv mold lld useMold useLld defaultLinker;};
 
@@ -150,25 +94,7 @@ in rec {
     lld ? pkgs.lld,
     useMold ? null,
     useLld ? null,
-    defaultLinker ? (
-      if useLld != null
-      then
-        (
-          if useLld
-          then "lld"
-          else null
-        )
-      else if useMold != null
-      then
-        (
-          if useMold
-          then "mold"
-          else null
-        )
-      else if stdenv.hostPlatform.isLinux
-      then "lld"
-      else null
-    ),
+    defaultLinker ? linker.defaultFor {inherit stdenv useMold useLld;},
   }:
     import ./optimize.nix {inherit pkgs lib rustc stdenv mold lld useMold useLld defaultLinker;};
 

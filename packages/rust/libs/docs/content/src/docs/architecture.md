@@ -32,7 +32,8 @@ crates.io tarball (.crate)
 ```
 
 - **Metadata Propagation**: Each compiled crate emits a `nix-support/meta.sh` script containing its crate name, library archive path, and sys-crate `DEP_<LINKS>_<KEY>` variables.
-- **Transitive Closure**: Crates populate a lightweight `deps-closure/` directory with symlinks, allowing `rustc` to resolve indirect dependencies and proc-macro helpers without full tree re-scanning.
+- **Transitive Closure**: Each crate lists the crate outputs a consumer must stage in `nix-support/deps-closure`. Builders extract each listed archive once, in parallel, so `rustc` resolves indirect dependencies without re-scanning the tree.
+- **Split Archives**: Crates publish compile-time artifacts (`.rmeta`, proc-macro libraries, native libraries) in `meta.tar.zst` and linkable `.rlib` outputs in `lib.tar.zst`. Compilations that do not link stage only the metadata archives. Archives are byte-reproducible.
 
 ---
 

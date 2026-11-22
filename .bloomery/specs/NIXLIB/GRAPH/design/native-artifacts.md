@@ -2,17 +2,19 @@
 
 A build script may produce native link inputs under `OUT_DIR`, such as static
 archives (`.a`) and shared objects (`.so`, `.dylib`). The crate builder installs
-them into the crate's flat library directory before that directory is archived.
-Native artifacts are archive-only: the crate output never exposes a separate
-uncompressed native directory.
+them into the crate's compile-time archive, `meta.tar.zst` (see
+[Crate archives and dependency staging](crate-archives.md)). Native artifacts
+are archive-only: the crate output never exposes an uncompressed library
+directory.
 
 ## Installation
 
 After the build script runs, the crate builder copies every native static and
-shared library found under `OUT_DIR` into `$out/lib`, preserving each library's
-path relative to `OUT_DIR`. They sit alongside the crate's Rust libraries. The
-builder then packs `$out/lib` into `$out/lib.tar.zst` and removes `$out/lib`, so
-the archive is the only installed location for native artifacts.
+shared library found under `OUT_DIR` into `meta.tar.zst`, preserving each
+library's path relative to `OUT_DIR`. Native libraries travel in the
+compile-time archive because a dependent `rlib` compilation bundles static
+native libraries named by propagated `-l` flags, so every staging mode needs
+them. The archive is the only installed location for native artifacts.
 
 ## Propagation
 
@@ -28,10 +30,10 @@ flags.
 
 ## Archive and closure
 
-Installed native libraries are members of the single `lib.tar.zst` archive. The
-crate publishes that archive in its `deps-closure` together with the transitive
-dependency archives, so every consumer extracts the same native inputs. No
-native artifact is exposed outside the archive.
+Installed native libraries are members of the crate's `meta.tar.zst`. The crate
+lists itself in its `deps-closure`, so every consumer that stages the crate
+extracts the same native inputs. No native artifact is exposed outside the
+archive.
 
 ## Links awareness
 
@@ -47,5 +49,6 @@ The crate builder test suite covers native propagation directly:
   dependent that links it;
 - a build-script fixture that emits a shared native library, consumed by a
   dependent that links it; and
-- archive membership, `deps-closure` propagation of native libraries, and the
-  absence of an uncompressed library directory in the crate output.
+- membership of native libraries in `meta.tar.zst`, the crate's presence in its
+  own `deps-closure`, and the absence of an uncompressed library directory in
+  the crate output.

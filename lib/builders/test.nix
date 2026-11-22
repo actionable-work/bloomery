@@ -174,16 +174,11 @@ in
         ${import ./dependencies.nix {inherit lib;} {inherit dependencyBindings buildScriptBindings;}}
         EXTERN_FLAGS=()
         EXTRA_LINK_FLAGS=()
-        SKIP_PROC_MACRO_CLOSURE=0
-        resolve_deps EXTERN_FLAGS EXTRA_LINK_FLAGS _deps $dependencies
-        if [ -n "$crateDrv" ]; then
-          resolve_deps EXTERN_FLAGS EXTRA_LINK_FLAGS _deps "$crateDrv"
-        fi
+        resolve_deps EXTERN_FLAGS EXTRA_LINK_FLAGS _deps link $dependencies $crateDrv
         BUILD_SCRIPT_DEPS_DIR="_deps_bs"
         BUILD_SCRIPT_EXTERN_FLAGS=()
         BUILD_SCRIPT_DEP_LINK_FLAGS=()
-        SKIP_PROC_MACRO_CLOSURE=0
-        resolve_deps BUILD_SCRIPT_EXTERN_FLAGS BUILD_SCRIPT_DEP_LINK_FLAGS _deps_bs $buildScriptDependencies
+        resolve_deps BUILD_SCRIPT_EXTERN_FLAGS BUILD_SCRIPT_DEP_LINK_FLAGS _deps_bs link $buildScriptDependencies
 
         runHook postConfigure
       '';
@@ -202,6 +197,7 @@ in
             $EDITION_FLAG \
             -L dependency=$BUILD_SCRIPT_DEPS_DIR \
             "''${BUILD_SCRIPT_EXTERN_FLAGS[@]}" \
+            ${lib.escapeShellArgs linkerFlags} \
             -o _build_script/build_script_build
 
           export OUT_DIR="$PWD/_build_script/out"
@@ -270,41 +266,57 @@ in
           ./_unit_test_runner --color always
         fi
 
-        # Check for integration tests in tests/*.rs and tests/*/main.rs
+        # Integration tests are tests/*.rs and tests/*/main.rs. Compile them
+        # in parallel, bounded by the build cores, then run them in order.
+        INTEGRATION_TESTS=()
         if [ -d tests ]; then
-          for testfile in tests/*.rs; do
-            if [ -f "$testfile" ]; then
-              testname=$(basename "$testfile" .rs)
-              echo "Compiling integration test $testname..."
-              CARGO_CRATE_NAME="$testname" $RUSTC --test "$testfile" \
-                --crate-name "$testname" \
-                $EDITION_FLAG \
-                -L dependency=_deps \
-                "''${EXTERN_FLAGS[@]}" \
-                "''${BUILD_SCRIPT_FLAGS[@]}" \
-                "''${EXTRA_LINK_FLAGS[@]}" \
-                -o "_test_$testname"
-              echo "Running integration test $testname..."
-              "./_test_$testname" --color always
-            fi
-          done
-          for testdir in tests/*; do
-            if [ -d "$testdir" ] && [ -f "$testdir/main.rs" ]; then
-              testname=$(basename "$testdir")
-              echo "Compiling integration test $testname from $testdir/main.rs..."
-              CARGO_CRATE_NAME="$testname" $RUSTC --test "$testdir/main.rs" \
-                --crate-name "$testname" \
-                $EDITION_FLAG \
-                -L dependency=_deps \
-                "''${EXTERN_FLAGS[@]}" \
-                "''${BUILD_SCRIPT_FLAGS[@]}" \
-                "''${EXTRA_LINK_FLAGS[@]}" \
-                -o "_test_$testname"
-              echo "Running integration test $testname..."
-              "./_test_$testname" --color always
-            fi
+          for testfile in tests/*.rs tests/*/main.rs; do
+            if [ -f "$testfile" ]; then INTEGRATION_TESTS+=("$testfile"); fi
           done
         fi
+        integration_test_name() {
+          case "$1" in
+            */main.rs) basename "$(dirname "$1")" ;;
+            *) basename "$1" .rs ;;
+          esac
+        }
+        compile_integration_test() {
+          local testfile="$1" testname status=0
+          testname=$(integration_test_name "$testfile")
+          CARGO_CRATE_NAME="$testname" $RUSTC --test "$testfile" \
+            --crate-name "$testname" \
+            $EDITION_FLAG \
+            -L dependency=_deps \
+            "''${EXTERN_FLAGS[@]}" \
+            "''${BUILD_SCRIPT_FLAGS[@]}" \
+            "''${EXTRA_LINK_FLAGS[@]}" \
+            ${lib.escapeShellArgs (extraRustcFlags ++ compilerFlags.target)} \
+            -o "_test_$testname" > "_test_$testname.log" 2>&1 || status=$?
+          echo "$status" > "_test_$testname.status"
+        }
+        jobs_limit="''${NIX_BUILD_CORES:-1}"
+        if [ "$jobs_limit" -lt 1 ]; then jobs_limit=1; fi
+        for testfile in "''${INTEGRATION_TESTS[@]}"; do
+          while [ "$(jobs -rp | wc -l)" -ge "$jobs_limit" ]; do wait -n || true; done
+          echo "Compiling integration test $(integration_test_name "$testfile") from $testfile..."
+          compile_integration_test "$testfile" &
+        done
+        wait
+        compile_failed=0
+        for testfile in "''${INTEGRATION_TESTS[@]}"; do
+          testname=$(integration_test_name "$testfile")
+          cat "_test_$testname.log"
+          if [ "$(cat "_test_$testname.status")" != 0 ]; then
+            echo "Integration test $testname failed to compile" >&2
+            compile_failed=1
+          fi
+        done
+        if [ "$compile_failed" = 1 ]; then exit 1; fi
+        for testfile in "''${INTEGRATION_TESTS[@]}"; do
+          testname=$(integration_test_name "$testfile")
+          echo "Running integration test $testname..."
+          "./_test_$testname" --color always
+        done
         runHook postCheck
       '';
 

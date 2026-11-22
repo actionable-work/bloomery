@@ -11,8 +11,8 @@ in
     ];
   } ''
     echo "Validating the proc-macro fixture crate type..."
-    if ! tar --zstd -tf ${procMacro}/lib.tar.zst | grep -E 'libbloomery_test_macros.*\.(so|dylib)$'; then
-      echo "missing proc-macro dynamic library in ${procMacro}/lib.tar.zst" >&2
+    if ! tar --zstd -tf ${procMacro}/meta.tar.zst | grep -E 'libbloomery_test_macros.*\.(so|dylib)$'; then
+      echo "missing proc-macro dynamic library in ${procMacro}/meta.tar.zst" >&2
       exit 1
     fi
     mkdir "$out"

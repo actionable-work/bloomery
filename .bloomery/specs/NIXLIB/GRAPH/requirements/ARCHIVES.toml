@@ -1,0 +1,114 @@
+schema_version = 1
+group = "ARCHIVES"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ARCHIVES-001"
+title = "Compile-time artifacts form the meta archive"
+manual = false
+design = "design/crate-archives.md#archive-layout"
+ears = { type = "ubiquitous", system = "the crate builder", action = "publish a crate's rmeta files, proc-macro library, and build-script native libraries in meta.tar.zst" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ARCHIVES-002"
+title = "Linkable artifacts form the lib archive"
+manual = false
+design = "design/crate-archives.md#archive-layout"
+ears = { type = "ubiquitous", system = "the crate builder", action = "publish a crate's rlib files and cdylib and staticlib outputs in lib.tar.zst" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ARCHIVES-003"
+title = "Non-linkable crates publish no lib archive"
+manual = false
+design = "design/crate-archives.md#archive-layout"
+ears = { type = "state", system = "the crate builder", state = "the crate is a metadata-only variant or a proc macro", action = "publish no lib.tar.zst" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ARCHIVES-004"
+title = "Archive members are sorted"
+manual = false
+design = "design/crate-archives.md#reproducible-archives"
+ears = { type = "ubiquitous", system = "the crate builder", action = "write archive members sorted by name" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ARCHIVES-005"
+title = "Archive members carry fixed timestamps and ownership"
+manual = false
+design = "design/crate-archives.md#reproducible-archives"
+ears = { type = "ubiquitous", system = "the crate builder", action = "write every archive member with mtime @1 and numeric owner and group 0" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ARCHIVES-006"
+title = "Archive compression is fixed"
+manual = false
+design = "design/crate-archives.md#reproducible-archives"
+ears = { type = "ubiquitous", system = "the crate builder", action = "compress archives with single-threaded zstd at level 3" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ARCHIVES-007"
+title = "Independent builds produce identical archives"
+manual = false
+design = "design/crate-archives.md#reproducible-archives"
+ears = { type = "ubiquitous", system = "the crate builder", action = "produce byte-identical archives from independent builds of the same crate" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ARCHIVES-008"
+title = "Proc-macro closures list only the proc macro"
+manual = false
+design = "design/crate-archives.md#dependency-closure"
+ears = { type = "state", system = "the crate builder", state = "the crate is a proc macro", action = "list only the crate itself in its dependency closure" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ARCHIVES-009"
+title = "Crate outputs reference only their closure"
+manual = false
+design = "design/crate-archives.md#dependency-closure"
+ears = { type = "ubiquitous", system = "the crate builder", action = "reference only the crate outputs listed in its dependency closure and name no build-local path in its metadata" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ARCHIVES-010"
+title = "Staging extracts each closure archive once"
+manual = false
+design = "design/crate-archives.md#staging"
+ears = { type = "ubiquitous", system = "the Rust builders", action = "stage the union of the direct dependencies' closures and extract each unique archive once" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ARCHIVES-011"
+title = "Staging extracts archives in parallel"
+manual = false
+design = "design/crate-archives.md#staging"
+ears = { type = "ubiquitous", system = "the Rust builders", action = "extract staged archives in parallel bounded by the build cores" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ARCHIVES-012"
+title = "Deduplicated staging matches full extraction"
+manual = false
+design = "design/crate-archives.md#staging"
+ears = { type = "ubiquitous", system = "the Rust builders", action = "stage the same file set in link mode as extracting every closure archive of every direct dependency" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ARCHIVES-013"
+title = "Meta staging omits linkable libraries"
+manual = false
+design = "design/crate-archives.md#staging"
+ears = { type = "state", system = "the Rust builders", state = "staging in meta mode", action = "extract only meta.tar.zst archives and bind each direct dependency's metadata member" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ARCHIVES-014"
+title = "Link staging includes linkable libraries"
+manual = false
+design = "design/crate-archives.md#staging"
+ears = { type = "state", system = "the Rust builders", state = "staging in link mode", action = "extract meta.tar.zst and lib.tar.zst archives and bind each direct dependency's library member" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ARCHIVES-015"
+title = "Non-linking compilations stage metadata"
+manual = false
+design = "design/crate-archives.md#staging"
+ears = { type = "ubiquitous", system = "the Rust builders", action = "stage in meta mode for rlib compilation without linked crate types, metadata-only variants, check, clippy, and documentation builds" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-ARCHIVES-016"
+title = "Linking compilations stage libraries"
+manual = false
+design = "design/crate-archives.md#staging"
+ears = { type = "ubiquitous", system = "the Rust builders", action = "stage in link mode for binaries, tests, doctests, build scripts, proc macros, and crates with cdylib or staticlib outputs" }

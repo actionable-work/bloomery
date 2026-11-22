@@ -174,16 +174,11 @@ in
         ${import ./dependencies.nix {inherit lib;} {inherit dependencyBindings buildScriptBindings;}}
         EXTERN_FLAGS=()
         EXTRA_LINK_FLAGS=()
-        SKIP_PROC_MACRO_CLOSURE=0
-        resolve_deps EXTERN_FLAGS EXTRA_LINK_FLAGS _deps $dependencies
-        if [ -n "$crateDrv" ]; then
-          resolve_deps EXTERN_FLAGS EXTRA_LINK_FLAGS _deps "$crateDrv"
-        fi
+        resolve_deps EXTERN_FLAGS EXTRA_LINK_FLAGS _deps link $dependencies $crateDrv
         BUILD_SCRIPT_DEPS_DIR="_deps_bs"
         BUILD_SCRIPT_EXTERN_FLAGS=()
         BUILD_SCRIPT_DEP_LINK_FLAGS=()
-        SKIP_PROC_MACRO_CLOSURE=0
-        resolve_deps BUILD_SCRIPT_EXTERN_FLAGS BUILD_SCRIPT_DEP_LINK_FLAGS _deps_bs $buildScriptDependencies
+        resolve_deps BUILD_SCRIPT_EXTERN_FLAGS BUILD_SCRIPT_DEP_LINK_FLAGS _deps_bs link $buildScriptDependencies
 
         runHook postConfigure
       '';
@@ -201,6 +196,7 @@ in
             $EDITION_FLAG \
             -L dependency=$BUILD_SCRIPT_DEPS_DIR \
             "''${BUILD_SCRIPT_EXTERN_FLAGS[@]}" \
+            ${lib.escapeShellArgs linkerFlags} \
             -o _build_script/build_script_build
 
           export OUT_DIR="$PWD/_build_script/out"

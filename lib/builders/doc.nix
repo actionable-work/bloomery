@@ -3,6 +3,9 @@
   lib,
   rustc ? pkgs.rustc,
   stdenv ? pkgs.stdenv,
+  mold ? pkgs.mold,
+  lld ? pkgs.lld,
+  defaultLinker ? null,
 }: {
   pkg,
   src,
@@ -17,11 +20,12 @@
   splitBuildScriptDeps ? false,
 }: let
   compilerFlags = import ./compiler-flags.nix {inherit pkgs lib stdenv;};
+  linker = (import ./linker.nix {inherit pkgs lib;}).resolve {inherit defaultLinker mold lld;};
   pname = pkg.name;
   version = pkg.version;
   crateName = pkg.crateName;
 
-  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc pkgs.zstd] ++ tailwind.nativeBuildInputs;
+  nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc pkgs.zstd] ++ lib.optional (linker.package != null) linker.package ++ tailwind.nativeBuildInputs;
   buildInputs = override.buildInputs or [];
   extraRustdocFlags = (override.rustdocFlags or []) ++ defaultRustdocFlags;
   tailwind = (import ./tailwind.nix {inherit pkgs lib;}).forBuildScript buildScriptDependencies;
@@ -141,13 +145,11 @@ in
         ${import ./dependencies.nix {inherit lib;} {inherit dependencyBindings buildScriptBindings;}}
         EXTERN_FLAGS=()
         EXTRA_LINK_FLAGS=()
-        SKIP_PROC_MACRO_CLOSURE=1
-        resolve_deps EXTERN_FLAGS EXTRA_LINK_FLAGS _deps $dependencies
+        resolve_deps EXTERN_FLAGS EXTRA_LINK_FLAGS _deps meta $dependencies
         BUILD_SCRIPT_DEPS_DIR="_deps_bs"
         BUILD_SCRIPT_EXTERN_FLAGS=()
         BUILD_SCRIPT_DEP_LINK_FLAGS=()
-        SKIP_PROC_MACRO_CLOSURE=0
-        resolve_deps BUILD_SCRIPT_EXTERN_FLAGS BUILD_SCRIPT_DEP_LINK_FLAGS _deps_bs $buildScriptDependencies
+        resolve_deps BUILD_SCRIPT_EXTERN_FLAGS BUILD_SCRIPT_DEP_LINK_FLAGS _deps_bs link $buildScriptDependencies
 
         runHook postConfigure
       '';
@@ -165,6 +167,7 @@ in
             $EDITION_FLAG \
             -L dependency=$BUILD_SCRIPT_DEPS_DIR \
             "''${BUILD_SCRIPT_EXTERN_FLAGS[@]}" \
+            ${lib.escapeShellArgs linker.flags} \
             -o _build_script/build_script_build
 
           export OUT_DIR="$PWD/_build_script/out"

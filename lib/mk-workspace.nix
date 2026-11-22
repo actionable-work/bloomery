@@ -299,9 +299,9 @@ in
     builderBin = builders.buildBinWith {inherit rustc stdenv mold lld defaultLinker;};
     builderTest = builders.testCrateWith {inherit rustc stdenv mold lld defaultLinker;};
     builderOptimize = builders.optimizeBinWith {inherit rustc stdenv mold lld defaultLinker;};
-    builderClippy = builders.clippyCrateWith {inherit rustc clippy stdenv;};
-    builderCheck = builders.checkCrateWith {inherit rustc stdenv;};
-    builderDoc = builders.docCrateWith {inherit rustc stdenv;};
+    builderClippy = builders.clippyCrateWith {inherit rustc clippy stdenv mold lld defaultLinker;};
+    builderCheck = builders.checkCrateWith {inherit rustc stdenv mold lld defaultLinker;};
+    builderDoc = builders.docCrateWith {inherit rustc stdenv mold lld defaultLinker;};
     builderDocTest = builders.doctestCrateWith {inherit rustc stdenv mold lld defaultLinker;};
     builderLockCheck = import ./workspace/lock-check.nix {inherit pkgs lib;};
     builderManifestCheck = import ./workspace/manifest-check.nix {inherit pkgs lib;};

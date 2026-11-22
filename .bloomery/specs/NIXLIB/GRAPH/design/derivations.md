@@ -17,7 +17,8 @@ using resolved edge names and each dependency's `nix-support/meta.sh`, following
 [Library names and dependency aliases](library-names.md). Each
 crate records its name, library path, proc-macro flag, link flags, assets, and
 sys-crate `DEP_<LINKS>_<KEY>` values in that metadata, and publishes a
-`deps-closure` of transitive libraries for downstream compilation.
+`deps-closure` of the crates downstream compilation stages, as described in
+[Crate archives and dependency staging](crate-archives.md).
 
 ## Build scripts
 
@@ -61,6 +62,13 @@ profile. The [optimization pipeline](../../OPTIMIZE/design/optimization.md)
 adds training and profiling stages around that compilation and exports the
 result in place of the release package.
 
+## Linking
+
+Every step that links uses the selected linker: binaries, unit and integration
+tests, doctests, proc macros, `cdylib` and `staticlib` crate types, and build
+scripts compiled by any builder, including check, clippy, and documentation
+builds.
+
 ## Runtime dependencies
 
 A binary override may declare runtime tool dependencies that the executable
@@ -81,29 +89,16 @@ assets. Topcoat `asset!` declarations are indexed and bundled as described in
 
 ## Compressed crate artifacts
 
-A crate derivation installs its compiled libraries, compiler metadata,
-proc-macro dynamic libraries, and any build-script native libraries as a single
-zstd-compressed archive named `lib.tar.zst` instead of an uncompressed `lib/`
-directory. The archive is built from the crate's library directory so
-extraction restores the installed layout. The crate metadata script publishes
-the archive path and the primary library's filename in place of an absolute
-library path.
-
-Every Rust builder extracts each direct dependency's archive into its
-build-local dependency directory before invoking `rustc`, then links the
-extracted primary library with `--extern`. A crate publishes its own archive
-together with the archives inherited from its dependencies in `deps-closure`,
-so a consumer can restore the transitive dependency set. Ordinary library
-directories remain supported for externally supplied dependencies.
-
-Archiving is an installation detail: crate, binary, test, documentation, and
-clippy outcomes are unchanged.
+Crate outputs are compressed archives staged per compilation mode; see
+[Crate archives and dependency staging](crate-archives.md).
 
 ## Checks
 
 `<crate>:check` type-checks a workspace crate with `rustc --emit=metadata`.
 `<crate>:test` compiles and runs unit tests and integration tests with
-`rustc --test` and test overrides. `<crate>:clippy` runs `clippy-driver` with
+`rustc --test` and test overrides. Integration test binaries compile in
+parallel, bounded by the build cores, before any of them runs; they then run in
+file order. `<crate>:clippy` runs `clippy-driver` with
 warnings denied by default. `<crate>:doc` builds rustdoc output.
 `<crate>:doctest` runs rustdoc tests for library crates. `<crate>:check`,
 clippy, and documentation checks consume metadata-only variants of their

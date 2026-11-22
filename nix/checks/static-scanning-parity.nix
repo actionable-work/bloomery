@@ -11,7 +11,7 @@ in
   } ''
     ${dependencies}
     declare -a EXTERN_FLAGS=() LINK_FLAGS=()
-    resolve_deps EXTERN_FLAGS LINK_FLAGS "$PWD/deps" \
+    resolve_deps EXTERN_FLAGS LINK_FLAGS "$PWD/deps" link \
       ${workspace.crates."bloomery-scanning-0.1.0"} \
       ${workspace.crates."bloomery-model-0.1.0"} \
       ${workspace.crates."bloomery-workspace-0.1.0"} \
