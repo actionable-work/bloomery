@@ -6,7 +6,7 @@ Bloomery features a strongly-typed profile evaluation system. Compiler optimizat
 
 | Option | Allowed Types | Default | Generated rustc Flag | Description |
 |---|---|---|---|---|
-| `optLevel` | `0, 1, 2, 3, "0", "1", "2", "3", "s", "z"` | `null` (inherits profile/3) | `-Copt-level=3` | Compiler optimization level |
+| `optLevel` | `0, 1, 2, 3, "0", "1", "2", "3", "s", "z"` | `null` (inherits profile) | `-Copt-level=3` | Compiler optimization level |
 | `lto` | `"fat", "thin", "off", "full", "none", "yes", "no", bool` | `null` (inherits profile) | `-Clto=thin` | Link-Time Optimization |
 | `codegenUnits` | Positive integer | `null` (inherits profile) | `-Ccodegen-units=1` | Parallel code generation units |
 | `panic` | `"unwind", "abort"` | `null` (inherits profile) | `-Cpanic=abort` | Panic unwind vs abort strategy |
@@ -19,12 +19,24 @@ Bloomery features a strongly-typed profile evaluation system. Compiler optimizat
 
 ---
 
-## Configuring Release and Dev Profiles
+## Profiles
 
-You can configure release (`[build.profile.release]`) and dev (`[build.profile.dev]`) profile settings in `.bloomery/config.toml`:
+| Profile | Defaults | Compiles |
+|---|---|---|
+| release | `optLevel = 3` | Packages, binaries, and the crates they link |
+| dev | `optLevel = 0`, `lto = "off"`, `codegenUnits = 256`, `debuginfo = 2` | `<bin>:dev` apps and their workspace crates |
+| test | The dev profile, then `debuginfo = "line-tables-only"` | Test, doctest, check, clippy, and doc checks |
+
+`optLevel`, `codegenUnits`, `debuginfo`, and `overflowChecks` apply to every crate a profile compiles. `lto`, `panic`, `strip`, `targetCpu`, `linker`, and `linkArgs` apply to the final binary link.
+
+`[build.flags]` lists add extra flags and never carry codegen settings: a flag that sets `opt-level`, `codegen-units`, `debuginfo`, or `overflow-checks` is an evaluation error pointing at the profile field to use.
+
+## Configuring Profiles
+
+You can configure release (`[build.profile.release]`), dev (`[build.profile.dev]`), and test (`[build.profile.test]`) profile settings in `.bloomery/config.toml`:
 
 ```toml bloomery-config
-version = 2
+version = 3
 
 [build.profile.release]
 optLevel = 3
@@ -39,10 +51,31 @@ optLevel = 0
 lto = "off"
 codegenUnits = 256
 debuginfo = 2
+
+[build.profile.test]
+debuginfo = 2 # full debuginfo for debugging test binaries
+```
+
+## Check Graph Modes
+
+`checks.profile` selects which crates checks rebuild with the test profile:
+
+| Mode | Test-profile crates | Use when |
+|---|---|---|
+| `"dev"` (default) | Workspace crates; registry crates share release builds | Iterating on workspace crates |
+| `"cargo"` | Every crate, matching `cargo test` | Registry crates' debug assertions and overflow checks matter |
+| `"release"` | None; checks share the release graph | CI that always builds packages; gives up debug assertions outside each crate's own unit tests |
+
+```toml bloomery-config
+version = 3
+
+[checks]
+enable = true
+profile = "cargo"
 ```
 
 > [!NOTE]
 > When `build.devPackages = true`, Bloomery generates fast-compiling dev apps (`apps."<name>:dev"`) without publishing dev derivations as packages.
 
 > [!TIP]
-> When `Cargo.toml` specifies `[profile.release]` or `[profile.dev]` sections, Bloomery automatically parses their values as base profiles, allowing Nix overrides without editing `Cargo.toml`.
+> When `Cargo.toml` specifies `[profile.release]`, `[profile.dev]`, or `[profile.test]` sections, Bloomery automatically parses their values as base profiles, allowing Nix overrides without editing `Cargo.toml`.

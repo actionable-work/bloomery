@@ -50,22 +50,14 @@ id = "NIXLIB-FLAKE-OPTIONS-005"
 title = "Profile options are type-checked"
 manual = false
 design = "design/workspace-options.md#compilation-profiles"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the workspace option module"
-action = "type-check build.profile.release and build.profile.dev settings for optimization, LTO, codegen units, panic strategy, stripping, debug info, target CPU, overflow checks, linker, and link arguments"
+ears = { type = "ubiquitous", system = "the workspace option module", action = "type-check build.profile.release, build.profile.dev, and build.profile.test settings for optimization, LTO, codegen units, panic strategy, stripping, debug info, target CPU, overflow checks, linker, and link arguments" }
 
 [[requirements]]
 id = "NIXLIB-FLAKE-OPTIONS-006"
 title = "Profiles lower to rustc flags"
 manual = false
 design = "design/workspace-options.md#compilation-profiles"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the workspace builder"
-action = "lower the effective release and dev profile settings into rustc flags for their respective derivations"
+ears = { type = "ubiquitous", system = "the workspace builder", action = "lower the effective release, dev, and test profile settings into rustc flags for their respective derivations" }
 
 [[requirements]]
 id = "NIXLIB-FLAKE-OPTIONS-007"
@@ -275,3 +267,38 @@ title = "Lock freshness check defaults off"
 manual = false
 design = "design/workspace-options.md#development-shell-and-checks"
 ears = { type = "ubiquitous", system = "the workspace option module", action = "default checks.lockFreshness.enable to false" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-026"
+title = "Release profile defaults to opt-level 3"
+manual = false
+design = "design/workspace-options.md#compilation-profiles"
+ears = { type = "ubiquitous", system = "the workspace builder", action = "compile release-profile crates with -Copt-level=3 unless a release profile layer sets optLevel" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-027"
+title = "Crate codegen fields apply to every profile crate"
+manual = false
+design = "design/workspace-options.md#compilation-profiles"
+ears = { type = "ubiquitous", system = "the workspace builder", action = "apply the optLevel, codegenUnits, debuginfo, and overflowChecks fields of a profile to every crate compiled with that profile" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-028"
+title = "Link fields apply to binaries only"
+manual = false
+design = "design/workspace-options.md#compilation-profiles"
+ears = { type = "ubiquitous", system = "the workspace builder", action = "apply the lto, panic, strip, linker, and linkArgs fields of a profile only to binary links" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-029"
+title = "Extra rustc flags apply to every crate"
+manual = false
+design = "design/workspace-options.md#flags"
+ears = { type = "ubiquitous", system = "the workspace builder", action = "pass build.flags.rustc to every crate compilation in the release, dev, and test profiles" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-OPTIONS-030"
+title = "Flag lists reject profile-owned settings"
+manual = false
+design = "design/workspace-options.md#flags"
+ears = { type = "unwanted_behavior", trigger = "build.flags.rustc, build.flags.test, or build.flags.clippy sets opt-level, codegen-units, debuginfo, or overflow-checks", system = "the workspace builder", action = "fail evaluation with an error naming the profile fields to set instead" }

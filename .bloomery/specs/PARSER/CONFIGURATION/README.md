@@ -19,8 +19,8 @@ source of requirement identity or lifecycle state. The file also carries the
 build tables and the sub-flake composition table consumed by
 [NIXLIB/FLAKE](../../NIXLIB/FLAKE/README.md), which the parser type-validates
 during loading and passes through for the flake interface. The top-level
-integer `version` identifies the structural layout; format `2` is current, and
-`bloomery config upgrade` migrates format `1`. A missing or unsupported version
+integer `version` identifies the structural layout; format `3` is current, and
+`bloomery config upgrade` migrates formats `1` and `2`. A missing or unsupported version
 is rejected before configuration validation.
 
 ## Design documents
@@ -37,7 +37,7 @@ is rejected before configuration validation.
 - Require `.bloomery/config.toml` for repository commands while exempting help,
   `init`, and `config`, whose mutating commands create a missing file with a
   warning.
-- Require the top-level format version, support format `2`, and normalize the
+- Require the top-level format version, support format `3`, and normalize the
   configuration before validation.
 - Keep configuration format versions stable when the schema catalog gains keys.
 - Use validated defaults for tables and keys omitted from a present file,

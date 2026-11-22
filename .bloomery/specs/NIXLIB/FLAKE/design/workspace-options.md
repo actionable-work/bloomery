@@ -21,12 +21,22 @@ explicitly.
 
 ## Compilation profiles
 
-`build.profile.release` and `build.profile.dev` accept `optLevel`, `lto`,
-`codegenUnits`, `panic`, `strip`, `debuginfo`, `targetCpu`, `overflowChecks`,
-`linker`, and `linkArgs`. Values are type-checked and lowered to `rustc` flags.
-`Cargo.toml` `[profile.release]` and `[profile.dev]` values provide the base;
-explicit options override them. `build.profileName` selects the active package
-profile.
+`build.profile.release`, `build.profile.dev`, and `build.profile.test` accept
+`optLevel`, `lto`, `codegenUnits`, `panic`, `strip`, `debuginfo`, `targetCpu`,
+`overflowChecks`, `linker`, and `linkArgs`. Values are type-checked and lowered
+to `rustc` flags. Each profile resolves in layers, later layers winning field by
+field: Bloomery defaults, `Cargo.toml` `[profile.*]`, then explicit options.
+`build.profileName` selects the `Cargo.toml` profile behind the release profile.
+
+| Profile | Bloomery defaults | Compiles |
+| --- | --- | --- |
+| release | `optLevel = 3` | packages, binaries, and the crates they link |
+| dev | `optLevel = 0`, `lto = "off"`, `codegenUnits = 256`, `debuginfo = 2` | `<bin>:dev` apps and their workspace crates |
+| test | the dev profile, then `debuginfo = "line-tables-only"` | the [check graph](../../GRAPH/design/check-profiles.md) |
+
+`optLevel`, `codegenUnits`, `debuginfo`, and `overflowChecks` apply to every
+crate a profile compiles. `lto`, `panic`, `strip`, `targetCpu`, `linker`, and
+`linkArgs` apply to the final binary link.
 
 ## Package visibility
 
@@ -35,8 +45,12 @@ produces dev-profile apps.
 
 ## Flags
 
-`build.flags` supplies extra `rustc`, `test`, `clippy`, `doc`, and `doctest`
-flag lists applied per build phase.
+`build.flags` supplies extra flag lists applied per build phase. `rustc`
+applies to every crate compilation in every profile; `test` adds to unit-test
+harnesses, `clippy` to clippy runs, and `doc` and `doctest` to `rustdoc`. Flag
+lists never carry codegen settings: a `rustc`, `test`, or `clippy` entry that
+sets `opt-level`, `codegen-units`, `debuginfo`, or `overflow-checks` (including
+`-O` and `-g`) is an evaluation error naming the profile field to use.
 
 ## Overrides
 

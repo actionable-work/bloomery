@@ -4,7 +4,7 @@ use std::path::Path;
 
 fn parse(policy: &str) -> Result<Config, Diagnostic> {
     parse_contents(
-        &format!("version = 2\n[checks.specifications]\n{policy}"),
+        &format!("version = 3\n[checks.specifications]\n{policy}"),
         Path::new(".bloomery/config.toml"),
     )
     .map(|loaded| loaded.config)

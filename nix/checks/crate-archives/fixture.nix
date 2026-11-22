@@ -21,7 +21,6 @@
       }
       // args);
   a = crate "a" "pub fn a() -> u32 { 1 }" {};
-  aMetadata = crate "a" "pub fn a() -> u32 { 1 }" {metadataOnly = true;};
   m =
     crate "m" ''
       use proc_macro::TokenStream;

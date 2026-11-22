@@ -1,11 +1,11 @@
-version = 2
+version = 3
 
 [build]
 devPackages = true
 libPackages = true
 
 [build.flags]
-rustc = ["-Copt-level=3"]
+rustc = []
 
 [build.profile.release]
 codegenUnits = 16

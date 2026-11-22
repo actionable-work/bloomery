@@ -23,7 +23,7 @@ resolved local file into
 build, so paths into the crate sources and into the build-script `OUT_DIR`
 both resolve; files a build script generates, such as a Tailwind stylesheet,
 are indexed like checked-in files. Declarations that do not resolve at this
-stage are left for the binary to report. Metadata-only variants do not index.
+stage are left for the binary to report.
 
 A crate derivation links each dependency's index entries into its own index,
 so a binary sees the transitive closure. Different contents published under

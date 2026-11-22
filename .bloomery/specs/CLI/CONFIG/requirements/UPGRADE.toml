@@ -60,7 +60,7 @@ id = "CLI-CONFIG-UPGRADE-007"
 title = "Upgrade rejects invalid configurations"
 manual = false
 design = "design/upgrade.md#validation-and-publication"
-ears = { type = "unwanted_behavior", trigger = "the configuration is malformed, unreadable, invalid, lacks a version, or uses an unsupported format", system = "bloomery config upgrade", action = "report a ConfigurationError without writing and ask the user to set version = 2 when it is missing" }
+ears = { type = "unwanted_behavior", trigger = "the configuration is malformed, unreadable, invalid, lacks a version, or uses an unsupported format", system = "bloomery config upgrade", action = "report a ConfigurationError without writing and ask the user to set version = 3 when it is missing" }
 
 [[requirements]]
 id = "CLI-CONFIG-UPGRADE-008"
@@ -232,7 +232,7 @@ id = "CLI-CONFIG-UPGRADE-023"
 title = "Upgrade migrates format 1 to format 2"
 manual = false
 design = "design/upgrade.md#format-migrations"
-ears = { type = "event", trigger = "config upgrade reads a format 1 configuration", system = "bloomery config upgrade", action = "move toolchain, profile, flag, and flat check settings to their format 2 paths and write version = 2" }
+ears = { type = "event", trigger = "config upgrade reads a format 1 configuration", system = "bloomery config upgrade", action = "move toolchain, profile, flag, and flat check settings to their format 2 paths before applying later format steps" }
 
 [[requirements]]
 id = "CLI-CONFIG-UPGRADE-024"
@@ -268,3 +268,31 @@ title = "No-write allows read-only upgrade modes"
 manual = false
 design = "design/upgrade.md"
 ears = { type = "event", trigger = "config upgrade is invoked with --no-write and either --dry-run or --diff", system = "bloomery config upgrade", action = "report the requested upgrade preview without creating or changing .bloomery/config.toml" }
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-029"
+title = "Upgrade moves rustc codegen flags into profiles"
+manual = false
+design = "design/upgrade.md#format-migrations"
+ears = { type = "event", trigger = "config upgrade reads a format 2 configuration whose build.flags.rustc sets codegen options", system = "bloomery config upgrade", action = "remove those options and set the matching build.profile.release fields, and build.profile.dev fields for options other than opt-level, unless already set" }
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-030"
+title = "Upgrade omits the default release opt-level"
+manual = false
+design = "design/upgrade.md#format-migrations"
+ears = { type = "event", trigger = "config upgrade migrates an opt-level of 3 from build.flags.rustc", system = "bloomery config upgrade", action = "remove the flag without writing build.profile.release.optLevel" }
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-031"
+title = "Upgrade moves test codegen flags into the test profile"
+manual = false
+design = "design/upgrade.md#format-migrations"
+ears = { type = "event", trigger = "config upgrade reads a format 2 configuration whose build.flags.test sets codegen options", system = "bloomery config upgrade", action = "remove those options and set the matching build.profile.test fields unless already set" }
+
+[[requirements]]
+id = "CLI-CONFIG-UPGRADE-032"
+title = "Upgrade drops clippy codegen flags"
+manual = false
+design = "design/upgrade.md#format-migrations"
+ears = { type = "event", trigger = "config upgrade reads a format 2 configuration whose build.flags.clippy sets codegen options", system = "bloomery config upgrade", action = "remove those options and keep the remaining clippy flags in order" }

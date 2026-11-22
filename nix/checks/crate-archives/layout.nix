@@ -1,5 +1,5 @@
 {fixture}: let
-  inherit (fixture) a aMetadata m check;
+  inherit (fixture) a m check;
 in
   check "layout" {
     passthru.bloomery = [
@@ -15,6 +15,5 @@ in
     tar --zstd -tf ${a}/lib.tar.zst | grep -qE '^\./liba-.*\.rlib$' || fail "a lib archive lacks its rlib"
     tar --zstd -tf ${m}/meta.tar.zst | grep -qE '^\./libm-.*\.so$' || fail "m meta archive lacks its proc-macro library"
     test ! -e ${m}/lib.tar.zst || fail "proc macro publishes a lib archive"
-    test ! -e ${aMetadata}/lib.tar.zst || fail "metadata-only variant publishes a lib archive"
     test ! -e ${a}/lib || fail "crate output has an uncompressed library directory"
   ''

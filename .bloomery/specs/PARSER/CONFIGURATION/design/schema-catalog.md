@@ -87,10 +87,11 @@ editing and validation.
 | `build.toolchain.stdenv` | nixpkgs attribute path | `"stdenv"` |
 | `build.toolchain.linker` | `"lld"`, `"mold"`, `"system"`, or absent | none |
 
-### `[build.profile.release]` and `[build.profile.dev]`
+### `[build.profile.release]`, `[build.profile.dev]`, and `[build.profile.test]`
 
-Both sub-tables share the same ten keys. Every profile key has no recommended
-default because omission delegates to `Cargo.toml` and rustc defaults.
+All three sub-tables share the same ten keys. Every profile key has no
+recommended default because omission delegates to `Cargo.toml` and the
+[profile defaults](../../../NIXLIB/FLAKE/design/workspace-options.md#compilation-profiles).
 
 | Key | Type |
 | --- | --- |
@@ -109,7 +110,7 @@ default because omission delegates to `Cargo.toml` and rustc defaults.
 
 | Key | Type | Recommended default |
 | --- | --- | --- |
-| `build.flags.rustc` | list of strings | `["-Copt-level=3"]` |
+| `build.flags.rustc` | list of strings | `[]` |
 | `build.flags.test` | list of strings | `[]` |
 | `build.flags.clippy` | list of strings | `[]` |
 | `build.flags.doc` | list of strings | `["-Dwarnings"]` |
@@ -128,6 +129,7 @@ default because omission delegates to `Cargo.toml` and rustc defaults.
 | Key | Type | Upgrade recommendation |
 | --- | --- | --- |
 | `checks.enable` | boolean | `true` |
+| `checks.profile` | `"dev"`, `"cargo"`, or `"release"` | `"dev"` |
 | `checks.crates.enable` | boolean | `true` |
 | `checks.packages.enable` | boolean | `true` |
 | `checks.lockFreshness.enable` | boolean | `true` |

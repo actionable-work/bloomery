@@ -164,7 +164,7 @@ fn crate_exception_is_retained_and_stale_manifest_paths_are_rejected() {
     let (root, cache, backend) = health_fixture();
     fs::write(
         root.join(".bloomery/config.toml"),
-        "version = 2\n[specs]\nenable = false\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\n\n[checks.codeHealth.crateExceptions.\"crates/demo/Cargo.toml\"]\nmaxCrateSloc = 6000\n",
+        "version = 3\n[specs]\nenable = false\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\n\n[checks.codeHealth.crateExceptions.\"crates/demo/Cargo.toml\"]\nmaxCrateSloc = 6000\n",
     )
     .expect("configured crate exception");
     let mut args = request();
@@ -186,7 +186,7 @@ fn crate_exception_is_retained_and_stale_manifest_paths_are_rejected() {
 
     fs::write(
         root.join(".bloomery/config.toml"),
-        "version = 2\n[specs]\nenable = false\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\n\n[checks.codeHealth.crateExceptions.\"crates/unknown/Cargo.toml\"]\nmaxCrateSloc = 6000\n",
+        "version = 3\n[specs]\nenable = false\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\n\n[checks.codeHealth.crateExceptions.\"crates/unknown/Cargo.toml\"]\nmaxCrateSloc = 6000\n",
     )
     .expect("stale crate exception");
     let mut args = request();
@@ -209,7 +209,7 @@ fn first_write_initializes_baseline_while_enforcing_absolute_health_gates() {
     let (root, cache, backend) = health_fixture();
     fs::write(
         root.join(".bloomery/config.toml"),
-        "version = 2\n[specs]\nenable = false\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\ncyclomaticLimit = 1\nmaxCyclomatic = 1\n",
+        "version = 3\n[specs]\nenable = false\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\ncyclomaticLimit = 1\nmaxCyclomatic = 1\n",
     )
     .expect("strict health policy");
     let mut args = request();
@@ -401,7 +401,7 @@ fn unselected_health_does_not_refresh_the_configured_baseline() {
     let (root, cache) = crate::check_command::test_support::fixture(true);
     fs::write(
         root.join(".bloomery/config.toml"),
-        "version = 2\n[specs]\ndir = \"specs\"\n\n[checks.specifications]\nenable = true\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\n",
+        "version = 3\n[specs]\ndir = \"specs\"\n\n[checks.specifications]\nenable = true\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\n",
     )
     .expect("enable health beside structure check");
     let backend = FakeNix::default();
@@ -618,7 +618,7 @@ fn health_regressions_compare_crate_and_workspace_scores_after_export() {
     let (root, cache, backend) = health_fixture();
     fs::write(
         root.join(".bloomery/config.toml"),
-        "version = 2\n[specs]\nenable = false\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\ncyclomaticLimit = 2\n",
+        "version = 3\n[specs]\nenable = false\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\ncyclomaticLimit = 2\n",
     )
     .expect("health policy");
     let mut args = request();
@@ -759,7 +759,7 @@ fn health_rejects_baselines_when_scoring_semantics_change() {
 
     fs::write(
         root.join(".bloomery/config.toml"),
-        "version = 2\n[specs]\nenable = false\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\n\n[checks.codeHealth.weights]\ncrateSize = 29\n",
+        "version = 3\n[specs]\nenable = false\n\n[checks.codeHealth]\nenable = true\nminCrateScore = 0\nminWorkspaceScore = 0\n\n[checks.codeHealth.weights]\ncrateSize = 29\n",
     )
     .expect("changed scoring policy");
     let mut args = request();

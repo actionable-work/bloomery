@@ -38,14 +38,17 @@ in
       else cfg.toolchain.linker;
     stdenv = cfg.toolchain.stdenv;
 
-    defaultRustcFlags = cfg.flags.rustc;
-    testRustcFlags = cfg.flags.test;
-    clippyRustcFlags = cfg.flags.clippy;
+    # Extra flags never carry codegen settings; profiles own those.
+    extraRustcFlags = profileMod.checkExtraFlags "build.flags.rustc" cfg.flags.rustc;
+    extraTestFlags = profileMod.checkExtraFlags "build.flags.test" cfg.flags.test;
+    extraClippyFlags = profileMod.checkExtraFlags "build.flags.clippy" cfg.flags.clippy;
     docRustdocFlags = cfg.flags.doc;
     doctestRustdocFlags = cfg.flags.doctest;
 
     profile = cfg.profile;
     profileDev = cfg.profileDev;
+    profileTest = cfg.profileTest;
+    checkProfile = cfg.checks.profile;
     profileName = cfg.profileName;
     createLibPackages =
       if cfg.libPackages != null
@@ -409,47 +412,35 @@ in
         }
       else throw "bloomery: Lock manifest '${toString (root + "/bloomery.lock")}' not found. Please run 'bloomery sync' to generate it.";
 
-    # Resolve binary compilation profile (e.g. from [profile.release] in Cargo.toml)
+    # Compilation profiles. Each layer overrides the previous one field by
+    # field: Bloomery defaults, then Cargo.toml [profile.*], then explicit
+    # options. The test profile inherits the dev profile.
     rootToml =
       if builtins.pathExists cargoTomlPath
       then builtins.fromTOML (builtins.readFile cargoTomlPath)
       else {};
+    tomlProfileNamed = name: rootToml.profile.${name} or {};
     tomlProfile =
       if rootToml ? profile && rootToml.profile ? ${profileName}
       then rootToml.profile.${profileName}
-      else if rootToml ? profile && rootToml.profile ? release
-      then rootToml.profile.release
-      else {};
-    effectiveBinaryProfile = profileMod.evalProfile (
-      (filterNullAttrs (profileMod.normalizeProfileAttrs tomlProfile))
-      // (filterNullAttrs (profileMod.normalizeProfileAttrs profile))
-    );
-
-    # Resolve dev compilation profile (defaults to opt-level=0, lto=off, codegen-units=256, debuginfo=2)
-    tomlDevProfile =
-      if rootToml ? profile && rootToml.profile ? dev
-      then rootToml.profile.dev
-      else {};
+      else tomlProfileNamed "release";
+    baseReleaseProfile = {optLevel = 3;};
     baseDevProfile = {
       optLevel = 0;
       lto = "off";
       codegenUnits = 256;
       debuginfo = 2;
     };
-    filterNullAttrs = lib.filterAttrs (_: v: v != null);
-    effectiveDevBinaryProfile = profileMod.evalProfile (
-      (profileMod.normalizeProfileAttrs baseDevProfile)
-      // (filterNullAttrs (profileMod.normalizeProfileAttrs tomlDevProfile))
-      // (filterNullAttrs (profileMod.normalizeProfileAttrs profileDev))
-    );
-    devRustcFlags = lib.filter (f: !lib.hasPrefix "-Copt-level=" f && !lib.hasPrefix "-C opt-level=" f) defaultRustcFlags;
-    devCrateRustcFlags =
-      [
-        "-Copt-level=${toString (effectiveDevBinaryProfile.optLevel or 0)}"
-        "-Ccodegen-units=${toString (effectiveDevBinaryProfile.codegenUnits or 256)}"
-      ]
-      ++ lib.optional (effectiveDevBinaryProfile.debuginfo != null) "-Cdebuginfo=${toString effectiveDevBinaryProfile.debuginfo}"
-      ++ devRustcFlags;
+    baseTestProfile = {debuginfo = "line-tables-only";};
+    devProfileLayers = [baseDevProfile (tomlProfileNamed "dev") profileDev];
+    effectiveBinaryProfile = profileMod.mergeProfiles [baseReleaseProfile tomlProfile profile];
+    effectiveDevBinaryProfile = profileMod.mergeProfiles devProfileLayers;
+    effectiveTestProfile = profileMod.mergeProfiles (devProfileLayers ++ [baseTestProfile (tomlProfileNamed "test") profileTest]);
+
+    # rustc flags for crates compiled with each profile.
+    releaseCrateRustcFlags = profileMod.profileToCrateRustcFlags effectiveBinaryProfile ++ extraRustcFlags;
+    devCrateRustcFlags = profileMod.profileToCrateRustcFlags effectiveDevBinaryProfile ++ extraRustcFlags;
+    testCrateRustcFlags = profileMod.profileToCrateRustcFlags effectiveTestProfile ++ extraRustcFlags;
 
     # Active dependencies for the global unified package view.
 
@@ -551,7 +542,6 @@ in
       rustFlags,
       resolveDep,
       variantName ? null,
-      metadataOnly ? false,
       edges ? null,
       resolveHostDep ? (dep: globalHostCrates.${dep}),
       hostUnit ? false,
@@ -604,7 +594,6 @@ in
         src = resolveCrateSrc pkg;
         dependencies = bindingInputs dependencyBindings;
         buildScriptDependencies = bindingInputs buildScriptBindings;
-        metadataOnly = metadataOnly;
         override = cOverride;
         features = pkgFeatures;
         defaultRustcFlags = rustFlags;
@@ -618,56 +607,10 @@ in
       mkCrateNode {
         key = pkgKey;
         package = pkgKey;
-        rustFlags = defaultRustcFlags;
+        rustFlags = releaseCrateRustcFlags;
         resolveDep = dep: globalCrates.${dep};
       })
     parsed.byId;
-
-    # Metadata-only variants for every non-proc-macro crate. Proc-macro crates
-    # alias their release crate because expansion loads the dynamic library.
-    # Registry and Git crates always keep full build-script dependencies since
-    # their build scripts cannot be detected during pure evaluation.
-    globalMetadataCrates = let
-      graph = lib.mapAttrs (pkgKey: _: let
-        pkg = parsed.byId.${pkgKey};
-        pkgLock =
-          if lockManifest != null
-          then (lockManifest.packages.${pkgKey} or {})
-          else {};
-        isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or (namedPackage pkg).procMacro;
-      in
-        if isProcMacro
-        then globalCrates.${pkgKey}
-        else
-          mkCrateNode {
-            key = pkgKey;
-            package = pkgKey;
-            rustFlags = defaultRustcFlags;
-            resolveDep = dep: graph.${dep};
-            metadataOnly = true;
-            variantName = "metadata";
-          })
-      parsed.byId;
-    in
-      graph;
-
-    globalDevCrates =
-      if createDevPackages || cfg.checks.enable
-      then
-        lib.mapAttrs (pkgKey: _: let
-          pkg = parsed.byId.${pkgKey};
-        in
-          if !pkg.isWorkspace
-          then globalCrates.${pkgKey}
-          else
-            mkCrateNode {
-              key = pkgKey;
-              package = pkgKey;
-              rustFlags = devCrateRustcFlags;
-              resolveDep = dep: globalDevCrates.${dep};
-            })
-        parsed.byId
-      else {};
 
     # Per-member resolution contexts: each is a fully-unified closure.
     lockContexts =
@@ -696,7 +639,7 @@ in
           inherit (entry) features;
           edges = entry.dependency-edges;
           resolveHostDep = dep: contextHostCrates.${root}.${dep};
-          rustFlags = defaultRustcFlags;
+          rustFlags = releaseCrateRustcFlags;
           resolveDep = dep: contextCrates.${root}.${dep};
           variantName = root;
         })
@@ -711,7 +654,7 @@ in
           mkCrateNode {
             key = pkgKey;
             package = pkgKey;
-            rustFlags = defaultRustcFlags;
+            rustFlags = releaseCrateRustcFlags;
             hostUnit = true;
             resolveDep = dep: globalHostCrates.${dep};
             resolveHostDep = dep: globalHostCrates.${dep};
@@ -728,7 +671,7 @@ in
               package = pkgKey;
               inherit (entry) features;
               edges = entry.dependency-edges;
-              rustFlags = defaultRustcFlags;
+              rustFlags = releaseCrateRustcFlags;
               hostUnit = true;
               resolveDep = dep: contextHostCrates.${root}.${dep};
               resolveHostDep = dep: contextHostCrates.${root}.${dep};
@@ -737,42 +680,39 @@ in
           context)
         lockContexts;
 
-    # Profile variants of the crate graph. Workspace crates are rebuilt with the
-    # extra PGO flags so profile data covers the CLI logic; registry crates reuse
-    # the release build because we cannot recompile third-party codegen anyway.
-    mkGlobalProfileCrates = {
-      extraFlags,
-      variantName,
-      scope ? "workspace",
+    # Variants of the crate graph compiled with other rustc flags. Scope
+    # `workspace` rebuilds workspace crates and reuses the release build for
+    # registry crates; scope `all` rebuilds every crate. Build-script
+    # dependencies always come from the release host graph.
+    rebuildsIn = scope: pkgKey: scope == "all" || parsed.byId.${pkgKey}.isWorkspace;
+
+    mkGlobalVariantCrates = {
+      rustFlags,
+      scope,
+      variantName ? null,
     }: let
-      graph = lib.mapAttrs (pkgKey: _: let
-        pkg = parsed.byId.${pkgKey};
-      in
-        if scope == "all" || pkg.isWorkspace
+      graph = lib.mapAttrs (pkgKey: _:
+        if rebuildsIn scope pkgKey
         then
           mkCrateNode {
             key = pkgKey;
             package = pkgKey;
-            rustFlags = defaultRustcFlags ++ extraFlags;
+            inherit rustFlags variantName;
             resolveDep = dep: graph.${dep};
-            inherit variantName;
           }
         else globalCrates.${pkgKey})
       parsed.byId;
     in
       graph;
 
-    mkContextProfileCrates = {
-      extraFlags,
-      variantName,
+    mkContextVariantCrates = {
+      rustFlags,
+      scope,
       root,
-      scope ? "workspace",
+      variantName ? root,
     }: let
-      context = lockContexts.${root};
-      graph = lib.mapAttrs (pkgKey: entry: let
-        pkg = parsed.byId.${pkgKey};
-      in
-        if scope == "all" || pkg.isWorkspace
+      graph = lib.mapAttrs (pkgKey: entry:
+        if rebuildsIn scope pkgKey
         then
           mkCrateNode {
             key = pkgKey;
@@ -780,101 +720,78 @@ in
             inherit (entry) features;
             edges = entry.dependency-edges;
             resolveHostDep = dep: contextHostCrates.${root}.${dep};
-            rustFlags = defaultRustcFlags ++ extraFlags;
+            inherit rustFlags variantName;
             resolveDep = dep: graph.${dep};
-            variantName = "${root}-${variantName}";
           }
         else contextCrates.${root}.${pkgKey})
-      context;
+      lockContexts.${root};
     in
       graph;
 
-    contextDevCrates =
-      if createDevPackages || cfg.checks.enable
-      then
-        lib.mapAttrs (root: context:
-          lib.mapAttrs (pkgKey: _: let
-            pkg = parsed.byId.${pkgKey};
-            entry = context.${pkgKey};
-          in
-            if !pkg.isWorkspace
-            then contextCrates.${root}.${pkgKey}
-            else
-              mkCrateNode {
-                key = pkgKey;
-                package = pkgKey;
-                inherit (entry) features;
-                edges = entry.dependency-edges;
-                resolveHostDep = dep: contextHostCrates.${root}.${dep};
-                rustFlags = devCrateRustcFlags;
-                resolveDep = dep: contextDevCrates.${root}.${dep};
-                variantName = root;
-              })
-          context)
-        lockContexts
-      else {};
+    # Dev-profile graph behind <bin>:dev apps.
+    devVariant = {
+      rustFlags = devCrateRustcFlags;
+      scope = "workspace";
+    };
+    globalDevCrates = lib.optionalAttrs createDevPackages (mkGlobalVariantCrates devVariant);
+    contextDevCrates = lib.optionalAttrs createDevPackages (lib.mapAttrs (root: _: mkContextVariantCrates (devVariant // {inherit root;})) lockContexts);
 
-    contextMetadataCrates = lib.mapAttrs (root: context: let
-      graph = lib.mapAttrs (pkgKey: entry: let
-        pkg = parsed.byId.${pkgKey};
-        pkgLock =
-          if lockManifest != null
-          then (lockManifest.packages.${pkgKey} or {})
-          else {};
-        isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or (namedPackage pkg).procMacro;
-      in
-        if isProcMacro
-        then contextCrates.${root}.${pkgKey}
-        else
-          mkCrateNode {
-            key = pkgKey;
-            package = pkgKey;
-            inherit (entry) features;
-            edges = entry.dependency-edges;
-            resolveHostDep = dep: contextHostCrates.${root}.${dep};
-            rustFlags = defaultRustcFlags;
-            resolveDep = dep: graph.${dep};
-            metadataOnly = true;
-            variantName = "${root}-metadata";
-          })
-      context;
-    in
-      graph)
-    lockContexts;
+    # Test-profile graph behind test, doctest, check, clippy, and doc checks.
+    # checks.profile picks the crates it rebuilds: workspace crates (`dev`),
+    # every crate (`cargo`), or none, sharing the release graph (`release`).
+    checkVariant = {
+      rustFlags = testCrateRustcFlags;
+      scope =
+        if checkProfile == "cargo"
+        then "all"
+        else "workspace";
+    };
+    globalCheckCrates =
+      if checkProfile == "release"
+      then globalCrates
+      else mkGlobalVariantCrates checkVariant;
+    contextCheckCrates =
+      if checkProfile == "release"
+      then contextCrates
+      else lib.mapAttrs (root: _: mkContextVariantCrates (checkVariant // {inherit root;})) lockContexts;
 
     # The active graph for a workspace member: global when unifying, otherwise
     # the member's own context.
+    usesGlobalGraph = root: unifyFeatures || !(lockContexts ? ${root});
     cratesFor = root:
-      if unifyFeatures || !(lockContexts ? ${root})
+      if usesGlobalGraph root
       then globalCrates
       else contextCrates.${root};
     devCratesFor = root:
-      if unifyFeatures || !(lockContexts ? ${root})
+      if usesGlobalGraph root
       then globalDevCrates
       else contextDevCrates.${root};
-    metadataCratesFor = root:
-      if unifyFeatures || !(lockContexts ? ${root})
-      then globalMetadataCrates
-      else contextMetadataCrates.${root};
+    checkCratesFor = root:
+      if usesGlobalGraph root
+      then globalCheckCrates
+      else contextCheckCrates.${root};
 
+    # PGO variants rebuild the binary's closure with extra release flags.
     profileCratesFor = {
       extraFlags,
       variantName,
       root,
       scope ? "workspace",
-    }:
-      if unifyFeatures || !(lockContexts ? ${root})
-      then mkGlobalProfileCrates {inherit extraFlags variantName scope;}
-      else mkContextProfileCrates {inherit extraFlags variantName root scope;};
+    }: let
+      rustFlags = releaseCrateRustcFlags ++ extraFlags;
+    in
+      if usesGlobalGraph root
+      then mkGlobalVariantCrates {inherit rustFlags variantName scope;}
+      else
+        mkContextVariantCrates {
+          inherit rustFlags root scope;
+          variantName = "${root}-${variantName}";
+        };
 
-    # Public crates expose the global unified view. The dev graph is built for
-    # the check suite even when dev apps are hidden, but cratesDev stays gated
-    # on build.devPackages.
+    # Public crates expose the global unified view. cratesDev is gated on
+    # build.devPackages; checks use their own test-profile graph.
     crates = globalCrates;
-    devCrates =
-      if createDevPackages
-      then globalDevCrates
-      else {};
+    devCrates = globalDevCrates;
 
     hostCratesFor = rootId:
       if unifyFeatures || !(lockContexts ? ${rootId})
@@ -1010,7 +927,7 @@ in
               inherit dependencyBindings buildScriptBindings;
               override = materializedOverride;
               profile = effectiveBinaryProfile;
-              inherit defaultRustcFlags;
+              defaultRustcFlags = extraRustcFlags;
             };
             optimized =
               if !optimizeEnabled
@@ -1032,7 +949,7 @@ in
                   inherit dependencyBindings buildScriptBindings;
                   override = materializedOverride;
                   profile = optimizedProfile;
-                  inherit defaultRustcFlags;
+                  defaultRustcFlags = extraRustcFlags;
                   inherit root;
                   script = optimizeEntry.script;
                   pgo = optimizePgo;
@@ -1073,7 +990,7 @@ in
                   inherit buildScriptBindings;
                   override = cOverrideDev;
                   profile = effectiveDevBinaryProfile;
-                  defaultRustcFlags = devRustcFlags;
+                  defaultRustcFlags = extraRustcFlags;
                 }
               else null;
           };
@@ -1212,7 +1129,7 @@ in
     workspaceTests = lib.listToAttrs (
       map (
         wpkg: let
-          crates = devCratesFor wpkg.id;
+          crates = checkCratesFor wpkg.id;
           cratePath = buildTestMembers.${wpkg.name};
           dependencyBindings = unitBindings wpkg.id wpkg.id crates ["normal" "dev"];
           buildScriptBindings = scriptBindings wpkg.id wpkg.id;
@@ -1237,7 +1154,7 @@ in
             dependencies = depDrvs;
             inherit dependencyBindings buildScriptBindings;
             override = cOverride;
-            defaultRustcFlags = testRustcFlags;
+            defaultRustcFlags = testCrateRustcFlags ++ extraTestFlags;
             isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or null;
           };
         }
@@ -1249,7 +1166,7 @@ in
     workspaceClippy = lib.listToAttrs (
       map (
         wpkg: let
-          crates = metadataCratesFor wpkg.id;
+          crates = checkCratesFor wpkg.id;
           cratePath = buildMembers.${wpkg.name};
           dependencyBindings = unitBindings wpkg.id wpkg.id crates ["normal"];
           buildScriptBindings = scriptBindings wpkg.id wpkg.id;
@@ -1272,7 +1189,7 @@ in
             buildScriptDependencies = bindingInputs buildScriptBindings;
             splitBuildScriptDeps = hasBuildScript;
             override = cOverride;
-            defaultRustcFlags = clippyRustcFlags;
+            defaultRustcFlags = testCrateRustcFlags ++ extraClippyFlags;
             isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or null;
           };
         }
@@ -1284,7 +1201,7 @@ in
     workspaceChecks = lib.listToAttrs (
       map (
         wpkg: let
-          crates = metadataCratesFor wpkg.id;
+          crates = checkCratesFor wpkg.id;
           cratePath = buildMembers.${wpkg.name};
           dependencyBindings = unitBindings wpkg.id wpkg.id crates ["normal"];
           buildScriptBindings = scriptBindings wpkg.id wpkg.id;
@@ -1307,7 +1224,7 @@ in
             buildScriptDependencies = bindingInputs buildScriptBindings;
             splitBuildScriptDeps = hasBuildScript;
             override = cOverride;
-            defaultRustcFlags = defaultRustcFlags;
+            defaultRustcFlags = testCrateRustcFlags;
             isProcMacro = pkgLock."proc-macro" or pkgLock.procMacro or null;
           };
         }
@@ -1319,7 +1236,7 @@ in
     workspaceDocs = lib.listToAttrs (
       map (
         wpkg: let
-          crates = metadataCratesFor wpkg.id;
+          crates = checkCratesFor wpkg.id;
           cratePath = buildMembers.${wpkg.name};
           dependencyBindings = unitBindings wpkg.id wpkg.id crates ["normal"];
           buildScriptBindings = scriptBindings wpkg.id wpkg.id;
@@ -1355,7 +1272,7 @@ in
       builtins.filter (x: x != null) (
         map (
           wpkg: let
-            crates = devCratesFor wpkg.id;
+            crates = checkCratesFor wpkg.id;
             cratePath = buildMembers.${wpkg.name};
             hasLib = memberHasLib wpkg.name;
             dependencyBindings = unitBindings wpkg.id wpkg.id crates ["normal" "dev"];
@@ -1640,7 +1557,7 @@ in
     cratesDev = devCrates;
 
     # Per-member resolution contexts and their crate graphs
-    inherit lockContexts contextCrates contextDevCrates globalCrates globalDevCrates globalMetadataCrates contextMetadataCrates cratesFor devCratesFor metadataCratesFor;
+    inherit lockContexts contextCrates contextDevCrates contextCheckCrates globalCrates globalDevCrates globalCheckCrates cratesFor devCratesFor checkCratesFor;
 
     # Expose both binaries and libraries
     packages =

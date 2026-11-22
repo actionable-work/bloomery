@@ -61,11 +61,7 @@ id = "NIXLIB-FLAKE-CONFIGURATION-006"
 title = "Profile options are exposed"
 manual = false
 design = "design/configuration.md#profiles"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the build configuration"
-action = "accept optLevel, lto, codegenUnits, panic, strip, debuginfo, targetCpu, overflowChecks, linker, and linkArgs under build.profile.release and build.profile.dev"
+ears = { type = "ubiquitous", system = "the configuration loader", action = "accept optLevel, lto, codegenUnits, panic, strip, debuginfo, targetCpu, overflowChecks, linker, and linkArgs under build.profile.release, build.profile.dev, and build.profile.test" }
 
 [[requirements]]
 id = "NIXLIB-FLAKE-CONFIGURATION-007"
@@ -292,3 +288,17 @@ title = "License overrides are keyed by package selector"
 manual = false
 design = "design/configuration.md#checks"
 ears = { type = "ubiquitous", system = "the build configuration", action = "accept an SPDX expression under checks.licenses.overrides for each package selector" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-030"
+title = "Check graph mode is exposed"
+manual = false
+design = "design/configuration.md#checks"
+ears = { type = "ubiquitous", system = "the configuration loader", action = "accept checks.profile as one of dev, cargo, or release" }
+
+[[requirements]]
+id = "NIXLIB-FLAKE-CONFIGURATION-031"
+title = "Unknown check graph modes are rejected"
+manual = false
+design = "design/configuration.md#checks"
+ears = { type = "unwanted_behavior", trigger = "checks.profile names a value other than dev, cargo, or release", system = "the configuration loader", action = "fail evaluation with an error naming the accepted values" }

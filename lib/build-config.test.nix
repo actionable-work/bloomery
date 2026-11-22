@@ -9,7 +9,7 @@
       toWorkspaceArgs = request: let
         config = request.config or {};
       in
-        rawLoader.toWorkspaceArgs (request // {config = {version = 2;} // config;});
+        rawLoader.toWorkspaceArgs (request // {config = {version = 3;} // config;});
     };
   options = import ./workspace/options.nix {inherit pkgs lib;};
 
@@ -131,9 +131,10 @@ in {
             lto = "thin";
           };
           dev.optLevel = 1;
+          test.debuginfo = 2;
         };
         build.flags = {
-          rustc = ["-Copt-level=2"];
+          rustc = ["--cfg" "tokio_unstable"];
           doc = ["-Dwarnings"];
         };
       };
@@ -141,6 +142,7 @@ in {
       profileOptLevel = cfg.profile.optLevel;
       profileLto = cfg.profile.lto;
       profileDevOptLevel = cfg.profileDev.optLevel;
+      profileTestDebuginfo = cfg.profileTest.debuginfo;
       rustcFlags = cfg.flags.rustc;
       docFlags = cfg.flags.doc;
     };
@@ -148,7 +150,8 @@ in {
       profileOptLevel = 2;
       profileLto = "thin";
       profileDevOptLevel = 1;
-      rustcFlags = ["-Copt-level=2"];
+      profileTestDebuginfo = 2;
+      rustcFlags = ["--cfg" "tokio_unstable"];
       docFlags = ["-Dwarnings"];
     };
   };
@@ -614,16 +617,20 @@ in {
       });
       future = fails (rawLoader.toWorkspaceArgs {
         root = ./.;
-        config.version = 3;
+        config.version = 4;
       });
       old = fails (rawLoader.toWorkspaceArgs {
         root = ./.;
         config.version = 1;
       });
+      previous = fails (rawLoader.toWorkspaceArgs {
+        root = ./.;
+        config.version = 2;
+      });
       current =
         !fails (rawLoader.toWorkspaceArgs {
           root = ./.;
-          config.version = 2;
+          config.version = 3;
         });
     };
     expected = {
@@ -635,6 +642,7 @@ in {
       boolean = true;
       future = true;
       old = true;
+      previous = true;
       current = true;
     };
   };
@@ -654,7 +662,7 @@ in {
       profileOptLevel = cfg.profile.optLevel;
     };
     expected = {
-      version = 2;
+      version = 3;
       libPackages = true;
       devPackages = true;
       linker = "mold";
@@ -916,6 +924,24 @@ in {
 
   testFlakeMissingDirectoryFails = {
     expr = fails (loader.loadFlakes ../tests/composition-missing-fixture);
+    expected = true;
+  };
+
+  testCheckProfileIsMapped = {
+    expr = {
+      default = (eval {}).checks.profile;
+      cargo = (eval {checks.profile = "cargo";}).checks.profile;
+      release = (eval {checks.profile = "release";}).checks.profile;
+    };
+    expected = {
+      default = "dev";
+      cargo = "cargo";
+      release = "release";
+    };
+  };
+
+  testUnknownCheckProfileFails = {
+    expr = fails (eval {checks.profile = "fast";});
     expected = true;
   };
 }

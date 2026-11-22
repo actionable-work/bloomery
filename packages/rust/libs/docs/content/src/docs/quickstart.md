@@ -31,7 +31,7 @@ For standard workspaces, `bloomery.mkFlake` sets up complete packages, runnable 
 > `mkFlake` requires `.bloomery/config.toml`. Create it next to `flake.nix`:
 >
 > ```toml
-> version = 2
+> version = 3
 >
 > [build]
 > libPackages = false
@@ -66,8 +66,8 @@ All build settings are read from `.bloomery/config.toml`:
 | --- | --- |
 | `[build]` | Source paths, member selection, `profileName`, `libPackages`, `devPackages`, `unify` |
 | `[build.toolchain]` | `rustc`, `clippy`, `cargo`, `lld`, `mold`, `stdenv`, and `linker` |
-| `[build.profile.release]`, `[build.profile.dev]` | Optimization, LTO, codegen units, panic, strip, debug info, CPU target |
-| `[build.flags]` | Extra `rustc`, `test`, `clippy`, `doc`, and `doctest` flags |
+| `[build.profile.release]`, `[build.profile.dev]`, `[build.profile.test]` | Optimization, LTO, codegen units, panic, strip, debug info, CPU target |
+| `[build.flags]` | Extra `rustc`, `test`, `clippy`, `doc`, and `doctest` flags (no codegen settings) |
 | `[devShell]` | `enable`, extra `packages`, and `shellHook` |
 | `[checks]` | Global `enable`; generated check families use `[checks.<name>].enable` |
 | `[features]` | `cratesIoIndex` |

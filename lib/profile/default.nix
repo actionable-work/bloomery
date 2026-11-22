@@ -5,7 +5,7 @@
   tests = import ./profile.test.nix {inherit lib;};
 in {
   inherit (types) profileOptionModule profileType;
-  inherit (flags) normalizeLto normalizeStrip profileToRustcFlags;
-  inherit (eval) normalizeProfileAttrs evalProfile;
+  inherit (flags) normalizeLto normalizeStrip normalizeDebuginfo profileToRustcFlags profileToCrateRustcFlags checkExtraFlags;
+  inherit (eval) normalizeProfileAttrs evalProfile mergeProfiles;
   inherit tests;
 }

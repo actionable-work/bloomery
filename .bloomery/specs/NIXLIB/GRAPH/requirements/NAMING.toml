@@ -44,10 +44,10 @@ ears = { type = "ubiquitous", system = "the Bloomery builders", action = "compil
 
 [[requirements]]
 id = "NIXLIB-GRAPH-NAMING-007"
-title = "Metadata checks resolve custom names and aliases"
+title = "Type-checking checks resolve custom names and aliases"
 manual = false
 design = "design/library-names.md#builder-wiring"
-ears = { type = "ubiquitous", system = "the Bloomery builders", action = "type-check a fixture using custom library names and explicit aliases against metadata-only dependency artifacts" }
+ears = { type = "ubiquitous", system = "the Bloomery builders", action = "type-check a fixture using custom library names and explicit aliases against staged dependency metadata" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-NAMING-008"

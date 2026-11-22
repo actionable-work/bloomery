@@ -29,7 +29,7 @@ pub(super) fn files(rust: &str) -> BTreeMap<String, String> {
 }
 
 pub(super) fn config(policy: &str) -> Config {
-    parse_contents(&format!("version = 2\n[scanners.rust]\npaths = ['tests/**/*.rs']\n[scanners.playwright]\npaths = ['e2e/**/*.ts']\n[scanners.nix]\npaths = ['checks/**/*.nix']\ntestPaths = ['checks/**/*.test.nix']\n[checks.specifications]\n{policy}"), Path::new(".bloomery/config.toml")).expect("configuration").config
+    parse_contents(&format!("version = 3\n[scanners.rust]\npaths = ['tests/**/*.rs']\n[scanners.playwright]\npaths = ['e2e/**/*.ts']\n[scanners.nix]\npaths = ['checks/**/*.nix']\ntestPaths = ['checks/**/*.test.nix']\n[checks.specifications]\n{policy}"), Path::new(".bloomery/config.toml")).expect("configuration").config
 }
 
 pub(super) fn tagged(name: &str, ids: &[&str]) -> String {

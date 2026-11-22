@@ -101,7 +101,7 @@ impl KeySpec {
 }
 
 /// Increment when the catalog changes.
-pub const CATALOG_VERSION: u32 = 16;
+pub const CATALOG_VERSION: u32 = 17;
 
 fn is_check_control(path: &[&str]) -> bool {
     matches!(
@@ -437,17 +437,62 @@ pub const CATALOG: &[CatalogEntry] = &[
         ValueType::Bool,
         "enable integer overflow checks"
     ),
+    profile_field!(
+        "test",
+        "optLevel",
+        ValueType::Union(OPT_LEVEL),
+        "optimization level (0-3, s, z)"
+    ),
+    profile_field!(
+        "test",
+        "lto",
+        ValueType::Union(LTO),
+        "link-time optimization mode"
+    ),
+    profile_field!(
+        "test",
+        "codegenUnits",
+        ValueType::PositiveInteger,
+        "number of codegen units"
+    ),
+    profile_field!("test", "panic", ValueType::Union(PANIC), "panic strategy"),
+    profile_field!(
+        "test",
+        "strip",
+        ValueType::Union(STRIP),
+        "debug symbol stripping"
+    ),
+    profile_field!("test", "linker", ValueType::String, "linker driver"),
+    profile_field!(
+        "test",
+        "linkArgs",
+        ValueType::StringList,
+        "extra linker arguments"
+    ),
+    profile_field!("test", "targetCpu", ValueType::String, "target CPU"),
+    profile_field!(
+        "test",
+        "debuginfo",
+        ValueType::Union(DEBUGINFO),
+        "debug info level"
+    ),
+    profile_field!(
+        "test",
+        "overflowChecks",
+        ValueType::Bool,
+        "enable integer overflow checks"
+    ),
     CatalogEntry {
         path: &["build", "flags", "rustc"],
         value_type: ValueType::StringList,
-        recommended: Some(DefaultValue::StringList(&["-Copt-level=3"])),
-        documentation: "Extra rustc flags for release compilation.",
+        recommended: Some(DefaultValue::StringList(&[])),
+        documentation: "Extra rustc flags for every crate compilation.",
     },
     CatalogEntry {
         path: &["build", "flags", "test"],
         value_type: ValueType::StringList,
         recommended: Some(DefaultValue::StringList(&[])),
-        documentation: "Extra rustc flags for test compilation.",
+        documentation: "Extra rustc flags for unit-test harnesses.",
     },
     CatalogEntry {
         path: &["build", "flags", "clippy"],
@@ -490,6 +535,12 @@ pub const CATALOG: &[CatalogEntry] = &[
         value_type: ValueType::Bool,
         recommended: Some(DefaultValue::Bool(true)),
         documentation: "Generate workspace checks.",
+    },
+    CatalogEntry {
+        path: &["checks", "profile"],
+        value_type: ValueType::StringEnum(&["dev", "cargo", "release"]),
+        recommended: Some(DefaultValue::String("dev")),
+        documentation: "Check graph mode: test-profile workspace crates (dev), every crate (cargo), or the release graph (release).",
     },
     CatalogEntry {
         path: &["checks", "packages", "enable"],

@@ -29,7 +29,7 @@ design = "design/main.md"
 ears = { type = "ubiquitous", system = "example", action = "work" }
 '''
     group.write_text('group = "BIND"\n' + record)
-    (root / ".bloomery/config.toml").write_text('''version = 2
+    (root / ".bloomery/config.toml").write_text('''version = 3
 [specs]
 dir = "custom"
 [scanners.rust]

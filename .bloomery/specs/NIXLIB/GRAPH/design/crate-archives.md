@@ -19,8 +19,8 @@ directory:
 `meta.tar.zst` holds everything a non-linking compilation reads. `lib.tar.zst`
 holds what only linking reads. `rustc` writes into a build-local directory and
 the archives are packed from there, so the crate output receives only the
-finished archives. A metadata-only variant and a proc-macro crate
-publish no `lib.tar.zst`.
+finished archives. A proc-macro crate publishes no
+`lib.tar.zst`.
 
 The crate metadata script publishes each archive path (`DEP_META_ARCHIVE`,
 `DEP_LIB_ARCHIVE`) and the primary member for each mode: `DEP_META_NAME` (the
@@ -56,7 +56,7 @@ Staging has two modes:
 
 - `meta` stages only `meta.tar.zst` and binds each direct dependency's
   `DEP_META_NAME`. Rlib compilation of a crate without linked crate types,
-  metadata-only variants, check, clippy, and documentation use it.
+  check, clippy, and documentation use it.
 - `link` also stages `lib.tar.zst` and binds `DEP_LIB_NAME`. Binaries, tests,
   doctests, build scripts, proc macros, and crates with `cdylib` or
   `staticlib` outputs use it.

@@ -45,8 +45,9 @@ specification tree, scan evidence, run checks, or touch lockfiles.
 - Validate the complete resulting configuration and publish it atomically.
 - Add only absent recommended keys during `config upgrade` and report
   recommendation differences with `--diff`.
-- Require an explicit supported configuration format version; format `2` is
-  current, and a writing `config upgrade` migrates format `1` to format `2`.
+- Require an explicit supported configuration format version; format `3` is
+  current, and a writing `config upgrade` migrates formats `1` and `2` to
+  format `3`.
 - Annotate every configured key with its schema-catalog documentation during
   `config document` without changing values or materializing absent keys.
 - Warn, without failing, when a config command runs outside a Bloomery flake

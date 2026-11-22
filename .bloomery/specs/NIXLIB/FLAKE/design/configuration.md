@@ -8,7 +8,8 @@ passed through the `rustsecAdvisoryDb` constructor argument.
 ## Configuration source
 
 Build settings live in `[build]` and its `[build.toolchain]`,
-`[build.profile.release]`, `[build.profile.dev]`, and `[build.flags]` subtables,
+`[build.profile.release]`, `[build.profile.dev]`, `[build.profile.test]`, and
+`[build.flags]` subtables,
 plus `[devShell]`, `[checks]`, `[features]`, `[formatters]`, and `[optimize]`.
 The `[specs]` and `[scanners.*]`
 tables belong to the CLI; the flake interface ignores them. The nested
@@ -88,9 +89,9 @@ linker = "lld"                   # "lld", "mold", "system", or omit
 
 ## Profiles
 
-`[build.profile.release]` and `[build.profile.dev]` carry the scalar profile
-settings `optLevel`, `lto`, `codegenUnits`, `panic`, `strip`, `debuginfo`,
-`targetCpu`, `overflowChecks`, `linker`, and `linkArgs`.
+`[build.profile.release]`, `[build.profile.dev]`, and `[build.profile.test]`
+carry the scalar profile settings `optLevel`, `lto`, `codegenUnits`, `panic`,
+`strip`, `debuginfo`, `targetCpu`, `overflowChecks`, `linker`, and `linkArgs`.
 
 ```toml
 [build.profile.release]
@@ -100,16 +101,21 @@ codegenUnits = 1
 
 [build.profile.dev]
 optLevel = 0
+
+[build.profile.test]
+debuginfo = 2
 ```
 
 ## Flags
 
 `[build.flags]` carries the per-phase flag lists `rustc`, `test`, `clippy`,
-`doc`, and `doctest`.
+`doc`, and `doctest`. Codegen settings belong in the profiles, so a flag list
+that sets `opt-level`, `codegen-units`, `debuginfo`, or `overflow-checks` is an
+evaluation error.
 
 ```toml
 [build.flags]
-rustc = ["-Copt-level=3"]
+rustc = ["--cfg", "tokio_unstable"]
 test = []
 clippy = []
 doc = ["-Dwarnings"]
@@ -130,7 +136,9 @@ shellHook = "echo ready"
 
 ## Checks
 
-`[checks]` carries the global `enable` switch. Each check has a subtable with an
+`[checks]` carries the global `enable` switch and `profile`, the
+[check graph mode](../../GRAPH/design/check-profiles.md#check-graph-modes):
+`"dev"` (default), `"cargo"`, or `"release"`. Each check has a subtable with an
 `enable` switch: `[checks.crates]`, `[checks.packages]`,
 `[checks.lockFreshness]`, `[checks.workspaceDependencies]`,
 `[checks.noDefaultFeatures]`, `[checks.vulnerabilities]`, `[checks.licenses]`,
@@ -146,6 +154,7 @@ package path; package checks are available when explicitly enabled.
 ```toml
 [checks]
 enable = false
+profile = "dev"
 
 [checks.crates]
 enable = false

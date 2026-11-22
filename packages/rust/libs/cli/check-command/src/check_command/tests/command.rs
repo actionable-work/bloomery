@@ -187,7 +187,7 @@ fn unused_dependency_check_is_independently_selectable_and_fails_on_unused_entri
     fs::write(
         root.join(".bloomery/config.toml"),
         format!(
-            "version = 2\n{}\n[checks.codeHealth]\nenable = false\n",
+            "version = 3\n{}\n[checks.codeHealth]\nenable = false\n",
             config.replace("enable = true\n", "enable = false\n")
         ),
     )
@@ -235,7 +235,7 @@ fn health_catalog_enablement_ignores_specs_scanners_build_toggle_and_system_coun
     fs::write(
         root.join(".bloomery/config.toml"),
         format!(
-            "version = 2\n{}",
+            "version = 3\n{}",
             config.replace("enable = true\n", "enable = false\n")
         ),
     )

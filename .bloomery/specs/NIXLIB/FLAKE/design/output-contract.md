@@ -36,9 +36,9 @@ the source. It does not modify the workspace.
 When checks are enabled, `checks` contains `<crate>:check`, `<crate>:test`,
 `<crate>:clippy`, `<crate>:doc`, and `<crate>:doctest` for workspace crates;
 `<crate>:doctest` exists only for crates with a library entrypoint.
-`<crate>:check`, clippy, and documentation checks compile their dependency
-crates metadata-only; test and doctest compile workspace crates with the dev
-profile; package checks use full release crates. `<crate>:check` is generated
+Every check except package checks compiles workspace crates once with the dev
+profile, and `<crate>:check`, clippy, and documentation stage only their
+metadata; package checks use full release crates. `<crate>:check` is generated
 only when `checks.crates.enable` is enabled; it is off by default. Package checks
 `<bin>:bin` and `<crate>:lib` are included only when
 `checks.packages.enable` is enabled; it is also off by default. Enabling

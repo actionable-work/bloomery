@@ -21,7 +21,6 @@ build.
 - [Lock data and graph resolution](design/resolution.md)
 - [Library names and dependency aliases](design/library-names.md)
 - [Derivation contracts](design/derivations.md)
-- [Metadata-only check compilation](design/metadata-check.md)
 - [Check profile selection](design/check-profiles.md)
 - [Crate archives and dependency staging](design/crate-archives.md)
 - [Build-script native artifacts](design/native-artifacts.md)
@@ -37,6 +36,6 @@ crate sourcing, crate identity, binary
 discovery, build scripts, crate archives and dependency staging, build-script
 native artifacts, propagation metadata,
 asset flow, Topcoat asset bundling and Tailwind provisioning, lock validation,
-metadata-only check compilation, check profile selection, manifest policy
+check profile selection, manifest policy
 checks, dependency policy checks, and the workspace check derivations. Fileset
 selection mechanics are owned by [NIX/SOURCES](../../NIX/SOURCES/README.md).

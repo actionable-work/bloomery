@@ -2,48 +2,31 @@ group = "PROFILES"
 
 [[requirements]]
 id = "NIXLIB-GRAPH-PROFILES-001"
-title = "Test checks use dev-profile crates"
+title = "Test checks use the check graph"
 manual = false
 design = "design/check-profiles.md#linking-check-crates"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the test builder"
-action = "resolve the crate under test and its workspace dependency closure to dev-profile crate variants"
+ears = { type = "ubiquitous", system = "the test builder", action = "resolve the crate under test and its dependency closure through the test-profile check graph" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-PROFILES-002"
-title = "Doctest checks use dev-profile crates"
+title = "Doctest checks use the check graph"
 manual = false
 design = "design/check-profiles.md#linking-check-crates"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the doctest builder"
-action = "resolve the crate under test and its workspace dependency closure to dev-profile crate variants"
+ears = { type = "ubiquitous", system = "the doctest builder", action = "resolve the crate under test and its dependency closure through the test-profile check graph" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-PROFILES-003"
-title = "Non-workspace check dependencies reuse release crates"
+title = "Dev check mode reuses release registry crates"
 manual = false
-design = "design/check-profiles.md#linking-check-crates"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the dev-profile check graph"
-action = "resolve non-workspace dependency crates to their release variants"
+design = "design/check-profiles.md#check-graph-modes"
+ears = { type = "state", state = "checks.profile is dev", system = "the check graph", action = "compile workspace crates with the test profile and resolve non-workspace crates to their release variants" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-PROFILES-004"
 title = "Check profiles ignore dev package visibility"
 manual = false
 design = "design/check-profiles.md#availability"
-
-[requirements.ears]
-type = "event"
-trigger = "build.devPackages is disabled"
-system = "the workspace builder"
-action = "still resolve test and doctest checks to dev-profile workspace crate variants"
+ears = { type = "event", trigger = "build.devPackages is disabled", system = "the workspace builder", action = "still resolve test and doctest checks to test-profile workspace crate variants" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-PROFILES-005"
@@ -69,22 +52,105 @@ action = "link crate instances from a single profile inside one artifact"
 
 [[requirements]]
 id = "NIXLIB-GRAPH-PROFILES-007"
-title = "Dev-profile test consumption is covered by builder tests"
+title = "Test-profile test consumption is covered by builder tests"
 manual = false
 design = "design/check-profiles.md#builder-tests"
-
-[requirements.ears]
-type = "ubiquitous"
-system = "the crate builder test suite"
-action = "compile a test check whose workspace dependency resolves to a dev-profile variant"
+ears = { type = "ubiquitous", system = "the crate builder test suite", action = "compile a test check whose workspace dependency resolves to a test-profile variant" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-PROFILES-008"
-title = "Dev-profile doctest consumption is covered by builder tests"
+title = "Test-profile doctest consumption is covered by builder tests"
 manual = false
 design = "design/check-profiles.md#builder-tests"
+ears = { type = "ubiquitous", system = "the crate builder test suite", action = "compile a doctest check whose workspace dependency resolves to a test-profile variant" }
 
-[requirements.ears]
-type = "ubiquitous"
-system = "the crate builder test suite"
-action = "compile a doctest check whose workspace dependency resolves to a dev-profile variant"
+[[requirements]]
+id = "NIXLIB-GRAPH-PROFILES-009"
+title = "Check entries type-check with metadata"
+manual = false
+design = "design/check-profiles.md#type-checking-checks"
+ears = { type = "ubiquitous", system = "the check builder", action = "compile a workspace crate with rustc --emit=metadata for its <crate>:check entry" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-PROFILES-010"
+title = "Check entries use the check graph"
+manual = false
+design = "design/check-profiles.md#type-checking-checks"
+ears = { type = "ubiquitous", system = "the check builder", action = "resolve the dependency closure of a <crate>:check entry through the test-profile check graph" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-PROFILES-011"
+title = "Clippy checks use the check graph"
+manual = false
+design = "design/check-profiles.md#type-checking-checks"
+ears = { type = "ubiquitous", system = "the clippy builder", action = "resolve the dependency closure of a <crate>:clippy entry through the test-profile check graph" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-PROFILES-012"
+title = "Documentation checks use the check graph"
+manual = false
+design = "design/check-profiles.md#type-checking-checks"
+ears = { type = "ubiquitous", system = "the documentation builder", action = "resolve the dependency closure of a <crate>:doc entry through the test-profile check graph" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-PROFILES-013"
+title = "Checks build no metadata-only crate variants"
+manual = false
+design = "design/check-profiles.md#type-checking-checks"
+ears = { type = "ubiquitous", system = "the workspace builder", action = "build each dependency crate of a workspace crate's checks once, without a separate metadata-only variant" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-PROFILES-014"
+title = "Check graph mode defaults to dev"
+manual = false
+design = "design/check-profiles.md#check-graph-modes"
+ears = { type = "ubiquitous", system = "the workspace builder", action = "use the dev check graph mode when checks.profile is unset" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-PROFILES-015"
+title = "Cargo check mode rebuilds every crate"
+manual = false
+design = "design/check-profiles.md#check-graph-modes"
+ears = { type = "state", state = "checks.profile is cargo", system = "the check graph", action = "compile every crate, including non-workspace crates, with the test profile" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-PROFILES-016"
+title = "Release check mode shares release crates"
+manual = false
+design = "design/check-profiles.md#check-graph-modes"
+ears = { type = "state", state = "checks.profile is release", system = "the check graph", action = "resolve every crate to its release variant" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-PROFILES-017"
+title = "Unit-test harnesses use the test profile"
+manual = false
+design = "design/check-profiles.md#linking-check-crates"
+ears = { type = "ubiquitous", system = "the test builder", action = "compile the unit-test harness of the crate under test with the test profile in every check graph mode" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-PROFILES-018"
+title = "Type-checked crates use the test profile"
+manual = false
+design = "design/check-profiles.md#type-checking-checks"
+ears = { type = "ubiquitous", system = "the check and clippy builders", action = "compile the checked workspace crate with the test profile" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-PROFILES-019"
+title = "Test profile inherits the dev profile"
+manual = false
+design = "design/check-profiles.md#test-profile"
+ears = { type = "ubiquitous", system = "the workspace builder", action = "derive every unset test profile field from the dev profile, except debuginfo" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-PROFILES-020"
+title = "Test profile defaults to line tables"
+manual = false
+design = "design/check-profiles.md#test-profile"
+ears = { type = "ubiquitous", system = "the workspace builder", action = "compile test-profile crates with -Cdebuginfo=line-tables-only unless build.profile.test or Cargo.toml [profile.test] sets debuginfo" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-PROFILES-021"
+title = "Test profile options override the inherited profile"
+manual = false
+design = "design/check-profiles.md#test-profile"
+ears = { type = "ubiquitous", system = "the workspace builder", action = "apply build.profile.test fields over the inherited dev profile for test-profile crates" }

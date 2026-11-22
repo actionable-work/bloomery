@@ -35,7 +35,7 @@ pub struct Config {
     pub flakes: Option<toml::Value>,
 }
 
-pub const CURRENT_CONFIG_VERSION: u32 = 2;
+pub const CURRENT_CONFIG_VERSION: u32 = 3;
 
 impl Default for Config {
     fn default() -> Self {
@@ -449,7 +449,7 @@ mod tests {
     }
 
     fn write_versioned_config(path: &Path, contents: &str) {
-        fs::write(path, format!("version = 2\n{contents}")).expect("config contents");
+        fs::write(path, format!("version = 3\n{contents}")).expect("config contents");
     }
 
     #[test]
@@ -694,7 +694,7 @@ mod tests {
 
         let diagnostic = load(&root).expect_err("missing version should be rejected");
         assert_eq!(diagnostic.code, "ConfigurationError");
-        assert!(diagnostic.message.contains("version = 2"));
+        assert!(diagnostic.message.contains("version = 3"));
         let _ = fs::remove_dir_all(root);
     }
 
@@ -713,11 +713,12 @@ mod tests {
         for contents in [
             "version = 0\n",
             "version = 1\n",
+            "version = 2\n",
             "version = -1\n",
             "version = 2.0\n",
             "version = \"2\"\n",
             "version = true\n",
-            "version = 3\n",
+            "version = 4\n",
         ] {
             let root = root();
             let config_path = root.join(".bloomery/config.toml");

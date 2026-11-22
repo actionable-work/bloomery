@@ -25,9 +25,11 @@ fn catalog_enumerates_every_recognized_key() {
         "build.toolchain.rustc",
         "build.profile.release.optLevel",
         "build.profile.dev.debuginfo",
+        "build.profile.test.debuginfo",
         "build.flags.rustc",
         "devShell.shellHook",
         "checks.enable",
+        "checks.profile",
         "build.unify",
         "formatters.toml-sort.before",
         "checks.codeHealth.enable",
@@ -49,7 +51,7 @@ fn catalog_enumerates_every_recognized_key() {
         "format metadata is not catalogued"
     );
     let versioned: Value =
-        toml::from_str("version = 2\n[checks]\nenable = true\n").expect("versioned TOML");
+        toml::from_str("version = 3\n[checks]\nenable = true\n").expect("versioned TOML");
     assert!(
         validate_raw(&versioned).is_ok(),
         "format metadata is ignored by the catalog"
@@ -299,7 +301,11 @@ fn effective_defaults_are_distinct_from_upgrade_recommendations() {
     );
     assert_eq!(
         effective_default(&["build", "flags", "rustc"]),
-        Some(Value::Array(vec![Value::String("-Copt-level=3".into())]))
+        Some(Value::Array(Vec::new()))
+    );
+    assert_eq!(
+        effective_default(&["checks", "profile"]),
+        Some(Value::String("dev".into()))
     );
     assert_eq!(
         effective_default(&["checks", "packages", "enable"]),
@@ -478,7 +484,7 @@ fn nix_test_paths_are_catalogued() {
 #[test]
 #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-005"))]
 fn catalog_version_tracks_the_binary() {
-    assert_eq!(CATALOG_VERSION, 16);
+    assert_eq!(CATALOG_VERSION, 17);
     assert!(!CATALOG.is_empty());
 }
 
@@ -507,6 +513,7 @@ fn optional_keys_have_no_recommendation() {
         "features.cratesIoIndex",
         "build.profile.release.optLevel",
         "build.profile.dev.linkArgs",
+        "build.profile.test.debuginfo",
         "specs.enable",
     ] {
         let parts = path.split('.').collect::<Vec<_>>();

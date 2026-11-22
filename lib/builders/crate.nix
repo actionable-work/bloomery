@@ -39,7 +39,6 @@
   isProcMacro ? null,
   edition ? null,
   variantName ? null,
-  metadataOnly ? false,
   buildScriptDependencies ? dependencies,
 }: let
   compilerFlags = import ./compiler-flags.nix {inherit pkgs lib stdenv;};
@@ -92,12 +91,6 @@ in
 
       # Pass dependencies so nix tracks and provides them in builder
       inherit dependencies buildScriptDependencies;
-
-      # Compile the target to metadata only, without linking object code.
-      METADATA_ONLY =
-        if metadataOnly
-        then "1"
-        else "0";
 
       # Environment variables
       RUSTC = "${rustc}/bin/rustc";
@@ -196,14 +189,7 @@ in
           CRATE_TYPE="proc-macro"
           EXTRA_FLAGS+=("--extern" "proc_macro")
         fi
-        EMIT_KIND="${
-          if metadataOnly
-          then "metadata"
-          else "link,metadata"
-        }"
         if [ "$IS_PROC_MACRO" = 1 ]; then
-          METADATA_ONLY=0
-          EMIT_KIND="link,metadata"
           RUSTC="$BUILD_RUSTC"
         fi
         EXTRA_CRATE_TYPES=()
@@ -222,10 +208,10 @@ in
             fi
           done
         fi
-        # Proc macros and cdylib or staticlib outputs link; plain rlib and
-        # metadata compilations only need dependency metadata.
+        # Proc macros and cdylib or staticlib outputs link; plain rlib
+        # compilations only need dependency metadata.
         STAGING_MODE=meta
-        if [ "$IS_PROC_MACRO" = "1" ] || { [ "$METADATA_ONLY" != "1" ] && [ ''${#EXTRA_CRATE_TYPES[@]} -gt 0 ]; }; then
+        if [ "$IS_PROC_MACRO" = "1" ] || [ ''${#EXTRA_CRATE_TYPES[@]} -gt 0 ]; then
           STAGING_MODE=link
           ${lib.optionalString (defaultLinker != null) ''EXTRA_FLAGS+=("-Clink-arg=-fuse-ld=${defaultLinker}")''}
         fi
@@ -510,7 +496,7 @@ in
           --crate-name "$CRATE_NAME" \
           --crate-type "$CRATE_TYPE" \
           "''${EXTRA_CRATE_TYPES[@]}" \
-          --emit="$EMIT_KIND" \
+          --emit=link,metadata \
           $EDITION_FLAG \
           -L dependency=_deps \
           "''${EXTERN_FLAGS[@]}" \
@@ -527,12 +513,7 @@ in
         runHook preInstall
 
         OUT_LIB=""
-        if [ "$METADATA_ONLY" = "1" ]; then
-          OUT_LIB=$(ls $RUSTC_OUT/lib$CRATE_NAME*.rmeta 2>/dev/null | head -n 1)
-          if [ -z "$OUT_LIB" ]; then
-            OUT_LIB=$(ls $RUSTC_OUT/*.rmeta 2>/dev/null | head -n 1)
-          fi
-        elif [ "$IS_PROC_MACRO" = "1" ] || [ "$CRATE_TYPE" = "proc-macro" ]; then
+        if [ "$IS_PROC_MACRO" = "1" ] || [ "$CRATE_TYPE" = "proc-macro" ]; then
           OUT_LIB=$(ls $RUSTC_OUT/lib$CRATE_NAME*.so $RUSTC_OUT/lib$CRATE_NAME*.dylib 2>/dev/null | head -n 1)
           if [ -z "$OUT_LIB" ]; then
             OUT_LIB=$(ls $RUSTC_OUT/*.so $RUSTC_OUT/*.dylib 2>/dev/null | head -n 1)
@@ -554,7 +535,7 @@ in
           exit 1
         fi
 
-        ${lib.optionalString (hasTopcoatAssets && !metadataOnly) ''
+        ${lib.optionalString hasTopcoatAssets ''
           # Index files while the crate's sources and build-script OUT_DIR
           # still exist.
           mapfile -t TOPCOAT_ARTIFACTS < <(grep -rlaF TOPCOAT_ASSET "$RUSTC_OUT" || true)
@@ -602,7 +583,7 @@ in
             --use-compress-program='zstd -3 -T1 -q' -cf "$1" -C "$2" .
         }
         write_archive "$out/meta.tar.zst" _archive/meta
-        if [ "$METADATA_ONLY" != "1" ] && [ "$IS_PROC_MACRO" != "1" ]; then
+        if [ "$IS_PROC_MACRO" != "1" ]; then
           write_archive "$out/lib.tar.zst" _archive/lib
         fi
 
@@ -621,7 +602,7 @@ in
           fi
         } | LC_ALL=C sort -u > "$out/nix-support/deps-closure"
 
-        ${lib.optionalString (hasTopcoatAssets && !metadataOnly) ''
+        ${lib.optionalString hasTopcoatAssets ''
           # Forward dependency Topcoat asset indexes for transitive consumers.
           ${topcoat.executable} merge "$out/topcoat-assets" ${lib.concatMapStringsSep " " (dep: ''"${dep}/topcoat-assets"'') dependencies}
         ''}# Discover and forward dependency assets for transitive downstream consumers

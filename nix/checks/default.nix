@@ -10,6 +10,7 @@
   root ? ../..,
 }:
 (import ./playwright.test.nix {inherit pkgs workspace;})
+// (import ./playwright-workers.test.nix {inherit pkgs workspace;})
 // (import ./crate-archives {inherit pkgs lib;})
 // (import ./builder-linking.nix {inherit pkgs lib;})
 // {

@@ -43,7 +43,7 @@ accept workspace options as arguments.
 
 ```toml bloomery-config
 # .bloomery/config.toml (required)
-version = 2
+version = 3
 
 [build]
 libPackages = false

@@ -44,7 +44,7 @@ execution and host/target dependency selection. Mutually exclusive edges do not
 produce duplicate or incorrect extern bindings. Optional or otherwise inactive
 edges produce none.
 
-Global, per-member, release, dev, metadata-only, and optimized graphs use the
+Global, per-member, release, dev, and optimized graphs use the
 same naming contract. An alias in one member's context cannot change another
 context's bindings or the dependency artifact's intrinsic name. Feature
 requests use declaration keys independently of the resolved extern name.

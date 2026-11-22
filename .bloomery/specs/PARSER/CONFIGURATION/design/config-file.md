@@ -7,12 +7,18 @@ design tree.
 ## Format versioning
 
 The top-level integer `version` identifies the configuration's structural
-layout. Format `2` is current, and every new or upgraded configuration declares
-`version = 2`. Bloomery does not infer a version for an unversioned file or
+layout. Format `3` is current, and every new or upgraded configuration declares
+`version = 3`. Bloomery does not infer a version for an unversioned file or
 accept format `0`. A missing version produces a `ConfigurationError` that asks
-the user to set `version = 2`. `bloomery config upgrade` accepts format `1` and
-migrates it to format `2`; other configuration readers require the current
-format. The `version` field is format metadata, not a configurable
+the user to set `version = 3`. `bloomery config upgrade` accepts formats `1` and
+`2` and migrates them to format `3`; other configuration readers require the
+current format.
+
+| Format | Change from the previous format |
+| --- | --- |
+| `1` | Initial layout. |
+| `2` | Toolchain, profile, and flag tables nest under `build`; flat check controls move into check subtables. |
+| `3` | Codegen settings move from `build.flags` lists into `build.profile.*` fields. | The `version` field is format metadata, not a configurable
 schema-catalog key.
 
 The format version describes the structure of existing keys, not the set of
@@ -40,7 +46,7 @@ values.
 The scanner and spec configuration shape begins with the required format key:
 
 ```toml
-version = 2
+version = 3
 
 [specs]
 dir = "specs"
@@ -173,7 +179,7 @@ Explicit values, including `false`, always take precedence over an upgrade.
 
 A missing, unreadable, unparsable, or invalid configuration file produces a
 `ConfigurationError`. A missing format version produces an error that asks the
-user to add `version = 2` to `.bloomery/config.toml`. A malformed, negative, or
+user to add `version = 3` to `.bloomery/config.toml`. A malformed, negative, or
 unsupported version, including `0` or `1` outside `config upgrade`, is also a
 `ConfigurationError`; a version `1` error directs the user to
 `bloomery config upgrade`. Bloomery must not silently replace a broken file

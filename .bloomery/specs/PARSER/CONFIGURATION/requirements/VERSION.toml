@@ -5,14 +5,14 @@ id = "PARSER-CONFIGURATION-VERSION-001"
 title = "Missing config version is an actionable error"
 manual = false
 design = "design/config-file.md#format-versioning"
-ears = { type = "unwanted_behavior", trigger = "config.toml has no top-level version", system = "the configuration loader", action = "report a ConfigurationError asking the user to set version = 2" }
+ears = { type = "unwanted_behavior", trigger = "config.toml has no top-level version", system = "the configuration loader", action = "report a ConfigurationError asking the user to set version = 3" }
 
 [[requirements]]
 id = "PARSER-CONFIGURATION-VERSION-002"
-title = "Format 2 is the current version"
+title = "Format 3 is the current version"
 manual = false
 design = "design/config-file.md#format-versioning"
-ears = { type = "ubiquitous", system = "configuration loading", action = "accept and normalize config files whose top-level version is integer 2" }
+ears = { type = "ubiquitous", system = "configuration loading", action = "accept and normalize config files whose top-level version is integer 3" }
 
 [[requirements]]
 id = "PARSER-CONFIGURATION-VERSION-003"
@@ -41,3 +41,10 @@ title = "Format 1 has a migration to format 2"
 manual = false
 design = "design/config-file.md#format-versioning"
 ears = { type = "event", trigger = "bloomery config upgrade reads a format 1 configuration", system = "configuration migration", action = "move toolchain, profile, flag, and flat check settings to their format 2 paths while preserving their values" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-VERSION-007"
+title = "Format 2 has a migration to format 3"
+manual = false
+design = "design/config-file.md#format-versioning"
+ears = { type = "event", trigger = "bloomery config upgrade reads a format 2 configuration", system = "configuration migration", action = "move codegen settings from build.flags lists into build.profile fields while preserving their meaning" }

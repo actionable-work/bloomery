@@ -17,10 +17,10 @@ ears = { type = "ubiquitous", system = "the crate builder", action = "publish a 
 
 [[requirements]]
 id = "NIXLIB-GRAPH-ARCHIVES-003"
-title = "Non-linkable crates publish no lib archive"
+title = "Proc-macro crates publish no lib archive"
 manual = false
 design = "design/crate-archives.md#archive-layout"
-ears = { type = "state", system = "the crate builder", state = "the crate is a metadata-only variant or a proc macro", action = "publish no lib.tar.zst" }
+ears = { type = "state", system = "the crate builder", state = "the crate is a proc macro", action = "publish no lib.tar.zst" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-ARCHIVES-004"
@@ -104,7 +104,7 @@ id = "NIXLIB-GRAPH-ARCHIVES-015"
 title = "Non-linking compilations stage metadata"
 manual = false
 design = "design/crate-archives.md#staging"
-ears = { type = "ubiquitous", system = "the Rust builders", action = "stage in meta mode for rlib compilation without linked crate types, metadata-only variants, check, clippy, and documentation builds" }
+ears = { type = "ubiquitous", system = "the Rust builders", action = "stage in meta mode for rlib compilation without linked crate types, check, clippy, and documentation builds" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-ARCHIVES-016"

@@ -379,7 +379,7 @@ mod tests {
     }
 
     fn seed(root: &Path, contents: &str) {
-        seed_raw(root, &format!("version = 2\n{contents}"));
+        seed_raw(root, &format!("version = 3\n{contents}"));
     }
 
     fn seed_raw(root: &Path, contents: &str) {
@@ -412,7 +412,7 @@ mod tests {
         assert!(report.warnings.contains(&ConfigWarning::CreatedConfig {
             path: CONFIG_RELATIVE_PATH.to_owned()
         }));
-        assert!(contents(&root).contains("version = 2"));
+        assert!(contents(&root).contains("version = 3"));
         assert!(contents(&root).contains("enable = false"));
         let _ = fs::remove_dir_all(root);
     }
@@ -428,7 +428,7 @@ mod tests {
         ] {
             let root = temp_root();
             run(&root, &operation).expect("mutator creates configuration");
-            assert_eq!(contents(&root), "version = 2\n", "{operation:?}");
+            assert_eq!(contents(&root), "version = 3\n", "{operation:?}");
             let _ = fs::remove_dir_all(root);
         }
     }
@@ -458,7 +458,7 @@ mod tests {
             let original = "checks.enable = true\n";
             seed_raw(&root, original);
             let error = run(&root, &operation).expect_err("missing version is rejected");
-            assert!(error.message().contains("version = 2"), "{error}");
+            assert!(error.message().contains("version = 3"), "{error}");
             assert_eq!(contents(&root), original);
             let _ = fs::remove_dir_all(root);
         }
@@ -489,7 +489,7 @@ mod tests {
         let root = temp_root();
         seed_raw(
             &root,
-            "version = 2 # preserve format comment\nchecks.enable = true\n",
+            "version = 3 # preserve format comment\nchecks.enable = true\n",
         );
 
         let error = run(
@@ -511,7 +511,7 @@ mod tests {
         .expect("set");
         run(&root, &ConfigOperation::Document).expect("document");
         let after_edit = contents(&root);
-        assert!(after_edit.contains("version = 2"), "{after_edit}");
+        assert!(after_edit.contains("version = 3"), "{after_edit}");
         assert!(
             after_edit.contains("# preserve format comment"),
             "{after_edit}"
@@ -526,7 +526,7 @@ mod tests {
         )
         .expect("unset");
         let after_unset = contents(&root);
-        assert!(after_unset.contains("version = 2"), "{after_unset}");
+        assert!(after_unset.contains("version = 3"), "{after_unset}");
         assert!(
             after_unset.contains("# preserve format comment"),
             "{after_unset}"
@@ -987,7 +987,7 @@ mod tests {
             other => panic!("unexpected outcome: {other:?}"),
         }
         let after = contents(&root);
-        assert!(after.contains("version = 2"));
+        assert!(after.contains("version = 3"));
         assert!(after.contains("enable = true"));
         assert!(after.contains("[checks.crates]\nenable = true"));
         assert!(after.contains("[checks.specifications]\nenable = true"));
@@ -1252,7 +1252,7 @@ mod tests {
                 ..
             } => {
                 assert_eq!(source_version, Some(1));
-                assert_eq!(target_version, Some(2));
+                assert_eq!(target_version, Some(3));
                 assert!(written);
             }
             other => panic!("unexpected outcome: {other:?}"),
@@ -1260,7 +1260,7 @@ mod tests {
 
         let after = contents(&root);
         let parsed = toml::from_str::<toml::Value>(&after).expect("migrated TOML");
-        assert_eq!(parsed["version"].as_integer(), Some(2));
+        assert_eq!(parsed["version"].as_integer(), Some(3));
         assert_eq!(
             parsed["build"]["cargoToml"].as_str(),
             Some("workspace/Cargo.toml")
@@ -1282,8 +1282,16 @@ mod tests {
             Some(1)
         );
         assert_eq!(
-            parsed["build"]["flags"]["rustc"][0].as_str(),
-            Some("-Cdebuginfo=0")
+            parsed["build"]["flags"]["rustc"].as_array().map(Vec::len),
+            Some(0)
+        );
+        assert_eq!(
+            parsed["build"]["profile"]["release"]["debuginfo"].as_integer(),
+            Some(0)
+        );
+        assert_eq!(
+            parsed["build"]["profile"]["dev"]["debuginfo"].as_integer(),
+            Some(0)
         );
         assert_eq!(parsed["checks"]["enable"].as_bool(), Some(false));
         assert_eq!(parsed["checks"]["crates"]["enable"].as_bool(), Some(false));
@@ -1316,7 +1324,7 @@ mod tests {
                 diff: false,
             }),
         )
-        .expect("second v2 upgrade");
+        .expect("second v3 upgrade");
         match second.outcome {
             ConfigOutcome::Upgrade { written, added, .. } => {
                 assert!(!written);
@@ -1325,6 +1333,122 @@ mod tests {
             other => panic!("unexpected outcome: {other:?}"),
         }
         assert_eq!(contents(&root), after);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    fn upgrade_v2(root: &Path) -> (Option<u32>, Option<u32>, toml::Value) {
+        let report = run(
+            root,
+            &operation(ConfigOperation::Upgrade {
+                dry_run: false,
+                diff: false,
+            }),
+        )
+        .expect("v2 upgrade");
+        let ConfigOutcome::Upgrade {
+            source_version,
+            target_version,
+            ..
+        } = report.outcome
+        else {
+            panic!("unexpected outcome: {:?}", report.outcome);
+        };
+        let parsed = toml::from_str::<toml::Value>(&contents(root)).expect("migrated TOML");
+        (source_version, target_version, parsed)
+    }
+
+    fn strings(value: &toml::Value) -> Vec<&str> {
+        value
+            .as_array()
+            .expect("flag list")
+            .iter()
+            .map(|flag| flag.as_str().expect("flag string"))
+            .collect()
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-029"))]
+    #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-VERSION-007"))]
+    fn upgrade_moves_v2_rustc_codegen_flags_into_profiles() {
+        let root = temp_root();
+        seed_raw(
+            &root,
+            "version = 2\n\
+             [build.profile.release]\ndebuginfo = 1\n\
+             [build.flags]\nrustc = [\"-Copt-level=3\", \"--cfg\", \"x\", \"-C\", \"codegen-units=4\", \"-g\"]\n",
+        );
+
+        let (source, target, parsed) = upgrade_v2(&root);
+        assert_eq!((source, target), (Some(2), Some(3)));
+        assert_eq!(parsed["version"].as_integer(), Some(3));
+        let build = &parsed["build"];
+        assert_eq!(strings(&build["flags"]["rustc"]), ["--cfg", "x"]);
+        let release = &build["profile"]["release"];
+        assert!(
+            release.get("optLevel").is_none(),
+            "opt-level 3 is the default"
+        );
+        assert_eq!(release["codegenUnits"].as_integer(), Some(4));
+        assert_eq!(release["debuginfo"].as_integer(), Some(1));
+        let dev = &build["profile"]["dev"];
+        assert!(
+            dev.get("optLevel").is_none(),
+            "dev never used flags.rustc opt-level"
+        );
+        assert_eq!(dev["codegenUnits"].as_integer(), Some(4));
+        assert_eq!(dev["debuginfo"].as_integer(), Some(2));
+        bloomery_model::config::load(&root).expect("migrated config validates");
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-030"))]
+    fn upgrade_keeps_non_default_v2_release_opt_level() {
+        let root = temp_root();
+        seed_raw(
+            &root,
+            "version = 2\n[build.flags]\nrustc = [\"-C opt-level=s\"]\n",
+        );
+
+        let (_, _, parsed) = upgrade_v2(&root);
+        let profile = &parsed["build"]["profile"];
+        assert_eq!(profile["release"]["optLevel"].as_str(), Some("s"));
+        assert!(profile.get("dev").is_none());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-031"))]
+    fn upgrade_moves_v2_test_codegen_flags_into_the_test_profile() {
+        let root = temp_root();
+        seed_raw(
+            &root,
+            "version = 2\n[build.flags]\ntest = [\"-Copt-level=1\", \"-Coverflow-checks=off\"]\n",
+        );
+
+        let (_, _, parsed) = upgrade_v2(&root);
+        let build = &parsed["build"];
+        assert!(strings(&build["flags"]["test"]).is_empty());
+        let test = &build["profile"]["test"];
+        assert_eq!(test["optLevel"].as_integer(), Some(1));
+        assert_eq!(test["overflowChecks"].as_bool(), Some(false));
+        assert!(build["profile"].get("release").is_none());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CONFIG-UPGRADE-032"))]
+    fn upgrade_drops_v2_clippy_codegen_flags() {
+        let root = temp_root();
+        seed_raw(
+            &root,
+            "version = 2\n[build.flags]\nclippy = [\"-Dwarnings\", \"-Copt-level=0\"]\n",
+        );
+
+        let (_, _, parsed) = upgrade_v2(&root);
+        let build = &parsed["build"];
+        assert_eq!(strings(&build["flags"]["clippy"]), ["-Dwarnings"]);
+        assert!(build.get("profile").is_none());
         let _ = fs::remove_dir_all(root);
     }
 
@@ -1353,7 +1477,7 @@ mod tests {
                 ..
             } => {
                 assert_eq!(source_version, Some(1));
-                assert_eq!(target_version, Some(2));
+                assert_eq!(target_version, Some(3));
                 assert!(added.contains(&"checks.enable".to_owned()));
                 assert!(!written);
             }
@@ -1387,7 +1511,7 @@ mod tests {
                 ..
             } => {
                 assert_eq!(source_version, Some(1));
-                assert_eq!(target_version, Some(2));
+                assert_eq!(target_version, Some(3));
                 assert!(!written);
                 assert!(differences.iter().any(|record| {
                     record.key == "checks.crates.enable"
@@ -1531,7 +1655,7 @@ mod tests {
         assert!(report.warnings.contains(&ConfigWarning::CreatedConfig {
             path: CONFIG_RELATIVE_PATH.to_owned()
         }));
-        assert!(contents(&root).contains("version = 2"));
+        assert!(contents(&root).contains("version = 3"));
         assert!(contents(&root).contains("enable = true"));
         let _ = fs::remove_dir_all(root);
     }

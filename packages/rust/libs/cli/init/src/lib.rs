@@ -807,7 +807,7 @@ mod tests {
                 );
             }
             let config = files.get(".bloomery/config.toml").expect("config");
-            assert!(config.contains("version = 2"), "{name} config version");
+            assert!(config.contains("version = 3"), "{name} config version");
             assert!(files.contains_key(".gitignore"), "{name} gitignore");
             let gitignore = files.get(".gitignore").expect("gitignore");
             for entry in ["target/", "result", "result-*", ".direnv/"] {

@@ -66,7 +66,6 @@
     checked = builtins.attrValues workspace.checks;
     dep = workspace.crates."different-name-0.1.0";
     macro = workspace.crates."different-macros-0.1.0";
-    metadata = workspace.globalMetadataCrates."different-name-0.1.0";
     builders = import ../../lib/builders {inherit pkgs lib;};
     source = name: version: code:
       pkgs.linkFarm "${name}-${version}-source" [
@@ -171,8 +170,7 @@
         grep -q 'DEP_PKG_NAME="different-name"' ${dep}/nix-support/meta.sh
         tar --zstd -tf ${dep}/lib.tar.zst | grep -E 'libactual_library.*\.rlib$'
         tar --zstd -tf ${macro}/meta.tar.zst | grep -E 'libactual_macro.*\.(so|dylib)$'
-        tar --zstd -tf ${metadata}/meta.tar.zst | grep -E 'libactual_library.*\.rmeta$'
-        test ! -e ${metadata}/lib.tar.zst
+        tar --zstd -tf ${dep}/meta.tar.zst | grep -E 'libactual_library.*\.rmeta$'
         mkdir "$out"
       '';
     validate-index-fallback =

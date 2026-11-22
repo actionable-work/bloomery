@@ -249,13 +249,19 @@
       profile = lib.mkOption {
         type = profileTypes.profileType;
         default = {};
-        description = "Workspace binary compilation profile settings (optLevel, lto, codegenUnits, panic, strip, etc.).";
+        description = "Release profile (defaults to optLevel=3). optLevel, codegenUnits, debuginfo, and overflowChecks apply to every release crate; the remaining fields apply to binaries.";
       };
 
       profileDev = lib.mkOption {
         type = profileTypes.profileType;
         default = {};
-        description = "Workspace binary dev compilation profile settings (defaults to optLevel=0, lto=off, codegenUnits=256, debuginfo=2).";
+        description = "Dev profile for <bin>:dev apps and their workspace crates (defaults to optLevel=0, lto=off, codegenUnits=256, debuginfo=2).";
+      };
+
+      profileTest = lib.mkOption {
+        type = profileTypes.profileType;
+        default = {};
+        description = "Test profile for check crates; inherits the dev profile with debuginfo defaulting to line-tables-only.";
       };
 
       profileName = lib.mkOption {
@@ -302,13 +308,13 @@
       flags = {
         rustc = lib.mkOption {
           type = types.listOf types.str;
-          default = ["-Copt-level=3"];
-          description = "Default rustc flags for binary and library builds.";
+          default = [];
+          description = "Extra rustc flags for every crate compilation. Codegen settings belong in the profiles.";
         };
         test = lib.mkOption {
           type = types.listOf types.str;
           default = [];
-          description = "Additional rustc flags for test runner compilation.";
+          description = "Extra rustc flags for test harness compilation.";
         };
         clippy = lib.mkOption {
           type = types.listOf types.str;
@@ -437,6 +443,11 @@
           type = types.bool;
           default = false;
           description = "Generate workspace check derivations for unit tests, clippy, docs, doctests, lock validation, and optional package builds.";
+        };
+        profile = lib.mkOption {
+          type = types.enum ["dev" "cargo" "release"];
+          default = "dev";
+          description = "Crates rebuilt with the test profile for checks: workspace crates (dev), every crate (cargo), or none, sharing the release graph (release).";
         };
         includePackageChecks = lib.mkOption {
           type = types.bool;

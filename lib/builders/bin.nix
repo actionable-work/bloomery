@@ -89,11 +89,7 @@ in
     runtimeDependencies = override.runtimeDependencies or [];
     nativeBuildInputs = (override.nativeBuildInputs or []) ++ [rustc pkgs.stdenv.cc pkgs.zstd] ++ lib.optional (linkerPackage != null) linkerPackage ++ lib.optional (runtimeDependencies != []) pkgs.makeWrapper ++ tailwind.nativeBuildInputs;
     buildInputs = override.buildInputs or [];
-    cleanDefaultFlags =
-      if evaluatedProfile.optLevel != null
-      then lib.filter (f: !lib.hasPrefix "-Copt-level=" f && !lib.hasPrefix "-C opt-level=" f) defaultRustcFlags
-      else defaultRustcFlags;
-    extraRustcFlags = (override.rustcFlags or []) ++ cleanDefaultFlags ++ profileFlags ++ linkerFlags;
+    extraRustcFlags = (override.rustcFlags or []) ++ defaultRustcFlags ++ profileFlags ++ linkerFlags;
     userEnv = tailwind.env // (override.env or {});
     # A prebuilt executable's own Topcoat declarations can only be indexed by
     # the compilation that produced it, so its assets must come from that output.

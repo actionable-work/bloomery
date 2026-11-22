@@ -3,20 +3,20 @@
   lib ? pkgs.lib,
 }: let
   inherit (builtins) attrNames elem filter isAttrs isInt isList isString;
-  currentConfigVersion = 2;
+  currentConfigVersion = 3;
   licenses = import ./workspace/licenses.nix {inherit lib;};
   packageSelectorPattern = "[A-Za-z0-9][A-Za-z0-9_-]*(@[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?)?";
   advisoryIdPattern = "RUSTSEC-[0-9]{4}-[0-9]{4}";
 
   validateConfigVersion = config:
     if !(isAttrs config)
-    then throw "bloomery: .bloomery/config.toml must contain a top-level version = 2"
+    then throw "bloomery: .bloomery/config.toml must contain a top-level version = ${toString currentConfigVersion}"
     else if !(config ? version)
-    then throw "bloomery: .bloomery/config.toml has no top-level version; set version = 2"
+    then throw "bloomery: .bloomery/config.toml has no top-level version; set version = ${toString currentConfigVersion}"
     else if isInt config.version && config.version == currentConfigVersion
     then config
-    else if isInt config.version && config.version == 1
-    then throw "bloomery: config format version 1 must be migrated with bloomery config upgrade"
+    else if isInt config.version && config.version > 0 && config.version < currentConfigVersion
+    then throw "bloomery: config format version ${toString config.version} must be migrated with bloomery config upgrade"
     else throw "bloomery: unsupported or malformed config format version; expected integer ${toString currentConfigVersion}";
 
   # Recognized keys for each build table. Unknown keys are evaluation errors so
@@ -36,7 +36,7 @@
       "flags"
     ];
     toolchain = ["rustc" "clippy" "cargo" "lld" "mold" "stdenv" "linker"];
-    profile = ["release" "dev"];
+    profile = ["release" "dev" "test"];
     profileFields = [
       "optLevel"
       "lto"
@@ -51,7 +51,7 @@
     ];
     flags = ["rustc" "test" "clippy" "doc" "doctest"];
     devShell = ["enable" "packages" "shellHook"];
-    checks = ["enable" "crates" "packages" "lockFreshness" "workspaceDependencies" "noDefaultFeatures" "vulnerabilities" "licenses" "bans" "codeHealth" "specifications" "clippySuppressions" "unusedDependencies"];
+    checks = ["enable" "profile" "crates" "packages" "lockFreshness" "workspaceDependencies" "noDefaultFeatures" "vulnerabilities" "licenses" "bans" "codeHealth" "specifications" "clippySuppressions" "unusedDependencies"];
     features = ["cratesIoIndex"];
   };
 
@@ -71,6 +71,11 @@
     if (config ? enable && !builtins.isBool config.enable)
     then throw "bloomery: ${name}.enable must be a boolean"
     else config;
+
+  checkCheckProfile = checks:
+    if checks ? profile && !(elem checks.profile ["dev" "cargo" "release"])
+    then throw "bloomery: checks.profile must be one of \"dev\", \"cargo\", or \"release\""
+    else checks;
 
   checkRootKeys = config: let
     known = ["version" "specs" "scanners" "build" "devShell" "checks" "features" "formatters" "optimize" "flakes"];
@@ -491,9 +496,10 @@
     profile = checkTable "build.profile" allowedKeys.profile (build.profile or {});
     release = checkTable "build.profile.release" allowedKeys.profileFields (profile.release or {});
     dev = checkTable "build.profile.dev" allowedKeys.profileFields (profile.dev or {});
+    test = checkTable "build.profile.test" allowedKeys.profileFields (profile.test or {});
     flags = checkTable "build.flags" allowedKeys.flags (build.flags or {});
     devShell = checkTable "devShell" allowedKeys.devShell (config.devShell or {});
-    rawChecks = checkTable "checks" allowedKeys.checks (config.checks or {});
+    rawChecks = checkCheckProfile (checkTable "checks" allowedKeys.checks (config.checks or {}));
     checkedCrates = checkEnableTable "checks.crates" (rawChecks.crates or {});
     checkedPackages = checkEnableTable "checks.packages" (rawChecks.packages or {});
     checkedLockFreshness = checkEnableTable "checks.lockFreshness" (rawChecks.lockFreshness or {});
@@ -570,6 +576,7 @@
         toolchain = toolchainArgs;
         profile = release;
         profileDev = dev;
+        profileTest = test;
         flags = flags;
         devShell = devShellArgs;
         checks = checks;

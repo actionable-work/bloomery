@@ -63,7 +63,7 @@ the main flake through that entry's `checks` mode.
 Package-valued settings are written as nixpkgs attribute paths. Path-valued settings are relative to the workspace root.
 
 ```toml bloomery-config
-version = 2
+version = 3
 
 [build]
 cargoToml = "Cargo.toml"        # defaults to root + "/Cargo.toml"
@@ -102,9 +102,12 @@ lto = "off"
 codegenUnits = 256
 debuginfo = 2
 
-[build.flags]
-rustc = ["-Copt-level=3"]       # base rustc flags applied to all crates
-test = []                       # extra flags for test runner compilation
+[build.profile.test]             # inherits dev; checks compile with it
+debuginfo = "line-tables-only"
+
+[build.flags]                    # extra flags only; codegen lives in profiles
+rustc = []                       # applied to every crate compilation
+test = []                       # extra flags for unit-test harnesses
 clippy = []                     # extra flags when running clippy-driver
 doc = ["-Dwarnings"]            # extra flags for rustdoc building
 doctest = []                    # extra flags for doctest runner
@@ -116,6 +119,7 @@ shellHook = ""                  # bash setup hook
 
 [checks]
 enable = true                   # generate Nix checks
+profile = "dev"                 # check graph: "dev", "cargo", or "release"
 
 [checks.crates]
 enable = true                   # generate per-crate type-check entries
@@ -233,10 +237,16 @@ extraOutputs = { eachSystem, perSystemWorkspace }: {
       # env = { APP_MODE = "test"; };
       # serverTimeout = 30000;
       # testTimeout = 30000;
+      # workers = 1;           # concurrent Playwright workers
+      # fullyParallel = false; # also split one file's tests across workers
     };
   });
 };
 ```
+
+Tests run one at a time by default. Raise `workers` to run test files
+concurrently, and set `fullyParallel` to also split one file's tests across
+workers; tests that run concurrently must not share mutable server state.
 
 Tests import `test` and `expect` from `@playwright/test`. No project npm manifest
 is required. Node, Playwright and Chromium use the pinned nixpkgs input and are

@@ -540,14 +540,14 @@ in {
     expr = {
       releaseBinaryOpt = lib.hasInfix "-Copt-level=2" profileWorkspace.packages."bin-calc".buildPhase;
       releaseBinaryLto = lib.hasInfix "-Clto=thin" profileWorkspace.packages."bin-calc".buildPhase;
-      releaseCrateKeepsDefault = lib.hasInfix "-Copt-level=3" profileWorkspace.crates."lib-calc-0.1.0".buildPhase;
+      releaseCrateUsesProfile = lib.hasInfix "-Copt-level=2" profileWorkspace.crates."lib-calc-0.1.0".buildPhase;
       devCrateOpt = lib.hasInfix "-Copt-level=0" profileWorkspace.devCrates."lib-calc-0.1.0".buildPhase;
       devCrateCodegen = lib.hasInfix "-Ccodegen-units=256" profileWorkspace.devCrates."lib-calc-0.1.0".buildPhase;
     };
     expected = {
       releaseBinaryOpt = true;
       releaseBinaryLto = true;
-      releaseCrateKeepsDefault = true;
+      releaseCrateUsesProfile = true;
       devCrateOpt = true;
       devCrateCodegen = true;
     };

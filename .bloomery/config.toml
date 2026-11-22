@@ -1,4 +1,4 @@
-version = 2
+version = 3
 
 [build]
 cargoLock = "Cargo.lock" # Repository-relative path to Cargo.lock.
@@ -9,11 +9,11 @@ profileName = "release"  # Active Cargo profile name for release builds.
 unify = false            # Unify workspace features like Cargo's resolver.
 
 [build.flags]
-clippy = ["-Dwarnings"]   # Extra rustc flags for clippy runs.
-doc = ["-Dwarnings"]      # Extra rustdoc flags for documentation builds.
-doctest = []              # Extra rustdoc flags for doctests.
-rustc = ["-Copt-level=3"] # Extra rustc flags for release compilation.
-test = []                 # Extra rustc flags for test compilation.
+clippy = ["-Dwarnings"] # Extra rustc flags for clippy runs.
+doc = ["-Dwarnings"]    # Extra rustdoc flags for documentation builds.
+doctest = []            # Extra rustdoc flags for doctests.
+rustc = []              # Extra rustc flags for every crate compilation.
+test = []               # Extra rustc flags for test compilation.
 
 [build.profile.release]
 codegenUnits = 1 # release profile: number of codegen units
@@ -29,7 +29,8 @@ rustc = "rustc"   # nixpkgs attribute path for rustc.
 stdenv = "stdenv" # nixpkgs attribute path for the C toolchain.
 
 [checks]
-enable = true # Generate workspace checks.
+enable = true   # Generate workspace checks.
+profile = "dev" # Check graph mode: test-profile workspace crates (dev), every crate (cargo), or the release graph (release).
 
 [checks.bans]
 allow = []      # Package selectors permitted by the package ban check.
@@ -362,7 +363,7 @@ path = "nix/checks/unit-tests.nix"                                              
 reason = "One check derivation exports the aggregated colocated Nix unit suite and its workspace wiring." # Reason for this specification policy exception or ownership.
 
 [checks.specifications.testExceptions.nix_unit_suite]
-maxRequirements = 324                                                                                                                 # Requirement ID limit for matching validating sites.
+maxRequirements = 325                                                                                                                 # Requirement ID limit for matching validating sites.
 path = "lib/tests.nix"                                                                                                                # Repository-relative path glob for this test breadth exception.
 reason = "File metadata enumerates the colocated Nix unit suite; static discovery cannot attribute its evaluated cases individually." # Reason for this specification policy exception or ownership.
 

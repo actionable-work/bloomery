@@ -9,6 +9,8 @@
   env ? {},
   serverTimeout ? 30000,
   testTimeout ? 30000,
+  workers ? 1,
+  fullyParallel ? false,
 }: let
   # Keep tool and browser evaluation inside the test constructor. Neither is a
   # workspace runtime dependency, and no npm install runs in the test build.
@@ -26,10 +28,12 @@
       linkFarm = _name: _entries: browsers;
     }).playwright-test;
   settings = pkgs.writeText "playwright-settings.json" (builtins.toJSON {
-    inherit serverCommand url env serverTimeout testTimeout;
+    inherit serverCommand url env serverTimeout testTimeout workers fullyParallel;
   });
 in
   assert lib.assertMsg (serverTimeout > 0 && testTimeout > 0) "playwrightTest: timeouts must be positive milliseconds";
+  assert lib.assertMsg (builtins.isInt workers && workers > 0) "playwrightTest: workers must be a positive integer";
+  assert lib.assertMsg (builtins.isBool fullyParallel) "playwrightTest: fullyParallel must be a boolean";
     pkgs.runCommand name {
       nativeBuildInputs = [pkgs.nodejs];
       __darwinAllowLocalNetworking = true;

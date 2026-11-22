@@ -13,6 +13,8 @@ Each evaluated workspace exposes `playwrightTest`, a function accepting:
 | `env` | Server environment overrides; defaults to an empty set. |
 | `serverTimeout` | Positive server readiness timeout in milliseconds; defaults to 30000. |
 | `testTimeout` | Positive per-test timeout in milliseconds; defaults to 30000. |
+| `workers` | Positive number of Playwright workers; defaults to 1. |
+| `fullyParallel` | Whether tests within one file may run on different workers; defaults to `false`. |
 
 `extraOutputs` registers returned derivations under `checks.<system>`. These
 checks participate in `bloomery check` and `nix flake check`. The repository
@@ -27,8 +29,12 @@ constructing browser-test derivations; they are absent from the CLI, server and
 default development-shell dependencies. Test builds do not run npm installation
 or browser downloads.
 
-The runner uses one worker, headless Chromium, no retries and a private HOME
-and cache. Chromium's internal sandbox is disabled; isolation comes from the
+The runner uses `workers` Playwright workers against the single application
+server, headless Chromium, no retries and a private HOME and cache. With the
+default single worker, tests run one at a time in file order. More workers run
+test files concurrently, and `fullyParallel` also spreads the tests of one file
+across workers; suites that enable either must not share mutable server state
+between concurrently running tests. Chromium's internal sandbox is disabled; isolation comes from the
 Nix build sandbox. Supported native systems are x86_64-linux, aarch64-linux and
 aarch64-darwin. The runner inherits the host's Nix sandbox policy.
 

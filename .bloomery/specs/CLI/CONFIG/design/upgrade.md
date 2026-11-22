@@ -21,28 +21,47 @@ from `Cargo.toml` and rustc.
 
 ## Format migrations
 
-The top-level integer `version` is required. Format `2` is current. An existing
+The top-level integer `version` is required. Format `3` is current. An existing
 file without a version is rejected with an error that asks the user to set
-`version = 2`; `config upgrade` does not infer or add a version to that file.
+`version = 3`; `config upgrade` does not infer or add a version to that file.
 Format `0` is unsupported.
 
-`config upgrade` migrates format `1` to format `2` before adding recommended
-keys. The migration moves top-level `toolchain`, `profile`, and `flags` tables
+`config upgrade` migrates older formats one step at a time, `1` to `2` then `2`
+to `3`, before adding recommended keys, and writes `version = 3`. No migration
+from format `0` or unversioned files is defined. Adding recommended keys does
+not itself change the format version.
+
+The format `1` to `2` step moves top-level `toolchain`, `profile`, and `flags` tables
 under `build`, then moves the flat Nix check controls into their check
 subtables: `checks.crateCheck` to `checks.crates.enable`,
 `checks.includePackageChecks` to `checks.packages.enable`,
 `checks.throwOnOutOfDate` to `checks.lockFreshness.enable`,
 `checks.workspaceDependencies` to `checks.workspaceDependencies.enable`, and
 `checks.noDefaultFeatures` to `checks.noDefaultFeatures.enable`. The global
-`checks.enable` and existing CLI-owned check tables retain their paths. The
-migration preserves configured values and their meaning, then writes
-`version = 2`. No migration from format `0` or unversioned files is defined.
-Adding recommended keys does not itself change the format version.
+`checks.enable` and existing CLI-owned check tables retain their paths.
+
+The format `2` to `3` step moves codegen settings out of flag lists, because
+[profiles own them](../../../NIXLIB/FLAKE/design/workspace-options.md#flags).
+It removes `opt-level`, `codegen-units`, `debuginfo`, and `overflow-checks`
+options, in `-Ckey=value`, `-C key=value`, and split `"-C", "key=value"` forms,
+plus `-O` and `-g`, and sets the matching profile field where it reached
+compilation in format `2`:
+
+| Flag list | Destination |
+| --- | --- |
+| `build.flags.rustc` | `build.profile.release`; settings other than `optLevel` also `build.profile.dev` |
+| `build.flags.test` | `build.profile.test` |
+| `build.flags.clippy` | dropped; clippy emits no code |
+
+A profile field the file already sets wins over a migrated flag. A migrated
+`optLevel = 3` for the release profile is the default and is not written. Other
+flags keep their order. Each step preserves configured values and their
+meaning.
 
 `--dry-run` reports source and target versions when a supported older numbered
 format needs migration, along with catalog keys that would be added, without
 writing. `--diff` compares recommendations against the normalized configuration
-and reports any applicable format migration without writing. A version `1`
+and reports any applicable format migration without writing. An older-format
 configuration is migrated before it receives newly recommended keys.
 
 ## Upgrade semantics
@@ -90,7 +109,7 @@ change and leaves the file byte-for-byte unchanged.
 Upgrade requires a readable configuration with an explicitly supported
 version. A malformed, unreadable, invalid, missing, or unsupported version
 yields a `ConfigurationError` and no write; a missing version error asks the
-user to set `version = 2`. An absent file is not an error: a writing upgrade
+user to set `version = 3`. An absent file is not an error: a writing upgrade
 creates it at the current format version and materializes every recommended
 key, warning while doing so, while `--dry-run` and `--diff` report against
 defaults without creating it. The upgraded candidate is revalidated as a

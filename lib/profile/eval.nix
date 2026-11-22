@@ -30,6 +30,14 @@
     };
   in
     evaluated.config;
+  # Merge profile layers, later layers winning field by field. Unset fields in
+  # a layer never mask an earlier value.
+  mergeProfiles = layers:
+    evalProfile (lib.foldl' (
+        acc: layer:
+          acc // lib.filterAttrs (_: v: v != null && v != []) (normalizeProfileAttrs layer)
+      ) {}
+      layers);
 in {
-  inherit normalizeProfileAttrs evalProfile;
+  inherit normalizeProfileAttrs evalProfile mergeProfiles;
 }
