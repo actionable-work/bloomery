@@ -48,14 +48,14 @@ id = "NIXLIB-GRAPH-UNUSED-007"
 title = "Failures name the member and repair"
 manual = false
 design = "design/unused-dependency-checks.md#diagnostics"
-ears = { type = "ubiquitous", system = "the <crate>:unused-dependencies check", action = "report the member, then each unused declaration with its section, package, and extern name, and a repair hint naming checks.unusedDependencies.exceptions" }
+ears = { type = "ubiquitous", system = "the <crate>:unused-dependencies check", action = "report the member, then each unused declaration with its section, package, and extern name, and a repair hint naming the use name as _; item for link-only dependencies and checks.unusedDependencies.exceptions" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-UNUSED-008"
 title = "Every Cargo target is compiled"
 manual = false
 design = "design/unused-dependency-checks.md#compilation-units"
-ears = { type = "ubiquitous", system = "the <crate>:unused-dependencies check", action = "compile the library, binaries, integration tests, examples, benchmarks, and build script that Cargo infers or declares for the member, honouring auto switches, harness, and required-features" }
+ears = { type = "ubiquitous", system = "the <crate>:unused-dependencies check", action = "compile the library, binaries, integration tests, examples, benchmarks, and build script that Cargo infers or declares for the member, honouring auto switches, harness, required-features, and example crate-type" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-UNUSED-009"
@@ -70,3 +70,10 @@ title = "Lint levels cannot fail the analysis"
 manual = false
 design = "design/unused-dependency-checks.md#compilation-units"
 ears = { type = "ubiquitous", system = "the <crate>:unused-dependencies check", action = "cap lints at warnings so -Dwarnings and source deny attributes report rather than fail" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-UNUSED-011"
+title = "Source allow attributes cannot silence the check"
+manual = false
+design = "design/unused-dependency-checks.md#compilation-units"
+ears = { type = "unwanted_behavior", trigger = "a target allows unused_crate_dependencies in its source", system = "the <crate>:unused-dependencies check", action = "still report the unused declarations its unit would satisfy" }

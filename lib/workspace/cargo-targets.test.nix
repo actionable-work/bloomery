@@ -10,8 +10,14 @@ in {
       "lib:app:src/lib.rs"
       "bin:tool:src/bin/tool.rs"
       "test:it:tests/it.rs"
+      "example:plugin:examples/plugin.rs"
       "example:demo:examples/demo.rs"
     ];
+  };
+
+  testCargoTargetsMarkLibraryExamples = {
+    expr = map (target: "${target.name}:${target.crateType}") (builtins.filter (target: target.kind == "example") (cargoTargets.discover {inherit crateDir;}));
+    expected = ["plugin:lib" "demo:bin"];
   };
 
   testCargoTargetsHonourManifestDeclarations = {

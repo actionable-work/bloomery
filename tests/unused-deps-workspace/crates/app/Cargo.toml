@@ -14,6 +14,10 @@ dep-dev-unused = { path = "../dep-dev-unused" }
 dep-example = { path = "../dep-example" }
 dep-test = { path = "../dep-test" }
 
+[[example]]
+crate-type = ["rlib"]
+name = "plugin"
+
 [package]
 edition = "2021"
 name = "app"

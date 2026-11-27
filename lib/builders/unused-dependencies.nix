@@ -43,15 +43,19 @@
   userEnv = tailwind.env // (override.env or {});
   extraRustcFlags = (override.rustcFlags or []) ++ defaultRustcFlags;
   featureFlags = map (feature: "--cfg=feature=\"${feature}\"") features;
-  lintFlags = ["--error-format=json" "-Wunused-crate-dependencies" "--cap-lints=warn"];
+  # `--force-warn` overrides source-level `allow` attributes; the cap keeps
+  # `-Dwarnings` and source `deny` attributes from failing the analysis.
+  lintFlags = ["--error-format=json" "--force-warn" "unused-crate-dependencies" "--cap-lints=warn"];
   externNames = kind: lib.unique (map (edge: edge.externName) (builtins.filter (edge: edge.kind == kind) externs));
-  targetLines =
-    lib.concatMapStrings (target: "${target.kind} ${target.name} ${
+  # One `kind name harness crate-type path` line per target; the path is last
+  # so it may contain spaces.
+  targetLine = target: let
+    harness =
       if target.harness
       then "1"
-      else "0"
-    } ${target.path}\n")
-    targets;
+      else "0";
+  in "${target.kind} ${target.name} ${harness} ${target.crateType or "bin"} ${target.path}\n";
+  targetLines = lib.concatMapStrings targetLine targets;
   declarationLines = lib.concatMapStrings (edge: "${edge.kind} ${edge.externName} ${edge.package}\n") declarations;
 in
   stdenv.mkDerivation (_finalAttrs:
@@ -167,7 +171,7 @@ in
           echo "Analyzing $label..."
           if ! "$@" --out-dir "_unused/$UNIT" ${lib.escapeShellArgs lintFlags} 2> "$log"; then
             echo "Could not compile $label of $PKG_NAME:" >&2
-            "$@" --out-dir "_unused/$UNIT" -Wunused-crate-dependencies --cap-lints=warn >&2 || true
+            "$@" --out-dir "_unused/$UNIT" --cap-lints=warn >&2 || true
             exit 1
           fi
           local unused
@@ -179,7 +183,7 @@ in
         }
 
         BUILD_SCRIPT_FLAGS=()
-        while read -r kind name harness path; do
+        while read -r kind name harness crate_type path; do
           if [ "$kind" != build ] || [ ! -f "$path" ]; then continue; fi
           BUILD_SCRIPT_NAMES=""
           for ((index = 0; index < ''${#BUILD_SCRIPT_EXTERN_FLAGS[@]}; index += 2)); do
@@ -214,7 +218,7 @@ in
           "''${BUILD_SCRIPT_FLAGS[@]}"
           ${lib.escapeShellArgs (featureFlags ++ extraRustcFlags ++ compilerFlags.target)}
         )
-        while read -r kind name harness path; do
+        while read -r kind name harness crate_type path; do
           # Targets outside a custom source selection are not compiled.
           if [ -z "$kind" ] || [ ! -f "$path" ]; then continue; fi
           case "$kind" in
@@ -238,7 +242,11 @@ in
               ;;
             test | bench | example)
               MODE_FLAGS=(--test)
-              if [ "$kind" = example ] || [ "$harness" = 0 ]; then MODE_FLAGS=(--crate-type bin); fi
+              if [ "$kind" = example ] && [ "$crate_type" = lib ]; then
+                MODE_FLAGS=(--crate-type rlib)
+              elif [ "$kind" = example ] || [ "$harness" = 0 ]; then
+                MODE_FLAGS=(--crate-type bin)
+              fi
               CARGO_CRATE_NAME="$name" analyze "$kind $path" dev "$DEV_EXTERNS" \
                 $RUSTC "''${MODE_FLAGS[@]}" "$path" --crate-name "$name" \
                 "''${TEST_EXTERN_FLAGS[@]}" "''${SELF_EXTERN_FLAGS[@]}" "''${COMMON_FLAGS[@]}"
@@ -259,7 +267,7 @@ in
         if [ ''${#FINDINGS[@]} -gt 0 ]; then
           echo "UNUSED DEPENDENCY CHECK FAILED for $PKG_NAME" >&2
           for finding in "''${FINDINGS[@]}"; do echo "  $finding" >&2; done
-          echo "Remove each entry, move it to the section whose targets use it, or list the package in checks.unusedDependencies.exceptions." >&2
+          echo "Remove each entry, move it to the section whose targets use it, add \`use <extern> as _;\` to a target that needs it only for linking, or list the package in checks.unusedDependencies.exceptions." >&2
           exit 1
         fi
 

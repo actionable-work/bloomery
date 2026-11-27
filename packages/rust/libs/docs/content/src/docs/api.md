@@ -139,7 +139,7 @@ enable = true                   # require default features to be disabled
 [checks.unusedDependencies]
 compiler = true                 # generate <crate>:unused-dependencies checks that confirm use with rustc
 enable = true                   # report dependencies no visible target source path references
-exceptions = []                 # dependency package names exempt from both checks
+exceptions = []                 # dependency package names exempt from both checks, such as link-only -sys crates
 
 [features]
 cratesIoIndex = "crates-io-index"

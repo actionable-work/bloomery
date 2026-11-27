@@ -165,6 +165,7 @@ fn diagnostics_identify_manifest_line_and_crate_name() {
         (Path::new("app/Cargo.toml"), Some(8))
     );
     assert!(diagnostics[0].notes[0].contains("`serde`"));
+    assert!(diagnostics[0].notes[0].contains("`use serde as _;`"));
 }
 
 #[test]

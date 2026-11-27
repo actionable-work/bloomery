@@ -18,10 +18,19 @@ impl References {
     /// as confined to `cfg(test)`.
     pub(crate) fn collect(&mut self, tokens: &TokenStream, test_only: bool) {
         let trees = tokens.clone().into_iter().collect::<Vec<_>>();
-        self.collect_trees(&trees, test_only);
+        self.collect_trees(&trees, test_only, &BTreeSet::new());
     }
 
-    fn collect_trees(&mut self, trees: &[TokenTree], mut test_only: bool) {
+    /// `modules` names the modules declared in enclosing code of the same
+    /// module scope; relative paths through them are not crate references.
+    fn collect_trees(
+        &mut self,
+        trees: &[TokenTree],
+        mut test_only: bool,
+        modules: &BTreeSet<String>,
+    ) {
+        let mut modules = modules.clone();
+        modules.extend(declared_modules(trees));
         let mut index = 0;
         while index < trees.len() {
             if let Some((attribute_end, inner, requires_test)) = attribute_at(trees, index) {
@@ -30,32 +39,112 @@ impl References {
                     test_only = true;
                 } else if requires_test && !test_only {
                     let item_end = item_end(trees, attribute_end);
-                    self.collect_trees(&trees[index..item_end], true);
+                    self.collect_trees(&trees[index..item_end], true, &modules);
                     index = item_end;
                     continue;
                 }
-                self.collect_trees(&trees[index + 1..attribute_end], test_only);
+                self.collect_trees(&trees[index + 1..attribute_end], test_only, &modules);
                 index = attribute_end;
                 continue;
             }
             match &trees[index] {
                 TokenTree::Group(group) => {
                     let inner = group.stream().into_iter().collect::<Vec<_>>();
-                    self.collect_trees(&inner, test_only);
+                    if is_root_use_group(trees, index) {
+                        for name in use_group_roots(&inner) {
+                            self.insert(name, test_only);
+                        }
+                    }
+                    // An inline module body starts a new module scope.
+                    let enclosing = if is_module_body(trees, index) {
+                        BTreeSet::new()
+                    } else {
+                        modules.clone()
+                    };
+                    self.collect_trees(&inner, test_only, &enclosing);
                 }
                 TokenTree::Ident(ident) if !is_keyword(ident) && starts_path(trees, index) => {
-                    let name = ident.to_string();
-                    let name = name.strip_prefix("r#").unwrap_or(&name).to_owned();
-                    if !test_only {
-                        self.production.insert(name.clone());
+                    let name = ident_name(ident);
+                    if !(modules.contains(&name) && is_relative_root(trees, index)) {
+                        self.insert(name, test_only);
                     }
-                    self.all.insert(name);
                 }
                 _ => {}
             }
             index += 1;
         }
     }
+
+    fn insert(&mut self, name: String, test_only: bool) {
+        if !test_only {
+            self.production.insert(name.clone());
+        }
+        self.all.insert(name);
+    }
+}
+
+fn ident_name(ident: &proc_macro2::Ident) -> String {
+    let name = ident.to_string();
+    name.strip_prefix("r#").unwrap_or(&name).to_owned()
+}
+
+/// Names of the `mod name;` and `mod name { ... }` items at this level.
+fn declared_modules(trees: &[TokenTree]) -> BTreeSet<String> {
+    trees
+        .windows(2)
+        .filter_map(|pair| match pair {
+            [TokenTree::Ident(keyword), TokenTree::Ident(name)] if keyword == "mod" => {
+                Some(ident_name(name))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+/// The brace group at `index` is the body of `mod name { ... }`.
+fn is_module_body(trees: &[TokenTree], index: usize) -> bool {
+    index >= 2
+        && matches!(trees.get(index), Some(TokenTree::Group(group)) if group.delimiter() == Delimiter::Brace)
+        && matches!(trees.get(index - 1), Some(TokenTree::Ident(_)))
+        && is_ident(trees.get(index - 2), "mod")
+}
+
+/// The brace group at `index` follows `use` or `use ::`, so each of its
+/// entries starts at a crate root.
+fn is_root_use_group(trees: &[TokenTree], index: usize) -> bool {
+    let brace = matches!(trees.get(index), Some(TokenTree::Group(group)) if group.delimiter() == Delimiter::Brace);
+    let previous = |offset: usize| index.checked_sub(offset).and_then(|at| trees.get(at));
+    brace
+        && (is_ident(previous(1), "use")
+            || (index >= 3 && is_path_separator(trees, index - 2) && is_ident(previous(3), "use")))
+}
+
+/// The first identifier of every comma-separated entry of a root `use` group.
+fn use_group_roots(trees: &[TokenTree]) -> Vec<String> {
+    let mut roots = Vec::new();
+    let mut entry_start = true;
+    for tree in trees {
+        match tree {
+            TokenTree::Punct(punct) if punct.as_char() == ',' => entry_start = true,
+            TokenTree::Ident(ident) if entry_start => {
+                if !is_keyword(ident) {
+                    roots.push(ident_name(ident));
+                }
+                entry_start = false;
+            }
+            _ => entry_start = false,
+        }
+    }
+    roots
+}
+
+/// The identifier at `index` starts a relative `name::` path rather than a
+/// global path, a `use` tree, or an `extern crate` item.
+fn is_relative_root(trees: &[TokenTree], index: usize) -> bool {
+    let previous = index.checked_sub(1).and_then(|at| trees.get(at));
+    is_path_separator(trees, index + 1)
+        && !(index >= 2 && is_path_separator(trees, index - 2))
+        && !is_ident(previous, "use")
 }
 
 /// An attribute `#[...]` or `#![...]` starting at `index`: the index after
@@ -206,6 +295,32 @@ mod tests {
                 "pi", "rho", "xi"
             ]
         );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-UNUSED-014"))]
+    fn root_use_group_entries_reference_crates() {
+        let found = references(
+            "use {alpha, beta::B, self::gamma};\nuse ::{delta as _, epsilon};\nuse zeta::{eta, theta};",
+        );
+        assert_eq!(
+            names(&found.all),
+            ["alpha", "beta", "delta", "epsilon", "zeta"]
+        );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-UNUSED-015"))]
+    fn local_modules_shadow_relative_paths() {
+        let found = references(
+            "mod config;\nfn f() { config::load(); ::config::global(); }\n\
+             mod inner { fn g() { config::load(); } }\n\
+             mod other { mod log { } fn h() { log::info(); } }\n\
+             use config as _;",
+        );
+        assert_eq!(names(&found.all), ["config"]);
+        let shadowed = references("mod config;\nfn f() { config::load(); }");
+        assert!(shadowed.all.is_empty(), "{:?}", shadowed.all);
     }
 
     #[test]

@@ -190,7 +190,7 @@ fn unused_diagnostic(package: &str, dependency: &Dependency, crate_name: &str) -
         ),
     )
     .note(format!(
-        "No {scope} source of {package} references `{crate_name}`; remove the entry, move it to the section whose targets use it, or list '{}' in checks.unusedDependencies.exceptions",
+        "No {scope} source of {package} references `{crate_name}`; remove the entry, move it to the section whose targets use it, add `use {crate_name} as _;` to a target that needs it only for linking, or list '{}' in checks.unusedDependencies.exceptions",
         dependency.name
     ))
 }

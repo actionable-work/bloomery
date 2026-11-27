@@ -449,8 +449,9 @@ in {
       build = lib.hasInfix "build dep_build dep-build\n" app.DECLARATIONS;
       exceptionSkipped = lib.hasInfix "dep-ignored" app.DECLARATIONS;
       exceptionStillLinked = lib.hasInfix "dep_ignored" app.NORMAL_EXTERNS;
-      example = lib.hasInfix "example demo 1 examples/demo.rs\n" app.TARGETS;
-      binary = lib.hasInfix "bin tool 1 src/bin/tool.rs\n" app.TARGETS;
+      example = lib.hasInfix "example demo 1 bin examples/demo.rs\n" app.TARGETS;
+      libraryExample = lib.hasInfix "example plugin 1 lib examples/plugin.rs\n" app.TARGETS;
+      binary = lib.hasInfix "bin tool 1 bin src/bin/tool.rs\n" app.TARGETS;
     };
     expected = {
       renamedNormal = true;
@@ -459,6 +460,7 @@ in {
       exceptionSkipped = false;
       exceptionStillLinked = true;
       example = true;
+      libraryExample = true;
       binary = true;
     };
   };

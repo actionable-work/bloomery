@@ -472,14 +472,14 @@
     {
       "manifest_path": "packages/rust/libs/shared/unused-deps/Cargo.toml",
       "name": "bloomery-unused-deps",
-      "overall_score": 99.87,
-      "sloc": 421,
+      "overall_score": 99.61,
+      "sloc": 502,
       "subscores": {
-        "complexity": 0.12,
+        "complexity": 0.28,
         "crateSize": 0.0,
         "duplication": 0.0,
         "nesting": 0.0,
-        "size": 0.02
+        "size": 0.11
       }
     },
     {
@@ -496,7 +496,7 @@
       }
     }
   ],
-  "input_digest": "b8e430f00eef6425eda0f90075d53535f15f3d4170d694045a96d6a0eb180133",
+  "input_digest": "cc2b2f8e0c7627b1fc74bc1b3cd57997d467feeb1d005d8c3c631ee66f64c7fa",
   "policy": {
     "scoring": {
       "crateSlocLimit": 1500,
@@ -521,11 +521,11 @@
   "schema_version": 4,
   "workspace": {
     "crate_count": 38,
-    "overall_score": 94.69,
-    "sloc": 29248,
+    "overall_score": 94.7,
+    "sloc": 29329,
     "subscores": {
       "complexity": 0.47,
-      "crateSize": 4.08,
+      "crateSize": 4.07,
       "duplication": 0.03,
       "nesting": 0.0,
       "size": 0.71

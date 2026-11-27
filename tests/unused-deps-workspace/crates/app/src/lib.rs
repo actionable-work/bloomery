@@ -1,5 +1,7 @@
 //! Uses only `core-lib` outside tests. The parameter shares a dependency's
-//! crate name without referencing the crate.
+//! crate name without referencing the crate, and the lint allow below must not
+//! hide the unused dependencies.
+#![allow(unused_crate_dependencies)]
 
 pub fn run(dep_unused: u8) -> u8 {
     core_lib::used();

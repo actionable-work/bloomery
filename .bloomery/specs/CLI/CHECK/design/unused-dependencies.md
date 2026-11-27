@@ -20,9 +20,12 @@ Each target's sources are its root file and every out-of-line module file it
 declares. A dependency is referenced when its Rust crate name starts a path
 (`name::`), follows a leading `::`, or is the root of a `use` tree or an
 `extern crate` item anywhere in those sources, including attributes, macro
-bodies, and conditionally compiled code. Identifiers in other positions, such
-as locals, fields, keywords, and segments after `::` or `.`, are not
-references. The crate name is the manifest rename, else the dependency library
+bodies, and conditionally compiled code. Each entry of a `use { ... }` or
+`use ::{ ... }` group is a `use` tree root. Identifiers in other positions,
+such as locals, fields, keywords, and segments after `::` or `.`, are not
+references. A relative `name::` path is not a reference when its module
+scope declares `mod name`: a file or inline module body is a new scope, and
+other blocks share the enclosing one. The crate name is the manifest rename, else the dependency library
 target name when the dependency is a workspace package, else the package name,
 with hyphens replaced by underscores.
 
@@ -56,7 +59,9 @@ match the package name, not a manifest rename.
 Each unused declaration produces one `UnusedDependency` diagnostic naming the
 member package, section, and manifest key, located at the repository-relative
 member `Cargo.toml` and the declaring key's line. Its note names the Rust crate
-name that was searched for.
+name that was searched for and the repairs: removing or moving the entry, a
+`use name as _;` item for a dependency needed only for linking, or an
+exception.
 
 Metadata discovery failures and unreadable or unparsable target sources produce
 `UnusedDependencySourceError`. A member with a source failure reports only its

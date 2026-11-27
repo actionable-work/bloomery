@@ -1,7 +1,8 @@
 # Cargo targets of a workspace member, read purely from its manifest and
-# directory layout. Each target is `{ kind, name, path, harness }` where
-# `kind` is lib, proc-macro, bin, test, example, bench, or build, `name` is
-# the Rust crate name, and `path` is crate-relative.
+# directory layout. Each target is `{ kind, name, path, harness, crateType? }`
+# where `kind` is lib, proc-macro, bin, test, example, bench, or build, `name`
+# is the Rust crate name, `path` is crate-relative, and `crateType` is `lib`
+# for examples that declare no `bin` crate type and `bin` otherwise.
 {lib}: let
   crateName = name: lib.replaceStrings ["-"] ["_"] name;
 
@@ -80,6 +81,10 @@
         inherit kind path;
         name = crateName (target.name or (lib.removeSuffix ".rs" (baseNameOf target.path)));
         harness = target.harness or true;
+        crateType =
+          if kind == "example" && target ? crate-type && !(builtins.elem "bin" target.crate-type)
+          then "lib"
+          else "bin";
         enabled = enabled target;
       }) (builtins.filter (target: target ? name || target ? path) (manifest.${kind} or []));
       explicitPaths = map (target: target.path) explicit;
@@ -96,6 +101,7 @@
         inherit (target) path;
         name = crateName target.name;
         harness = true;
+        crateType = "bin";
         enabled = true;
       }) (builtins.filter (target: !(builtins.elem target.path explicitPaths)) automatic);
     in

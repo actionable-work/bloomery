@@ -335,7 +335,7 @@ in {
       src = ./.;
       defaultRustcFlags = ["-Dwarnings"];
     };
-    lintFlags = lib.escapeShellArgs ["--error-format=json" "-Wunused-crate-dependencies" "--cap-lints=warn"];
+    lintFlags = lib.escapeShellArgs ["--error-format=json" "--force-warn" "unused-crate-dependencies" "--cap-lints=warn"];
   in {
     expr = {
       lintsEveryUnit = lib.hasInfix lintFlags drv.buildPhase;

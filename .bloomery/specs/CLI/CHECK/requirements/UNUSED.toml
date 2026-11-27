@@ -91,3 +91,17 @@ title = "Test-only code does not use normal dependencies"
 manual = false
 design = "design/unused-dependencies.md#usage-policy"
 ears = { type = "unwanted_behavior", trigger = "a dependencies entry is referenced only by code confined to cfg(test)", system = "Bloomery", action = "report the entry as unused" }
+
+[[requirements]]
+id = "CLI-CHECK-UNUSED-014"
+title = "Root use groups reference their entries"
+manual = false
+design = "design/unused-dependencies.md#usage-policy"
+ears = { type = "ubiquitous", system = "Bloomery", action = "treat the first identifier of every entry in a use { ... } or use ::{ ... } group as a dependency reference" }
+
+[[requirements]]
+id = "CLI-CHECK-UNUSED-015"
+title = "Local modules shadow relative paths"
+manual = false
+design = "design/unused-dependencies.md#usage-policy"
+ears = { type = "unwanted_behavior", trigger = "a relative name:: path is the only reference to a dependency and its module scope declares mod name", system = "Bloomery", action = "report the dependency as unreferenced" }
