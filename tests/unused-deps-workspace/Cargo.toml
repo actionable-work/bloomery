@@ -1,0 +1,15 @@
+[workspace]
+members = [
+  "crates/app",
+  "crates/dep-bin",
+  "crates/dep-build",
+  "crates/dep-build-unused",
+  "crates/dep-dev-unused",
+  "crates/dep-example",
+  "crates/dep-ignored",
+  "crates/dep-lib",
+  "crates/dep-test",
+  "crates/dep-test-only",
+  "crates/dep-unused",
+]
+resolver = "2"

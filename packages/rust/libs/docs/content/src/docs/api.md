@@ -137,8 +137,9 @@ enable = true                   # validate workspace dependency declarations
 enable = true                   # require default features to be disabled
 
 [checks.unusedDependencies]
-enable = true                   # report dependencies no visible target source references
-exceptions = []                 # dependency package names exempt from the check
+compiler = true                 # generate <crate>:unused-dependencies checks that confirm use with rustc
+enable = true                   # report dependencies no visible target source path references
+exceptions = []                 # dependency package names exempt from both checks
 
 [features]
 cratesIoIndex = "crates-io-index"
@@ -211,7 +212,7 @@ The evaluated workspace attribute set returned by `mkFlake` for each system expo
 
 - `packages`: Release derivations for binaries (`<name>`) and, when enabled, libraries (`<crate>:lib`), plus `default` when a binary exists.
 - `apps`: Runnable release/dev binaries, documentation apps (`<crate>:doc`), and `default` when a binary exists.
-- `checks`: Comprehensive Nix check suite (`name:test`, `name:clippy`, `name:doc`, `name:doctest`, and `workspace:lock`), with optional package build checks. It does not generate a recursive `bloomery:check`; run the Bloomery CLI directly for static validation and check orchestration.
+- `checks`: Comprehensive Nix check suite (`name:test`, `name:clippy`, `name:doc`, `name:doctest`, and `workspace:lock`), with optional package build checks and, when `checks.unusedDependencies.compiler` is set, `name:unused-dependencies`, which compiles every target with rustc's `unused_crate_dependencies` lint and fails on dependencies no target in their section uses. It does not generate a recursive `bloomery:check`; run the Bloomery CLI directly for static validation and check orchestration.
 - `formatter`: Default `treefmt` wrapper built from the resolved formatter graph, also exposed as the standard flake `formatter.<system>` output.
 - `formatterConfig`: Evaluated treefmt configuration, including each formatter's resolved priority.
 - `formatterOrder`: Enabled formatter names in their resolved order.

@@ -1,15 +1,18 @@
 //! Workspace dependency declarations that no target source references.
 //!
-//! A dependency counts as used when its Rust crate name appears as an
-//! identifier token anywhere in the module tree of a target that can see it,
-//! including attributes, macro bodies, and conditionally compiled code.
+//! A dependency counts as used when its Rust crate name starts a path, a `use`
+//! tree, or an `extern crate` item anywhere in the module tree of a target that
+//! can see it, including attributes, macro bodies, and conditionally compiled
+//! code. Normal dependencies ignore code confined to `cfg(test)`.
 
+mod cfg_test;
 mod manifest;
+mod references;
 
 use bloomery_cargo_metadata::{Dependency, DependencyKind, LIBRARY_KINDS, Metadata, Package};
 use bloomery_model::{Diagnostic, sort_diagnostics};
-use bloomery_scanning::{AnalysisSession, module_tree_files};
-use proc_macro2::{TokenStream, TokenTree};
+use bloomery_scanning::{AnalysisSession, module_tree_scopes};
+use references::References;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -103,11 +106,12 @@ fn package_usage(
                 continue;
             }
         };
-        for kind in visible_kinds(target) {
-            usage
-                .entry(kind)
-                .or_default()
-                .extend(identifiers.iter().cloned());
+        for (kind, scope) in visible_scopes(target) {
+            let names = match scope {
+                Scope::Production => &identifiers.production,
+                Scope::All => &identifiers.all,
+            };
+            usage.entry(kind).or_default().extend(names.iter().cloned());
         }
     }
     if errors.is_empty() {
@@ -117,26 +121,40 @@ fn package_usage(
     }
 }
 
+/// Which of a target's references count toward a dependency kind.
+#[derive(Clone, Copy)]
+enum Scope {
+    /// References outside code confined to `cfg(test)`.
+    Production,
+    /// Every reference, including test-only code.
+    All,
+}
+
 /// Dependency kinds whose declarations a target's sources can reference.
-fn visible_kinds(target: &bloomery_cargo_metadata::Target) -> Vec<DependencyKind> {
+fn visible_scopes(target: &bloomery_cargo_metadata::Target) -> Vec<(DependencyKind, Scope)> {
     if target.has_kind(&["custom-build"]) {
-        vec![DependencyKind::Build]
+        vec![(DependencyKind::Build, Scope::All)]
     } else if target.has_kind(&LIBRARY_KINDS) || target.has_kind(&["bin"]) {
-        vec![DependencyKind::Normal, DependencyKind::Development]
+        vec![
+            (DependencyKind::Normal, Scope::Production),
+            (DependencyKind::Development, Scope::All),
+        ]
     } else {
-        vec![DependencyKind::Development]
+        vec![(DependencyKind::Development, Scope::All)]
     }
 }
 
 fn target_identifiers(
     entry: &Path,
     session: &AnalysisSession,
-) -> Result<BTreeSet<String>, Vec<(PathBuf, String)>> {
-    let mut identifiers = BTreeSet::new();
+) -> Result<References, Vec<(PathBuf, String)>> {
+    let mut identifiers = References::default();
     let mut failures = Vec::new();
-    for file in module_tree_files(entry, session, &mut BTreeSet::new()) {
+    let confines =
+        |predicate: &proc_macro2::TokenStream| cfg_test::predicate_requires_test(predicate);
+    for file in module_tree_scopes(entry, session, &mut BTreeSet::new(), &confines) {
         match file {
-            Ok(parsed) => collect_identifiers(&parsed.tokens, &mut identifiers),
+            Ok((parsed, test_only)) => identifiers.collect(&parsed.tokens, test_only),
             Err(error) => failures.push((error.path, error.message)),
         }
     }
@@ -144,23 +162,6 @@ fn target_identifiers(
         Ok(identifiers)
     } else {
         Err(failures)
-    }
-}
-
-fn collect_identifiers(tokens: &TokenStream, identifiers: &mut BTreeSet<String>) {
-    let mut pending = vec![tokens.clone()];
-    while let Some(stream) = pending.pop() {
-        for tree in stream {
-            match tree {
-                TokenTree::Group(group) => pending.push(group.stream()),
-                TokenTree::Ident(ident) => {
-                    let name = ident.to_string();
-                    let name = name.strip_prefix("r#").unwrap_or(&name).to_owned();
-                    identifiers.insert(name);
-                }
-                TokenTree::Punct(_) | TokenTree::Literal(_) => {}
-            }
-        }
     }
 }
 
@@ -177,7 +178,7 @@ fn extern_crate_name(metadata: &Metadata, dependency: &Dependency) -> String {
 
 fn unused_diagnostic(package: &str, dependency: &Dependency, crate_name: &str) -> Diagnostic {
     let (section, scope) = match dependency.kind() {
-        DependencyKind::Normal => ("dependencies", "library, binary, or proc-macro"),
+        DependencyKind::Normal => ("dependencies", "non-test library, binary, or proc-macro"),
         DependencyKind::Development => ("dev-dependencies", "target"),
         DependencyKind::Build => ("build-dependencies", "build-script"),
     };

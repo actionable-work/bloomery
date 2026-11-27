@@ -44,7 +44,7 @@ pub use health::{
     HealthCallable, HealthCrateMetrics, HealthSourceCrate, HealthTarget, HealthToken, OpaqueSource,
     analyze_code_health,
 };
-pub use module_tree::{ModuleSourceError, module_tree_files};
+pub use module_tree::{ModuleSourceError, module_tree_files, module_tree_scopes};
 
 /// One scanner pass: requirement references plus discovered test sites.
 #[derive(Debug, Default, PartialEq, Eq)]

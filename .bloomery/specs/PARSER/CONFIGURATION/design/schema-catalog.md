@@ -168,10 +168,12 @@ The RustSec advisory database path is a `mkFlake` Nix argument, not a
 config.toml key.
 
 `checks.specifications`, `checks.codeHealth`, `checks.clippySuppressions`, and
-`checks.unusedDependencies` are CLI-owned nested tables. Their `enable` keys
+`checks.unusedDependencies` are nested policy tables. Their `enable` keys
 default to `false` and have upgrade recommendations of `true`; their policy
 designs define their scope. The Nix loader validates and accepts these tables
-without generating corresponding Nix checks.
+without generating corresponding Nix checks, except that
+`checks.unusedDependencies.compiler` generates the compiler-backed unused
+dependency checks.
 
 An unupgraded configuration generates no Nix checks by default. `config upgrade`
 sets each missing check enable setting with a recommendation to `true` unless a
@@ -247,12 +249,13 @@ accepts the table without creating a Clippy suppression derivation.
 
 ### `[checks.unusedDependencies]`
 
-Owned by [CLI/CHECK](../../../CLI/CHECK/design/unused-dependencies.md) and
-parsed by the CLI. The table enables the unused Cargo dependency check and
-lists the dependency package names exempt from it; see
-[unused dependency policy](unused-dependencies.md). Its `enable` key defaults to
-`false` and has an upgrade recommendation of `true`. The Nix loader accepts the
-table without creating an unused dependency derivation.
+Shared by [CLI/CHECK](../../../CLI/CHECK/design/unused-dependencies.md) and
+[NIXLIB/GRAPH](../../../NIXLIB/GRAPH/design/unused-dependency-checks.md). The
+table enables the static and compiler-backed unused Cargo dependency checks
+and lists the dependency package names exempt from both; see
+[unused dependency policy](unused-dependencies.md). Its `enable` and
+`compiler` keys default to `false` and have upgrade recommendations of
+`true`.
 
 ### `[features]`
 

@@ -14,10 +14,13 @@ plus `[devShell]`, `[checks]`, `[features]`, `[formatters]`, and `[optimize]`.
 The `[specs]` and `[scanners.*]`
 tables belong to the CLI; the flake interface ignores them. The nested
 `[checks.specifications]`, `[checks.codeHealth]`,
-`[checks.clippySuppressions]`, and `[checks.unusedDependencies]` tables are
+and `[checks.clippySuppressions]` tables are
 also CLI-owned. The loader accepts and
 validates them without generating corresponding Nix checks or applying the
-global `checks.enable` switch to them. Code health uses its
+global `checks.enable` switch to them. `[checks.unusedDependencies]` is shared:
+its `enable` key belongs to the CLI, while `compiler` and `exceptions` drive the
+[unused dependency checks](../../GRAPH/design/unused-dependency-checks.md),
+which `checks.enable` gates. Code health uses its
 [catalogued shape and constraints](../../../PARSER/CONFIGURATION/design/code-health.md).
 
 The CLI catalogs and type-validates the build keys before evaluation, using the

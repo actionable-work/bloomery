@@ -310,6 +310,43 @@ in {
     expected = true;
   };
 
+  testUnusedDependencyBuilderCompilesWithResolvedFeatures = let
+    drv = (builderExports.unusedDependenciesCheckWith {}) {
+      inherit pkg;
+      src = ./.;
+      features = ["fast"];
+      targets = [
+        {
+          kind = "lib";
+          name = "proc_macro_fixture";
+          path = "src/lib.rs";
+          harness = true;
+        }
+      ];
+    };
+  in {
+    expr = lib.hasInfix (lib.escapeShellArg "--cfg=feature=\"fast\"") drv.buildPhase;
+    expected = true;
+  };
+
+  testUnusedDependencyBuilderCapsLintLevels = let
+    drv = (builderExports.unusedDependenciesCheckWith {}) {
+      inherit pkg;
+      src = ./.;
+      defaultRustcFlags = ["-Dwarnings"];
+    };
+    lintFlags = lib.escapeShellArgs ["--error-format=json" "-Wunused-crate-dependencies" "--cap-lints=warn"];
+  in {
+    expr = {
+      lintsEveryUnit = lib.hasInfix lintFlags drv.buildPhase;
+      keepsProfileFlags = lib.hasInfix "-Dwarnings" drv.buildPhase;
+    };
+    expected = {
+      lintsEveryUnit = true;
+      keepsProfileFlags = true;
+    };
+  };
+
   testCrateBuilderTypesAndLintCapping = {
     expr = {
       invokesRustc = lib.hasInfix "$RUSTC" crateDrv.buildPhase;

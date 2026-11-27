@@ -433,24 +433,24 @@
     {
       "manifest_path": "packages/rust/libs/shared/scanning/Cargo.toml",
       "name": "bloomery-scanning",
-      "overall_score": 80.5,
-      "sloc": 2418,
+      "overall_score": 80.0,
+      "sloc": 2445,
       "subscores": {
-        "complexity": 0.44,
-        "crateSize": 18.36,
+        "complexity": 0.43,
+        "crateSize": 18.9,
         "duplication": 0.0,
         "nesting": 0.03,
-        "size": 0.67
+        "size": 0.65
       }
     },
     {
       "manifest_path": "packages/rust/libs/shared/schema/Cargo.toml",
       "name": "bloomery-schema",
-      "overall_score": 91.46,
-      "sloc": 1868,
+      "overall_score": 91.32,
+      "sloc": 1875,
       "subscores": {
         "complexity": 0.82,
-        "crateSize": 7.36,
+        "crateSize": 7.5,
         "duplication": 0.0,
         "nesting": 0.0,
         "size": 0.36
@@ -472,14 +472,14 @@
     {
       "manifest_path": "packages/rust/libs/shared/unused-deps/Cargo.toml",
       "name": "bloomery-unused-deps",
-      "overall_score": 100.0,
-      "sloc": 216,
+      "overall_score": 99.87,
+      "sloc": 421,
       "subscores": {
-        "complexity": 0.0,
+        "complexity": 0.12,
         "crateSize": 0.0,
         "duplication": 0.0,
         "nesting": 0.0,
-        "size": 0.0
+        "size": 0.02
       }
     },
     {
@@ -496,7 +496,7 @@
       }
     }
   ],
-  "input_digest": "128546aa63624f9ee716c5495bf015caa908f3106f892bfd5e8ac23c056eb205",
+  "input_digest": "b8e430f00eef6425eda0f90075d53535f15f3d4170d694045a96d6a0eb180133",
   "policy": {
     "scoring": {
       "crateSlocLimit": 1500,
@@ -521,14 +521,14 @@
   "schema_version": 4,
   "workspace": {
     "crate_count": 38,
-    "overall_score": 94.72,
-    "sloc": 29009,
+    "overall_score": 94.69,
+    "sloc": 29248,
     "subscores": {
-      "complexity": 0.48,
-      "crateSize": 4.04,
+      "complexity": 0.47,
+      "crateSize": 4.08,
       "duplication": 0.03,
       "nesting": 0.0,
-      "size": 0.72
+      "size": 0.71
     }
   }
 }

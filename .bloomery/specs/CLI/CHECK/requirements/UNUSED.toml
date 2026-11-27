@@ -20,7 +20,7 @@ id = "CLI-CHECK-UNUSED-003"
 title = "Normal dependencies need runtime target references"
 manual = false
 design = "design/unused-dependencies.md#usage-policy"
-ears = { type = "ubiquitous", system = "Bloomery", action = "report each dependencies entry whose crate name no library, binary, or proc-macro target source references" }
+ears = { type = "ubiquitous", system = "Bloomery", action = "report each dependencies entry whose crate name no non-test code of a library, binary, or proc-macro target references" }
 
 [[requirements]]
 id = "CLI-CHECK-UNUSED-004"
@@ -77,3 +77,17 @@ title = "Unused dependency policy follows check controls"
 manual = false
 design = "design/unused-dependencies.md#check-integration"
 ears = { type = "ubiquitous", system = "Bloomery", action = "apply ordinary check selection, scheduling, cancellation, failure-retention, and exit-code behavior to unused dependency policy" }
+
+[[requirements]]
+id = "CLI-CHECK-UNUSED-012"
+title = "Only path roots reference dependencies"
+manual = false
+design = "design/unused-dependencies.md#usage-policy"
+ears = { type = "unwanted_behavior", trigger = "a dependency crate name appears only as a local, field, keyword, or path segment after :: or .", system = "Bloomery", action = "report the dependency as unreferenced" }
+
+[[requirements]]
+id = "CLI-CHECK-UNUSED-013"
+title = "Test-only code does not use normal dependencies"
+manual = false
+design = "design/unused-dependencies.md#usage-policy"
+ears = { type = "unwanted_behavior", trigger = "a dependencies entry is referenced only by code confined to cfg(test)", system = "Bloomery", action = "report the entry as unused" }

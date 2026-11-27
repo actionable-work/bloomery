@@ -1,0 +1,20 @@
+[build-dependencies]
+dep-build = { path = "../dep-build" }
+dep-build-unused = { path = "../dep-build-unused" }
+
+[dependencies]
+core-lib = { package = "dep-lib", path = "../dep-lib" }
+dep-bin = { path = "../dep-bin" }
+dep-ignored = { path = "../dep-ignored" }
+dep-test-only = { path = "../dep-test-only" }
+dep-unused = { path = "../dep-unused" }
+
+[dev-dependencies]
+dep-dev-unused = { path = "../dep-dev-unused" }
+dep-example = { path = "../dep-example" }
+dep-test = { path = "../dep-test" }
+
+[package]
+edition = "2021"
+name = "app"
+version = "0.1.0"

@@ -1,0 +1,72 @@
+schema_version = 1
+group = "UNUSED"
+
+[[requirements]]
+id = "NIXLIB-GRAPH-UNUSED-001"
+title = "Compiler unused dependency checks are opt-in per member"
+manual = false
+design = "design/unused-dependency-checks.md#generation"
+ears = { type = "optional", feature = "checks.enable and checks.unusedDependencies.compiler are true", system = "mkWorkspace", action = "generate <crate>:unused-dependencies for every selected workspace member" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-UNUSED-002"
+title = "Unused normal dependencies fail the check"
+manual = false
+design = "design/unused-dependency-checks.md#usage-policy"
+ears = { type = "unwanted_behavior", trigger = "no library or binary unit uses a dependencies entry", system = "the <crate>:unused-dependencies check", action = "fail and name the entry" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-UNUSED-003"
+title = "Test-only normal dependencies fail the check"
+manual = false
+design = "design/unused-dependency-checks.md#usage-policy"
+ears = { type = "unwanted_behavior", trigger = "only test units use a dependencies entry", system = "the <crate>:unused-dependencies check", action = "fail and name the entry" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-UNUSED-004"
+title = "Unused dev-dependencies fail the check"
+manual = false
+design = "design/unused-dependency-checks.md#usage-policy"
+ears = { type = "unwanted_behavior", trigger = "no unit test, integration test, example, or benchmark unit uses a dev-dependencies entry", system = "the <crate>:unused-dependencies check", action = "fail and name the entry" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-UNUSED-005"
+title = "Unused build dependencies fail the check"
+manual = false
+design = "design/unused-dependency-checks.md#usage-policy"
+ears = { type = "unwanted_behavior", trigger = "the build script does not use a build-dependencies entry", system = "the <crate>:unused-dependencies check", action = "fail and name the entry" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-UNUSED-006"
+title = "Exceptions are never reported"
+manual = false
+design = "design/unused-dependency-checks.md#usage-policy"
+ears = { type = "ubiquitous", system = "the <crate>:unused-dependencies check", action = "never report a dependency whose package name is listed in checks.unusedDependencies.exceptions while still passing it to the compiler" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-UNUSED-007"
+title = "Failures name the member and repair"
+manual = false
+design = "design/unused-dependency-checks.md#diagnostics"
+ears = { type = "ubiquitous", system = "the <crate>:unused-dependencies check", action = "report the member, then each unused declaration with its section, package, and extern name, and a repair hint naming checks.unusedDependencies.exceptions" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-UNUSED-008"
+title = "Every Cargo target is compiled"
+manual = false
+design = "design/unused-dependency-checks.md#compilation-units"
+ears = { type = "ubiquitous", system = "the <crate>:unused-dependencies check", action = "compile the library, binaries, integration tests, examples, benchmarks, and build script that Cargo infers or declares for the member, honouring auto switches, harness, and required-features" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-UNUSED-009"
+title = "Units compile with resolved features"
+manual = false
+design = "design/unused-dependency-checks.md#compilation-units"
+ears = { type = "ubiquitous", system = "the <crate>:unused-dependencies check", action = "compile every unit with the member resolved features as feature cfgs" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-UNUSED-010"
+title = "Lint levels cannot fail the analysis"
+manual = false
+design = "design/unused-dependency-checks.md#compilation-units"
+ears = { type = "ubiquitous", system = "the <crate>:unused-dependencies check", action = "cap lints at warnings so -Dwarnings and source deny attributes report rather than fail" }

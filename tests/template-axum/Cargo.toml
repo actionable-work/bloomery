@@ -13,7 +13,6 @@ serde = { default-features = false, features = [
   "derive",
   "std",
 ], version = "1" }
-serde_json = { default-features = false, features = ["std"], version = "1" }
 tokio = { default-features = false, features = [
   "net",
   "rt-multi-thread",

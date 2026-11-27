@@ -402,6 +402,67 @@ in {
     };
   };
 
+  testUnusedDependencyChecksAreGeneratedAndGated = let
+    unusedWorkspace = checks:
+      rawMkWorkspace {
+        root = ../tests/unused-deps-workspace;
+        inherit checks;
+      };
+    enabled = unusedWorkspace {
+      enable = true;
+      unusedDependencies.compiler = true;
+    };
+    byDefault = unusedWorkspace {enable = true;};
+    checksDisabled = unusedWorkspace {
+      enable = false;
+      unusedDependencies.compiler = true;
+    };
+  in {
+    expr = {
+      perMember = builtins.all (name: builtins.hasAttr "${name}:unused-dependencies" enabled.checks) ["app" "dep-lib" "dep-unused"];
+      offByDefault = builtins.any (lib.hasSuffix ":unused-dependencies") (builtins.attrNames byDefault.checks);
+      offWithChecks = builtins.any (lib.hasSuffix ":unused-dependencies") (builtins.attrNames checksDisabled.checks);
+    };
+    expected = {
+      perMember = true;
+      offByDefault = false;
+      offWithChecks = false;
+    };
+  };
+
+  testUnusedDependencyChecksDeclareEdgesAndTargets = let
+    app =
+      (rawMkWorkspace {
+        root = ../tests/unused-deps-workspace;
+        checks = {
+          enable = true;
+          unusedDependencies = {
+            compiler = true;
+            exceptions = ["dep-ignored"];
+          };
+        };
+      }).checks."app:unused-dependencies";
+  in {
+    expr = {
+      renamedNormal = lib.hasInfix "normal core_lib dep-lib\n" app.DECLARATIONS;
+      dev = lib.hasInfix "dev dep_example dep-example\n" app.DECLARATIONS;
+      build = lib.hasInfix "build dep_build dep-build\n" app.DECLARATIONS;
+      exceptionSkipped = lib.hasInfix "dep-ignored" app.DECLARATIONS;
+      exceptionStillLinked = lib.hasInfix "dep_ignored" app.NORMAL_EXTERNS;
+      example = lib.hasInfix "example demo 1 examples/demo.rs\n" app.TARGETS;
+      binary = lib.hasInfix "bin tool 1 src/bin/tool.rs\n" app.TARGETS;
+    };
+    expected = {
+      renamedNormal = true;
+      dev = true;
+      build = true;
+      exceptionSkipped = false;
+      exceptionStillLinked = true;
+      example = true;
+      binary = true;
+    };
+  };
+
   testManifestChecksAreReadOnlyAndExplainRepairs = {
     expr = {
       hasWriteOperation = lib.hasInfix "builtins.writeFile" manifestCheckSource;

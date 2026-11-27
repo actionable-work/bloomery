@@ -223,12 +223,14 @@
     else config;
 
   checkUnusedDependencies = value: let
-    config = checkTable "checks.unusedDependencies" ["enable" "exceptions"] value;
+    config = checkTable "checks.unusedDependencies" ["enable" "compiler" "exceptions"] value;
     exceptions = config.exceptions or [];
     validName = name: isString name && builtins.match "[A-Za-z0-9][A-Za-z0-9_-]*" name != null;
   in
     if (config ? enable && !builtins.isBool config.enable)
     then throw "bloomery: checks.unusedDependencies.enable must be a boolean"
+    else if (config ? compiler && !builtins.isBool config.compiler)
+    then throw "bloomery: checks.unusedDependencies.compiler must be a boolean"
     else if !(isList exceptions) || !(builtins.all validName exceptions)
     then throw "bloomery: checks.unusedDependencies.exceptions must contain Cargo package names"
     else if builtins.length exceptions != builtins.length (lib.unique exceptions)
@@ -532,6 +534,12 @@
       // (lib.optionalAttrs (checkedLockFreshness ? enable) {throwOnOutOfDate = checkedLockFreshness.enable;})
       // (lib.optionalAttrs (checkedWorkspaceDependencies ? enable) {workspaceDependencies = checkedWorkspaceDependencies.enable;})
       // (lib.optionalAttrs (checkedNoDefaultFeatures ? enable) {noDefaultFeatures = checkedNoDefaultFeatures.enable;})
+      // (lib.optionalAttrs (checkedUnusedDependencies ? unusedDependencies) {
+        unusedDependencies = {
+          compiler = checkedUnusedDependencies.unusedDependencies.compiler or false;
+          exceptions = checkedUnusedDependencies.unusedDependencies.exceptions or [];
+        };
+      })
       // {
         vulnerabilities = checkedVulnerabilities;
         bans = checkedBans;

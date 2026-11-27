@@ -13,6 +13,7 @@
 // (import ./playwright-workers.test.nix {inherit pkgs workspace;})
 // (import ./crate-archives {inherit pkgs lib;})
 // (import ./builder-linking.nix {inherit pkgs lib;})
+// (import ./unused-dependencies {inherit pkgs lib;})
 // {
   "core:check-command-catalog" = import ./check-command-catalog.test.nix {inherit pkgs lib system;};
   "core:library-name-reader" = import ./library-name-reader.nix {inherit pkgs lib;};

@@ -187,6 +187,23 @@ fn unused_dependency_policy_is_catalogued() {
 }
 
 #[test]
+#[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-UNUSED-006"))]
+fn compiler_unused_dependency_switch_is_catalogued_and_validated() {
+    let path = &["checks", "unusedDependencies", "compiler"][..];
+    let entry = lookup(path).expect("compiler switch is catalogued");
+    assert_eq!(entry.value_type, ValueType::Bool);
+    assert_eq!(entry.recommended, Some(DefaultValue::Bool(true)));
+    assert_eq!(effective_default(path), Some(Value::Boolean(false)));
+    let invalid = toml::from_str::<Value>("[checks.unusedDependencies]\ncompiler = \"true\"\n")
+        .expect("TOML parses");
+    assert!(validate_raw(&invalid).is_err());
+    let valid =
+        toml::from_str::<Value>("[checks.unusedDependencies]\nenable = false\ncompiler = true\n")
+            .expect("TOML parses");
+    assert!(validate_raw(&valid).is_ok());
+}
+
+#[test]
 #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-UNUSED-003"))]
 #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-UNUSED-004"))]
 #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-UNUSED-005"))]
@@ -484,7 +501,7 @@ fn nix_test_paths_are_catalogued() {
 #[test]
 #[cfg_attr(any(), bloomery("PARSER-CONFIGURATION-CATALOG-005"))]
 fn catalog_version_tracks_the_binary() {
-    assert_eq!(CATALOG_VERSION, 17);
+    assert_eq!(CATALOG_VERSION, 18);
     assert!(!CATALOG.is_empty());
 }
 

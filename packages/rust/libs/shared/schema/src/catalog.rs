@@ -101,7 +101,7 @@ impl KeySpec {
 }
 
 /// Increment when the catalog changes.
-pub const CATALOG_VERSION: u32 = 17;
+pub const CATALOG_VERSION: u32 = 18;
 
 fn is_check_control(path: &[&str]) -> bool {
     matches!(
@@ -119,6 +119,7 @@ fn is_check_control(path: &[&str]) -> bool {
             | ["checks", "codeHealth", "enable"]
             | ["checks", "clippySuppressions", "enable"]
             | ["checks", "unusedDependencies", "enable"]
+            | ["checks", "unusedDependencies", "compiler"]
     )
 }
 
@@ -717,10 +718,16 @@ pub const CATALOG: &[CatalogEntry] = &[
         documentation: "Enable the unused Cargo dependency check.",
     },
     CatalogEntry {
+        path: &["checks", "unusedDependencies", "compiler"],
+        value_type: ValueType::Bool,
+        recommended: Some(DefaultValue::Bool(true)),
+        documentation: "Generate per-crate Nix checks that confirm dependency use with rustc.",
+    },
+    CatalogEntry {
         path: &["checks", "unusedDependencies", "exceptions"],
         value_type: ValueType::StringList,
         recommended: Some(DefaultValue::StringList(&[])),
-        documentation: "Dependency package names exempt from the unused dependency check.",
+        documentation: "Dependency package names exempt from the unused dependency checks.",
     },
     CatalogEntry {
         path: &["checks", "codeHealth", "baseline"],

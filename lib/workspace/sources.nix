@@ -63,6 +63,7 @@
   symlinkEntrypoints = {
     crateDir,
     includeTests ? false,
+    includeAllTargets ? false,
     manifest ? readManifest crateDir,
   }: let
     entrypoints = manifestEntrypoints manifest;
@@ -73,6 +74,7 @@
         then entrypoints.test
         else []
       )
+      ++ lib.optionals includeAllTargets entrypoints.auxiliary
       ++ rootRustFiles crateDir;
   in
     builtins.filter (
@@ -94,10 +96,11 @@
       if manifest ? bin
       then map (bin: bin.path) (builtins.filter (bin: bin ? path) manifest.bin)
       else [];
-    testPaths =
-      if manifest ? test
-      then map (test: test.path) (builtins.filter (test: test ? path) manifest.test)
+    declaredPaths = section:
+      if manifest ? ${section}
+      then map (target: target.path) (builtins.filter (target: target ? path) manifest.${section})
       else [];
+    testPaths = declaredPaths "test";
     buildPath =
       if manifest ? package && manifest.package ? build && builtins.isString manifest.package.build
       then [manifest.package.build]
@@ -105,6 +108,8 @@
   in {
     production = map normalizeRelPath (libPath ++ binPaths ++ buildPath);
     test = map normalizeRelPath testPaths;
+    # Examples and benchmarks, which only whole-target analyses compile.
+    auxiliary = map normalizeRelPath (declaredPaths "example" ++ declaredPaths "bench");
   };
 
   # Default compilation fileset for a member. The fileset is rooted at the
@@ -121,6 +126,7 @@
     crateDir,
     manifest ? readManifest crateDir,
     includeTests ? false,
+    includeAllTargets ? false,
     assetDirs ? [],
     extraFileset ? null,
     excludeDirs ? [],
@@ -132,7 +138,8 @@
         if includeTests
         then entrypoints.test
         else []
-      );
+      )
+      ++ lib.optionals includeAllTargets entrypoints.auxiliary;
     # Root-level Rust files (lib.rs, main.rs, build.rs, declared root paths)
     # are selected individually; including their parent "." would absorb the
     # whole crate tree.
@@ -143,6 +150,7 @@
     sourceDirs =
       ["src"]
       ++ lib.optional includeTests "tests"
+      ++ lib.optionals includeAllTargets ["examples" "benches"]
       ++ ["assets" "static" "public"]
       ++ assetDirs;
     moduleDirs = rootModuleDirs crateDir;
@@ -270,27 +278,34 @@
     crateDir,
     override ? {},
     includeTests ? false,
+    # Also select examples and benchmarks; implies `includeTests`.
+    includeAllTargets ? false,
     testFileset ? null,
     excludeDirs ? [],
   }: let
+    withTests = includeTests || includeAllTargets;
     hasExplicitSrc = override ? src && override.src != null;
     hasExplicitFileset = override ? fileset && override.fileset != null;
     assetDirs = override.assetDirs or [];
 
     defaultSelection = defaultFileset {
-      inherit crateDir includeTests assetDirs excludeDirs;
+      inherit crateDir includeAllTargets assetDirs excludeDirs;
+      includeTests = withTests;
       extraFileset =
-        if includeTests
+        if withTests
         then testFileset
         else null;
     };
 
     effectiveFileset =
-      if includeTests && testFileset != null
+      if withTests && testFileset != null
       then lib.fileset.unions [override.fileset testFileset]
       else override.fileset;
 
-    defaultSymlinks = symlinkEntrypoints {inherit crateDir includeTests;};
+    defaultSymlinks = symlinkEntrypoints {
+      inherit crateDir includeAllTargets;
+      includeTests = withTests;
+    };
 
     selectionSrc =
       if hasExplicitSrc

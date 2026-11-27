@@ -62,6 +62,17 @@ in rec {
   }:
     import ./check.nix {inherit pkgs lib rustc stdenv mold lld defaultLinker;};
 
+  unusedDependenciesCheckWith = {
+    rustc ? pkgs.rustc,
+    stdenv ? pkgs.stdenv,
+    mold ? pkgs.mold,
+    lld ? pkgs.lld,
+    useMold ? null,
+    useLld ? null,
+    defaultLinker ? linker.defaultFor {inherit stdenv useMold useLld;},
+  }:
+    import ./unused-dependencies.nix {inherit pkgs lib rustc stdenv mold lld defaultLinker;};
+
   docCrateWith = {
     rustc ? pkgs.rustc,
     stdenv ? pkgs.stdenv,

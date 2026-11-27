@@ -100,7 +100,10 @@ Crate outputs are compressed archives staged per compilation mode; see
 parallel, bounded by the build cores, before any of them runs; they then run in
 file order. `<crate>:clippy` runs `clippy-driver` with
 warnings denied by default. `<crate>:doc` builds rustdoc output.
-`<crate>:doctest` runs rustdoc tests for library crates. All checks except
+`<crate>:doctest` runs rustdoc tests for library crates.
+`<crate>:unused-dependencies` compiles every target with rustc's
+`unused_crate_dependencies` lint; see
+[Unused dependency checks](unused-dependency-checks.md). All checks except
 package checks share one dev-profile check graph; `<crate>:check`, clippy, and
 documentation stage only dependency metadata from it, and package checks
 consume full release crates. See [Check profile selection](check-profiles.md). Package checks reuse the release

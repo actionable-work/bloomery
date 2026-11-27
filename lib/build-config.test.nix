@@ -467,7 +467,7 @@ in {
         };
       };
     in {
-      policiesRemoved = !(args.checks ? specifications) && !(args.checks ? clippySuppressions) && !(args.checks ? unusedDependencies);
+      policiesRemoved = !(args.checks ? specifications) && !(args.checks ? clippySuppressions);
       badSpecType = fails (loader.toWorkspaceArgs {
         root = ./.;
         config.checks.specifications.enable = "true";
@@ -560,6 +560,41 @@ in {
       badUnusedException = true;
       duplicateUnusedException = true;
       badUnusedEnable = true;
+    };
+  };
+
+  testUnusedDependenciesCompilerMapsToWorkspaceOptions = {
+    expr = let
+      args = loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.unusedDependencies = {
+          enable = true;
+          compiler = true;
+          exceptions = ["openssl-sys"];
+        };
+      };
+      defaults = loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.unusedDependencies.enable = true;
+      };
+    in {
+      mapped = args.checks.unusedDependencies;
+      defaulted = defaults.checks.unusedDependencies;
+      badCompiler = fails (loader.toWorkspaceArgs {
+        root = ./.;
+        config.checks.unusedDependencies.compiler = "true";
+      });
+    };
+    expected = {
+      mapped = {
+        compiler = true;
+        exceptions = ["openssl-sys"];
+      };
+      defaulted = {
+        compiler = false;
+        exceptions = [];
+      };
+      badCompiler = true;
     };
   };
 
