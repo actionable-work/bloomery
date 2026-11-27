@@ -73,6 +73,7 @@ fn missing_check_control_warnings_respect_explicit_values_and_available_groups()
     assert!(keys.contains(&"checks.noDefaultFeatures.enable"));
     assert!(keys.contains(&"checks.clippySuppressions.enable"));
     assert!(keys.contains(&"checks.unusedDependencies.enable"));
+    assert!(keys.contains(&"checks.unusedDependencies.compiler"));
     assert!(!keys.contains(&"checks.packages.enable"));
     assert!(!keys.contains(&"checks.codeHealth.enable"));
     assert!(!keys.contains(&"checks.specifications.enable"));
@@ -86,6 +87,7 @@ fn missing_check_control_warnings_respect_explicit_values_and_available_groups()
     assert!(!keys.contains(&"checks.crates.enable"));
     assert!(!keys.contains(&"checks.packages.enable"));
     assert!(!keys.contains(&"checks.workspaceDependencies.enable"));
+    assert!(!keys.contains(&"checks.unusedDependencies.compiler"));
     assert!(keys.contains(&"checks.codeHealth.enable"));
     assert!(keys.contains(&"checks.clippySuppressions.enable"));
     assert!(keys.contains(&"checks.unusedDependencies.enable"));

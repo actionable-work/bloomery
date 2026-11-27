@@ -48,4 +48,11 @@ id = "PARSER-CONFIGURATION-UNUSED-007"
 title = "Nix loader maps the compiler switch"
 manual = false
 design = "design/unused-dependencies.md"
-ears = { type = "ubiquitous", system = "the Nix configuration loader", action = "map checks.unusedDependencies.compiler and checks.unusedDependencies.exceptions to the workspace options and reject a non-boolean compiler value" }
+ears = { type = "ubiquitous", system = "the Nix configuration loader", action = "map checks.unusedDependencies.compiler and checks.unusedDependencies.exceptions to the workspace options" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-UNUSED-008"
+title = "Nix loader rejects a non-boolean compiler switch"
+manual = false
+design = "design/unused-dependencies.md"
+ears = { type = "unwanted_behavior", trigger = "checks.unusedDependencies.compiler is not a boolean", system = "the Nix configuration loader", action = "fail evaluation" }

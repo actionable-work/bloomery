@@ -21,7 +21,7 @@ in {
   };
 
   testCargoTargetsHonourManifestDeclarations = {
-    expr = map (target: "${target.kind}:${target.name}:${target.path}:${lib.boolToString target.harness}") (cargoTargets.discover {
+    expr = map (target: "${target.kind}:${target.name}:${target.path}:${lib.boolToString target.harness}:${lib.boolToString target.enabled}") (cargoTargets.discover {
       inherit crateDir;
       features = ["fast"];
       manifest = {
@@ -30,11 +30,18 @@ in {
           build = false;
           autoexamples = false;
         };
+        lib.doctest = false;
         lib.proc-macro = true;
         bin = [
           {
             name = "tool";
             required-features = ["cli"];
+          }
+        ];
+        example = [
+          {
+            name = "demo";
+            required-features = ["fast/simd"];
           }
         ];
         test = [
@@ -53,9 +60,22 @@ in {
       };
     });
     expected = [
-      "proc-macro:app:src/lib.rs:true"
-      "test:it:tests/it.rs:false"
-      "bench:speed:tests/it.rs:true"
+      "proc-macro:app:src/lib.rs:true:true"
+      "bin:tool:src/bin/tool.rs:true:false"
+      "test:it:tests/it.rs:false:true"
+      "example:demo:examples/demo.rs:true:true"
+      "bench:speed:tests/it.rs:true:true"
     ];
+  };
+
+  testCargoTargetsRecordLibraryDoctests = {
+    expr = map (manifest: (lib.findFirst (target: target.kind == "lib") null (cargoTargets.discover {inherit crateDir manifest;})).doctest) [
+      {package.name = "app";}
+      {
+        package.name = "app";
+        lib.doctest = false;
+      }
+    ];
+    expected = [true false];
   };
 }

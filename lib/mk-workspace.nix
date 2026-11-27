@@ -1256,15 +1256,22 @@ in
           edges = edgesFor wpkg.id wpkg.id;
           selected = selectEdges targetPlatform ["normal" "dev"] edges ++ selectEdges hostPlatform ["build"] edges;
           packageName = edge: parsed.byId.${edge.package}.name;
+          # Edges resolved without bloomery.lock name only renamed externs.
+          externNameOf = edge: let
+            declared = edge.extern-name or null;
+          in
+            if declared != null
+            then declared
+            else (namedPackage parsed.byId.${edge.package}).crateName;
           externs =
             map (edge: {
               inherit (edge) kind;
-              externName = edge.extern-name;
+              externName = externNameOf edge;
             })
             selected;
           declarations = map (edge: {
             inherit (edge) kind;
-            externName = edge.extern-name;
+            externName = externNameOf edge;
             package = packageName edge;
           }) (builtins.filter (edge: !(builtins.elem (packageName edge) unusedDependencyExceptions)) selected);
           dependencyBindings = unitBindings wpkg.id wpkg.id crates ["normal" "dev"];
@@ -1273,13 +1280,21 @@ in
             if lockManifest != null
             then (lockManifest.packages.${wpkg.id} or lockManifest.packages.${wpkg.name} or {})
             else {};
-          featureOverride = (getCrateOverride wpkg.id wpkg.name).features or null;
+          # The resolution order of mkCrateNode, preferring the member's own
+          # lock context.
+          cOverride = getCrateOverride wpkg.id wpkg.name;
+          contextFeatures =
+            if usesGlobalGraph wpkg.id
+            then null
+            else lockContexts.${wpkg.id}.${wpkg.id}.features or null;
           features =
-            if featureOverride != null
-            then featureOverride
-            else if usesGlobalGraph wpkg.id
-            then pkgLock.features or []
-            else lockContexts.${wpkg.id}.${wpkg.id}.features or pkgLock.features or [];
+            if cOverride ? features
+            then cOverride.features
+            else if contextFeatures != null
+            then contextFeatures
+            else if pkgLock ? features
+            then pkgLock.features
+            else resolvedFeatures.${wpkg.id} or resolvedFeatures.${wpkg.name} or resolvedFeatures.${wpkg.crateName} or ["default"];
           crateDrv =
             if testMemberHasLib wpkg.name
             then (crates.${wpkg.id} or null)

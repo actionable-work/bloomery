@@ -19,6 +19,15 @@
       absent "entry 'dep-example'"
     '';
   };
+  "core:unused-dependencies-doctests" = expectLog {
+    name = "unused-dependencies-doctests";
+    passthru.bloomery = ["NIXLIB-GRAPH-UNUSED-012"];
+    script = ''
+      # Only a documentation test of the `app` library uses `dep-doc`.
+      reported "Documentation tests reference dep_doc."
+      absent "entry 'dep-doc'"
+    '';
+  };
   "core:unused-dependencies-build" = expectLog {
     name = "unused-dependencies-build";
     passthru.bloomery = ["NIXLIB-GRAPH-UNUSED-005"];

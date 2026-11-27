@@ -20,17 +20,23 @@ Each target's sources are its root file and every out-of-line module file it
 declares. A dependency is referenced when its Rust crate name starts a path
 (`name::`), follows a leading `::`, or is the root of a `use` tree or an
 `extern crate` item anywhere in those sources, including attributes, macro
-bodies, and conditionally compiled code. Each entry of a `use { ... }` or
+bodies, and conditionally compiled code. A leading `::` follows punctuation
+other than `>`, `->`, `=>`, or a keyword other than `self`, `Self`, `super`,
+and `crate`. Each entry of a `use { ... }` or
 `use ::{ ... }` group is a `use` tree root. Identifiers in other positions,
 such as locals, fields, keywords, and segments after `::` or `.`, are not
 references. A relative `name::` path is not a reference when its module
 scope declares `mod name`: a file or inline module body is a new scope, and
-other blocks share the enclosing one. The crate name is the manifest rename, else the dependency library
+other blocks share the enclosing one. Documentation text, including doctests,
+references a crate when it starts a `name::` or `::name` path with the crate
+name, or names it after a line-leading `use` or after `extern crate`;
+documentation references are test-only. The crate name is the manifest rename, else the dependency library
 target name when the dependency is a workspace package, else the package name,
 with hyphens replaced by underscores.
 
 Code confined to `cfg(test)` is test-only: an item whose `cfg` predicate holds
-only when `test` is set, a module file declared by such an item, and a file
+only when `test` is set, through the end of its body or `;` (or, for a field,
+variant, arm, or argument, its `,` outside generic arguments), a module file declared by such an item, and a file
 whose inner attributes require `cfg(test)`. Test-only code references only
 dev-dependencies.
 

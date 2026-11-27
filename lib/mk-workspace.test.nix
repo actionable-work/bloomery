@@ -449,9 +449,9 @@ in {
       build = lib.hasInfix "build dep_build dep-build\n" app.DECLARATIONS;
       exceptionSkipped = lib.hasInfix "dep-ignored" app.DECLARATIONS;
       exceptionStillLinked = lib.hasInfix "dep_ignored" app.NORMAL_EXTERNS;
-      example = lib.hasInfix "example demo 1 bin examples/demo.rs\n" app.TARGETS;
-      libraryExample = lib.hasInfix "example plugin 1 lib examples/plugin.rs\n" app.TARGETS;
-      binary = lib.hasInfix "bin tool 1 bin src/bin/tool.rs\n" app.TARGETS;
+      example = lib.hasInfix "example demo 1 bin 1 examples/demo.rs\n" app.TARGETS;
+      libraryExample = lib.hasInfix "example plugin 1 lib 1 examples/plugin.rs\n" app.TARGETS;
+      binary = lib.hasInfix "bin tool 1 bin 1 src/bin/tool.rs\n" app.TARGETS;
     };
     expected = {
       renamedNormal = true;
@@ -462,6 +462,34 @@ in {
       example = true;
       libraryExample = true;
       binary = true;
+    };
+  };
+
+  # Without bloomery.lock, edges name only renamed externs and features come
+  # from the manifest resolution.
+  testUnusedDependencyChecksResolveWithoutLock = let
+    app =
+      (rawMkWorkspace {
+        root = ../tests/unused-deps-workspace;
+        source.bloomeryLock = null;
+        features.cratesIoIndex = ../tests/crates-index;
+        checks = {
+          enable = true;
+          unusedDependencies.compiler = true;
+        };
+      }).checks."app:unused-dependencies";
+  in {
+    expr = {
+      renamedNormal = lib.hasInfix "normal core_lib dep-lib\n" app.DECLARATIONS;
+      intrinsicNormal = lib.hasInfix "normal dep_unused dep-unused\n" app.DECLARATIONS;
+      intrinsicExtern = lib.hasInfix "dep_bin" app.NORMAL_EXTERNS;
+      defaultFeatures = lib.hasInfix "feature=\"default\"" app.buildPhase;
+    };
+    expected = {
+      renamedNormal = true;
+      intrinsicNormal = true;
+      intrinsicExtern = true;
+      defaultFeatures = true;
     };
   };
 

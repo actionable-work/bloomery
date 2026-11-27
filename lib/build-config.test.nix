@@ -580,10 +580,6 @@ in {
     in {
       mapped = args.checks.unusedDependencies;
       defaulted = defaults.checks.unusedDependencies;
-      badCompiler = fails (loader.toWorkspaceArgs {
-        root = ./.;
-        config.checks.unusedDependencies.compiler = "true";
-      });
     };
     expected = {
       mapped = {
@@ -594,8 +590,15 @@ in {
         compiler = false;
         exceptions = [];
       };
-      badCompiler = true;
     };
+  };
+
+  testUnusedDependenciesCompilerRejectsNonBoolean = {
+    expr = fails (loader.toWorkspaceArgs {
+      root = ./.;
+      config.checks.unusedDependencies.compiler = "true";
+    });
+    expected = true;
   };
 
   testWrongPathTypeFails = {

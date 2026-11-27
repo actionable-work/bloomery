@@ -11,6 +11,7 @@ dep-unused = { path = "../dep-unused" }
 
 [dev-dependencies]
 dep-dev-unused = { path = "../dep-dev-unused" }
+dep-doc = { path = "../dep-doc" }
 dep-example = { path = "../dep-example" }
 dep-test = { path = "../dep-test" }
 

@@ -10,6 +10,7 @@ dependencies = [
  "dep-build",
  "dep-build-unused",
  "dep-dev-unused",
+ "dep-doc",
  "dep-example",
  "dep-ignored",
  "dep-lib",
@@ -32,6 +33,10 @@ version = "0.1.0"
 
 [[package]]
 name = "dep-dev-unused"
+version = "0.1.0"
+
+[[package]]
+name = "dep-doc"
 version = "0.1.0"
 
 [[package]]

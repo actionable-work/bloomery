@@ -1,6 +1,7 @@
 //! Crate names that source tokens reference as the start of a path.
 
 use crate::cfg_test::attribute_requires_test;
+use crate::doc_text::{doc_attribute_text, path_roots};
 use proc_macro2::{Delimiter, Spacing, TokenStream, TokenTree};
 use std::collections::BTreeSet;
 
@@ -42,6 +43,15 @@ impl References {
                     self.collect_trees(&trees[index..item_end], true, &modules);
                     index = item_end;
                     continue;
+                }
+                if let Some(TokenTree::Group(group)) = trees.get(attribute_end - 1)
+                    && let Some(text) = doc_attribute_text(&group.stream())
+                {
+                    // Doctests compile with dev-dependencies, so documentation
+                    // references never count as production use.
+                    for name in path_roots(&text) {
+                        self.insert(name, true);
+                    }
                 }
                 self.collect_trees(&trees[index + 1..attribute_end], test_only, &modules);
                 index = attribute_end;
@@ -164,16 +174,66 @@ fn attribute_at(trees: &[TokenTree], index: usize) -> Option<(usize, bool, bool)
 }
 
 /// End of the item, statement, field, or arm that starts at `start`: just
-/// past the first `;`, `,`, or brace block at this nesting level.
+/// past the first `;`, the first brace block that is not a match-arm
+/// pattern, or, unless an item keyword starts it, the first `,` outside
+/// generic arguments, at this nesting level.
 fn item_end(trees: &[TokenTree], start: usize) -> usize {
-    trees[start..]
-        .iter()
-        .position(|tree| match tree {
-            TokenTree::Punct(punct) => matches!(punct.as_char(), ';' | ','),
-            TokenTree::Group(group) => group.delimiter() == Delimiter::Brace,
-            _ => false,
-        })
-        .map_or(trees.len(), |offset| start + offset + 1)
+    let commas_end = !starts_item(trees, start);
+    let mut angle_depth = 0usize;
+    for index in start..trees.len() {
+        match &trees[index] {
+            TokenTree::Punct(punct) => match punct.as_char() {
+                ';' => return index + 1,
+                ',' if commas_end && angle_depth == 0 => return index + 1,
+                '<' => angle_depth += 1,
+                // `->` and `=>` close no generic argument list.
+                '>' if !follows_joint(trees, index, &['-', '=']) => {
+                    angle_depth = angle_depth.saturating_sub(1);
+                }
+                _ => {}
+            },
+            TokenTree::Group(group)
+                if group.delimiter() == Delimiter::Brace && !starts_arrow(trees, index + 1) =>
+            {
+                return index + 1;
+            }
+            _ => {}
+        }
+    }
+    trees.len()
+}
+
+/// An item keyword follows any further attributes at `start`, so the item
+/// ends only at `;` or its body.
+fn starts_item(trees: &[TokenTree], mut start: usize) -> bool {
+    while let Some((attribute_end, _, _)) = attribute_at(trees, start) {
+        start = attribute_end;
+    }
+    if is_ident(trees.get(start), "pub") {
+        start += 1;
+        if matches!(trees.get(start), Some(TokenTree::Group(group)) if group.delimiter() == Delimiter::Parenthesis)
+        {
+            start += 1;
+        }
+    }
+    matches!(trees.get(start), Some(TokenTree::Ident(ident)) if matches!(
+        ident.to_string().as_str(),
+        "async" | "const" | "enum" | "extern" | "fn" | "impl" | "macro_rules" | "mod"
+            | "static" | "struct" | "trait" | "type" | "union" | "unsafe" | "use"
+    ))
+}
+
+/// The punctuation at `index` is joined to a preceding one of `heads`.
+fn follows_joint(trees: &[TokenTree], index: usize, heads: &[char]) -> bool {
+    matches!(index.checked_sub(1).and_then(|at| trees.get(at)),
+        Some(TokenTree::Punct(head)) if heads.contains(&head.as_char()) && head.spacing() == Spacing::Joint)
+}
+
+/// A `=>` starts at `index`.
+fn starts_arrow(trees: &[TokenTree], index: usize) -> bool {
+    is_punct(trees.get(index), '=')
+        && is_punct(trees.get(index + 1), '>')
+        && follows_joint(trees, index + 1, &['='])
 }
 
 /// The identifier at `index` names a crate: it starts a relative path
@@ -221,25 +281,65 @@ fn is_global_path_start(trees: &[TokenTree], separator: usize) -> bool {
 /// Path keywords and other reserved words never name a crate; raw
 /// identifiers such as `r#match` can.
 fn is_keyword(ident: &proc_macro2::Ident) -> bool {
+    is_reserved(&ident.to_string())
+}
+
+/// Rust's strict and reserved keywords, which never name a crate.
+pub(crate) fn is_reserved(word: &str) -> bool {
     matches!(
-        ident.to_string().as_str(),
-        "as" | "crate"
+        word,
+        "abstract"
+            | "as"
+            | "async"
+            | "await"
+            | "become"
+            | "box"
+            | "break"
+            | "const"
+            | "continue"
+            | "crate"
+            | "do"
             | "dyn"
+            | "else"
+            | "enum"
             | "extern"
+            | "false"
+            | "final"
             | "fn"
             | "for"
+            | "gen"
+            | "if"
             | "impl"
             | "in"
             | "let"
+            | "loop"
+            | "macro"
+            | "match"
+            | "mod"
+            | "move"
             | "mut"
+            | "override"
+            | "priv"
             | "pub"
             | "ref"
             | "return"
             | "self"
             | "Self"
+            | "static"
+            | "struct"
             | "super"
+            | "trait"
+            | "true"
+            | "try"
+            | "type"
+            | "typeof"
+            | "unsafe"
+            | "unsized"
             | "use"
+            | "virtual"
             | "where"
+            | "while"
+            | "yield"
     )
 }
 
@@ -295,6 +395,47 @@ mod tests {
                 "pi", "rho", "xi"
             ]
         );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-UNUSED-012"))]
+    fn global_paths_after_expression_keywords_reference_crates() {
+        let found = references(
+            "fn f() { if ::alpha::ok() {} match ::beta::k() {} while ::gamma::x() {} \
+             let v = unsafe { ::delta::raw() }; let c = move || ::epsilon::go(); \
+             return ::zeta::done(); }",
+        );
+        assert_eq!(
+            names(&found.all),
+            ["alpha", "beta", "delta", "epsilon", "gamma", "zeta"]
+        );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-UNUSED-013"))]
+    fn cfg_test_items_span_generics_and_arm_patterns() {
+        let found = references(
+            "#[cfg(test)] fn helper<T: Clone, U>() where T: Into<U>, U: Copy { alpha::f(); }\n\
+             fn run(x: S) { match x { #[cfg(test)] S { a, b } => beta::f(), _ => gamma::g() } }\n\
+             #[cfg(test)] fn arrow() -> u8 { delta::h() }\n\
+             struct P { #[cfg(test)] pub(crate) e: epsilon::E, pub f: zeta::Z }",
+        );
+        assert_eq!(names(&found.production), ["gamma", "zeta"]);
+        assert_eq!(
+            names(&found.all),
+            ["alpha", "beta", "delta", "epsilon", "gamma", "zeta"]
+        );
+    }
+
+    #[test]
+    #[cfg_attr(any(), bloomery("CLI-CHECK-UNUSED-016"))]
+    fn doc_comment_references_are_test_only() {
+        let found = references(
+            "/// ```\n/// # use alpha::A;\n/// beta::run();\n/// ```\nfn f() { gamma::g(); }\n\
+             #[doc = \"delta::x\"] struct S;",
+        );
+        assert_eq!(names(&found.production), ["gamma"]);
+        assert_eq!(names(&found.all), ["alpha", "beta", "delta", "gamma"]);
     }
 
     #[test]

@@ -101,6 +101,10 @@ pub fn missing_check_controls(
             "checks.unusedDependencies.enable",
             "static:unused-dependencies",
         ),
+        (
+            "checks.unusedDependencies.compiler",
+            "nix:unused-dependencies",
+        ),
     ];
     if specifications_available {
         controls.push(("checks.specifications.enable", "static:structure"));

@@ -1,8 +1,11 @@
 # Cargo targets of a workspace member, read purely from its manifest and
-# directory layout. Each target is `{ kind, name, path, harness, crateType? }`
-# where `kind` is lib, proc-macro, bin, test, example, bench, or build, `name`
-# is the Rust crate name, `path` is crate-relative, and `crateType` is `lib`
-# for examples that declare no `bin` crate type and `bin` otherwise.
+# directory layout. Each target is
+# `{ kind, name, path, harness, enabled, crateType?, doctest? }` where `kind`
+# is lib, proc-macro, bin, test, example, bench, or build, `name` is the Rust
+# crate name, `path` is crate-relative, `enabled` is false when the resolved
+# features miss one of its `required-features`, `crateType` is `lib` for
+# examples that declare no `bin` crate type and `bin` otherwise, and `doctest`
+# says whether a library's documentation tests run.
 {lib}: let
   crateName = name: lib.replaceStrings ["-"] ["_"] name;
 
@@ -68,7 +71,9 @@
   }: let
     package = manifest.package or {};
     packageName = package.name or (baseNameOf (toString crateDir));
-    enabled = target: lib.all (feature: builtins.elem feature features) (target.required-features or []);
+    # `dep/feature` and `dep?/feature` entries need the `dep` feature.
+    requiredFeature = feature: lib.removeSuffix "?" (builtins.head (lib.splitString "/" feature));
+    enabled = target: lib.all (feature: builtins.elem (requiredFeature feature) features) (target.required-features or []);
 
     sectionTargets = kind: let
       section = sections.${kind};
@@ -105,7 +110,7 @@
         enabled = true;
       }) (builtins.filter (target: !(builtins.elem target.path explicitPaths)) automatic);
     in
-      builtins.filter (target: target.path != null && target.enabled) (explicit ++ implicit);
+      builtins.filter (target: target.path != null) (explicit ++ implicit);
 
     libTable = manifest.lib or {};
     libPath =
@@ -122,6 +127,8 @@
       name = crateName (libTable.name or packageName);
       path = libPath;
       harness = libTable.harness or true;
+      doctest = libTable.doctest or true;
+      enabled = true;
     };
 
     declaredBuild = package.build or null;
@@ -136,13 +143,12 @@
       name = "build_script_build";
       path = buildPath;
       harness = false;
+      enabled = true;
     };
-
-    strip = target: builtins.removeAttrs target ["enabled"];
   in
     buildTargets
     ++ libraryTargets
-    ++ map strip (lib.concatMap sectionTargets ["bin" "test" "example" "bench"]);
+    ++ lib.concatMap sectionTargets ["bin" "test" "example" "bench"];
 in {
   inherit discover;
 }

@@ -135,7 +135,7 @@
       "manifest_path": "packages/rust/libs/cli/check-selection/Cargo.toml",
       "name": "bloomery-check-selection",
       "overall_score": 99.98,
-      "sloc": 275,
+      "sloc": 279,
       "subscores": {
         "complexity": 0.0,
         "crateSize": 0.0,
@@ -472,14 +472,14 @@
     {
       "manifest_path": "packages/rust/libs/shared/unused-deps/Cargo.toml",
       "name": "bloomery-unused-deps",
-      "overall_score": 99.61,
-      "sloc": 502,
+      "overall_score": 99.39,
+      "sloc": 696,
       "subscores": {
-        "complexity": 0.28,
+        "complexity": 0.45,
         "crateSize": 0.0,
         "duplication": 0.0,
         "nesting": 0.0,
-        "size": 0.11
+        "size": 0.16
       }
     },
     {
@@ -496,7 +496,7 @@
       }
     }
   ],
-  "input_digest": "cc2b2f8e0c7627b1fc74bc1b3cd57997d467feeb1d005d8c3c631ee66f64c7fa",
+  "input_digest": "ad157e5a644a72ba7abc57f4ff0935431c1e8d8f730f238e855cb7565b4e51ca",
   "policy": {
     "scoring": {
       "crateSlocLimit": 1500,
@@ -521,11 +521,11 @@
   "schema_version": 4,
   "workspace": {
     "crate_count": 38,
-    "overall_score": 94.7,
-    "sloc": 29329,
+    "overall_score": 94.73,
+    "sloc": 29527,
     "subscores": {
-      "complexity": 0.47,
-      "crateSize": 4.07,
+      "complexity": 0.48,
+      "crateSize": 4.05,
       "duplication": 0.03,
       "nesting": 0.0,
       "size": 0.71

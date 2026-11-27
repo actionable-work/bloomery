@@ -52,10 +52,10 @@ ears = { type = "ubiquitous", system = "the <crate>:unused-dependencies check", 
 
 [[requirements]]
 id = "NIXLIB-GRAPH-UNUSED-008"
-title = "Every Cargo target is compiled"
+title = "Library targets are compiled"
 manual = false
 design = "design/unused-dependency-checks.md#compilation-units"
-ears = { type = "ubiquitous", system = "the <crate>:unused-dependencies check", action = "compile the library, binaries, integration tests, examples, benchmarks, and build script that Cargo infers or declares for the member, honouring auto switches, harness, required-features, and example crate-type" }
+ears = { type = "ubiquitous", system = "the <crate>:unused-dependencies check", action = "compile the member library or proc-macro and its unit tests" }
 
 [[requirements]]
 id = "NIXLIB-GRAPH-UNUSED-009"
@@ -77,3 +77,66 @@ title = "Source allow attributes cannot silence the check"
 manual = false
 design = "design/unused-dependency-checks.md#compilation-units"
 ears = { type = "unwanted_behavior", trigger = "a target allows unused_crate_dependencies in its source", system = "the <crate>:unused-dependencies check", action = "still report the unused declarations its unit would satisfy" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-UNUSED-012"
+title = "Doctest references use dev-dependencies"
+manual = false
+design = "design/unused-dependency-checks.md#usage-policy"
+ears = { type = "event", trigger = "a documentation comment of a member whose library runs doctests starts a path with a dev-dependency extern name", system = "the <crate>:unused-dependencies check", action = "treat that dev-dependency as used" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-UNUSED-013"
+title = "Build scripts run with the Cargo environment"
+manual = false
+design = "design/unused-dependency-checks.md#compilation-units"
+ears = { type = "ubiquitous", system = "the <crate>:unused-dependencies check", action = "run the build script with the CARGO_CFG_*, CARGO_FEATURE_*, and package variables that Cargo sets" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-UNUSED-014"
+title = "Skipped targets leave their sections unchecked"
+manual = false
+design = "design/unused-dependency-checks.md#compilation-units"
+ears = { type = "event", trigger = "a target is skipped because it is outside the source selection or its required-features are not enabled", system = "the <crate>:unused-dependencies check", action = "report no declaration of a section that target could satisfy and name the skipped target" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-UNUSED-015"
+title = "Binary targets are compiled"
+manual = false
+design = "design/unused-dependency-checks.md#compilation-units"
+ears = { type = "ubiquitous", system = "the <crate>:unused-dependencies check", action = "compile every binary target and its unit tests with the member library" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-UNUSED-016"
+title = "Integration tests are compiled"
+manual = false
+design = "design/unused-dependency-checks.md#compilation-units"
+ears = { type = "ubiquitous", system = "the <crate>:unused-dependencies check", action = "compile every integration test and benchmark as a test harness unless it sets harness = false" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-UNUSED-017"
+title = "Examples are compiled"
+manual = false
+design = "design/unused-dependency-checks.md#compilation-units"
+ears = { type = "ubiquitous", system = "the <crate>:unused-dependencies check", action = "compile every example as a binary, or as a library when its crate-type has no bin" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-UNUSED-018"
+title = "Targets follow Cargo inference"
+manual = false
+design = "design/unused-dependency-checks.md#compilation-units"
+ears = { type = "ubiquitous", system = "the <crate>:unused-dependencies check", action = "discover targets from the conventional layout and explicit manifest tables, honouring the auto target switches" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-UNUSED-019"
+title = "Required features gate targets"
+manual = false
+design = "design/unused-dependency-checks.md#compilation-units"
+ears = { type = "unwanted_behavior", trigger = "the resolved features miss a target required-features entry", system = "the <crate>:unused-dependencies check", action = "skip that target" }
+
+[[requirements]]
+id = "NIXLIB-GRAPH-UNUSED-020"
+title = "Lockless workspaces resolve extern names"
+manual = false
+design = "design/unused-dependency-checks.md#compilation-units"
+ears = { type = "state", state = "the workspace has no bloomery.lock", system = "the <crate>:unused-dependencies check", action = "name every declaration by its rename or the dependency library crate name" }

@@ -6,6 +6,7 @@
 //! code. Normal dependencies ignore code confined to `cfg(test)`.
 
 mod cfg_test;
+mod doc_text;
 mod manifest;
 mod references;
 
