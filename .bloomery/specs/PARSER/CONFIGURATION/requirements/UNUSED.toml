@@ -35,3 +35,24 @@ title = "Unused dependency policy validates when disabled"
 manual = false
 design = "design/unused-dependencies.md"
 ears = { type = "ubiquitous", system = "configuration loading", action = "validate checks.unusedDependencies configuration even when checks.unusedDependencies.enable is false" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-UNUSED-006"
+title = "Compiler unused dependency switch is catalogued"
+manual = false
+design = "design/unused-dependencies.md"
+ears = { type = "ubiquitous", system = "the configuration schema", action = "catalogue checks.unusedDependencies.compiler as a boolean that defaults to false and is recommended true" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-UNUSED-007"
+title = "Nix loader maps the compiler switch"
+manual = false
+design = "design/unused-dependencies.md"
+ears = { type = "ubiquitous", system = "the Nix configuration loader", action = "map checks.unusedDependencies.compiler and checks.unusedDependencies.exceptions to the workspace options" }
+
+[[requirements]]
+id = "PARSER-CONFIGURATION-UNUSED-008"
+title = "Nix loader rejects a non-boolean compiler switch"
+manual = false
+design = "design/unused-dependencies.md"
+ears = { type = "unwanted_behavior", trigger = "checks.unusedDependencies.compiler is not a boolean", system = "the Nix configuration loader", action = "fail evaluation" }

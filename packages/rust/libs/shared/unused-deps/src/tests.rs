@@ -165,6 +165,7 @@ fn diagnostics_identify_manifest_line_and_crate_name() {
         (Path::new("app/Cargo.toml"), Some(8))
     );
     assert!(diagnostics[0].notes[0].contains("`serde`"));
+    assert!(diagnostics[0].notes[0].contains("`use serde as _;`"));
 }
 
 #[test]
@@ -178,4 +179,51 @@ fn unreadable_sources_fail_without_unused_guesses() {
     assert_eq!(diagnostics.len(), 1);
     assert_eq!(diagnostics[0].code, "UnusedDependencySourceError");
     assert_eq!(location(&diagnostics[0]).0, Path::new("app/src/nested.rs"));
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-UNUSED-012"))]
+fn identifiers_that_do_not_start_paths_leave_dependencies_unused() {
+    let mut sources = used_sources();
+    sources.retain(|(path, _)| *path != "app/src/nested.rs");
+    sources.push((
+        "app/src/nested.rs",
+        "pub fn f(log: u8) -> u8 { helper_core::help(); let serde = log; let _ = helper_core::cc::X; serde }\n",
+    ));
+    let fixture = Fixture::new(&sources);
+    assert_eq!(
+        unused_messages(&fixture.check(&[])),
+        [
+            "app declares unused build-dependencies entry 'cc'",
+            "app declares unused dependencies entry 'log'",
+            "app declares unused dependencies entry 'serde'",
+        ]
+    );
+}
+
+#[test]
+#[cfg_attr(any(), bloomery("CLI-CHECK-UNUSED-013"))]
+fn normal_dependencies_used_only_by_cfg_test_code_are_unused() {
+    let mut sources = used_sources();
+    sources.retain(|(path, _)| *path != "app/src/lib.rs");
+    sources.push((
+        "app/src/lib.rs",
+        "mod nested;\n#[cfg(test)]\nmod tests { use tempfile as _; use log as _; }\n#[cfg(test)]\nmod more;\n",
+    ));
+    sources.push(("app/src/more.rs", "use serde as _;\n"));
+    let fixture = Fixture::new(&sources);
+    let diagnostics = fixture.check(&["cc"]);
+    assert_eq!(
+        unused_messages(&diagnostics),
+        [
+            "app declares unused dependencies entry 'log'",
+            "app declares unused dependencies entry 'serde'",
+        ]
+    );
+    assert!(
+        diagnostics
+            .iter()
+            .all(|diagnostic| diagnostic.notes[0].contains("non-test")),
+        "{diagnostics:?}"
+    );
 }

@@ -71,6 +71,8 @@ in
     includePackageChecks = cfg.checks.includePackageChecks;
     workspaceDependencies = cfg.checks.workspaceDependencies;
     noDefaultFeatures = cfg.checks.noDefaultFeatures;
+    unusedDependencyChecksEnabled = cfg.checks.unusedDependencies.compiler;
+    unusedDependencyExceptions = cfg.checks.unusedDependencies.exceptions;
     dependencyPolicyChecksEnabled =
       cfg.checks.enable
       && (
@@ -267,6 +269,17 @@ in
     # custom filesets, explicit local paths, and accepted path strings reflect
     # the entrypoints that will compile. An opaque source derivation falls back
     # to the raw member manifest.
+    # Every Cargo target, including examples and benchmarks, for whole-member
+    # analyses.
+    resolveAllTargetMemberSource = cname: crateDir:
+      workspace.sources.resolve {
+        inherit crateDir;
+        override = getOverride cname;
+        includeAllTargets = true;
+        testFileset = getTestFileset cname;
+        excludeDirs = workspace.sources.nestedMemberPaths crateDir discoveredWorkspaceMembers;
+      };
+
     memberSourceInfo = lib.mapAttrs resolveMemberSource discoveredWorkspaceMembers;
     testMemberSourceInfo = lib.mapAttrs resolveTestMemberSource discoveredWorkspaceMembers;
     discoveredMembers = lib.mapAttrs (_: info: info.evalSrc) memberSourceInfo;
@@ -306,6 +319,8 @@ in
     builderCheck = builders.checkCrateWith {inherit rustc stdenv mold lld defaultLinker;};
     builderDoc = builders.docCrateWith {inherit rustc stdenv mold lld defaultLinker;};
     builderDocTest = builders.doctestCrateWith {inherit rustc stdenv mold lld defaultLinker;};
+    builderUnusedDependencies = builders.unusedDependenciesCheckWith {inherit rustc stdenv mold lld defaultLinker;};
+    cargoTargets = import ./workspace/cargo-targets.nix {inherit lib;};
     builderLockCheck = import ./workspace/lock-check.nix {inherit pkgs lib;};
     builderManifestCheck = import ./workspace/manifest-check.nix {inherit pkgs lib;};
     builderDependencyPolicyCheck = builders.dependencyPolicyCheck;
@@ -1232,6 +1247,76 @@ in
       selectedWorkspacePackages
     );
 
+    # Compiler-backed unused dependency checks for all workspace crates
+    workspaceUnusedDependencies = lib.listToAttrs (
+      map (
+        wpkg: let
+          crates = checkCratesFor wpkg.id;
+          crateDir = discoveredWorkspaceMembers.${wpkg.name};
+          edges = edgesFor wpkg.id wpkg.id;
+          selected = selectEdges targetPlatform ["normal" "dev"] edges ++ selectEdges hostPlatform ["build"] edges;
+          packageName = edge: parsed.byId.${edge.package}.name;
+          # Edges resolved without bloomery.lock name only renamed externs.
+          externNameOf = edge: let
+            declared = edge.extern-name or null;
+          in
+            if declared != null
+            then declared
+            else (namedPackage parsed.byId.${edge.package}).crateName;
+          externs =
+            map (edge: {
+              inherit (edge) kind;
+              externName = externNameOf edge;
+            })
+            selected;
+          declarations = map (edge: {
+            inherit (edge) kind;
+            externName = externNameOf edge;
+            package = packageName edge;
+          }) (builtins.filter (edge: !(builtins.elem (packageName edge) unusedDependencyExceptions)) selected);
+          dependencyBindings = unitBindings wpkg.id wpkg.id crates ["normal" "dev"];
+          buildScriptBindings = scriptBindings wpkg.id wpkg.id;
+          pkgLock =
+            if lockManifest != null
+            then (lockManifest.packages.${wpkg.id} or lockManifest.packages.${wpkg.name} or {})
+            else {};
+          # The resolution order of mkCrateNode, preferring the member's own
+          # lock context.
+          cOverride = getCrateOverride wpkg.id wpkg.name;
+          contextFeatures =
+            if usesGlobalGraph wpkg.id
+            then null
+            else lockContexts.${wpkg.id}.${wpkg.id}.features or null;
+          features =
+            if cOverride ? features
+            then cOverride.features
+            else if contextFeatures != null
+            then contextFeatures
+            else if pkgLock ? features
+            then pkgLock.features
+            else resolvedFeatures.${wpkg.id} or resolvedFeatures.${wpkg.name} or resolvedFeatures.${wpkg.crateName} or ["default"];
+          crateDrv =
+            if testMemberHasLib wpkg.name
+            then (crates.${wpkg.id} or null)
+            else null;
+        in {
+          name = mkCheckName wpkg.name "unused-dependencies";
+          value = builderUnusedDependencies {
+            pkg = wpkg;
+            src = (resolveAllTargetMemberSource wpkg.name crateDir).src;
+            inherit crateDrv externs declarations features dependencyBindings buildScriptBindings;
+            targets = cargoTargets.discover {inherit crateDir features;};
+            dependencies = bindingInputs dependencyBindings;
+            buildScriptDependencies = bindingInputs buildScriptBindings;
+            override = testOverridesFor wpkg.name;
+            defaultRustcFlags = testCrateRustcFlags ++ extraTestFlags;
+            edition = pkgLock.edition or null;
+          };
+        }
+      )
+      selectedWorkspacePackages
+    );
+
     # Documentation for workspace crates
     workspaceDocs = lib.listToAttrs (
       map (
@@ -1505,6 +1590,11 @@ in
           // (
             if cfg.checks.crateCheck
             then workspaceChecks
+            else {}
+          )
+          // (
+            if unusedDependencyChecksEnabled
+            then workspaceUnusedDependencies
             else {}
           )
           // (

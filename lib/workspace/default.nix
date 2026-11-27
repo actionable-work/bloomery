@@ -20,6 +20,7 @@
   licensesTests = import ./licenses.test.nix {inherit lib;};
   dependencyPolicyTests = import ./dependency-policy.test.nix {inherit lib;};
   vulnerabilityTests = import ./vulnerabilities.test.nix {inherit lib;};
+  cargoTargetTests = import ./cargo-targets.test.nix {inherit lib;};
   lockCheckTests =
     if pkgs != null
     then import ./lock-check.test.nix {inherit pkgs lib;}
@@ -42,5 +43,5 @@ in {
   inherit manifestPolicy;
   inherit sources;
   inherit options;
-  tests = discoverTests // healthSourceTests // featuresTests // parseLockTests // manifestPolicyTests // licensesTests // dependencyPolicyTests // vulnerabilityTests // lockCheckTests // optionsTests // namingTests;
+  tests = discoverTests // healthSourceTests // featuresTests // parseLockTests // manifestPolicyTests // licensesTests // dependencyPolicyTests // vulnerabilityTests // cargoTargetTests // lockCheckTests // optionsTests // namingTests;
 }

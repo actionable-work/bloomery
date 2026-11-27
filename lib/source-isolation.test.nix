@@ -557,6 +557,8 @@ in {
         lib = {path = "custom/lib.rs";};
         bin = [{path = "bins/a.rs";}];
         test = [{path = "tests/a.rs";}];
+        example = [{path = "demos/a.rs";}];
+        bench = [{name = "unpathed";} {path = "perf/a.rs";}];
         package = {build = "build.rs";};
       };
       rootPackageHasLibrary = sources.hasLibrary {crateDir = fixtures + "/base/crates/app";};
@@ -566,6 +568,7 @@ in {
       entrypoints = {
         production = ["custom/lib.rs" "bins/a.rs" "build.rs"];
         test = ["tests/a.rs"];
+        auxiliary = ["demos/a.rs" "perf/a.rs"];
       };
       rootPackageHasLibrary = true;
       binaryOnlyHasNoLibrary = false;

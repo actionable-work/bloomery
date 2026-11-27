@@ -27,6 +27,7 @@ build.
 - [Topcoat assets](design/topcoat-assets.md)
 - [Manifest policy checks](design/manifest-checks.md)
 - [Dependency policy checks](design/dependency-policy-checks.md)
+- [Unused dependency checks](design/unused-dependency-checks.md)
 
 ## Scope
 
@@ -37,5 +38,6 @@ discovery, build scripts, crate archives and dependency staging, build-script
 native artifacts, propagation metadata,
 asset flow, Topcoat asset bundling and Tailwind provisioning, lock validation,
 check profile selection, manifest policy
-checks, dependency policy checks, and the workspace check derivations. Fileset
+checks, dependency policy checks, unused dependency checks, and the workspace
+check derivations. Fileset
 selection mechanics are owned by [NIX/SOURCES](../../NIX/SOURCES/README.md).

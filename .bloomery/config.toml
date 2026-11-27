@@ -479,9 +479,10 @@ path = "packages/rust/libs/cli/config/src/lib.rs"                               
 reason = "One complete upgrade verifies recommended defaults, opt-in controls and stable insertion order together." # Reason for this specification policy exception or ownership.
 
 [checks.unusedDependencies]
+compiler = true # Generate per-crate Nix checks that confirm dependency use with rustc.
 enable = true # Enable the unused Cargo dependency check.
 exceptions = [
-] # Dependency package names exempt from the unused dependency check.
+] # Dependency package names exempt from the unused dependency checks.
 
 [checks.vulnerabilities]
 ignoreAdvisories = [] # RustSec advisory IDs suppressed by vulnerability checks.

@@ -88,6 +88,7 @@ requireCrateOwnership = false
 untiedTests = "report"
 
 [checks.unusedDependencies]
+compiler = true
 enable = true
 exceptions = []
 

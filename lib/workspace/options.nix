@@ -474,6 +474,18 @@
           default = false;
           description = "Require every dependency consumed by a workspace member to disable default features.";
         };
+        unusedDependencies = {
+          compiler = lib.mkOption {
+            type = types.bool;
+            default = false;
+            description = "Generate <crate>:unused-dependencies checks that compile every target with rustc's unused_crate_dependencies lint.";
+          };
+          exceptions = lib.mkOption {
+            type = types.listOf types.str;
+            default = [];
+            description = "Dependency package names exempt from the unused dependency checks.";
+          };
+        };
         vulnerabilities = {
           enable = lib.mkOption {
             type = types.bool;
